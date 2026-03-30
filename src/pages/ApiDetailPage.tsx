@@ -142,7 +142,14 @@ export default function ApiDetailPage({ onBack }: Props) {
                   tab === (t as any) ? "nav-button active" : "nav-button"
                 }
                 onClick={() => setTab(t as any)}
-                style={{ background: "transparent", color: "var(--text)" }}
+                style={{
+                  background: "transparent",
+                  color: "var(--text)",
+                  borderBottom:
+                    tab === t ? "3px solid #4e85ff" : "3px solid transparent",
+                  paddingBottom: 8,
+                  transition: "border-color 180ms ease",
+                }}
               >
                 {t[0].toUpperCase() + t.slice(1)}
               </button>
