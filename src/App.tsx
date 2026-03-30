@@ -3,6 +3,79 @@ import { useEffect, useRef, useState } from 'react';
 type Tab = 'dashboard' | 'apis' | 'billing';
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
 type DemoOutcome = 'confirmed' | 'failed';
+type ViewMode = 'landing' | 'app';
+
+type Feature = {
+  icon: string;
+  title: string;
+  description: string;
+};
+
+type Step = {
+  title: string;
+  description: string;
+};
+
+const features: Feature[] = [
+  {
+    icon: '💸',
+    title: 'Pay-per-call billing',
+    description: 'Micro-payments in USDC mean every API request is billed precisely and transparently.',
+  },
+  {
+    icon: '⛓️',
+    title: 'On-chain settlement',
+    description: 'Every transaction settles on-chain with verifiable records and near real-time visibility.',
+  },
+  {
+    icon: '🧾',
+    title: 'No subscriptions',
+    description: 'Skip fixed plans and commitments. Pay only for the API calls your product actually makes.',
+  },
+  {
+    icon: '🧑‍💻',
+    title: 'Developer-friendly',
+    description: 'Publish APIs quickly, define per-request pricing, and start earning USDC automatically.',
+  },
+];
+
+const consumerSteps: Step[] = [
+  {
+    title: 'Connect wallet or sign up',
+    description: 'Create your account and securely link a wallet in minutes.',
+  },
+  {
+    title: 'Deposit USDC to vault',
+    description: 'Fund your usage balance once and keep API requests flowing.',
+  },
+  {
+    title: 'Browse and use APIs',
+    description: 'Discover programmable APIs and integrate them into your app.',
+  },
+  {
+    title: 'Pay automatically per call',
+    description: 'Billing happens in real time based on actual usage and price-per-request.',
+  },
+];
+
+const developerSteps: Step[] = [
+  {
+    title: 'Register as developer',
+    description: 'Set up your publisher profile and prepare your API listing.',
+  },
+  {
+    title: 'Publish your API',
+    description: 'Add docs, endpoints, and metadata to make your API easy to adopt.',
+  },
+  {
+    title: 'Set pricing per request',
+    description: 'Choose flexible per-call pricing that reflects the value of your service.',
+  },
+  {
+    title: 'Earn USDC automatically',
+    description: 'Collect revenue from each successful call with transparent settlement.',
+  },
+];
 
 const PRESET_AMOUNTS = [10, 50, 100, 500] as const;
 const MIN_DEPOSIT = 10;
@@ -39,7 +112,118 @@ function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
   return hasValidAmount ? 'Review transaction preview' : 'Enter a deposit amount';
 }
 
+function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () => void; onPublishApi: () => void }) {
+  return (
+    <div className="lp-shell">
+      <header className="lp-section lp-hero" aria-labelledby="hero-title">
+        <div>
+          <p className="lp-eyebrow">Built for API consumers and publishers</p>
+          <h1 id="hero-title">Callora - Programmable API Access</h1>
+          <p className="lp-subhead">
+            Access and monetize APIs with usage-based billing. Callora combines programmable API
+            access with pay-per-call settlement in USDC so teams can build faster and charge fairly.
+          </p>
+          <div className="lp-cta-row">
+            <button className="lp-btn lp-btn-primary" onClick={onStartUsingApis}>
+              Start Using APIs
+            </button>
+            <button className="lp-btn lp-btn-secondary" onClick={onPublishApi}>
+              Publish Your API
+            </button>
+          </div>
+        </div>
+        <div className="lp-visual" aria-hidden="true">
+          <p>API Marketplace</p>
+          <span>Programmable Access • USDC Per Call • On-chain Settlement</span>
+        </div>
+      </header>
+
+      <section className="lp-section">
+        <p className="lp-eyebrow">Core capabilities</p>
+        <h2>Why teams choose Callora</h2>
+        <div className="lp-feature-grid">
+          {features.map((feature) => (
+            <article className="lp-card" key={feature.title}>
+              <span>{feature.icon}</span>
+              <h3>{feature.title}</h3>
+              <p>{feature.description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="lp-section">
+        <p className="lp-eyebrow">How it works</p>
+        <h2>A simple flow for both sides of the marketplace</h2>
+        <div className="lp-flow-grid">
+          <article className="lp-card">
+            <h3>For API Consumers</h3>
+            <ol>
+              {consumerSteps.map((step) => (
+                <li key={step.title}>
+                  <strong>{step.title}</strong>
+                  <p>{step.description}</p>
+                </li>
+              ))}
+            </ol>
+          </article>
+          <article className="lp-card">
+            <h3>For API Developers</h3>
+            <ol>
+              {developerSteps.map((step) => (
+                <li key={step.title}>
+                  <strong>{step.title}</strong>
+                  <p>{step.description}</p>
+                </li>
+              ))}
+            </ol>
+          </article>
+        </div>
+      </section>
+
+      <section className="lp-section">
+        <p className="lp-eyebrow">Use cases & benefits</p>
+        <h2>Designed for practical adoption</h2>
+        <div className="lp-flow-grid">
+          <article className="lp-card">
+            <h3>Where Callora shines</h3>
+            <ul>
+              <li>AI workflows that need utility APIs without subscription overhead.</li>
+              <li>Data providers monetizing endpoint access with frictionless micro-billing.</li>
+              <li>Fintech and web3 apps requiring transparent usage-based costs.</li>
+            </ul>
+          </article>
+          <article className="lp-card">
+            <h3>Testimonials</h3>
+            <p>
+              “Callora helped us launch usage-based API monetization in days, not months.”
+              <span> — Case study placeholder</span>
+            </p>
+            <p>
+              “Our teams can scale integration costs exactly with demand, no wasted subscription
+              spend.”
+              <span> — Customer quote placeholder</span>
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <footer className="lp-section lp-footer">
+        <nav aria-label="Footer links">
+          <a href="#">About</a>
+          <a href="#">Documentation</a>
+          <a href="#">Support</a>
+          <a href="#">Terms</a>
+          <a href="#">Privacy</a>
+        </nav>
+        <p>© {new Date().getFullYear()} Callora. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+}
+
 function App() {
+  const [view, setView] = useState<ViewMode>('landing');
   const [tab, setTab] = useState<Tab>('dashboard');
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
@@ -203,6 +387,21 @@ function App() {
     resetFlow('50', 50);
   };
 
+  if (view === 'landing') {
+    return (
+      <LandingPage
+        onStartUsingApis={() => {
+          setTab('apis');
+          setView('app');
+        }}
+        onPublishApi={() => {
+          setTab('billing');
+          setView('app');
+        }}
+      />
+    );
+  }
+
   return (
     <div className="app-shell">
       <div className="ambient ambient-a" />
@@ -215,20 +414,17 @@ function App() {
         </div>
 
         <nav className="nav">
-          <button
-            className={tab === 'dashboard' ? 'active' : ''}
-            onClick={() => setTab('dashboard')}
-          >
+          <button className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>
             Dashboard
           </button>
           <button className={tab === 'apis' ? 'active' : ''} onClick={() => setTab('apis')}>
             APIs
           </button>
-          <button
-            className={tab === 'billing' ? 'active' : ''}
-            onClick={() => setTab('billing')}
-          >
+          <button className={tab === 'billing' ? 'active' : ''} onClick={() => setTab('billing')}>
             Billing
+          </button>
+          <button className="launch-home" onClick={() => setView('landing')}>
+            Home
           </button>
         </nav>
       </header>
@@ -332,22 +528,15 @@ function App() {
               <p className="eyebrow">Prototype state preview</p>
               <h3>Review both success and failure flows.</h3>
               <div className="outcome-toggle">
-                <button
-                  className={demoOutcome === 'confirmed' ? 'active' : ''}
-                  onClick={() => setDemoOutcome('confirmed')}
-                >
+                <button className={demoOutcome === 'confirmed' ? 'active' : ''} onClick={() => setDemoOutcome('confirmed')}>
                   Confirmed path
                 </button>
-                <button
-                  className={demoOutcome === 'failed' ? 'active' : ''}
-                  onClick={() => setDemoOutcome('failed')}
-                >
+                <button className={demoOutcome === 'failed' ? 'active' : ''} onClick={() => setDemoOutcome('failed')}>
                   Failed path
                 </button>
               </div>
               <p className="helper-text">
-                The modal follows the real sequence. Use this toggle to preview the end-state a
-                reviewer should see after wallet approval.
+                The modal follows the real sequence. Use this toggle to preview the end-state a reviewer should see after wallet approval.
               </p>
             </aside>
           </section>
@@ -356,13 +545,7 @@ function App() {
 
       {isDepositOpen && (
         <div className="modal-backdrop" role="presentation" onClick={closeDeposit}>
-          <section
-            className="deposit-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="deposit-title"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <section className="deposit-modal" role="dialog" aria-modal="true" aria-labelledby="deposit-title" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <p className="eyebrow">Secure vault funding</p>
@@ -375,18 +558,14 @@ function App() {
             </div>
 
             <div className="stage-strip" aria-label="Transaction flow status">
-              {['input', 'approving', 'pending', demoOutcome === 'confirmed' ? 'confirmed' : 'failed'].map(
-                (item) => {
-                  const isActive =
-                    item === depositStage ||
-                    (item === 'input' && depositStage === 'input' && hasValidAmount);
-                  return (
-                    <span key={item} className={`stage-pill ${isActive ? 'active' : ''}`}>
-                      {item}
-                    </span>
-                  );
-                },
-              )}
+              {['input', 'approving', 'pending', demoOutcome === 'confirmed' ? 'confirmed' : 'failed'].map((item) => {
+                const isActive = item === depositStage || (item === 'input' && depositStage === 'input' && hasValidAmount);
+                return (
+                  <span key={item} className={`stage-pill ${isActive ? 'active' : ''}`}>
+                    {item}
+                  </span>
+                );
+              })}
             </div>
 
             <div className="status-banner">
@@ -410,9 +589,7 @@ function App() {
                   </article>
                 </div>
 
-                <label className="field-label" htmlFor="deposit-amount">
-                  Amount
-                </label>
+                <label className="field-label" htmlFor="deposit-amount">Amount</label>
                 <div className={`input-shell ${validationMessage && depositStage === 'input' ? 'invalid' : ''}`}>
                   <input
                     id="deposit-amount"
@@ -430,29 +607,17 @@ function App() {
                   </button>
                 </div>
                 <p id="deposit-help" className="helper-text">
-                  Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom deposits settle into
-                  your vault after wallet approval.
+                  Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom deposits settle into your vault after wallet approval.
                 </p>
-                {validationMessage && depositStage === 'input' && (
-                  <p className="error-text">{validationMessage}</p>
-                )}
+                {validationMessage && depositStage === 'input' && <p className="error-text">{validationMessage}</p>}
 
                 <div className="preset-row">
                   {PRESET_AMOUNTS.map((preset) => (
-                    <button
-                      key={preset}
-                      className={selectedPreset === preset ? 'active' : ''}
-                      onClick={() => handlePresetClick(preset)}
-                      disabled={isBusy}
-                    >
+                    <button key={preset} className={selectedPreset === preset ? 'active' : ''} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
                       ${preset}
                     </button>
                   ))}
-                  <button
-                    className={selectedPreset === 'custom' ? 'active' : ''}
-                    onClick={() => setSelectedPreset('custom')}
-                    disabled={isBusy}
-                  >
+                  <button className={selectedPreset === 'custom' ? 'active' : ''} onClick={() => setSelectedPreset('custom')} disabled={isBusy}>
                     Custom
                   </button>
                 </div>
@@ -460,8 +625,7 @@ function App() {
                 <div className="security-note">
                   <strong>What you are approving</strong>
                   <p>
-                    Your wallet signs a USDC deposit into the Callora vault. The preview shows the
-                    exact vault credit, network fee, and post-deposit balance before submission.
+                    Your wallet signs a USDC deposit into the Callora vault. The preview shows the exact vault credit, network fee, and post-deposit balance before submission.
                   </p>
                 </div>
               </div>
@@ -494,47 +658,36 @@ function App() {
                   </div>
                   <div className="preview-row total">
                     <span>Total cost</span>
-                    <strong>
-                      {hasAmount || submittedAmount
-                        ? `${balanceDelta} USDC + ${NETWORK_FEE}`
-                        : `0.00 USDC + ${NETWORK_FEE}`}
-                    </strong>
+                    <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${NETWORK_FEE}` : `0.00 USDC + ${NETWORK_FEE}`}</strong>
                   </div>
                 </article>
 
-                {(depositStage === 'pending' || depositStage === 'confirmed' || depositStage === 'failed') &&
-                  txHash && (
-                    <article className="hash-card">
-                      <div>
-                        <span className="eyebrow">Transaction hash</span>
-                        <strong>{pendingHashLabel}</strong>
-                      </div>
-                      <div className="hash-actions">
-                        <a href={buildExplorerLink(txHash)} target="_blank" rel="noreferrer">
-                          View on Stellar Explorer
-                        </a>
-                        <button onClick={handleCopyHash}>{copied ? 'Copied' : 'Copy hash'}</button>
-                      </div>
-                    </article>
-                  )}
+                {(depositStage === 'pending' || depositStage === 'confirmed' || depositStage === 'failed') && txHash && (
+                  <article className="hash-card">
+                    <div>
+                      <span className="eyebrow">Transaction hash</span>
+                      <strong>{pendingHashLabel}</strong>
+                    </div>
+                    <div className="hash-actions">
+                      <a href={buildExplorerLink(txHash)} target="_blank" rel="noreferrer">
+                        View on Stellar Explorer
+                      </a>
+                      <button onClick={handleCopyHash}>{copied ? 'Copied' : 'Copy hash'}</button>
+                    </div>
+                  </article>
+                )}
 
                 {depositStage === 'failed' && (
                   <article className="error-card">
                     <strong>Approval not confirmed</strong>
-                    <p>
-                      No funds were added to the vault. Retry after confirming the wallet prompt or
-                      checking your network status.
-                    </p>
+                    <p>No funds were added to the vault. Retry after confirming the wallet prompt or checking your network status.</p>
                   </article>
                 )}
 
                 {depositStage === 'confirmed' && (
                   <article className="success-card">
                     <strong>Deposit successful</strong>
-                    <p>
-                      Your updated vault balance is {formatUsdc(vaultBalance)} USDC and ready for
-                      usage.
-                    </p>
+                    <p>Your updated vault balance is {formatUsdc(vaultBalance)} USDC and ready for usage.</p>
                   </article>
                 )}
               </div>
@@ -542,19 +695,11 @@ function App() {
 
             <div className="modal-actions">
               {depositStage === 'failed' ? (
-                <button className="primary-button" onClick={handleRetry}>
-                  Retry deposit
-                </button>
+                <button className="primary-button" onClick={handleRetry}>Retry deposit</button>
               ) : depositStage === 'confirmed' ? (
-                <button className="primary-button" onClick={handleDepositAnother}>
-                  Deposit another amount
-                </button>
+                <button className="primary-button" onClick={handleDepositAnother}>Deposit another amount</button>
               ) : (
-                <button
-                  className="primary-button"
-                  onClick={handleApproveTransaction}
-                  disabled={!hasValidAmount || isBusy}
-                >
+                <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy}>
                   {depositStage === 'approving'
                     ? 'Approve in wallet...'
                     : depositStage === 'pending'
