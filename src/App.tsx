@@ -271,6 +271,12 @@ function App() {
           </NavLink>
           <NavLink
             className={({ isActive }) => (isActive ? "active" : "")}
+            to={APP_ROUTES.status}
+          >
+            Status
+          </NavLink>
+          <NavLink
+            className={({ isActive }) => (isActive ? "active" : "")}
             to={APP_ROUTES.documentation}
           >
             Documentation
@@ -488,8 +494,9 @@ function App() {
         <nav className="footer-nav" aria-label="Footer">
           <NavLink to={APP_ROUTES.dashboard}>Dashboard</NavLink>
           <NavLink to={APP_ROUTES.marketplace}>Marketplace</NavLink>
-          <NavLink to={APP_ROUTES.documentation}>Documentation</NavLink>
           <NavLink to={APP_ROUTES.billing}>Billing</NavLink>
+          <NavLink to={APP_ROUTES.status}>Status</NavLink>
+          <NavLink to={APP_ROUTES.documentation}>Documentation</NavLink>
         </nav>
       </footer>
 
