@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ThemeToggle } from './ThemeToggle';
 
-type Tab = 'dashboard' | 'apis' | 'billing';
+type Tab = 'dashboard' | 'apis' | 'billing' | 'api-usage';
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
 type DemoOutcome = 'confirmed' | 'failed';
 
@@ -279,15 +279,95 @@ function App() {
         )}
 
         {tab === 'apis' && (
-          <section className="surface placeholder-card">
-            <p className="eyebrow">API catalog</p>
-            <h2>API monetization controls live here.</h2>
-            <p>
-              Use the vault funding flow from the billing tab whenever you need to top up USDC for
-              usage, settlements, or premium compute access.
-            </p>
+          <section className="surface apis-catalog">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">API catalog</p>
+                <h2>Available APIs</h2>
+                <p>Select an API to start using it with your vault funding.</p>
+              </div>
+            </div>
+
+            <div className="apis-grid">
+              <article className="api-card" onClick={() => setTab('api-usage')}>
+                <div className="api-card-header">
+                  <div className="api-icon">
+                    <span>👤</span>
+                  </div>
+                  <div>
+                    <h3>User Profile API</h3>
+                    <p className="api-status active">Active</p>
+                  </div>
+                </div>
+                <div className="api-card-content">
+                  <p>Manage user profiles, authentication, and account information.</p>
+                  <div className="api-stats">
+                    <span>Endpoints: 3</span>
+                    <span>Cost: ~0.002 USDC/call</span>
+                  </div>
+                </div>
+                <button className="primary-button">Start Using API</button>
+              </article>
+
+              <article className="api-card">
+                <div className="api-card-header">
+                  <div className="api-icon">
+                    <span>💳</span>
+                  </div>
+                  <div>
+                    <h3>Payment API</h3>
+                    <p className="api-status active">Active</p>
+                  </div>
+                </div>
+                <div className="api-card-content">
+                  <p>Process payments, handle transactions, and manage billing.</p>
+                  <div className="api-stats">
+                    <span>Endpoints: 5</span>
+                    <span>Cost: ~0.003 USDC/call</span>
+                  </div>
+                </div>
+                <button className="primary-button" disabled>Coming Soon</button>
+              </article>
+
+              <article className="api-card">
+                <div className="api-card-header">
+                  <div className="api-icon">
+                    <span>📊</span>
+                  </div>
+                  <div>
+                    <h3>Analytics API</h3>
+                    <p className="api-status inactive">In Development</p>
+                  </div>
+                </div>
+                <div className="api-card-content">
+                  <p>Get insights, reports, and analytics data for your applications.</p>
+                  <div className="api-stats">
+                    <span>Endpoints: 8</span>
+                    <span>Cost: ~0.001 USDC/call</span>
+                  </div>
+                </div>
+                <button className="secondary-button" disabled>Notify When Available</button>
+              </article>
+            </div>
+
+            <div className="apis-info">
+              <div className="info-card">
+                <h3>Vault Integration</h3>
+                <p>All API usage is automatically deducted from your USDC vault balance in real-time.</p>
+              </div>
+              <div className="info-card">
+                <h3>Transparent Pricing</h3>
+                <p>See exactly how much each call costs before you make it with no hidden fees.</p>
+              </div>
+              <div className="info-card">
+                <h3>Developer Friendly</h3>
+                <p>Comprehensive documentation, code examples, and testing tools included.</p>
+              </div>
+            </div>
           </section>
         )}
+
+        {tab === 'api-usage' && <ApiUsage />}
 
         {tab === 'billing' && (
           <section className="billing-layout">
