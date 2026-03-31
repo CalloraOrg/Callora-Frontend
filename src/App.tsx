@@ -1,31 +1,30 @@
-import { useEffect, useRef, useState } from "react";
-import ApiDetailPage from "./pages/ApiDetailPage";
+import { useEffect, useRef, useState } from 'react';
 
-type Tab = "dashboard" | "apis" | "billing" | "apiDetail";
-type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
-type DemoOutcome = "confirmed" | "failed";
+type Tab = 'dashboard' | 'apis' | 'billing';
+type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
+type DemoOutcome = 'confirmed' | 'failed';
 
 const PRESET_AMOUNTS = [10, 50, 100, 500] as const;
 const MIN_DEPOSIT = 10;
-const NETWORK_FEE = "0.00001 XLM";
-const EXPLORER_BASE_URL = "https://stellar.expert/explorer/testnet/tx/";
+const NETWORK_FEE = '0.00001 XLM';
+const EXPLORER_BASE_URL = 'https://stellar.expert/explorer/testnet/tx/';
 
 function formatUsdc(value: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 }
 
 function formatUsdShortcut(value: number) {
-  return `$${new Intl.NumberFormat("en-US", {
+  return `$${new Intl.NumberFormat('en-US', {
     maximumFractionDigits: value >= 100 ? 0 : 2,
   }).format(value)}`;
 }
 
 function createMockHash() {
   const seed = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
-  return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
+  return seed.toUpperCase().padEnd(64, 'A').slice(0, 64);
 }
 
 function buildExplorerLink(hash: string) {
@@ -33,60 +32,53 @@ function buildExplorerLink(hash: string) {
 }
 
 function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
-  if (stage === "approving") return "Approve in wallet...";
-  if (stage === "pending") return "Transaction submitted...";
-  if (stage === "confirmed") return "Deposit successful";
-  if (stage === "failed") return "Transaction failed";
-  return hasValidAmount
-    ? "Review transaction preview"
-    : "Enter a deposit amount";
+  if (stage === 'approving') return 'Approve in wallet...';
+  if (stage === 'pending') return 'Transaction submitted...';
+  if (stage === 'confirmed') return 'Deposit successful';
+  if (stage === 'failed') return 'Transaction failed';
+  return hasValidAmount ? 'Review transaction preview' : 'Enter a deposit amount';
 }
 
 function App() {
-  const [tab, setTab] = useState<Tab>("dashboard");
+  const [tab, setTab] = useState<Tab>('dashboard');
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
-  const [amountInput, setAmountInput] = useState("50");
-  const [selectedPreset, setSelectedPreset] = useState<number | "custom">(50);
-  const [depositStage, setDepositStage] = useState<DepositStage>("input");
-  const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
-  const [txHash, setTxHash] = useState("");
+  const [amountInput, setAmountInput] = useState('50');
+  const [selectedPreset, setSelectedPreset] = useState<number | 'custom'>(50);
+  const [depositStage, setDepositStage] = useState<DepositStage>('input');
+  const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>('confirmed');
+  const [txHash, setTxHash] = useState('');
   const [copied, setCopied] = useState(false);
   const [statusMessage, setStatusMessage] = useState(
-    "Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.",
+    'Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.',
   );
   const [submittedAmount, setSubmittedAmount] = useState<number | null>(null);
-  const [submittedStartingBalance, setSubmittedStartingBalance] = useState<
-    number | null
-  >(null);
+  const [submittedStartingBalance, setSubmittedStartingBalance] = useState<number | null>(null);
   const timersRef = useRef<number[]>([]);
 
   const parsedAmount = Number(amountInput);
-  const hasAmount =
-    amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
+  const hasAmount = amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
   const activeAmount = submittedAmount ?? (hasAmount ? parsedAmount : 0);
   const previewCurrentBalance = submittedStartingBalance ?? vaultBalance;
   const projectedBalance = previewCurrentBalance + activeAmount;
-  const isBusy = depositStage === "approving" || depositStage === "pending";
+  const isBusy = depositStage === 'approving' || depositStage === 'pending';
 
-  let validationMessage = "";
+  let validationMessage = '';
   if (amountInput.trim().length === 0) {
-    validationMessage = "Enter a deposit amount to continue.";
+    validationMessage = 'Enter a deposit amount to continue.';
   } else if (!Number.isFinite(parsedAmount)) {
-    validationMessage = "Amount must be a valid number.";
+    validationMessage = 'Amount must be a valid number.';
   } else if (parsedAmount < MIN_DEPOSIT) {
     validationMessage = `Minimum deposit is ${formatUsdShortcut(MIN_DEPOSIT)}.`;
   } else if (parsedAmount > walletBalance) {
-    validationMessage = "Amount exceeds available wallet balance.";
+    validationMessage = 'Amount exceeds available wallet balance.';
   }
 
   const hasValidAmount = validationMessage.length === 0;
   const stageLabel = getStageLabel(depositStage, hasValidAmount);
   const balanceDelta = formatUsdc(activeAmount || 0);
-  const pendingHashLabel = txHash
-    ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}`
-    : null;
+  const pendingHashLabel = txHash ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : null;
 
   useEffect(() => {
     return () => {
@@ -103,18 +95,18 @@ function App() {
     clearTimers();
     setAmountInput(nextAmount);
     setSelectedPreset(nextPreset);
-    setDepositStage("input");
-    setTxHash("");
+    setDepositStage('input');
+    setTxHash('');
     setCopied(false);
     setSubmittedAmount(null);
     setSubmittedStartingBalance(null);
     setStatusMessage(
-      "Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.",
+      'Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.',
     );
   };
 
   const openDeposit = () => {
-    setTab("billing");
+    setTab('billing');
     resetFlow(amountInput, selectedPreset);
     setIsDepositOpen(true);
   };
@@ -126,14 +118,11 @@ function App() {
     setIsDepositOpen(false);
   };
 
-  const handleAmountChange = (
-    value: string,
-    preset: number | "custom" = "custom",
-  ) => {
+  const handleAmountChange = (value: string, preset: number | 'custom' = 'custom') => {
     if (isBusy) {
       return;
     }
-    const sanitized = value.replace(/[^\d.]/g, "");
+    const sanitized = value.replace(/[^\d.]/g, '');
     resetFlow(sanitized, preset);
   };
 
@@ -142,7 +131,7 @@ function App() {
   };
 
   const handleMax = () => {
-    handleAmountChange(walletBalance.toFixed(2), "custom");
+    handleAmountChange(walletBalance.toFixed(2), 'custom');
   };
 
   const handleCopyHash = async () => {
@@ -173,32 +162,28 @@ function App() {
     setSubmittedStartingBalance(startingBalance);
     setTxHash(nextHash);
     setCopied(false);
-    setDepositStage("approving");
-    setStatusMessage("Approve this USDC deposit in your wallet to continue.");
+    setDepositStage('approving');
+    setStatusMessage('Approve this USDC deposit in your wallet to continue.');
 
     timersRef.current.push(
       window.setTimeout(() => {
-        setDepositStage("pending");
-        setStatusMessage(
-          "Transaction submitted to Stellar. Waiting for confirmation.",
-        );
+        setDepositStage('pending');
+        setStatusMessage('Transaction submitted to Stellar. Waiting for confirmation.');
       }, 1400),
     );
 
     timersRef.current.push(
       window.setTimeout(() => {
-        if (demoOutcome === "confirmed") {
-          setDepositStage("confirmed");
-          setVaultBalance(
-            Number((startingBalance + approvedAmount).toFixed(2)),
-          );
+        if (demoOutcome === 'confirmed') {
+          setDepositStage('confirmed');
+          setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
           setStatusMessage(
             `${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`,
           );
         } else {
-          setDepositStage("failed");
+          setDepositStage('failed');
           setStatusMessage(
-            "The deposit was not confirmed. Review the details, then retry when your wallet is ready.",
+            'The deposit was not confirmed. Review the details, then retry when your wallet is ready.',
           );
         }
       }, 3600),
@@ -209,13 +194,13 @@ function App() {
     if (submittedAmount !== null) {
       setAmountInput(String(submittedAmount));
     }
-    setSelectedPreset("custom");
-    setDepositStage("input");
-    setStatusMessage("Review the transaction details and approve again.");
+    setSelectedPreset('custom');
+    setDepositStage('input');
+    setStatusMessage('Review the transaction details and approve again.');
   };
 
   const handleDepositAnother = () => {
-    resetFlow("50", 50);
+    resetFlow('50', 50);
   };
 
   return (
@@ -231,20 +216,17 @@ function App() {
 
         <nav className="nav">
           <button
-            className={tab === "dashboard" ? "active" : ""}
-            onClick={() => setTab("dashboard")}
+            className={tab === 'dashboard' ? 'active' : ''}
+            onClick={() => setTab('dashboard')}
           >
             Dashboard
           </button>
-          <button
-            className={tab === "apis" ? "active" : ""}
-            onClick={() => setTab("apis")}
-          >
+          <button className={tab === 'apis' ? 'active' : ''} onClick={() => setTab('apis')}>
             APIs
           </button>
           <button
-            className={tab === "billing" ? "active" : ""}
-            onClick={() => setTab("billing")}
+            className={tab === 'billing' ? 'active' : ''}
+            onClick={() => setTab('billing')}
           >
             Billing
           </button>
@@ -252,25 +234,21 @@ function App() {
       </header>
 
       <main className="page">
-        {tab === "dashboard" && (
+        {tab === 'dashboard' && (
           <section className="surface hero-grid">
             <div className="hero-copy">
               <p className="eyebrow">Vault ready</p>
               <h2>Fund once, route calls without friction.</h2>
               <p className="hero-text">
-                Keep your USDC vault topped up for uninterrupted usage. Review
-                every deposit before signing, confirm it on Stellar, and track
-                the status without leaving the app.
+                Keep your USDC vault topped up for uninterrupted usage. Review every deposit before
+                signing, confirm it on Stellar, and track the status without leaving the app.
               </p>
 
               <div className="hero-actions">
                 <button className="primary-button" onClick={openDeposit}>
                   Deposit USDC
                 </button>
-                <button
-                  className="secondary-button"
-                  onClick={() => setTab("billing")}
-                >
+                <button className="secondary-button" onClick={() => setTab('billing')}>
                   View vault details
                 </button>
               </div>
@@ -296,74 +274,18 @@ function App() {
           </section>
         )}
 
-        {tab === "apis" && (
+        {tab === 'apis' && (
           <section className="surface placeholder-card">
             <p className="eyebrow">API catalog</p>
-            <h2>API marketplace</h2>
-            <p className="helper-text">
-              A small preview list of available APIs. Click any API to view
-              detailed documentation, pricing, and examples.
+            <h2>API monetization controls live here.</h2>
+            <p>
+              Use the vault funding flow from the billing tab whenever you need to top up USDC for
+              usage, settlements, or premium compute access.
             </p>
-
-            <div style={{ marginTop: 18, display: "grid", gap: 12 }}>
-              <article
-                className="stat-card"
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div>
-                  <strong>WeatherSim API</strong>
-                  <div style={{ color: "var(--muted)", marginTop: 6 }}>
-                    by Acme Labs · Weather · $0.010 per request
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    className="secondary-button"
-                    onClick={() => setTab("apiDetail")}
-                  >
-                    View details
-                  </button>
-                </div>
-              </article>
-
-              <article
-                className="stat-card"
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div>
-                  <strong>TextInsight API</strong>
-                  <div style={{ color: "var(--muted)", marginTop: 6 }}>
-                    by Meridian · NLP · $0.025 per request
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    className="secondary-button"
-                    onClick={() => setTab("apiDetail")}
-                  >
-                    View details
-                  </button>
-                </div>
-              </article>
-            </div>
           </section>
         )}
 
-        {tab === "apiDetail" && (
-          <section className="surface" style={{ padding: 0 }}>
-            <ApiDetailPage onBack={() => setTab("apis")} />
-          </section>
-        )}
-
-        {tab === "billing" && (
+        {tab === 'billing' && (
           <section className="billing-layout">
             <div className="surface billing-panel">
               <div className="section-heading">
@@ -380,43 +302,28 @@ function App() {
                 <article className="vault-balance-card">
                   <span>Current vault balance</span>
                   <strong>{formatUsdc(vaultBalance)} USDC</strong>
-                  <p>
-                    Funds are used for call routing, model execution, and
-                    premium features.
-                  </p>
+                  <p>Funds are used for call routing, model execution, and premium features.</p>
                 </article>
 
                 <article className="vault-balance-card secondary">
                   <span>Wallet available</span>
                   <strong>{formatUsdc(walletBalance)} USDC</strong>
-                  <p>
-                    Deposits settle on Stellar. Network fee is shown before
-                    wallet approval.
-                  </p>
+                  <p>Deposits settle on Stellar. Network fee is shown before wallet approval.</p>
                 </article>
               </div>
 
               <div className="info-row">
                 <div className="info-card">
                   <h3>Preset funding options</h3>
-                  <p>
-                    $10, $50, $100, $500, or any custom amount above the
-                    minimum.
-                  </p>
+                  <p>$10, $50, $100, $500, or any custom amount above the minimum.</p>
                 </div>
                 <div className="info-card">
                   <h3>Status tracking</h3>
-                  <p>
-                    Approving, pending, confirmed, and failed states are all
-                    shown in-context.
-                  </p>
+                  <p>Approving, pending, confirmed, and failed states are all shown in-context.</p>
                 </div>
                 <div className="info-card">
                   <h3>Explorer visibility</h3>
-                  <p>
-                    Once submitted, the transaction hash is linkable and
-                    copyable from the UI.
-                  </p>
+                  <p>Once submitted, the transaction hash is linkable and copyable from the UI.</p>
                 </div>
               </div>
             </div>
@@ -426,21 +333,21 @@ function App() {
               <h3>Review both success and failure flows.</h3>
               <div className="outcome-toggle">
                 <button
-                  className={demoOutcome === "confirmed" ? "active" : ""}
-                  onClick={() => setDemoOutcome("confirmed")}
+                  className={demoOutcome === 'confirmed' ? 'active' : ''}
+                  onClick={() => setDemoOutcome('confirmed')}
                 >
                   Confirmed path
                 </button>
                 <button
-                  className={demoOutcome === "failed" ? "active" : ""}
-                  onClick={() => setDemoOutcome("failed")}
+                  className={demoOutcome === 'failed' ? 'active' : ''}
+                  onClick={() => setDemoOutcome('failed')}
                 >
                   Failed path
                 </button>
               </div>
               <p className="helper-text">
-                The modal follows the real sequence. Use this toggle to preview
-                the end-state a reviewer should see after wallet approval.
+                The modal follows the real sequence. Use this toggle to preview the end-state a
+                reviewer should see after wallet approval.
               </p>
             </aside>
           </section>
@@ -448,11 +355,7 @@ function App() {
       </main>
 
       {isDepositOpen && (
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onClick={closeDeposit}
-        >
+        <div className="modal-backdrop" role="presentation" onClick={closeDeposit}>
           <section
             className="deposit-modal"
             role="dialog"
@@ -466,36 +369,24 @@ function App() {
                 <h2 id="deposit-title">Deposit USDC to Vault</h2>
               </div>
 
-              <button
-                className="close-button"
-                onClick={closeDeposit}
-                disabled={isBusy}
-              >
+              <button className="close-button" onClick={closeDeposit} disabled={isBusy}>
                 Close
               </button>
             </div>
 
             <div className="stage-strip" aria-label="Transaction flow status">
-              {[
-                "input",
-                "approving",
-                "pending",
-                demoOutcome === "confirmed" ? "confirmed" : "failed",
-              ].map((item) => {
-                const isActive =
-                  item === depositStage ||
-                  (item === "input" &&
-                    depositStage === "input" &&
-                    hasValidAmount);
-                return (
-                  <span
-                    key={item}
-                    className={`stage-pill ${isActive ? "active" : ""}`}
-                  >
-                    {item}
-                  </span>
-                );
-              })}
+              {['input', 'approving', 'pending', demoOutcome === 'confirmed' ? 'confirmed' : 'failed'].map(
+                (item) => {
+                  const isActive =
+                    item === depositStage ||
+                    (item === 'input' && depositStage === 'input' && hasValidAmount);
+                  return (
+                    <span key={item} className={`stage-pill ${isActive ? 'active' : ''}`}>
+                      {item}
+                    </span>
+                  );
+                },
+              )}
             </div>
 
             <div className="status-banner">
@@ -503,9 +394,7 @@ function App() {
                 <strong>{stageLabel}</strong>
                 <p>{statusMessage}</p>
               </div>
-              <span className={`status-chip ${depositStage}`}>
-                {depositStage}
-              </span>
+              <span className={`status-chip ${depositStage}`}>{depositStage}</span>
             </div>
 
             <div className="modal-grid">
@@ -524,9 +413,7 @@ function App() {
                 <label className="field-label" htmlFor="deposit-amount">
                   Amount
                 </label>
-                <div
-                  className={`input-shell ${validationMessage && depositStage === "input" ? "invalid" : ""}`}
-                >
+                <div className={`input-shell ${validationMessage && depositStage === 'input' ? 'invalid' : ''}`}>
                   <input
                     id="deposit-amount"
                     type="text"
@@ -538,20 +425,15 @@ function App() {
                     aria-describedby="deposit-help"
                   />
                   <span>USDC</span>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={handleMax}
-                    disabled={isBusy}
-                  >
+                  <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy}>
                     Max
                   </button>
                 </div>
                 <p id="deposit-help" className="helper-text">
-                  Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom
-                  deposits settle into your vault after wallet approval.
+                  Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom deposits settle into
+                  your vault after wallet approval.
                 </p>
-                {validationMessage && depositStage === "input" && (
+                {validationMessage && depositStage === 'input' && (
                   <p className="error-text">{validationMessage}</p>
                 )}
 
@@ -559,7 +441,7 @@ function App() {
                   {PRESET_AMOUNTS.map((preset) => (
                     <button
                       key={preset}
-                      className={selectedPreset === preset ? "active" : ""}
+                      className={selectedPreset === preset ? 'active' : ''}
                       onClick={() => handlePresetClick(preset)}
                       disabled={isBusy}
                     >
@@ -567,8 +449,8 @@ function App() {
                     </button>
                   ))}
                   <button
-                    className={selectedPreset === "custom" ? "active" : ""}
-                    onClick={() => setSelectedPreset("custom")}
+                    className={selectedPreset === 'custom' ? 'active' : ''}
+                    onClick={() => setSelectedPreset('custom')}
                     disabled={isBusy}
                   >
                     Custom
@@ -578,9 +460,8 @@ function App() {
                 <div className="security-note">
                   <strong>What you are approving</strong>
                   <p>
-                    Your wallet signs a USDC deposit into the Callora vault. The
-                    preview shows the exact vault credit, network fee, and
-                    post-deposit balance before submission.
+                    Your wallet signs a USDC deposit into the Callora vault. The preview shows the
+                    exact vault credit, network fee, and post-deposit balance before submission.
                   </p>
                 </div>
               </div>
@@ -597,11 +478,7 @@ function App() {
 
                   <div className="preview-row">
                     <span>Deposit amount</span>
-                    <strong>
-                      {hasAmount || submittedAmount
-                        ? `${balanceDelta} USDC`
-                        : "--"}
-                    </strong>
+                    <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC` : '--'}</strong>
                   </div>
                   <div className="preview-row">
                     <span>Current balance</span>
@@ -609,11 +486,7 @@ function App() {
                   </div>
                   <div className="preview-row emphasis">
                     <span>New balance</span>
-                    <strong>
-                      {hasAmount || submittedAmount
-                        ? `${formatUsdc(projectedBalance)} USDC`
-                        : "--"}
-                    </strong>
+                    <strong>{hasAmount || submittedAmount ? `${formatUsdc(projectedBalance)} USDC` : '--'}</strong>
                   </div>
                   <div className="preview-row">
                     <span>Network fee</span>
@@ -629,9 +502,7 @@ function App() {
                   </div>
                 </article>
 
-                {(depositStage === "pending" ||
-                  depositStage === "confirmed" ||
-                  depositStage === "failed") &&
+                {(depositStage === 'pending' || depositStage === 'confirmed' || depositStage === 'failed') &&
                   txHash && (
                     <article className="hash-card">
                       <div>
@@ -639,36 +510,30 @@ function App() {
                         <strong>{pendingHashLabel}</strong>
                       </div>
                       <div className="hash-actions">
-                        <a
-                          href={buildExplorerLink(txHash)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
+                        <a href={buildExplorerLink(txHash)} target="_blank" rel="noreferrer">
                           View on Stellar Explorer
                         </a>
-                        <button onClick={handleCopyHash}>
-                          {copied ? "Copied" : "Copy hash"}
-                        </button>
+                        <button onClick={handleCopyHash}>{copied ? 'Copied' : 'Copy hash'}</button>
                       </div>
                     </article>
                   )}
 
-                {depositStage === "failed" && (
+                {depositStage === 'failed' && (
                   <article className="error-card">
                     <strong>Approval not confirmed</strong>
                     <p>
-                      No funds were added to the vault. Retry after confirming
-                      the wallet prompt or checking your network status.
+                      No funds were added to the vault. Retry after confirming the wallet prompt or
+                      checking your network status.
                     </p>
                   </article>
                 )}
 
-                {depositStage === "confirmed" && (
+                {depositStage === 'confirmed' && (
                   <article className="success-card">
                     <strong>Deposit successful</strong>
                     <p>
-                      Your updated vault balance is {formatUsdc(vaultBalance)}{" "}
-                      USDC and ready for usage.
+                      Your updated vault balance is {formatUsdc(vaultBalance)} USDC and ready for
+                      usage.
                     </p>
                   </article>
                 )}
@@ -676,15 +541,12 @@ function App() {
             </div>
 
             <div className="modal-actions">
-              {depositStage === "failed" ? (
+              {depositStage === 'failed' ? (
                 <button className="primary-button" onClick={handleRetry}>
                   Retry deposit
                 </button>
-              ) : depositStage === "confirmed" ? (
-                <button
-                  className="primary-button"
-                  onClick={handleDepositAnother}
-                >
+              ) : depositStage === 'confirmed' ? (
+                <button className="primary-button" onClick={handleDepositAnother}>
                   Deposit another amount
                 </button>
               ) : (
@@ -693,19 +555,15 @@ function App() {
                   onClick={handleApproveTransaction}
                   disabled={!hasValidAmount || isBusy}
                 >
-                  {depositStage === "approving"
-                    ? "Approve in wallet..."
-                    : depositStage === "pending"
-                      ? "Transaction submitted..."
-                      : "Approve Transaction"}
+                  {depositStage === 'approving'
+                    ? 'Approve in wallet...'
+                    : depositStage === 'pending'
+                      ? 'Transaction submitted...'
+                      : 'Approve Transaction'}
                 </button>
               )}
 
-              <button
-                className="secondary-button"
-                onClick={closeDeposit}
-                disabled={isBusy}
-              >
+              <button className="secondary-button" onClick={closeDeposit} disabled={isBusy}>
                 Cancel
               </button>
             </div>
