@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ThemeToggle } from './ThemeToggle';
 
-type Tab = 'dashboard' | 'apis' | 'billing';
+type Tab = 'dashboard' | 'apis' | 'billing' | 'api-usage';
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
 type DemoOutcome = 'confirmed' | 'failed';
 type ViewMode = 'landing' | 'app';
@@ -79,25 +80,34 @@ const developerSteps: Step[] = [
 
 const PRESET_AMOUNTS = [10, 50, 100, 500] as const;
 const MIN_DEPOSIT = 10;
-const NETWORK_FEE = '0.00001 XLM';
-const EXPLORER_BASE_URL = 'https://stellar.expert/explorer/testnet/tx/';
+const NETWORK_FEE = "0.00001 XLM";
+const EXPLORER_BASE_URL = "https://stellar.expert/explorer/testnet/tx/";
+const APP_ROUTES = {
+  home: "/dashboard",
+  dashboard: "/dashboard",
+  marketplace: "/marketplace",
+  billing: "/billing",
+  documentation: "/documentation",
+  status: "/status",
+  serverError: "/500",
+} as const;
 
 function formatUsdc(value: number) {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 }
 
 function formatUsdShortcut(value: number) {
-  return `$${new Intl.NumberFormat('en-US', {
+  return `$${new Intl.NumberFormat("en-US", {
     maximumFractionDigits: value >= 100 ? 0 : 2,
   }).format(value)}`;
 }
 
 function createMockHash() {
   const seed = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
-  return seed.toUpperCase().padEnd(64, 'A').slice(0, 64);
+  return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
 }
 
 function buildExplorerLink(hash: string) {
@@ -105,11 +115,13 @@ function buildExplorerLink(hash: string) {
 }
 
 function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
-  if (stage === 'approving') return 'Approve in wallet...';
-  if (stage === 'pending') return 'Transaction submitted...';
-  if (stage === 'confirmed') return 'Deposit successful';
-  if (stage === 'failed') return 'Transaction failed';
-  return hasValidAmount ? 'Review transaction preview' : 'Enter a deposit amount';
+  if (stage === "approving") return "Approve in wallet...";
+  if (stage === "pending") return "Transaction submitted...";
+  if (stage === "confirmed") return "Deposit successful";
+  if (stage === "failed") return "Transaction failed";
+  return hasValidAmount
+    ? "Review transaction preview"
+    : "Enter a deposit amount";
 }
 
 function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () => void; onPublishApi: () => void }) {
@@ -223,52 +235,63 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
 }
 
 function App() {
-  const [view, setView] = useState<ViewMode>('landing');
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
-  const [amountInput, setAmountInput] = useState('50');
-  const [selectedPreset, setSelectedPreset] = useState<number | 'custom'>(50);
-  const [depositStage, setDepositStage] = useState<DepositStage>('input');
-  const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>('confirmed');
-  const [txHash, setTxHash] = useState('');
+  const [amountInput, setAmountInput] = useState("50");
+  const [selectedPreset, setSelectedPreset] = useState<number | "custom">(50);
+  const [depositStage, setDepositStage] = useState<DepositStage>("input");
+  const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
+  const [txHash, setTxHash] = useState("");
   const [copied, setCopied] = useState(false);
   const [statusMessage, setStatusMessage] = useState(
-    'Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.',
+    "Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.",
   );
   const [submittedAmount, setSubmittedAmount] = useState<number | null>(null);
-  const [submittedStartingBalance, setSubmittedStartingBalance] = useState<number | null>(null);
+  const [submittedStartingBalance, setSubmittedStartingBalance] = useState<
+    number | null
+  >(null);
   const timersRef = useRef<number[]>([]);
 
   const parsedAmount = Number(amountInput);
-  const hasAmount = amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
+  const hasAmount =
+    amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
   const activeAmount = submittedAmount ?? (hasAmount ? parsedAmount : 0);
   const previewCurrentBalance = submittedStartingBalance ?? vaultBalance;
   const projectedBalance = previewCurrentBalance + activeAmount;
-  const isBusy = depositStage === 'approving' || depositStage === 'pending';
+  const isBusy = depositStage === "approving" || depositStage === "pending";
 
-  let validationMessage = '';
+  let validationMessage = "";
   if (amountInput.trim().length === 0) {
-    validationMessage = 'Enter a deposit amount to continue.';
+    validationMessage = "Enter a deposit amount to continue.";
   } else if (!Number.isFinite(parsedAmount)) {
-    validationMessage = 'Amount must be a valid number.';
+    validationMessage = "Amount must be a valid number.";
   } else if (parsedAmount < MIN_DEPOSIT) {
     validationMessage = `Minimum deposit is ${formatUsdShortcut(MIN_DEPOSIT)}.`;
   } else if (parsedAmount > walletBalance) {
-    validationMessage = 'Amount exceeds available wallet balance.';
+    validationMessage = "Amount exceeds available wallet balance.";
   }
 
   const hasValidAmount = validationMessage.length === 0;
   const stageLabel = getStageLabel(depositStage, hasValidAmount);
   const balanceDelta = formatUsdc(activeAmount || 0);
-  const pendingHashLabel = txHash ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : null;
+  const pendingHashLabel = txHash
+    ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}`
+    : null;
 
   useEffect(() => {
     return () => {
       timersRef.current.forEach((timer) => window.clearTimeout(timer));
     };
   }, []);
+
+  useEffect(() => {
+    if (location.pathname !== APP_ROUTES.billing && isDepositOpen) {
+      setIsDepositOpen(false);
+    }
+  }, [isDepositOpen, location.pathname]);
 
   const clearTimers = () => {
     timersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -279,18 +302,18 @@ function App() {
     clearTimers();
     setAmountInput(nextAmount);
     setSelectedPreset(nextPreset);
-    setDepositStage('input');
-    setTxHash('');
+    setDepositStage("input");
+    setTxHash("");
     setCopied(false);
     setSubmittedAmount(null);
     setSubmittedStartingBalance(null);
     setStatusMessage(
-      'Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.',
+      "Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.",
     );
   };
 
   const openDeposit = () => {
-    setTab('billing');
+    navigate(APP_ROUTES.billing);
     resetFlow(amountInput, selectedPreset);
     setIsDepositOpen(true);
   };
@@ -302,11 +325,14 @@ function App() {
     setIsDepositOpen(false);
   };
 
-  const handleAmountChange = (value: string, preset: number | 'custom' = 'custom') => {
+  const handleAmountChange = (
+    value: string,
+    preset: number | "custom" = "custom",
+  ) => {
     if (isBusy) {
       return;
     }
-    const sanitized = value.replace(/[^\d.]/g, '');
+    const sanitized = value.replace(/[^\d.]/g, "");
     resetFlow(sanitized, preset);
   };
 
@@ -315,7 +341,7 @@ function App() {
   };
 
   const handleMax = () => {
-    handleAmountChange(walletBalance.toFixed(2), 'custom');
+    handleAmountChange(walletBalance.toFixed(2), "custom");
   };
 
   const handleCopyHash = async () => {
@@ -346,28 +372,32 @@ function App() {
     setSubmittedStartingBalance(startingBalance);
     setTxHash(nextHash);
     setCopied(false);
-    setDepositStage('approving');
-    setStatusMessage('Approve this USDC deposit in your wallet to continue.');
+    setDepositStage("approving");
+    setStatusMessage("Approve this USDC deposit in your wallet to continue.");
 
     timersRef.current.push(
       window.setTimeout(() => {
-        setDepositStage('pending');
-        setStatusMessage('Transaction submitted to Stellar. Waiting for confirmation.');
+        setDepositStage("pending");
+        setStatusMessage(
+          "Transaction submitted to Stellar. Waiting for confirmation.",
+        );
       }, 1400),
     );
 
     timersRef.current.push(
       window.setTimeout(() => {
-        if (demoOutcome === 'confirmed') {
-          setDepositStage('confirmed');
-          setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
+        if (demoOutcome === "confirmed") {
+          setDepositStage("confirmed");
+          setVaultBalance(
+            Number((startingBalance + approvedAmount).toFixed(2)),
+          );
           setStatusMessage(
             `${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`,
           );
         } else {
-          setDepositStage('failed');
+          setDepositStage("failed");
           setStatusMessage(
-            'The deposit was not confirmed. Review the details, then retry when your wallet is ready.',
+            "The deposit was not confirmed. Review the details, then retry when your wallet is ready.",
           );
         }
       }, 3600),
@@ -378,13 +408,17 @@ function App() {
     if (submittedAmount !== null) {
       setAmountInput(String(submittedAmount));
     }
-    setSelectedPreset('custom');
-    setDepositStage('input');
-    setStatusMessage('Review the transaction details and approve again.');
+    setSelectedPreset("custom");
+    setDepositStage("input");
+    setStatusMessage("Review the transaction details and approve again.");
   };
 
   const handleDepositAnother = () => {
-    resetFlow('50', 50);
+    resetFlow("50", 50);
+  };
+
+  const handleServerRetry = () => {
+    window.location.reload();
   };
 
   if (view === 'landing') {
@@ -413,57 +447,56 @@ function App() {
           <h1 className="brand">Secure USDC funding for premium API usage</h1>
         </div>
 
-        <nav className="nav">
-          <button className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>
-            Dashboard
-          </button>
-          <button className={tab === 'apis' ? 'active' : ''} onClick={() => setTab('apis')}>
-            APIs
-          </button>
-          <button className={tab === 'billing' ? 'active' : ''} onClick={() => setTab('billing')}>
-            Billing
-          </button>
-          <button className="launch-home" onClick={() => setView('landing')}>
-            Home
-          </button>
-        </nav>
+        <div className="topbar-actions">
+          <nav className="nav">
+            <button
+              className={tab === 'dashboard' ? 'active' : ''}
+              onClick={() => setTab('dashboard')}
+            >
+              Dashboard
+            </button>
+            <button className={tab === 'apis' ? 'active' : ''} onClick={() => setTab('apis')}>
+              APIs
+            </button>
+            <button
+              className={tab === 'billing' ? 'active' : ''}
+              onClick={() => setTab('billing')}
+            >
+              Billing
+            </button>
+          </nav>
+          <ThemeToggle />
+        </div>
       </header>
 
       <main className="page">
-        {tab === 'dashboard' && (
-          <section className="surface hero-grid">
-            <div className="hero-copy">
-              <p className="eyebrow">Vault ready</p>
-              <h2>Fund once, route calls without friction.</h2>
-              <p className="hero-text">
-                Keep your USDC vault topped up for uninterrupted usage. Review every deposit before
-                signing, confirm it on Stellar, and track the status without leaving the app.
-              </p>
+        <Routes>
+          <Route path="/" element={<Navigate replace to={APP_ROUTES.home} />} />
 
-              <div className="hero-actions">
-                <button className="primary-button" onClick={openDeposit}>
-                  Deposit USDC
-                </button>
-                <button className="secondary-button" onClick={() => setTab('billing')}>
-                  View vault details
-                </button>
-              </div>
-            </div>
+          <Route
+            path={APP_ROUTES.dashboard}
+            element={
+              <section className="surface hero-grid">
+                <div className="hero-copy">
+                  <p className="eyebrow">Vault ready</p>
+                  <h2>Fund once, route calls without friction.</h2>
+                  <p className="hero-text">
+                    Keep your USDC vault topped up for uninterrupted usage.
+                    Review every deposit before signing, confirm it on Stellar,
+                    and track the status without leaving the app.
+                  </p>
 
-            <div className="hero-summary">
-              <div className="stat-card emphasis">
-                <span>Current vault balance</span>
-                <strong>{formatUsdc(vaultBalance)} USDC</strong>
-                <small>Available for premium API workloads</small>
-              </div>
-              <div className="stat-row">
-                <div className="stat-card">
-                  <span>Wallet available</span>
-                  <strong>{formatUsdc(walletBalance)} USDC</strong>
-                </div>
-                <div className="stat-card">
-                  <span>Network fee</span>
-                  <strong>{NETWORK_FEE}</strong>
+                  <div className="hero-actions">
+                    <button className="primary-button" onClick={openDeposit}>
+                      Deposit USDC
+                    </button>
+                    <button
+                      className="secondary-button"
+                      onClick={() => navigate(APP_ROUTES.billing)}
+                    >
+                      View vault details
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -471,15 +504,95 @@ function App() {
         )}
 
         {tab === 'apis' && (
-          <section className="surface placeholder-card">
-            <p className="eyebrow">API catalog</p>
-            <h2>API monetization controls live here.</h2>
-            <p>
-              Use the vault funding flow from the billing tab whenever you need to top up USDC for
-              usage, settlements, or premium compute access.
-            </p>
+          <section className="surface apis-catalog">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">API catalog</p>
+                <h2>Available APIs</h2>
+                <p>Select an API to start using it with your vault funding.</p>
+              </div>
+            </div>
+
+            <div className="apis-grid">
+              <article className="api-card" onClick={() => setTab('api-usage')}>
+                <div className="api-card-header">
+                  <div className="api-icon">
+                    <span>👤</span>
+                  </div>
+                  <div>
+                    <h3>User Profile API</h3>
+                    <p className="api-status active">Active</p>
+                  </div>
+                </div>
+                <div className="api-card-content">
+                  <p>Manage user profiles, authentication, and account information.</p>
+                  <div className="api-stats">
+                    <span>Endpoints: 3</span>
+                    <span>Cost: ~0.002 USDC/call</span>
+                  </div>
+                </div>
+                <button className="primary-button">Start Using API</button>
+              </article>
+
+              <article className="api-card">
+                <div className="api-card-header">
+                  <div className="api-icon">
+                    <span>💳</span>
+                  </div>
+                  <div>
+                    <h3>Payment API</h3>
+                    <p className="api-status active">Active</p>
+                  </div>
+                </div>
+                <div className="api-card-content">
+                  <p>Process payments, handle transactions, and manage billing.</p>
+                  <div className="api-stats">
+                    <span>Endpoints: 5</span>
+                    <span>Cost: ~0.003 USDC/call</span>
+                  </div>
+                </div>
+                <button className="primary-button" disabled>Coming Soon</button>
+              </article>
+
+              <article className="api-card">
+                <div className="api-card-header">
+                  <div className="api-icon">
+                    <span>📊</span>
+                  </div>
+                  <div>
+                    <h3>Analytics API</h3>
+                    <p className="api-status inactive">In Development</p>
+                  </div>
+                </div>
+                <div className="api-card-content">
+                  <p>Get insights, reports, and analytics data for your applications.</p>
+                  <div className="api-stats">
+                    <span>Endpoints: 8</span>
+                    <span>Cost: ~0.001 USDC/call</span>
+                  </div>
+                </div>
+                <button className="secondary-button" disabled>Notify When Available</button>
+              </article>
+            </div>
+
+            <div className="apis-info">
+              <div className="info-card">
+                <h3>Vault Integration</h3>
+                <p>All API usage is automatically deducted from your USDC vault balance in real-time.</p>
+              </div>
+              <div className="info-card">
+                <h3>Transparent Pricing</h3>
+                <p>See exactly how much each call costs before you make it with no hidden fees.</p>
+              </div>
+              <div className="info-card">
+                <h3>Developer Friendly</h3>
+                <p>Comprehensive documentation, code examples, and testing tools included.</p>
+              </div>
+            </div>
           </section>
         )}
+
+        {tab === 'api-usage' && <ApiUsage />}
 
         {tab === 'billing' && (
           <section className="billing-layout">
@@ -489,79 +602,220 @@ function App() {
                   <p className="eyebrow">Deposit USDC to Vault</p>
                   <h2>Review every number before you approve.</h2>
                 </div>
-                <button className="primary-button" onClick={openDeposit}>
-                  Open deposit modal
-                </button>
-              </div>
+              </section>
+            }
+          />
 
-              <div className="vault-grid">
-                <article className="vault-balance-card">
-                  <span>Current vault balance</span>
-                  <strong>{formatUsdc(vaultBalance)} USDC</strong>
-                  <p>Funds are used for call routing, model execution, and premium features.</p>
-                </article>
+          <Route
+            path={APP_ROUTES.marketplace}
+            element={
+              <section className="surface placeholder-card">
+                <p className="eyebrow">Marketplace</p>
+                <h2>Discover premium APIs ready for production usage.</h2>
+                <p>
+                  Compare APIs, review pricing, and route high-priority
+                  workloads with confidence. Use the billing tab whenever you
+                  need to top up your USDC vault.
+                </p>
+              </section>
+            }
+          />
 
-                <article className="vault-balance-card secondary">
-                  <span>Wallet available</span>
-                  <strong>{formatUsdc(walletBalance)} USDC</strong>
-                  <p>Deposits settle on Stellar. Network fee is shown before wallet approval.</p>
-                </article>
-              </div>
+          <Route
+            path={APP_ROUTES.billing}
+            element={
+              <section className="billing-layout">
+                <div className="surface billing-panel">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">Deposit USDC to Vault</p>
+                      <h2>Review every number before you approve.</h2>
+                    </div>
+                    <button className="primary-button" onClick={openDeposit}>
+                      Open deposit modal
+                    </button>
+                  </div>
 
-              <div className="info-row">
-                <div className="info-card">
-                  <h3>Preset funding options</h3>
-                  <p>$10, $50, $100, $500, or any custom amount above the minimum.</p>
+                  <div className="vault-grid">
+                    <article className="vault-balance-card">
+                      <span>Current vault balance</span>
+                      <strong>{formatUsdc(vaultBalance)} USDC</strong>
+                      <p>
+                        Funds are used for call routing, model execution, and
+                        premium features.
+                      </p>
+                    </article>
+
+                    <article className="vault-balance-card secondary">
+                      <span>Wallet available</span>
+                      <strong>{formatUsdc(walletBalance)} USDC</strong>
+                      <p>
+                        Deposits settle on Stellar. Network fee is shown before
+                        wallet approval.
+                      </p>
+                    </article>
+                  </div>
+
+                  <div className="info-row">
+                    <div className="info-card">
+                      <h3>Preset funding options</h3>
+                      <p>
+                        $10, $50, $100, $500, or any custom amount above the
+                        minimum.
+                      </p>
+                    </div>
+                    <div className="info-card">
+                      <h3>Status tracking</h3>
+                      <p>
+                        Approving, pending, confirmed, and failed states are
+                        all shown in-context.
+                      </p>
+                    </div>
+                    <div className="info-card">
+                      <h3>Explorer visibility</h3>
+                      <p>
+                        Once submitted, the transaction hash is linkable and
+                        copyable from the UI.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="info-card">
-                  <h3>Status tracking</h3>
-                  <p>Approving, pending, confirmed, and failed states are all shown in-context.</p>
-                </div>
-                <div className="info-card">
-                  <h3>Explorer visibility</h3>
-                  <p>Once submitted, the transaction hash is linkable and copyable from the UI.</p>
-                </div>
-              </div>
-            </div>
 
-            <aside className="surface prototype-panel">
-              <p className="eyebrow">Prototype state preview</p>
-              <h3>Review both success and failure flows.</h3>
-              <div className="outcome-toggle">
-                <button className={demoOutcome === 'confirmed' ? 'active' : ''} onClick={() => setDemoOutcome('confirmed')}>
-                  Confirmed path
-                </button>
-                <button className={demoOutcome === 'failed' ? 'active' : ''} onClick={() => setDemoOutcome('failed')}>
-                  Failed path
-                </button>
-              </div>
-              <p className="helper-text">
-                The modal follows the real sequence. Use this toggle to preview the end-state a reviewer should see after wallet approval.
-              </p>
-            </aside>
-          </section>
-        )}
+                <aside className="surface prototype-panel">
+                  <p className="eyebrow">Prototype state preview</p>
+                  <h3>Review both success and failure flows.</h3>
+                  <div className="outcome-toggle">
+                    <button
+                      className={demoOutcome === "confirmed" ? "active" : ""}
+                      onClick={() => setDemoOutcome("confirmed")}
+                    >
+                      Confirmed path
+                    </button>
+                    <button
+                      className={demoOutcome === "failed" ? "active" : ""}
+                      onClick={() => setDemoOutcome("failed")}
+                    >
+                      Failed path
+                    </button>
+                  </div>
+                  <p className="helper-text">
+                    The modal follows the real sequence. Use this toggle to
+                    preview the end-state a reviewer should see after wallet
+                    approval.
+                  </p>
+                </aside>
+              </section>
+            }
+          />
+
+          <Route
+            path={APP_ROUTES.documentation}
+            element={
+              <section className="surface placeholder-card">
+                <p className="eyebrow">Documentation</p>
+                <h2>Everything you need to ship with the Callora vault.</h2>
+                <p>
+                  Implementation guides, transaction lifecycle notes, and
+                  troubleshooting references live here so teams can move from
+                  prototype to production quickly.
+                </p>
+              </section>
+            }
+          />
+
+          <Route
+            path={APP_ROUTES.status}
+            element={
+              <section className="surface placeholder-card">
+                <p className="eyebrow">Status</p>
+                <h2>System status updates in one place.</h2>
+                <p>
+                  All core services are operational. If you are still seeing
+                  issues, please contact support and include what action you
+                  were trying to complete.
+                </p>
+              </section>
+            }
+          />
+
+          <Route
+            path={APP_ROUTES.serverError}
+            element={
+              <ServerError
+                onRetry={handleServerRetry}
+                onGoHome={() => navigate(APP_ROUTES.home)}
+              />
+            }
+          />
+
+          <Route
+            path="*"
+            element={<NotFound onGoHome={() => navigate(APP_ROUTES.home)} />}
+          />
+        </Routes>
       </main>
 
+      <footer className="surface app-footer">
+        <div>
+          <p className="eyebrow">Callora</p>
+          <p className="footer-copy">
+            Reliable USDC funding and API operations for modern product teams.
+          </p>
+        </div>
+        <nav className="footer-nav" aria-label="Footer">
+          <NavLink to={APP_ROUTES.dashboard}>Dashboard</NavLink>
+          <NavLink to={APP_ROUTES.marketplace}>Marketplace</NavLink>
+          <NavLink to={APP_ROUTES.billing}>Billing</NavLink>
+          <NavLink to={APP_ROUTES.status}>Status</NavLink>
+          <NavLink to={APP_ROUTES.documentation}>Documentation</NavLink>
+        </nav>
+      </footer>
+
       {isDepositOpen && (
-        <div className="modal-backdrop" role="presentation" onClick={closeDeposit}>
-          <section className="deposit-modal" role="dialog" aria-modal="true" aria-labelledby="deposit-title" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={closeDeposit}
+        >
+          <section
+            className="deposit-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deposit-title"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="modal-header">
               <div>
                 <p className="eyebrow">Secure vault funding</p>
                 <h2 id="deposit-title">Deposit USDC to Vault</h2>
               </div>
 
-              <button className="close-button" onClick={closeDeposit} disabled={isBusy}>
+              <button
+                className="close-button"
+                onClick={closeDeposit}
+                disabled={isBusy}
+              >
                 Close
               </button>
             </div>
 
             <div className="stage-strip" aria-label="Transaction flow status">
-              {['input', 'approving', 'pending', demoOutcome === 'confirmed' ? 'confirmed' : 'failed'].map((item) => {
-                const isActive = item === depositStage || (item === 'input' && depositStage === 'input' && hasValidAmount);
+              {[
+                "input",
+                "approving",
+                "pending",
+                demoOutcome === "confirmed" ? "confirmed" : "failed",
+              ].map((item) => {
+                const isActive =
+                  item === depositStage ||
+                  (item === "input" &&
+                    depositStage === "input" &&
+                    hasValidAmount);
                 return (
-                  <span key={item} className={`stage-pill ${isActive ? 'active' : ''}`}>
+                  <span
+                    key={item}
+                    className={`stage-pill ${isActive ? "active" : ""}`}
+                  >
                     {item}
                   </span>
                 );
@@ -573,7 +827,9 @@ function App() {
                 <strong>{stageLabel}</strong>
                 <p>{statusMessage}</p>
               </div>
-              <span className={`status-chip ${depositStage}`}>{depositStage}</span>
+              <span className={`status-chip ${depositStage}`}>
+                {depositStage}
+              </span>
             </div>
 
             <div className="modal-grid">
@@ -589,8 +845,12 @@ function App() {
                   </article>
                 </div>
 
-                <label className="field-label" htmlFor="deposit-amount">Amount</label>
-                <div className={`input-shell ${validationMessage && depositStage === 'input' ? 'invalid' : ''}`}>
+                <label className="field-label" htmlFor="deposit-amount">
+                  Amount
+                </label>
+                <div
+                  className={`input-shell ${validationMessage && depositStage === "input" ? "invalid" : ""}`}
+                >
                   <input
                     id="deposit-amount"
                     type="text"
@@ -602,22 +862,39 @@ function App() {
                     aria-describedby="deposit-help"
                   />
                   <span>USDC</span>
-                  <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy}>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={handleMax}
+                    disabled={isBusy}
+                  >
                     Max
                   </button>
                 </div>
                 <p id="deposit-help" className="helper-text">
-                  Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom deposits settle into your vault after wallet approval.
+                  Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom
+                  deposits settle into your vault after wallet approval.
                 </p>
-                {validationMessage && depositStage === 'input' && <p className="error-text">{validationMessage}</p>}
+                {validationMessage && depositStage === "input" && (
+                  <p className="error-text">{validationMessage}</p>
+                )}
 
                 <div className="preset-row">
                   {PRESET_AMOUNTS.map((preset) => (
-                    <button key={preset} className={selectedPreset === preset ? 'active' : ''} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
+                    <button
+                      key={preset}
+                      className={selectedPreset === preset ? "active" : ""}
+                      onClick={() => handlePresetClick(preset)}
+                      disabled={isBusy}
+                    >
                       ${preset}
                     </button>
                   ))}
-                  <button className={selectedPreset === 'custom' ? 'active' : ''} onClick={() => setSelectedPreset('custom')} disabled={isBusy}>
+                  <button
+                    className={selectedPreset === "custom" ? "active" : ""}
+                    onClick={() => setSelectedPreset("custom")}
+                    disabled={isBusy}
+                  >
                     Custom
                   </button>
                 </div>
@@ -625,7 +902,9 @@ function App() {
                 <div className="security-note">
                   <strong>What you are approving</strong>
                   <p>
-                    Your wallet signs a USDC deposit into the Callora vault. The preview shows the exact vault credit, network fee, and post-deposit balance before submission.
+                    Your wallet signs a USDC deposit into the Callora vault. The
+                    preview shows the exact vault credit, network fee, and
+                    post-deposit balance before submission.
                   </p>
                 </div>
               </div>
@@ -642,7 +921,11 @@ function App() {
 
                   <div className="preview-row">
                     <span>Deposit amount</span>
-                    <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC` : '--'}</strong>
+                    <strong>
+                      {hasAmount || submittedAmount
+                        ? `${balanceDelta} USDC`
+                        : "--"}
+                    </strong>
                   </div>
                   <div className="preview-row">
                     <span>Current balance</span>
@@ -650,7 +933,11 @@ function App() {
                   </div>
                   <div className="preview-row emphasis">
                     <span>New balance</span>
-                    <strong>{hasAmount || submittedAmount ? `${formatUsdc(projectedBalance)} USDC` : '--'}</strong>
+                    <strong>
+                      {hasAmount || submittedAmount
+                        ? `${formatUsdc(projectedBalance)} USDC`
+                        : "--"}
+                    </strong>
                   </div>
                   <div className="preview-row">
                     <span>Network fee</span>
@@ -662,53 +949,83 @@ function App() {
                   </div>
                 </article>
 
-                {(depositStage === 'pending' || depositStage === 'confirmed' || depositStage === 'failed') && txHash && (
-                  <article className="hash-card">
-                    <div>
-                      <span className="eyebrow">Transaction hash</span>
-                      <strong>{pendingHashLabel}</strong>
-                    </div>
-                    <div className="hash-actions">
-                      <a href={buildExplorerLink(txHash)} target="_blank" rel="noreferrer">
-                        View on Stellar Explorer
-                      </a>
-                      <button onClick={handleCopyHash}>{copied ? 'Copied' : 'Copy hash'}</button>
-                    </div>
-                  </article>
-                )}
+                {(depositStage === "pending" ||
+                  depositStage === "confirmed" ||
+                  depositStage === "failed") &&
+                  txHash && (
+                    <article className="hash-card">
+                      <div>
+                        <span className="eyebrow">Transaction hash</span>
+                        <strong>{pendingHashLabel}</strong>
+                      </div>
+                      <div className="hash-actions">
+                        <a
+                          href={buildExplorerLink(txHash)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View on Stellar Explorer
+                        </a>
+                        <button onClick={handleCopyHash}>
+                          {copied ? "Copied" : "Copy hash"}
+                        </button>
+                      </div>
+                    </article>
+                  )}
 
-                {depositStage === 'failed' && (
+                {depositStage === "failed" && (
                   <article className="error-card">
                     <strong>Approval not confirmed</strong>
-                    <p>No funds were added to the vault. Retry after confirming the wallet prompt or checking your network status.</p>
+                    <p>
+                      No funds were added to the vault. Retry after confirming
+                      the wallet prompt or checking your network status.
+                    </p>
                   </article>
                 )}
 
-                {depositStage === 'confirmed' && (
+                {depositStage === "confirmed" && (
                   <article className="success-card">
                     <strong>Deposit successful</strong>
-                    <p>Your updated vault balance is {formatUsdc(vaultBalance)} USDC and ready for usage.</p>
+                    <p>
+                      Your updated vault balance is {formatUsdc(vaultBalance)}{" "}
+                      USDC and ready for usage.
+                    </p>
                   </article>
                 )}
               </div>
             </div>
 
             <div className="modal-actions">
-              {depositStage === 'failed' ? (
-                <button className="primary-button" onClick={handleRetry}>Retry deposit</button>
-              ) : depositStage === 'confirmed' ? (
-                <button className="primary-button" onClick={handleDepositAnother}>Deposit another amount</button>
+              {depositStage === "failed" ? (
+                <button className="primary-button" onClick={handleRetry}>
+                  Retry deposit
+                </button>
+              ) : depositStage === "confirmed" ? (
+                <button
+                  className="primary-button"
+                  onClick={handleDepositAnother}
+                >
+                  Deposit another amount
+                </button>
               ) : (
-                <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy}>
-                  {depositStage === 'approving'
-                    ? 'Approve in wallet...'
-                    : depositStage === 'pending'
-                      ? 'Transaction submitted...'
-                      : 'Approve Transaction'}
+                <button
+                  className="primary-button"
+                  onClick={handleApproveTransaction}
+                  disabled={!hasValidAmount || isBusy}
+                >
+                  {depositStage === "approving"
+                    ? "Approve in wallet..."
+                    : depositStage === "pending"
+                      ? "Transaction submitted..."
+                      : "Approve Transaction"}
                 </button>
               )}
 
-              <button className="secondary-button" onClick={closeDeposit} disabled={isBusy}>
+              <button
+                className="secondary-button"
+                onClick={closeDeposit}
+                disabled={isBusy}
+              >
                 Cancel
               </button>
             </div>
