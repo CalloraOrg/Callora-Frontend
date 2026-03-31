@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ThemeToggle } from './ThemeToggle';
 
 type Tab = 'dashboard' | 'apis' | 'billing';
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
@@ -214,23 +215,26 @@ function App() {
           <h1 className="brand">Secure USDC funding for premium API usage</h1>
         </div>
 
-        <nav className="nav">
-          <button
-            className={tab === 'dashboard' ? 'active' : ''}
-            onClick={() => setTab('dashboard')}
-          >
-            Dashboard
-          </button>
-          <button className={tab === 'apis' ? 'active' : ''} onClick={() => setTab('apis')}>
-            APIs
-          </button>
-          <button
-            className={tab === 'billing' ? 'active' : ''}
-            onClick={() => setTab('billing')}
-          >
-            Billing
-          </button>
-        </nav>
+        <div className="topbar-actions">
+          <nav className="nav">
+            <button
+              className={tab === 'dashboard' ? 'active' : ''}
+              onClick={() => setTab('dashboard')}
+            >
+              Dashboard
+            </button>
+            <button className={tab === 'apis' ? 'active' : ''} onClick={() => setTab('apis')}>
+              APIs
+            </button>
+            <button
+              className={tab === 'billing' ? 'active' : ''}
+              onClick={() => setTab('billing')}
+            >
+              Billing
+            </button>
+          </nav>
+          <ThemeToggle />
+        </div>
       </header>
 
       <main className="page">
