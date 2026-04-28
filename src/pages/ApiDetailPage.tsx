@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import { findApiById } from "../data/mockApis";
@@ -22,7 +22,6 @@ type TabType = "overview" | "documentation" | "pricing" | "examples" | "reviews"
 export default function ApiDetailPage({ onBack }: Props) {
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
-  const [isScrolled, setIsScrolled] = useState(false);
 
   // Extract ID from URL path: /api/[id]
   const id =
@@ -31,13 +30,6 @@ export default function ApiDetailPage({ onBack }: Props) {
       : undefined;
 
   const api = useMemo(() => findApiById(id), [id]);
-
-  // Handle scroll effect for the sticky header
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   if (!api) {
     return (
