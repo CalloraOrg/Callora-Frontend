@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 import ApiUsage from './ApiUsage';
-import { ServerError } from './components/ServerError';
+import ErrorPage from './components/ServerError';
 import NotFound from './components/NotFound';
 
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
@@ -273,82 +273,9 @@ function LandingPage({
   );
 }
 
-function ApiUsage() {
-  return (
-    <section className="surface placeholder-card">
-      <p className="eyebrow">API detail</p>
-      <h2>User Profile API</h2>
-      <p>
-        Manage user profiles, authentication, and account information with
-        transparent pay-per-call pricing.
-      </p>
-
-      <div className="info-row">
-        <div className="info-card">
-          <h3>Endpoints</h3>
-          <p>GET /users, POST /users, PATCH /users/:id</p>
-        </div>
-        <div className="info-card">
-          <h3>Pricing</h3>
-          <p>~0.002 USDC per successful call.</p>
-        </div>
-        <div className="info-card">
-          <h3>Status</h3>
-          <p>Active and ready for vault-funded usage.</p>
-        </div>
-      </div>
-
-      <pre>
-        <code>{`curl https://api.callora.dev/users \\
-  -H "Authorization: Bearer <API_KEY>"`}</code>
-      </pre>
-    </section>
-  );
-}
-
-function ServerError({
-  onRetry,
-  onGoHome,
-}: {
-  onRetry: () => void;
-  onGoHome: () => void;
-}) {
-  return (
-    <section className="surface placeholder-card">
-      <p className="eyebrow">Server error</p>
-      <h2>Something went wrong.</h2>
-      <p>Please retry or return to the dashboard.</p>
-
-      <div className="hero-actions">
-        <button className="primary-button" onClick={onRetry}>
-          Retry
-        </button>
-        <button className="secondary-button" onClick={onGoHome}>
-          Go home
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function NotFound({ onGoHome }: { onGoHome: () => void }) {
-  return (
-    <section className="surface placeholder-card">
-      <p className="eyebrow">404</p>
-      <h2>Page not found.</h2>
-      <p>The page you are looking for does not exist.</p>
-      <button className="primary-button" onClick={onGoHome}>
-        Go to dashboard
-      </button>
-    </section>
-  );
-}
-
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [view, setView] = useState<ViewMode>('landing');
-  const [tab, setTab] = useState<Tab>('dashboard');
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
@@ -730,13 +657,13 @@ function App() {
           <Route
             path={APP_ROUTES.serverError}
             element={
-              <ServerError
+              <ErrorPage
                 code="500"
                 title="Server Error"
                 message="Something went wrong. Please try again or contact support."
                 primaryAction={{
                   label: "Go Home",
-                  onClick: () => navigate(APP_ROUTES.home)
+                  onClick: () => navigate(APP_ROUTES.landing)
                 }}
                 secondaryAction={{
                   label: "Retry",
