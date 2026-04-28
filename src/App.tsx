@@ -5,10 +5,8 @@ import ApiUsage from './ApiUsage';
 import { ServerError } from './components/ServerError';
 import NotFound from './components/NotFound';
 
-type Tab = 'dashboard' | 'apis' | 'billing' | 'api-usage';
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
 type DemoOutcome = 'confirmed' | 'failed';
-type ViewMode = 'landing' | 'app';
 
 type Feature = {
   icon: string;
@@ -648,8 +646,17 @@ function App() {
             path={APP_ROUTES.serverError}
             element={
               <ServerError
-                onRetry={handleServerRetry}
-                onGoHome={() => navigate(APP_ROUTES.home)}
+                code="500"
+                title="Server Error"
+                message="Something went wrong. Please try again or contact support."
+                primaryAction={{
+                  label: "Go Home",
+                  onClick: () => navigate(APP_ROUTES.home)
+                }}
+                secondaryAction={{
+                  label: "Retry",
+                  onClick: handleServerRetry
+                }}
               />
             }
           />

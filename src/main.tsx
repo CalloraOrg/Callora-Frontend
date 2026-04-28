@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { BrowserRouter } from "react-router-dom";
 
 // Simple client-side route renderer to support direct URLs and client navigation
 // without causing the dev server to proxy `/api` requests. This keeps `App.tsx`
@@ -42,7 +43,9 @@ async function renderRoute() {
   // Default: render the existing App
   root.render(
     <React.StrictMode>
+      <BrowserRouter>
       <App />
+      </BrowserRouter>
     </React.StrictMode>,
   );
 }
