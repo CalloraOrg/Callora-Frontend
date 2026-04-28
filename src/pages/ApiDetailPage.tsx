@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import CodeExample from "../components/CodeExample";
+import Breadcrumb from "../components/Breadcrumb";
 import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 
@@ -40,19 +41,26 @@ export default function ApiDetailPage({ onBack }: Props) {
 
   if (!api) {
     return (
-      <div style={{ padding: "80px 20px", textAlign: "center" }}>
-        <EmptyState
-          title="API not found"
-          message="We couldn't find the API you're looking for. It may have been removed or the ID is incorrect."
-        />
-        <div style={{ marginTop: 24 }}>
-          <button
-            className="primary-button"
-            onClick={() => (window.location.href = "/marketplace")}
-            style={{ padding: "12px 24px" }}
-          >
-            Return to Marketplace
-          </button>
+      <div style={{ padding: 20 }}>
+        <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
+          <Breadcrumb
+            items={[
+              { label: "Marketplace", href: "/marketplace" },
+              { label: "Not Found", href: "", isCurrent: true },
+            ]}
+          />
+          <EmptyState
+            title="API not found"
+            message="We couldn't find that API. Try the marketplace."
+          />
+          <div style={{ textAlign: "center", marginTop: 12 }}>
+            <button
+              className="primary-button"
+              onClick={() => (window.location.href = "/marketplace")}
+            >
+              Back to marketplace
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -114,53 +122,60 @@ print(data)`;
     `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-main)" }}>
-      {/* Dynamic Breadcrumb / Back Navigation */}
-      <div style={{ 
-        padding: "12px 20px", 
-        borderBottom: "1px solid var(--border-subtle)",
-        position: "sticky",
-        top: 0,
-        background: isScrolled ? "var(--bg-glass)" : "transparent",
-        backdropFilter: isScrolled ? "blur(10px)" : "none",
-        zIndex: 100,
-        transition: "all 0.3s ease"
-      }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", alignItems: "center", gap: 12 }}>
-          <button className="ghost-button" onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            ← Back
-          </button>
-          <span style={{ color: "var(--muted)", fontSize: 13 }}>Marketplace / {api.category} / {api.name}</span>
-        </div>
-      </div>
-
-      <div style={{ padding: "40px 20px" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto" }}>
-          {/* Main Hero Header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 40 }}>
-            <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
-              <div style={{
-                width: 100,
-                height: 100,
-                borderRadius: 20,
-                background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%)",
-                display: "grid",
-                placeItems: "center",
-                fontSize: 40,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.2)"
-              }}>
-                {api.name.charAt(0)}
-              </div>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <h1 style={{ margin: 0, fontSize: 32 }}>{api.name}</h1>
-                  <span style={{ 
-                    padding: "4px 10px", 
-                    background: "var(--bg-highlight)", 
-                    borderRadius: 20, 
-                    fontSize: 12, 
-                    color: "var(--accent)" 
-                  }}>v1.4.2</span>
+    <div style={{ padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
+        <Breadcrumb
+          items={[
+            { label: "Marketplace", href: "/marketplace" },
+            { label: api.name, href: "", isCurrent: true },
+          ]}
+        />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) 320px",
+            gap: 0,
+          }}
+        >
+          <div style={{ padding: 24 }}>
+            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+              <button
+                className="ghost-button"
+                onClick={onBack}
+                style={{ marginRight: 8 }}
+              >
+                Back
+              </button>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 16,
+                  alignItems: "center",
+                  flex: 1,
+                }}
+              >
+                <div
+                  style={{
+                    width: 84,
+                    height: 84,
+                    borderRadius: 14,
+                    background: "rgba(255,255,255,0.04)",
+                    display: "grid",
+                    placeItems: "center",
+                    fontWeight: 700,
+                  }}
+                >
+                  W
+                </div>
+                <div>
+                  <h2 style={{ margin: 0 }}>{api.name}</h2>
+                  <div style={{ color: "var(--muted)", marginTop: 6 }}>
+                    <a href={api.provider?.url}>{api.provider?.name}</a> ·{" "}
+                    <strong style={{ color: "var(--accent-strong)" }}>
+                      {currency(api.pricePerRequest ?? 0)}
+                    </strong>{" "}
+                    per request
+                  </div>
                 </div>
                 <div style={{ color: "var(--muted)", marginTop: 8, fontSize: 16 }}>
                   Published by <a href={api.provider?.url} style={{ color: "var(--text-main)", textDecoration: "none" }}>{api.provider?.name}</a>

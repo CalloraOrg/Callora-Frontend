@@ -2,7 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { ThemeProvider } from "./ThemeContext";
 import "./index.css";
+import { BrowserRouter } from "react-router-dom";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -45,8 +47,14 @@ async function renderRoute() {
     return;
   }
 
-  // Default fallback: render the primary App component
-  root.render(wrap(<App />));
+  // Default: render the existing App
+  root.render(
+    <React.StrictMode>
+      <BrowserRouter>
+      <App />
+      </BrowserRouter>
+    </React.StrictMode>,
+  );
 }
 
 // Ensure the UI re-renders correctly when the user hits the browser back/forward buttons
