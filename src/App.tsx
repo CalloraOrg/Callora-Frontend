@@ -1,5 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
+import ApiUsage from './ApiUsage';
+import { ServerError } from './components/ServerError';
+import NotFound from './components/NotFound';
 
 type Tab = 'dashboard' | 'apis' | 'billing' | 'api-usage';
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
@@ -237,6 +241,8 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [view, setView] = useState<ViewMode>('landing');
+  const [tab, setTab] = useState<Tab>('dashboard');
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
@@ -283,7 +289,7 @@ function App() {
 
   useEffect(() => {
     return () => {
-      timersRef.current.forEach((timer) => window.clearTimeout(timer));
+      timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
     };
   }, []);
 
@@ -294,7 +300,7 @@ function App() {
   }, [isDepositOpen, location.pathname]);
 
   const clearTimers = () => {
-    timersRef.current.forEach((timer) => window.clearTimeout(timer));
+    timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
     timersRef.current = [];
   };
 
@@ -631,6 +637,11 @@ function App() {
                 </p>
               </section>
             }
+          />
+
+          <Route
+            path="/api-usage"
+            element={<ApiUsage />}
           />
 
           <Route
