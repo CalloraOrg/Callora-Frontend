@@ -53,7 +53,6 @@ export default function SearchBar({
           style={{
             background: "transparent",
             border: "none",
-            outline: "none",
             color: "var(--text)",
             width: "100%",
             fontSize: 14,
