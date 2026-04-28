@@ -1,24 +1,43 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 
+/**
+ * ApiDetailPage Component
+ * * Provides a comprehensive view of a specific API, including:
+ * - Interactive documentation with code snippets
+ * - Real-time cost estimation
+ * - Performance statistics and health metrics
+ * - Implementation examples across multiple languages
+ */
+
 type Props = {
   onBack?: () => void;
 };
 
-export default function ApiDetailPage({ onBack }: Props) {
-  const [tab, setTab] = useState<
-    "overview" | "documentation" | "pricing" | "examples" | "reviews"
-  >("overview");
-  const [requests, setRequests] = useState(1000);
+type TabType = "overview" | "documentation" | "pricing" | "examples" | "reviews";
 
+export default function ApiDetailPage({ onBack }: Props) {
+  const [tab, setTab] = useState<TabType>("overview");
+  const [requests, setRequests] = useState(1000);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Extract ID from URL path: /api/[id]
   const id =
     typeof window !== "undefined"
       ? window.location.pathname.split("/").filter(Boolean).pop()
       : undefined;
+
   const api = useMemo(() => findApiById(id), [id]);
+
+  // Handle scroll effect for the sticky header
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   if (!api) {
     return (
@@ -49,10 +68,55 @@ export default function ApiDetailPage({ onBack }: Props) {
 
   const currency = (n: number) => `$${n.toFixed(3)}`;
 
-  const firstEndpoint = (api.endpoints && api.endpoints[0]) || { url: "/" };
-  const curlExample = `curl -X GET "https://api.example.com${firstEndpoint.url}?lat=37.78&lon=-122.41" -H "Authorization: Bearer $API_KEY"`;
-  const jsExample = `import fetch from 'node-fetch';\n\nconst res = await fetch('https://api.example.com${firstEndpoint.url}?lat=37.78&lon=-122.41', {\n  headers: { Authorization: 'Bearer YOUR_KEY' }\n});\nconst data = await res.json();\nconsole.log(data);`;
-  const pyExample = `import requests\n\nresp = requests.get('https://api.example.com${firstEndpoint.url}', params={'lat':37.78, 'lon':-122.41}, headers={'Authorization':'Bearer YOUR_KEY'})\nprint(resp.json())`;
+  // Example Generation Logic
+  const firstEndpoint = (api.endpoints && api.endpoints[0]) || { url: "/v1/data", method: "GET" };
+  const baseUrl = "https://api.callora.com";
+
+  const curlExample = `curl -X ${firstEndpoint.method} "${baseUrl}${firstEndpoint.url}?lat=37.78&lon=-122.41" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json"`;
+
+  const jsExample = `import fetch from 'node-fetch';
+
+const getApiData = async () => {
+  const response = await fetch('${baseUrl}${firstEndpoint.url}', {
+    method: '${firstEndpoint.method}',
+    headers: { 
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  if (!response.ok) throw new Error('API request failed');
+  
+  const data = await response.json();
+  return data;
+};
+
+getApiData().then(console.log).catch(console.error);`;
+
+  const pyExample = `import requests
+
+url = "${baseUrl}${firstEndpoint.url}"
+headers = {
+    "Authorization": "Bearer YOUR_API_KEY",
+    "Content-Type": "application/json"
+}
+params = {
+    "lat": 37.78,
+    "lon": -122.41
+}
+
+response = requests.get(url, headers=headers, params=params)
+data = response.json()
+
+print(data)`;
+
+  const allSnippets = {
+    bash: curlExample,
+    javascript: jsExample,
+    python: pyExample,
+  };
 
   const estimatedCost = (n: number) =>
     `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
@@ -113,259 +177,239 @@ export default function ApiDetailPage({ onBack }: Props) {
                     per request
                   </div>
                 </div>
-                <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                  <button
-                    className="primary-button"
-                    onClick={() => alert("Start using API (placeholder)")}
-                  >
-                    Start Using API
-                  </button>
-                  <div style={{ alignSelf: "center", color: "var(--muted)" }}>
-                    ⭐ {api.rating}
-                  </div>
+                <div style={{ color: "var(--muted)", marginTop: 8, fontSize: 16 }}>
+                  Published by <a href={api.provider?.url} style={{ color: "var(--text-main)", textDecoration: "none" }}>{api.provider?.name}</a>
                 </div>
               </div>
             </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--accent-strong)" }}>
+                {currency(api.pricePerRequest ?? 0)}
+              </div>
+              <div style={{ color: "var(--muted)", fontSize: 13 }}>per successful request</div>
+              <button className="primary-button" style={{ marginTop: 16, padding: "12px 32px" }}>
+                Connect API
+              </button>
+            </div>
+          </div>
 
-            <div style={{ marginTop: 20 }}>
-              <nav
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  borderBottom: "1px solid rgba(255,255,255,0.04)",
-                  paddingBottom: 12,
-                }}
-              >
-                {[
-                  "overview",
-                  "documentation",
-                  "pricing",
-                  "examples",
-                  "reviews",
-                ].map((t) => (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 40 }}>
+            <div className="content-left">
+              {/* Tabs Navigation */}
+              <nav style={{
+                display: "flex",
+                gap: 24,
+                borderBottom: "1px solid var(--border-subtle)",
+                marginBottom: 32,
+                position: "sticky",
+                top: 60,
+                background: "var(--bg-main)",
+                zIndex: 90
+              }}>
+                {(["overview", "documentation", "pricing", "examples", "reviews"] as TabType[]).map((t) => (
                   <button
                     key={t}
-                    className={
-                      tab === (t as any) ? "nav-button active" : "nav-button"
-                    }
-                    onClick={() => setTab(t as any)}
+                    onClick={() => setTab(t)}
                     style={{
                       background: "transparent",
-                      color: "var(--text)",
-                      borderBottom:
-                        tab === t
-                          ? "3px solid #4e85ff"
-                          : "3px solid transparent",
-                      paddingBottom: 8,
-                      transition: "border-color 180ms ease",
+                      border: "none",
+                      padding: "12px 0",
+                      color: tab === t ? "var(--text-main)" : "var(--muted)",
+                      fontSize: 15,
+                      fontWeight: tab === t ? 600 : 400,
+                      cursor: "pointer",
+                      position: "relative",
+                      transition: "color 0.2s"
                     }}
                   >
-                    {t[0].toUpperCase() + t.slice(1)}
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                    {tab === t && (
+                      <div style={{
+                        position: "absolute",
+                        bottom: -1,
+                        left: 0,
+                        right: 0,
+                        height: 2,
+                        background: "var(--accent)"
+                      }} />
+                    )}
                   </button>
                 ))}
               </nav>
 
-              <div style={{ marginTop: 18 }}>
+              <div className="tab-content" style={{ animation: "fadeIn 0.3s ease" }}>
+                {/* OVERVIEW TAB */}
                 {tab === "overview" && (
                   <section>
-                    <p className="helper-text">{api.description}</p>
-
-                    <h3 style={{ marginTop: 18 }}>Key features</h3>
-                    <ul>
-                      {(api.features || []).map((f: string) => (
-                        <li key={f} style={{ color: "var(--muted)" }}>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-
-                    <h3>Use cases</h3>
-                    <ul>
-                      {(api.useCases || []).map((u: string) => (
-                        <li key={u} style={{ color: "var(--muted)" }}>
-                          {u}
-                        </li>
-                      ))}
-                    </ul>
-
-                    <h3>Endpoints (summary)</h3>
-                    <div style={{ display: "grid", gap: 8 }}>
-                      {(api.endpoints || []).map((ep: any) => (
-                        <article
-                          key={ep.id}
-                          className="preview-card"
-                          style={{ padding: 12 }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <div>
-                              <strong>{ep.title}</strong>
-                              <div
-                                style={{ color: "var(--muted)", marginTop: 6 }}
-                              >
-                                {ep.method} {ep.url}
-                              </div>
-                            </div>
-                            <div style={{ color: "var(--muted)" }}>
-                              Example response
-                            </div>
-                          </div>
-                        </article>
-                      ))}
+                    <div className="preview-card" style={{ padding: 24, marginBottom: 32 }}>
+                       <h3 style={{ marginTop: 0 }}>About this API</h3>
+                       <p style={{ lineHeight: 1.6, fontSize: 16, color: "var(--text-secondary)" }}>{api.description}</p>
                     </div>
 
-                    <h3 style={{ marginTop: 18 }}>Statistics</h3>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(3, minmax(0,1fr))",
-                        gap: 12,
-                      }}
-                    >
-                      <div className="stat-card">
-                        <span>Total calls</span>
-                        <strong>
-                          {(api.stats?.totalCalls ?? 0).toLocaleString()}
-                        </strong>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
+                      <div>
+                        <h3>Key Features</h3>
+                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                          {(api.features || []).map((f) => (
+                            <li key={f} style={{ color: "var(--text-secondary)" }}>{f}</li>
+                          ))}
+                        </ul>
                       </div>
-                      <div className="stat-card">
-                        <span>Avg response time</span>
-                        <strong>{api.stats?.avgResponseMs ?? 0} ms</strong>
+                      <div>
+                        <h3>Primary Use Cases</h3>
+                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                          {(api.useCases || []).map((u) => (
+                            <li key={u} style={{ color: "var(--text-secondary)" }}>{u}</li>
+                          ))}
+                        </ul>
                       </div>
-                      <div className="stat-card">
-                        <span>Uptime</span>
-                        <strong>{api.stats?.uptimePct ?? 0}%</strong>
+                    </div>
+
+                    <h3 style={{ marginTop: 40 }}>Performance Metrics</h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                      <div className="stat-card" style={{ padding: 20, background: "var(--bg-subtle)", borderRadius: 12 }}>
+                        <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase" }}>Total Requests</div>
+                        <div style={{ fontSize: 24, fontWeight: 700, marginTop: 8 }}>{(api.stats?.totalCalls ?? 0).toLocaleString()}</div>
+                      </div>
+                      <div className="stat-card" style={{ padding: 20, background: "var(--bg-subtle)", borderRadius: 12 }}>
+                        <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase" }}>Latency (P95)</div>
+                        <div style={{ fontSize: 24, fontWeight: 700, marginTop: 8 }}>{api.stats?.avgResponseMs ?? 0}ms</div>
+                      </div>
+                      <div className="stat-card" style={{ padding: 20, background: "var(--bg-subtle)", borderRadius: 12 }}>
+                        <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase" }}>System Uptime</div>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: "#10b981", marginTop: 8 }}>{api.stats?.uptimePct ?? 0}%</div>
                       </div>
                     </div>
                   </section>
                 )}
 
+                {/* DOCUMENTATION TAB */}
                 {tab === "documentation" && (
                   <section>
-                    <h3>Endpoints</h3>
-                    <div style={{ display: "grid", gap: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <h3>Available Endpoints</h3>
+                      <span style={{ fontSize: 13, color: "var(--muted)" }}>Base URL: <code>{baseUrl}</code></span>
+                    </div>
+                    
+                    <div style={{ display: "grid", gap: 20, marginTop: 16 }}>
                       {(api.endpoints || []).map((ep: any) => (
-                        <article
-                          key={ep.id}
-                          className="preview-card"
-                          style={{ padding: 12 }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <div>
-                              <strong>{ep.title}</strong>
-                              <div style={{ color: "var(--muted)" }}>
-                                {ep.method} {ep.url}
-                              </div>
+                        <div key={ep.id} className="preview-card" style={{ padding: 0, overflow: "hidden" }}>
+                          <div style={{ 
+                            padding: "16px 24px", 
+                            background: "var(--bg-highlight)", 
+                            display: "flex", 
+                            justifyContent: "space-between",
+                            alignItems: "center"
+                          }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                              <span style={{ 
+                                padding: "4px 8px", 
+                                background: ep.method === "GET" ? "#3b82f6" : "#10b981",
+                                color: "white",
+                                borderRadius: 4,
+                                fontSize: 11,
+                                fontWeight: 800
+                              }}>{ep.method}</span>
+                              <strong style={{ fontSize: 15 }}>{ep.title}</strong>
                             </div>
-                            <div style={{ color: "var(--muted)" }}>
-                              Response: JSON
-                            </div>
+                            <code style={{ fontSize: 12, color: "var(--muted)" }}>{ep.url}</code>
                           </div>
+                          
+                          <div style={{ padding: 24 }}>
+                            <h4 style={{ margin: "0 0 12px 0", fontSize: 14 }}>Request Parameters</h4>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                              <thead>
+                                <tr style={{ textAlign: "left", color: "var(--muted)", borderBottom: "1px solid var(--border-subtle)" }}>
+                                  <th style={{ padding: "8px 0" }}>Parameter</th>
+                                  <th>Type</th>
+                                  <th>Required</th>
+                                  <th>Description</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {ep.params.map((p: any) => (
+                                  <tr key={p.name} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                                    <td style={{ padding: "12px 0", fontFamily: "monospace", color: "var(--accent)" }}>{p.name}</td>
+                                    <td><span className="type-tag">{p.type}</span></td>
+                                    <td>{p.required ? "✅ Yes" : "Optional"}</td>
+                                    <td style={{ color: "var(--muted)" }}>Standard filter for this endpoint.</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
 
-                          <div style={{ marginTop: 12 }}>
-                            <div style={{ color: "var(--muted)" }}>
-                              Parameters:
-                            </div>
-                            <ul>
-                              {ep.params.map((p: any) => (
-                                <li
-                                  key={p.name}
-                                  style={{ color: "var(--muted)" }}
-                                >
-                                  <strong>{p.name}</strong> — {p.type}{" "}
-                                  {p.required ? "(required)" : "(optional)"}
-                                </li>
-                              ))}
-                            </ul>
+                            <h4 style={{ margin: "24px 0 12px 0", fontSize: 14 }}>Implementation</h4>
+                            <CodeExample snippets={allSnippets} defaultLanguage="bash" />
                           </div>
-
-                          <div style={{ marginTop: 12 }}>
-                            <CodeExample language="cURL" code={curlExample} />
-                            <div style={{ height: 12 }} />
-                            <CodeExample
-                              language="JavaScript"
-                              code={jsExample}
-                            />
-                            <div style={{ height: 12 }} />
-                            <CodeExample language="Python" code={pyExample} />
-                          </div>
-                        </article>
+                        </div>
                       ))}
                     </div>
                   </section>
                 )}
 
+                {/* PRICING TAB */}
                 {tab === "pricing" && (
                   <section>
-                    <h3>Pricing</h3>
-                    <div style={{ display: "flex", gap: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <div className="preview-card" style={{ padding: 12 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <div>
-                              <strong>
-                                {currency(api.pricePerRequest ?? 0)}
-                              </strong>
-                              <div style={{ color: "var(--muted)" }}>
-                                per request
-                              </div>
-                            </div>
-                            <div style={{ color: "var(--muted)" }}>
-                              Volume discounts available
-                            </div>
-                          </div>
-                        </div>
+                    <h3>Pricing Plans</h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 40 }}>
+                      <div className="preview-card" style={{ padding: 24, border: "2px solid var(--accent)" }}>
+                        <div style={{ color: "var(--accent)", fontWeight: 700, fontSize: 12, textTransform: "uppercase" }}>Standard</div>
+                        <div style={{ fontSize: 32, fontWeight: 800, margin: "12px 0" }}>{currency(api.pricePerRequest ?? 0)} <span style={{ fontSize: 14, color: "var(--muted)" }}>/ call</span></div>
+                        <p style={{ fontSize: 14, color: "var(--muted)" }}>Perfect for startups and scaling applications. Pay only for what you use.</p>
+                        <ul style={{ padding: 0, listStyle: "none", fontSize: 14, marginTop: 20 }}>
+                          <li style={{ marginBottom: 10 }}>✅ Unlimited Throughput</li>
+                          <li style={{ marginBottom: 10 }}>✅ 99.9% Uptime SLA</li>
+                          <li style={{ marginBottom: 10 }}>✅ Community Support</li>
+                        </ul>
+                      </div>
+                      <div className="preview-card" style={{ padding: 24 }}>
+                        <div style={{ color: "var(--muted)", fontWeight: 700, fontSize: 12, textTransform: "uppercase" }}>Enterprise</div>
+                        <div style={{ fontSize: 32, fontWeight: 800, margin: "12px 0" }}>Custom</div>
+                        <p style={{ fontSize: 14, color: "var(--muted)" }}>For high-volume needs requiring dedicated infrastructure and support.</p>
+                        <ul style={{ padding: 0, listStyle: "none", fontSize: 14, marginTop: 20 }}>
+                          <li style={{ marginBottom: 10 }}>✅ Dedicated Node</li>
+                          <li style={{ marginBottom: 10 }}>✅ 24/7 Phone Support</li>
+                          <li style={{ marginBottom: 10 }}>✅ Custom Rate Limits</li>
+                        </ul>
+                        <button className="secondary-button" style={{ width: "100%", marginTop: 10 }}>Contact Sales</button>
+                      </div>
+                    </div>
 
-                        <h4 style={{ marginTop: 12 }}>Estimate costs</h4>
-                        <label className="field-label">
-                          Number of requests
-                        </label>
+                    <div className="preview-card" style={{ padding: 32 }}>
+                      <h4 style={{ marginTop: 0 }}>Cost Calculator</h4>
+                      <p style={{ color: "var(--muted)" }}>Estimate your monthly billing based on projected request volume.</p>
+                      
+                      <div style={{ marginTop: 32 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                          <span style={{ fontWeight: 600 }}>Monthly Volume</span>
+                          <span style={{ color: "var(--accent)", fontWeight: 700 }}>{requests.toLocaleString()} Requests</span>
+                        </div>
                         <input
                           type="range"
-                          min={0}
-                          max={100000}
+                          min={100}
+                          max={1000000}
+                          step={100}
                           value={requests}
                           onChange={(e) => setRequests(Number(e.target.value))}
+                          style={{ width: "100%", height: 6, borderRadius: 3, appearance: "none", background: "var(--border-subtle)" }}
                         />
-                        <div
-                          style={{
-                            marginTop: 8,
-                            display: "flex",
-                            justifyContent: "space-between",
-                            color: "var(--muted)",
-                          }}
-                        >
-                          <div>{requests.toLocaleString()} requests</div>
+                        
+                        <div style={{ 
+                          marginTop: 32, 
+                          padding: 20, 
+                          background: "var(--bg-highlight)", 
+                          borderRadius: 8,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center"
+                        }}>
                           <div>
-                            Estimated:{" "}
-                            <strong style={{ color: "var(--accent-strong)" }}>
-                              {estimatedCost(requests)}
-                            </strong>
+                            <div style={{ fontSize: 12, color: "var(--muted)" }}>Estimated Monthly Total</div>
+                            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--text-main)" }}>{estimatedCost(requests)}</div>
                           </div>
-                        </div>
-                      </div>
-
-                      <div style={{ width: 320 }}>
-                        <div className="stat-card">
-                          <span>Pricing tiers</span>
-                          <div style={{ marginTop: 8, color: "var(--muted)" }}>
-                            <div>$0.010 / req — 0–100k</div>
-                            <div>$0.008 / req — 100k–1M</div>
-                            <div>Contact sales — enterprise</div>
+                          <div style={{ textAlign: "right", fontSize: 13, color: "var(--muted)" }}>
+                            * Volume discounts apply automatically <br /> 
+                            at 500k+ requests.
                           </div>
                         </div>
                       </div>
@@ -373,75 +417,94 @@ export default function ApiDetailPage({ onBack }: Props) {
                   </section>
                 )}
 
+                {/* EXAMPLES TAB */}
                 {tab === "examples" && (
                   <section>
-                    <h3>Integration examples</h3>
-                    <div className="preview-card" style={{ padding: 12 }}>
-                      <p className="helper-text">
-                        A short real-world example showing how to call the
-                        forecast endpoint and handle results.
-                      </p>
-                      <CodeExample language="JavaScript" code={jsExample} />
+                    <h3>Integration Gallery</h3>
+                    <p style={{ color: "var(--muted)", marginBottom: 24 }}>Explore these Boilerplate examples to get integrated in minutes.</p>
+                    
+                    <div className="preview-card" style={{ padding: 24, marginBottom: 24 }}>
+                      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                        <span style={{ padding: "4px 12px", background: "#e0f2fe", color: "#0369a1", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>React / Next.js</span>
+                        <span style={{ padding: "4px 12px", background: "#fef3c7", color: "#92400e", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>Server-side</span>
+                      </div>
+                      <h4>Fetching data in a Next.js Page</h4>
+                      <CodeExample snippets={allSnippets} defaultLanguage="javascript" />
+                    </div>
+
+                    <div className="preview-card" style={{ padding: 24 }}>
+                      <h4>Python Data Analysis Workflow</h4>
+                      <CodeExample snippets={allSnippets} defaultLanguage="python" />
                     </div>
                   </section>
                 )}
 
+                {/* REVIEWS TAB */}
                 {tab === "reviews" && (
                   <section>
-                    <h3>Reviews & Feedback</h3>
-                    <div className="preview-card" style={{ padding: 12 }}>
-                      <p style={{ margin: 0, color: "var(--muted)" }}>
-                        No public reviews yet. Be the first to leave feedback.
-                      </p>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                      <h3>Developer Feedback</h3>
+                      <button className="secondary-button">Write a Review</button>
+                    </div>
+                    
+                    <div className="preview-card" style={{ padding: 40, textAlign: "center", borderStyle: "dashed" }}>
+                       <div style={{ fontSize: 40, marginBottom: 16 }}>💬</div>
+                       <h4>No public reviews yet</h4>
+                       <p style={{ color: "var(--muted)", maxWidth: 400, margin: "0 auto" }}>
+                         Be the first to share your experience with this API. 
+                         Your feedback helps other developers make better choices.
+                       </p>
                     </div>
                   </section>
                 )}
               </div>
             </div>
+
+            {/* Sidebar Sticky Column */}
+            <aside>
+              <div style={{ position: "sticky", top: 100 }}>
+                <div className="stat-card" style={{ padding: 24, marginBottom: 20 }}>
+                  <h4 style={{ marginTop: 0 }}>API Health</h4>
+                  <div style={{ display: "grid", gap: 16, marginTop: 20 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 14, color: "var(--muted)" }}>Status</span>
+                      <span style={{ fontSize: 14, color: "#10b981", fontWeight: 600 }}>● Operational</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 14, color: "var(--muted)" }}>Region</span>
+                      <span style={{ fontSize: 14 }}>Global (Edge)</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 14, color: "var(--muted)" }}>CORS</span>
+                      <span style={{ fontSize: 14, color: "#10b981" }}>Supported</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="preview-card" style={{ padding: 24, marginBottom: 20 }}>
+                  <h4 style={{ marginTop: 0 }}>SDKs & Tools</h4>
+                  <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
+                    <button className="ghost-button" style={{ justifyContent: "flex-start", width: "100%", fontSize: 13 }}>📦 Node.js SDK</button>
+                    <button className="ghost-button" style={{ justifyContent: "flex-start", width: "100%", fontSize: 13 }}>📦 Python Wrapper</button>
+                    <button className="ghost-button" style={{ justifyContent: "flex-start", width: "100%", fontSize: 13 }}>📜 OpenAPI Spec (JSON)</button>
+                  </div>
+                </div>
+
+                <div style={{ 
+                  background: "linear-gradient(rgba(78, 133, 255, 0.1), rgba(78, 133, 255, 0.05))", 
+                  padding: 24, 
+                  borderRadius: 16,
+                  border: "1px solid rgba(78, 133, 255, 0.2)"
+                }}>
+                  <h4 style={{ marginTop: 0, color: "var(--accent-strong)" }}>Support</h4>
+                  <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                    Need help with integration? Access our developer discord or email the provider directly.
+                  </p>
+                  <button className="primary-button" style={{ width: "100%", marginTop: 12 }}>Contact Publisher</button>
+                </div>
+              </div>
+            </aside>
           </div>
-
-          <aside
-            style={{
-              padding: 20,
-              borderLeft: "1px solid rgba(255,255,255,0.03)",
-            }}
-          >
-            <div className="stat-card" style={{ marginBottom: 12 }}>
-              <span>Price per request</span>
-              <strong>{currency(api.pricePerRequest ?? 0)}</strong>
-              <div style={{ color: "var(--muted)", marginTop: 8 }}>
-                Category: Weather · Last updated: Mar 25, 2026
-              </div>
-            </div>
-
-            <div className="stat-card" style={{ marginBottom: 12 }}>
-              <span>Quick stats</span>
-              <div style={{ marginTop: 8, color: "var(--muted)" }}>
-                <div>
-                  Total calls: {(api.stats?.totalCalls ?? 0).toLocaleString()}
-                </div>
-                <div>Uptime: {api.stats?.uptimePct ?? 0}%</div>
-              </div>
-            </div>
-
-            <div style={{ position: "sticky", top: 24 }}>
-              <button
-                className="primary-button"
-                style={{ width: "100%", marginBottom: 12 }}
-                onClick={() => alert("Start using API (placeholder)")}
-              >
-                Start Using API
-              </button>
-
-              <div className="stat-card">
-                <span>Related APIs</span>
-                <div style={{ marginTop: 8, color: "var(--muted)" }}>
-                  <div>ClimateTrend API — $0.02 / req</div>
-                  <div>StormAlert API — $0.012 / req</div>
-                </div>
-              </div>
-            </div>
-          </aside>
         </div>
       </div>
     </div>
