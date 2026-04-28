@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import CodeExample from "../components/CodeExample";
+import Breadcrumb from "../components/Breadcrumb";
 import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 
@@ -22,17 +23,25 @@ export default function ApiDetailPage({ onBack }: Props) {
   if (!api) {
     return (
       <div style={{ padding: 20 }}>
-        <EmptyState
-          title="API not found"
-          message="We couldn't find that API. Try the marketplace."
-        />
-        <div style={{ textAlign: "center", marginTop: 12 }}>
-          <button
-            className="primary-button"
-            onClick={() => (window.location.href = "/marketplace")}
-          >
-            Back to marketplace
-          </button>
+        <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
+          <Breadcrumb
+            items={[
+              { label: "Marketplace", href: "/marketplace" },
+              { label: "Not Found", href: "", isCurrent: true },
+            ]}
+          />
+          <EmptyState
+            title="API not found"
+            message="We couldn't find that API. Try the marketplace."
+          />
+          <div style={{ textAlign: "center", marginTop: 12 }}>
+            <button
+              className="primary-button"
+              onClick={() => (window.location.href = "/marketplace")}
+            >
+              Back to marketplace
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -51,6 +60,12 @@ export default function ApiDetailPage({ onBack }: Props) {
   return (
     <div style={{ padding: 20 }}>
       <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
+        <Breadcrumb
+          items={[
+            { label: "Marketplace", href: "/marketplace" },
+            { label: api.name, href: "", isCurrent: true },
+          ]}
+        />
         <div
           style={{
             display: "grid",
