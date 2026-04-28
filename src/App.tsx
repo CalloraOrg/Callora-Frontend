@@ -1,10 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ThemeToggle } from './ThemeToggle';
+import { useEffect, useRef, useState } from "react";
+import {
+  NavLink,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import { ThemeToggle } from "./ThemeToggle";
 
-type Tab = 'dashboard' | 'apis' | 'billing' | 'api-usage';
-type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
-type DemoOutcome = 'confirmed' | 'failed';
-type ViewMode = 'landing' | 'app';
+type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
+type DemoOutcome = "confirmed" | "failed";
 
 type Feature = {
   icon: string;
@@ -19,62 +24,71 @@ type Step = {
 
 const features: Feature[] = [
   {
-    icon: '💸',
-    title: 'Pay-per-call billing',
-    description: 'Micro-payments in USDC mean every API request is billed precisely and transparently.',
+    icon: "💸",
+    title: "Pay-per-call billing",
+    description:
+      "Micro-payments in USDC mean every API request is billed precisely and transparently.",
   },
   {
-    icon: '⛓️',
-    title: 'On-chain settlement',
-    description: 'Every transaction settles on-chain with verifiable records and near real-time visibility.',
+    icon: "⛓️",
+    title: "On-chain settlement",
+    description:
+      "Every transaction settles on-chain with verifiable records and near real-time visibility.",
   },
   {
-    icon: '🧾',
-    title: 'No subscriptions',
-    description: 'Skip fixed plans and commitments. Pay only for the API calls your product actually makes.',
+    icon: "🧾",
+    title: "No subscriptions",
+    description:
+      "Skip fixed plans and commitments. Pay only for the API calls your product actually makes.",
   },
   {
-    icon: '🧑‍💻',
-    title: 'Developer-friendly',
-    description: 'Publish APIs quickly, define per-request pricing, and start earning USDC automatically.',
+    icon: "🧑‍💻",
+    title: "Developer-friendly",
+    description:
+      "Publish APIs quickly, define per-request pricing, and start earning USDC automatically.",
   },
 ];
 
 const consumerSteps: Step[] = [
   {
-    title: 'Connect wallet or sign up',
-    description: 'Create your account and securely link a wallet in minutes.',
+    title: "Connect wallet or sign up",
+    description: "Create your account and securely link a wallet in minutes.",
   },
   {
-    title: 'Deposit USDC to vault',
-    description: 'Fund your usage balance once and keep API requests flowing.',
+    title: "Deposit USDC to vault",
+    description: "Fund your usage balance once and keep API requests flowing.",
   },
   {
-    title: 'Browse and use APIs',
-    description: 'Discover programmable APIs and integrate them into your app.',
+    title: "Browse and use APIs",
+    description: "Discover programmable APIs and integrate them into your app.",
   },
   {
-    title: 'Pay automatically per call',
-    description: 'Billing happens in real time based on actual usage and price-per-request.',
+    title: "Pay automatically per call",
+    description:
+      "Billing happens in real time based on actual usage and price-per-request.",
   },
 ];
 
 const developerSteps: Step[] = [
   {
-    title: 'Register as developer',
-    description: 'Set up your publisher profile and prepare your API listing.',
+    title: "Register as developer",
+    description:
+      "Set up your publisher profile and prepare your API listing.",
   },
   {
-    title: 'Publish your API',
-    description: 'Add docs, endpoints, and metadata to make your API easy to adopt.',
+    title: "Publish your API",
+    description:
+      "Add docs, endpoints, and metadata to make your API easy to adopt.",
   },
   {
-    title: 'Set pricing per request',
-    description: 'Choose flexible per-call pricing that reflects the value of your service.',
+    title: "Set pricing per request",
+    description:
+      "Choose flexible per-call pricing that reflects the value of your service.",
   },
   {
-    title: 'Earn USDC automatically',
-    description: 'Collect revenue from each successful call with transparent settlement.',
+    title: "Earn USDC automatically",
+    description:
+      "Collect revenue from each successful call with transparent settlement.",
   },
 ];
 
@@ -82,10 +96,12 @@ const PRESET_AMOUNTS = [10, 50, 100, 500] as const;
 const MIN_DEPOSIT = 10;
 const NETWORK_FEE = "0.00001 XLM";
 const EXPLORER_BASE_URL = "https://stellar.expert/explorer/testnet/tx/";
+
 const APP_ROUTES = {
-  home: "/dashboard",
+  landing: "/",
   dashboard: "/dashboard",
   marketplace: "/marketplace",
+  apiUsage: "/api-usage",
   billing: "/billing",
   documentation: "/documentation",
   status: "/status",
@@ -106,7 +122,9 @@ function formatUsdShortcut(value: number) {
 }
 
 function createMockHash() {
-  const seed = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+  const seed = `${Date.now().toString(16)}${Math.random()
+    .toString(16)
+    .slice(2)}`;
   return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
 }
 
@@ -119,12 +137,19 @@ function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
   if (stage === "pending") return "Transaction submitted...";
   if (stage === "confirmed") return "Deposit successful";
   if (stage === "failed") return "Transaction failed";
+
   return hasValidAmount
     ? "Review transaction preview"
     : "Enter a deposit amount";
 }
 
-function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () => void; onPublishApi: () => void }) {
+function LandingPage({
+  onStartUsingApis,
+  onPublishApi,
+}: {
+  onStartUsingApis: () => void;
+  onPublishApi: () => void;
+}) {
   return (
     <div className="lp-shell">
       <header className="lp-section lp-hero" aria-labelledby="hero-title">
@@ -132,9 +157,11 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
           <p className="lp-eyebrow">Built for API consumers and publishers</p>
           <h1 id="hero-title">Callora - Programmable API Access</h1>
           <p className="lp-subhead">
-            Access and monetize APIs with usage-based billing. Callora combines programmable API
-            access with pay-per-call settlement in USDC so teams can build faster and charge fairly.
+            Access and monetize APIs with usage-based billing. Callora combines
+            programmable API access with pay-per-call settlement in USDC so
+            teams can build faster and charge fairly.
           </p>
+
           <div className="lp-cta-row">
             <button className="lp-btn lp-btn-primary" onClick={onStartUsingApis}>
               Start Using APIs
@@ -144,6 +171,7 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
             </button>
           </div>
         </div>
+
         <div className="lp-visual" aria-hidden="true">
           <p>API Marketplace</p>
           <span>Programmable Access • USDC Per Call • On-chain Settlement</span>
@@ -153,6 +181,7 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
       <section className="lp-section">
         <p className="lp-eyebrow">Core capabilities</p>
         <h2>Why teams choose Callora</h2>
+
         <div className="lp-feature-grid">
           {features.map((feature) => (
             <article className="lp-card" key={feature.title}>
@@ -167,6 +196,7 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
       <section className="lp-section">
         <p className="lp-eyebrow">How it works</p>
         <h2>A simple flow for both sides of the marketplace</h2>
+
         <div className="lp-flow-grid">
           <article className="lp-card">
             <h3>For API Consumers</h3>
@@ -179,6 +209,7 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
               ))}
             </ol>
           </article>
+
           <article className="lp-card">
             <h3>For API Developers</h3>
             <ol>
@@ -196,24 +227,35 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
       <section className="lp-section">
         <p className="lp-eyebrow">Use cases & benefits</p>
         <h2>Designed for practical adoption</h2>
+
         <div className="lp-flow-grid">
           <article className="lp-card">
             <h3>Where Callora shines</h3>
             <ul>
-              <li>AI workflows that need utility APIs without subscription overhead.</li>
-              <li>Data providers monetizing endpoint access with frictionless micro-billing.</li>
-              <li>Fintech and web3 apps requiring transparent usage-based costs.</li>
+              <li>
+                AI workflows that need utility APIs without subscription
+                overhead.
+              </li>
+              <li>
+                Data providers monetizing endpoint access with frictionless
+                micro-billing.
+              </li>
+              <li>
+                Fintech and web3 apps requiring transparent usage-based costs.
+              </li>
             </ul>
           </article>
+
           <article className="lp-card">
             <h3>Testimonials</h3>
             <p>
-              “Callora helped us launch usage-based API monetization in days, not months.”
+              “Callora helped us launch usage-based API monetization in days,
+              not months.”
               <span> — Case study placeholder</span>
             </p>
             <p>
-              “Our teams can scale integration costs exactly with demand, no wasted subscription
-              spend.”
+              “Our teams can scale integration costs exactly with demand, no
+              wasted subscription spend.”
               <span> — Customer quote placeholder</span>
             </p>
           </article>
@@ -234,9 +276,81 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
   );
 }
 
+function ApiUsage() {
+  return (
+    <section className="surface placeholder-card">
+      <p className="eyebrow">API detail</p>
+      <h2>User Profile API</h2>
+      <p>
+        Manage user profiles, authentication, and account information with
+        transparent pay-per-call pricing.
+      </p>
+
+      <div className="info-row">
+        <div className="info-card">
+          <h3>Endpoints</h3>
+          <p>GET /users, POST /users, PATCH /users/:id</p>
+        </div>
+        <div className="info-card">
+          <h3>Pricing</h3>
+          <p>~0.002 USDC per successful call.</p>
+        </div>
+        <div className="info-card">
+          <h3>Status</h3>
+          <p>Active and ready for vault-funded usage.</p>
+        </div>
+      </div>
+
+      <pre>
+        <code>{`curl https://api.callora.dev/users \\
+  -H "Authorization: Bearer <API_KEY>"`}</code>
+      </pre>
+    </section>
+  );
+}
+
+function ServerError({
+  onRetry,
+  onGoHome,
+}: {
+  onRetry: () => void;
+  onGoHome: () => void;
+}) {
+  return (
+    <section className="surface placeholder-card">
+      <p className="eyebrow">Server error</p>
+      <h2>Something went wrong.</h2>
+      <p>Please retry or return to the dashboard.</p>
+
+      <div className="hero-actions">
+        <button className="primary-button" onClick={onRetry}>
+          Retry
+        </button>
+        <button className="secondary-button" onClick={onGoHome}>
+          Go home
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function NotFound({ onGoHome }: { onGoHome: () => void }) {
+  return (
+    <section className="surface placeholder-card">
+      <p className="eyebrow">404</p>
+      <h2>Page not found.</h2>
+      <p>The page you are looking for does not exist.</p>
+      <button className="primary-button" onClick={onGoHome}>
+        Go to dashboard
+      </button>
+    </section>
+  );
+}
+
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
+
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
@@ -253,6 +367,7 @@ function App() {
   const [submittedStartingBalance, setSubmittedStartingBalance] = useState<
     number | null
   >(null);
+
   const timersRef = useRef<number[]>([]);
 
   const parsedAmount = Number(amountInput);
@@ -264,6 +379,7 @@ function App() {
   const isBusy = depositStage === "approving" || depositStage === "pending";
 
   let validationMessage = "";
+
   if (amountInput.trim().length === 0) {
     validationMessage = "Enter a deposit amount to continue.";
   } else if (!Number.isFinite(parsedAmount)) {
@@ -319,9 +435,7 @@ function App() {
   };
 
   const closeDeposit = () => {
-    if (isBusy) {
-      return;
-    }
+    if (isBusy) return;
     setIsDepositOpen(false);
   };
 
@@ -329,9 +443,8 @@ function App() {
     value: string,
     preset: number | "custom" = "custom",
   ) => {
-    if (isBusy) {
-      return;
-    }
+    if (isBusy) return;
+
     const sanitized = value.replace(/[^\d.]/g, "");
     resetFlow(sanitized, preset);
   };
@@ -345,9 +458,7 @@ function App() {
   };
 
   const handleCopyHash = async () => {
-    if (!txHash) {
-      return;
-    }
+    if (!txHash) return;
 
     try {
       await navigator.clipboard.writeText(txHash);
@@ -359,9 +470,7 @@ function App() {
   };
 
   const handleApproveTransaction = () => {
-    if (!hasValidAmount || isBusy) {
-      return;
-    }
+    if (!hasValidAmount || isBusy) return;
 
     const approvedAmount = parsedAmount;
     const startingBalance = vaultBalance;
@@ -388,11 +497,11 @@ function App() {
       window.setTimeout(() => {
         if (demoOutcome === "confirmed") {
           setDepositStage("confirmed");
-          setVaultBalance(
-            Number((startingBalance + approvedAmount).toFixed(2)),
-          );
+          setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
           setStatusMessage(
-            `${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`,
+            `${formatUsdShortcut(
+              approvedAmount,
+            )} reached the vault. Your balance is updated and ready for API usage.`,
           );
         } else {
           setDepositStage("failed");
@@ -408,6 +517,7 @@ function App() {
     if (submittedAmount !== null) {
       setAmountInput(String(submittedAmount));
     }
+
     setSelectedPreset("custom");
     setDepositStage("input");
     setStatusMessage("Review the transaction details and approve again.");
@@ -420,21 +530,6 @@ function App() {
   const handleServerRetry = () => {
     window.location.reload();
   };
-
-  if (view === 'landing') {
-    return (
-      <LandingPage
-        onStartUsingApis={() => {
-          setTab('apis');
-          setView('app');
-        }}
-        onPublishApi={() => {
-          setTab('billing');
-          setView('app');
-        }}
-      />
-    );
-  }
 
   return (
     <div className="app-shell">
@@ -449,21 +544,9 @@ function App() {
 
         <div className="topbar-actions">
           <nav className="nav">
-            <button
-              className={tab === 'dashboard' ? 'active' : ''}
-              onClick={() => setTab('dashboard')}
-            >
-              Dashboard
-            </button>
-            <button className={tab === 'apis' ? 'active' : ''} onClick={() => setTab('apis')}>
-              APIs
-            </button>
-            <button
-              className={tab === 'billing' ? 'active' : ''}
-              onClick={() => setTab('billing')}
-            >
-              Billing
-            </button>
+            <NavLink to={APP_ROUTES.dashboard}>Dashboard</NavLink>
+            <NavLink to={APP_ROUTES.marketplace}>Marketplace</NavLink>
+            <NavLink to={APP_ROUTES.billing}>Billing</NavLink>
           </nav>
           <ThemeToggle />
         </div>
@@ -471,7 +554,15 @@ function App() {
 
       <main className="page">
         <Routes>
-          <Route path="/" element={<Navigate replace to={APP_ROUTES.home} />} />
+          <Route
+            path={APP_ROUTES.landing}
+            element={
+              <LandingPage
+                onStartUsingApis={() => navigate(APP_ROUTES.marketplace)}
+                onPublishApi={() => navigate(APP_ROUTES.billing)}
+              />
+            }
+          />
 
           <Route
             path={APP_ROUTES.dashboard}
@@ -498,109 +589,14 @@ function App() {
                     </button>
                   </div>
                 </div>
-              </div>
-            </div>
-          </section>
-        )}
 
-        {tab === 'apis' && (
-          <section className="surface apis-catalog">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">API catalog</p>
-                <h2>Available APIs</h2>
-                <p>Select an API to start using it with your vault funding.</p>
-              </div>
-            </div>
-
-            <div className="apis-grid">
-              <article className="api-card" onClick={() => setTab('api-usage')}>
-                <div className="api-card-header">
-                  <div className="api-icon">
-                    <span>👤</span>
-                  </div>
-                  <div>
-                    <h3>User Profile API</h3>
-                    <p className="api-status active">Active</p>
-                  </div>
-                </div>
-                <div className="api-card-content">
-                  <p>Manage user profiles, authentication, and account information.</p>
-                  <div className="api-stats">
-                    <span>Endpoints: 3</span>
-                    <span>Cost: ~0.002 USDC/call</span>
-                  </div>
-                </div>
-                <button className="primary-button">Start Using API</button>
-              </article>
-
-              <article className="api-card">
-                <div className="api-card-header">
-                  <div className="api-icon">
-                    <span>💳</span>
-                  </div>
-                  <div>
-                    <h3>Payment API</h3>
-                    <p className="api-status active">Active</p>
-                  </div>
-                </div>
-                <div className="api-card-content">
-                  <p>Process payments, handle transactions, and manage billing.</p>
-                  <div className="api-stats">
-                    <span>Endpoints: 5</span>
-                    <span>Cost: ~0.003 USDC/call</span>
-                  </div>
-                </div>
-                <button className="primary-button" disabled>Coming Soon</button>
-              </article>
-
-              <article className="api-card">
-                <div className="api-card-header">
-                  <div className="api-icon">
-                    <span>📊</span>
-                  </div>
-                  <div>
-                    <h3>Analytics API</h3>
-                    <p className="api-status inactive">In Development</p>
-                  </div>
-                </div>
-                <div className="api-card-content">
-                  <p>Get insights, reports, and analytics data for your applications.</p>
-                  <div className="api-stats">
-                    <span>Endpoints: 8</span>
-                    <span>Cost: ~0.001 USDC/call</span>
-                  </div>
-                </div>
-                <button className="secondary-button" disabled>Notify When Available</button>
-              </article>
-            </div>
-
-            <div className="apis-info">
-              <div className="info-card">
-                <h3>Vault Integration</h3>
-                <p>All API usage is automatically deducted from your USDC vault balance in real-time.</p>
-              </div>
-              <div className="info-card">
-                <h3>Transparent Pricing</h3>
-                <p>See exactly how much each call costs before you make it with no hidden fees.</p>
-              </div>
-              <div className="info-card">
-                <h3>Developer Friendly</h3>
-                <p>Comprehensive documentation, code examples, and testing tools included.</p>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {tab === 'api-usage' && <ApiUsage />}
-
-        {tab === 'billing' && (
-          <section className="billing-layout">
-            <div className="surface billing-panel">
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">Deposit USDC to Vault</p>
-                  <h2>Review every number before you approve.</h2>
+                <div className="hero-card">
+                  <p className="eyebrow">Vault balance</p>
+                  <strong>{formatUsdc(vaultBalance)} USDC</strong>
+                  <p>
+                    Available balance for API usage, model execution, and
+                    premium workflows.
+                  </p>
                 </div>
               </section>
             }
@@ -609,17 +605,127 @@ function App() {
           <Route
             path={APP_ROUTES.marketplace}
             element={
-              <section className="surface placeholder-card">
-                <p className="eyebrow">Marketplace</p>
-                <h2>Discover premium APIs ready for production usage.</h2>
-                <p>
-                  Compare APIs, review pricing, and route high-priority
-                  workloads with confidence. Use the billing tab whenever you
-                  need to top up your USDC vault.
-                </p>
+              <section className="surface apis-catalog">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">API catalog</p>
+                    <h2>Available APIs</h2>
+                    <p>Select an API to start using it with your vault funding.</p>
+                  </div>
+                </div>
+
+                <div className="apis-grid">
+                  <article
+                    className="api-card"
+                    onClick={() => navigate(APP_ROUTES.apiUsage)}
+                  >
+                    <div className="api-card-header">
+                      <div className="api-icon">
+                        <span>👤</span>
+                      </div>
+                      <div>
+                        <h3>User Profile API</h3>
+                        <p className="api-status active">Active</p>
+                      </div>
+                    </div>
+
+                    <div className="api-card-content">
+                      <p>
+                        Manage user profiles, authentication, and account
+                        information.
+                      </p>
+                      <div className="api-stats">
+                        <span>Endpoints: 3</span>
+                        <span>Cost: ~0.002 USDC/call</span>
+                      </div>
+                    </div>
+
+                    <button className="primary-button">Start Using API</button>
+                  </article>
+
+                  <article className="api-card">
+                    <div className="api-card-header">
+                      <div className="api-icon">
+                        <span>💳</span>
+                      </div>
+                      <div>
+                        <h3>Payment API</h3>
+                        <p className="api-status active">Active</p>
+                      </div>
+                    </div>
+
+                    <div className="api-card-content">
+                      <p>
+                        Process payments, handle transactions, and manage
+                        billing.
+                      </p>
+                      <div className="api-stats">
+                        <span>Endpoints: 5</span>
+                        <span>Cost: ~0.003 USDC/call</span>
+                      </div>
+                    </div>
+
+                    <button className="primary-button" disabled>
+                      Coming Soon
+                    </button>
+                  </article>
+
+                  <article className="api-card">
+                    <div className="api-card-header">
+                      <div className="api-icon">
+                        <span>📊</span>
+                      </div>
+                      <div>
+                        <h3>Analytics API</h3>
+                        <p className="api-status inactive">In Development</p>
+                      </div>
+                    </div>
+
+                    <div className="api-card-content">
+                      <p>
+                        Get insights, reports, and analytics data for your
+                        applications.
+                      </p>
+                      <div className="api-stats">
+                        <span>Endpoints: 8</span>
+                        <span>Cost: ~0.001 USDC/call</span>
+                      </div>
+                    </div>
+
+                    <button className="secondary-button" disabled>
+                      Notify When Available
+                    </button>
+                  </article>
+                </div>
+
+                <div className="apis-info">
+                  <div className="info-card">
+                    <h3>Vault Integration</h3>
+                    <p>
+                      All API usage is automatically deducted from your USDC
+                      vault balance in real-time.
+                    </p>
+                  </div>
+                  <div className="info-card">
+                    <h3>Transparent Pricing</h3>
+                    <p>
+                      See exactly how much each call costs before you make it
+                      with no hidden fees.
+                    </p>
+                  </div>
+                  <div className="info-card">
+                    <h3>Developer Friendly</h3>
+                    <p>
+                      Comprehensive documentation, code examples, and testing
+                      tools included.
+                    </p>
+                  </div>
+                </div>
               </section>
             }
           />
+
+          <Route path={APP_ROUTES.apiUsage} element={<ApiUsage />} />
 
           <Route
             path={APP_ROUTES.billing}
@@ -667,8 +773,8 @@ function App() {
                     <div className="info-card">
                       <h3>Status tracking</h3>
                       <p>
-                        Approving, pending, confirmed, and failed states are
-                        all shown in-context.
+                        Approving, pending, confirmed, and failed states are all
+                        shown in-context.
                       </p>
                     </div>
                     <div className="info-card">
@@ -731,8 +837,8 @@ function App() {
                 <h2>System status updates in one place.</h2>
                 <p>
                   All core services are operational. If you are still seeing
-                  issues, please contact support and include what action you
-                  were trying to complete.
+                  issues, please contact support and include what action you were
+                  trying to complete.
                 </p>
               </section>
             }
@@ -743,14 +849,14 @@ function App() {
             element={
               <ServerError
                 onRetry={handleServerRetry}
-                onGoHome={() => navigate(APP_ROUTES.home)}
+                onGoHome={() => navigate(APP_ROUTES.dashboard)}
               />
             }
           />
 
           <Route
             path="*"
-            element={<NotFound onGoHome={() => navigate(APP_ROUTES.home)} />}
+            element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />}
           />
         </Routes>
       </main>
@@ -762,6 +868,7 @@ function App() {
             Reliable USDC funding and API operations for modern product teams.
           </p>
         </div>
+
         <nav className="footer-nav" aria-label="Footer">
           <NavLink to={APP_ROUTES.dashboard}>Dashboard</NavLink>
           <NavLink to={APP_ROUTES.marketplace}>Marketplace</NavLink>
@@ -811,6 +918,7 @@ function App() {
                   (item === "input" &&
                     depositStage === "input" &&
                     hasValidAmount);
+
                 return (
                   <span
                     key={item}
@@ -848,8 +956,13 @@ function App() {
                 <label className="field-label" htmlFor="deposit-amount">
                   Amount
                 </label>
+
                 <div
-                  className={`input-shell ${validationMessage && depositStage === "input" ? "invalid" : ""}`}
+                  className={`input-shell ${
+                    validationMessage && depositStage === "input"
+                      ? "invalid"
+                      : ""
+                  }`}
                 >
                   <input
                     id="deposit-amount"
@@ -871,10 +984,12 @@ function App() {
                     Max
                   </button>
                 </div>
+
                 <p id="deposit-help" className="helper-text">
                   Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom
                   deposits settle into your vault after wallet approval.
                 </p>
+
                 {validationMessage && depositStage === "input" && (
                   <p className="error-text">{validationMessage}</p>
                 )}
@@ -927,10 +1042,12 @@ function App() {
                         : "--"}
                     </strong>
                   </div>
+
                   <div className="preview-row">
                     <span>Current balance</span>
                     <strong>{formatUsdc(previewCurrentBalance)} USDC</strong>
                   </div>
+
                   <div className="preview-row emphasis">
                     <span>New balance</span>
                     <strong>
@@ -939,13 +1056,19 @@ function App() {
                         : "--"}
                     </strong>
                   </div>
+
                   <div className="preview-row">
                     <span>Network fee</span>
                     <strong>{NETWORK_FEE}</strong>
                   </div>
+
                   <div className="preview-row total">
                     <span>Total cost</span>
-                    <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${NETWORK_FEE}` : `0.00 USDC + ${NETWORK_FEE}`}</strong>
+                    <strong>
+                      {hasAmount || submittedAmount
+                        ? `${balanceDelta} USDC + ${NETWORK_FEE}`
+                        : `0.00 USDC + ${NETWORK_FEE}`}
+                    </strong>
                   </div>
                 </article>
 
@@ -958,6 +1081,7 @@ function App() {
                         <span className="eyebrow">Transaction hash</span>
                         <strong>{pendingHashLabel}</strong>
                       </div>
+
                       <div className="hash-actions">
                         <a
                           href={buildExplorerLink(txHash)}
