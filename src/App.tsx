@@ -1,5 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
+import ApiUsage from './ApiUsage';
+import { ServerError } from './components/ServerError';
+import NotFound from './components/NotFound';
 
 type Tab = 'dashboard' | 'apis' | 'billing' | 'api-usage';
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
@@ -237,6 +241,8 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [view, setView] = useState<ViewMode>('landing');
+  const [tab, setTab] = useState<Tab>('dashboard');
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
@@ -283,7 +289,7 @@ function App() {
 
   useEffect(() => {
     return () => {
-      timersRef.current.forEach((timer) => window.clearTimeout(timer));
+      timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
     };
   }, []);
 
@@ -294,7 +300,7 @@ function App() {
   }, [isDepositOpen, location.pathname]);
 
   const clearTimers = () => {
-    timersRef.current.forEach((timer) => window.clearTimeout(timer));
+    timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
     timersRef.current = [];
   };
 
@@ -498,114 +504,9 @@ function App() {
                     </button>
                   </div>
                 </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {tab === 'apis' && (
-          <section className="surface apis-catalog">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">API catalog</p>
-                <h2>Available APIs</h2>
-                <p>Select an API to start using it with your vault funding.</p>
-              </div>
-            </div>
-
-            <div className="apis-grid">
-              <article className="api-card" onClick={() => setTab('api-usage')}>
-                <div className="api-card-header">
-                  <div className="api-icon">
-                    <span>👤</span>
-                  </div>
-                  <div>
-                    <h3>User Profile API</h3>
-                    <p className="api-status active">Active</p>
-                  </div>
-                </div>
-                <div className="api-card-content">
-                  <p>Manage user profiles, authentication, and account information.</p>
-                  <div className="api-stats">
-                    <span>Endpoints: 3</span>
-                    <span>Cost: ~0.002 USDC/call</span>
-                  </div>
-                </div>
-                <button className="primary-button">Start Using API</button>
-              </article>
-
-              <article className="api-card">
-                <div className="api-card-header">
-                  <div className="api-icon">
-                    <span>💳</span>
-                  </div>
-                  <div>
-                    <h3>Payment API</h3>
-                    <p className="api-status active">Active</p>
-                  </div>
-                </div>
-                <div className="api-card-content">
-                  <p>Process payments, handle transactions, and manage billing.</p>
-                  <div className="api-stats">
-                    <span>Endpoints: 5</span>
-                    <span>Cost: ~0.003 USDC/call</span>
-                  </div>
-                </div>
-                <button className="primary-button" disabled>Coming Soon</button>
-              </article>
-
-              <article className="api-card">
-                <div className="api-card-header">
-                  <div className="api-icon">
-                    <span>📊</span>
-                  </div>
-                  <div>
-                    <h3>Analytics API</h3>
-                    <p className="api-status inactive">In Development</p>
-                  </div>
-                </div>
-                <div className="api-card-content">
-                  <p>Get insights, reports, and analytics data for your applications.</p>
-                  <div className="api-stats">
-                    <span>Endpoints: 8</span>
-                    <span>Cost: ~0.001 USDC/call</span>
-                  </div>
-                </div>
-                <button className="secondary-button" disabled>Notify When Available</button>
-              </article>
-            </div>
-
-            <div className="apis-info">
-              <div className="info-card">
-                <h3>Vault Integration</h3>
-                <p>All API usage is automatically deducted from your USDC vault balance in real-time.</p>
-              </div>
-              <div className="info-card">
-                <h3>Transparent Pricing</h3>
-                <p>See exactly how much each call costs before you make it with no hidden fees.</p>
-              </div>
-              <div className="info-card">
-                <h3>Developer Friendly</h3>
-                <p>Comprehensive documentation, code examples, and testing tools included.</p>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {tab === 'api-usage' && <ApiUsage />}
-
-        {tab === 'billing' && (
-          <section className="billing-layout">
-            <div className="surface billing-panel">
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">Deposit USDC to Vault</p>
-                  <h2>Review every number before you approve.</h2>
-                </div>
               </section>
             }
           />
-
           <Route
             path={APP_ROUTES.marketplace}
             element={
@@ -736,6 +637,11 @@ function App() {
                 </p>
               </section>
             }
+          />
+
+          <Route
+            path="/api-usage"
+            element={<ApiUsage />}
           />
 
           <Route

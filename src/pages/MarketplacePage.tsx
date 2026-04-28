@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import ApiCard from "../components/ApiCard";
+import { useEffect, useMemo, useState } from "react";
+import ApiCard, { ApiCardSkeleton } from "../components/ApiCard";
 import SearchBar from "../components/SearchBar";
 import FiltersSidebar from "../components/FiltersSidebar";
 import EmptyState from "../components/EmptyState";
@@ -16,6 +16,15 @@ export default function MarketplacePage(): JSX.Element {
   const [sort, setSort] = useState<string>("relevance");
   const [shown, setShown] = useState<number>(12);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate initial data loading
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const toggleCategory = (c: string) => {
     const copy = new Set(selectedCategories);
@@ -178,9 +187,15 @@ export default function MarketplacePage(): JSX.Element {
                 gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
               }}
             >
-              {displayedItems.map((a) => (
-                <ApiCard key={a.id} api={a} onViewDetails={handleViewDetails} />
-              ))}
+              {isLoading ? (
+                Array.from({ length: shown }).map((_, i) => (
+                  <ApiCardSkeleton key={i} />
+                ))
+              ) : (
+                displayedItems.map((a) => (
+                  <ApiCard key={a.id} api={a} onViewDetails={handleViewDetails} />
+                ))
+              )}
             </div>
           )}
 
