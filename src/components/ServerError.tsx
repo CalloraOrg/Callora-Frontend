@@ -1,78 +1,189 @@
-interface ErrorPageProps {
-  code: string;
-  title: string;
-  message: string;
-  primaryAction: { label: string; onClick: () => void };
-  secondaryAction?: { label: string; onClick: () => void };
-  supportContact?: { label: string; href: string };
-  statusLink?: { label: string; href: string };
+import { useState, useEffect, useRef } from 'react';
+
+interface ServerErrorProps {
+  /** Optional retry callback. When provided, renders the retry button. */
+  onRetry?: () => void | Promise<void>;
+  /** Optional request ID for support traceability. Displayed as a masked reference only. */
+  requestId?: string;
+  /** Optional override for the error heading. Defaults to the standard copy. */
+  title?: string;
+  /** Optional override for the body copy. Defaults to the standard copy. */
+  description?: string;
 }
 
-export default function ErrorPage({
-  code,
-  title,
-  message,
-  primaryAction,
-  secondaryAction,
-  supportContact,
-  statusLink,
-}: ErrorPageProps) {
+export default function ServerError({
+  onRetry,
+  requestId,
+  title = 'Something went wrong on our end',
+  description = 'This is not your fault. Our team has been notified and we're working on a fix. Please try again in a moment.',
+}: ServerErrorProps) {
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const retryButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Focus retry button on mount if onRetry is provided
+  useEffect(() => {
+    if (onRetry && retryButtonRef.current) {
+      retryButtonRef.current.focus();
+    }
+  }, [onRetry]);
+
+  const handleRetry = async () => {
+    if (!onRetry || isRetrying) return;
+
+    setIsRetrying(true);
+    try {
+      await onRetry();
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  const handleCopyRequestId = async () => {
+    if (!requestId) return;
+
+    try {
+      await navigator.clipboard.writeText(requestId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // Silently fail if clipboard API is not available
+      console.error('Failed to copy request ID:', err);
+    }
+  };
+
   return (
     <section
-      className="surface placeholder-card not-found server-error"
-      aria-labelledby="error-title"
+      className="surface placeholder-card server-error"
+      role="alert"
+      style={{
+        margin: '0 auto',
+        maxWidth: '400px',
+        padding: '48px 28px',
+        textAlign: 'center',
+      }}
     >
-      <div className="error-illustration" aria-hidden="true">
-        <span>!</span>
+      {/* Illustration */}
+      <div
+        aria-hidden="true"
+        style={{
+          width: '80px',
+          height: '80px',
+          margin: '0 auto 24px',
+          borderRadius: '50%',
+          background: 'var(--surface-soft)',
+          border: '1px solid var(--line)',
+          display: 'grid',
+          placeItems: 'center',
+        }}
+      >
+        <svg
+          width="40"
+          height="40"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--muted)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
       </div>
-      <p className="not-found-code">{code}</p>
-      <h2 id="error-title">{title}</h2>
-      <p className="not-found-message">{message}</p>
-      <p className="helper-text">
-        This is on us. Your data is safe, and our team is already looking into
-        it.
+
+      {/* Heading */}
+      <h2
+        style={{
+          margin: '0 0 12px',
+          fontSize: 'clamp(1.5rem, 2vw, 1.8rem)',
+          fontWeight: '600',
+          color: 'var(--text)',
+        }}
+      >
+        {title}
+      </h2>
+
+      {/* Body copy */}
+      <p className="helper-text" style={{ marginBottom: '24px' }}>
+        {description}
       </p>
 
-      <div className="hero-actions not-found-actions">
-        <button className="primary-button" onClick={primaryAction.onClick} type="button">
-          {primaryAction.label}
+      {/* Retry button */}
+      {onRetry && (
+        <button
+          ref={retryButtonRef}
+          className="primary-button"
+          onClick={handleRetry}
+          disabled={isRetrying}
+          aria-busy={isRetrying}
+          type="button"
+          style={{
+            minWidth: '140px',
+            minHeight: '48px',
+          }}
+        >
+          {isRetrying ? 'Retrying…' : 'Try again'}
         </button>
+      )}
 
-        {secondaryAction && (
-          <button className="secondary-button" onClick={secondaryAction.onClick} type="button">
-            {secondaryAction.label}
-          </button>
-        )}
-      </div>
-
-      {(supportContact || statusLink) && (
-        <div className="error-links" aria-label="Support and status links">
-          {supportContact && (
-            <a href={supportContact.href} className="error-link-pill">
-              {supportContact.label}
-            </a>
-          )}
-          {statusLink && (
-            <a href={statusLink.href} className="error-link-pill">
-              {statusLink.label}
-            </a>
-          )}
+      {/* Request ID */}
+      {requestId && (
+        <div
+          style={{
+            marginTop: '32px',
+            paddingTop: '24px',
+            borderTop: '1px solid var(--line)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '0.8125rem',
+                color: 'var(--muted)',
+                fontFamily: "'Courier New', monospace",
+              }}
+            >
+              Reference: {requestId}
+            </span>
+            <button
+              onClick={handleCopyRequestId}
+              className="ghost-button"
+              type="button"
+              aria-label="Copy request ID"
+              style={{
+                minHeight: '32px',
+                padding: '0 12px',
+                fontSize: '0.8125rem',
+              }}
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <div
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              position: 'absolute',
+              left: '-10000px',
+              width: '1px',
+              height: '1px',
+              overflow: 'hidden',
+            }}
+          >
+            {copied ? 'Request ID copied to clipboard' : ''}
+          </div>
         </div>
       )}
     </section>
-  );
-}
-
-export function ServerError({ onRetry, onGoHome }: { onRetry: () => void; onGoHome: () => void }) {
-  return (
-    <ErrorPage
-      code="Error 500"
-      title="Something Went Wrong"
-      message="We're experiencing technical difficulties. Please try again later."
-      primaryAction={{ label: "Try Again", onClick: onRetry }}
-      secondaryAction={{ label: "Go to Home", onClick: onGoHome }}
-      supportContact={{ label: "Contact Support", href: "mailto:support@callora.com" }}
-      statusLink={{ label: "View Status Page", href: "/status" }}
-    />
   );
 }
