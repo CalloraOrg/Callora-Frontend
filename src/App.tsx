@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
-import ApiUsage from './ApiUsage';
-import { ServerError } from './components/ServerError';
-import NotFound from './components/NotFound';
 
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
 type DemoOutcome = 'confirmed' | 'failed';
@@ -347,8 +344,6 @@ function NotFound({ onGoHome }: { onGoHome: () => void }) {
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [view, setView] = useState<ViewMode>('landing');
-  const [tab, setTab] = useState<Tab>('dashboard');
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
@@ -731,17 +726,8 @@ function App() {
             path={APP_ROUTES.serverError}
             element={
               <ServerError
-                code="500"
-                title="Server Error"
-                message="Something went wrong. Please try again or contact support."
-                primaryAction={{
-                  label: "Go Home",
-                  onClick: () => navigate(APP_ROUTES.home)
-                }}
-                secondaryAction={{
-                  label: "Retry",
-                  onClick: handleServerRetry
-                }}
+                onRetry={handleServerRetry}
+                onGoHome={() => navigate(APP_ROUTES.dashboard)}
               />
             }
           />
