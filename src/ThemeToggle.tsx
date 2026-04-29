@@ -1,7 +1,7 @@
 import { useTheme } from './ThemeContext';
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, actualTheme } = useTheme();
 
   const toggleTheme = () => {
     if (theme === 'dark') setTheme('light');
@@ -11,12 +11,12 @@ export function ThemeToggle() {
 
   const getIcon = () => {
     if (theme === 'dark') return (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
       </svg>
     );
     if (theme === 'light') return (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="5" />
         <line x1="12" y1="1" x2="12" y2="3" />
         <line x1="12" y1="21" x2="12" y2="23" />
@@ -29,7 +29,7 @@ export function ThemeToggle() {
       </svg>
     );
     return (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
         <line x1="8" y1="21" x2="16" y2="21" />
         <line x1="12" y1="17" x2="12" y2="21" />
@@ -42,10 +42,11 @@ export function ThemeToggle() {
       className="theme-toggle" 
       onClick={toggleTheme}
       title={`Current: ${theme}. Click to change.`}
-      aria-label="Toggle theme"
+      aria-label={`Toggle theme, currently ${theme}`}
+      aria-pressed={actualTheme === 'dark'}
     >
-      <span className="theme-toggle-icon">{getIcon()}</span>
-      <span className="theme-toggle-label">{theme}</span>
+      <span className="theme-toggle-icon" aria-hidden="true">{getIcon()}</span>
+      <span className="theme-toggle-label" aria-live="polite">{theme}</span>
     </button>
   );
 }
