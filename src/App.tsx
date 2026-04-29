@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
-import ApiUsage from './ApiUsage';
-import ErrorPage from './components/ServerError';
-import NotFound from './components/NotFound';
 
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
 type DemoOutcome = 'confirmed' | 'failed';
@@ -657,18 +654,9 @@ function App() {
           <Route
             path={APP_ROUTES.serverError}
             element={
-              <ErrorPage
-                code="500"
-                title="Server Error"
-                message="Something went wrong. Please try again or contact support."
-                primaryAction={{
-                  label: "Go Home",
-                  onClick: () => navigate(APP_ROUTES.landing)
-                }}
-                secondaryAction={{
-                  label: "Retry",
-                  onClick: handleServerRetry
-                }}
+              <ServerError
+                onRetry={handleServerRetry}
+                onGoHome={() => navigate(APP_ROUTES.dashboard)}
               />
             }
           />

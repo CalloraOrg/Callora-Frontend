@@ -2,8 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
-import { ThemeProvider } from "./ThemeContext";
 import "./index.css";
+import { ThemeProvider } from "./ThemeContext";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -51,11 +51,11 @@ async function renderRoute() {
   // Default: render the existing App
   root.render(
     <React.StrictMode>
+      <BrowserRouter>
       <ThemeProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+      <App />
       </ThemeProvider>
+      </BrowserRouter>
     </React.StrictMode>,
   );
 }
