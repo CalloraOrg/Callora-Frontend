@@ -4,9 +4,12 @@ import SearchBar from "../components/SearchBar";
 import FiltersSidebar from "../components/FiltersSidebar";
 import EmptyState from "../components/EmptyState";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
+import { useDebounce } from "../hooks/useDebounce";
 
 export default function MarketplacePage(): JSX.Element {
   const [search, setSearch] = useState("");
+  // Debounce search input to prevent excessive re-renders on large lists
+  const debouncedSearch = useDebounce(search, 300);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
     new Set(),
   );
@@ -44,8 +47,8 @@ export default function MarketplacePage(): JSX.Element {
   const filtered = useMemo(() => {
     let items = MOCK_APIS.slice();
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
       items = items.filter((a) => {
         return (
           a.name.toLowerCase().includes(q) ||
@@ -91,7 +94,7 @@ export default function MarketplacePage(): JSX.Element {
       );
 
     return items;
-  }, [search, selectedCategories, minPrice, maxPrice, popularity, sort]);
+  }, [debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sort]);
 
   const displayedItems = filtered.slice(0, shown);
 
