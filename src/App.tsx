@@ -270,113 +270,9 @@ function LandingPage({
   );
 }
 
-function ApiUsage() {
-  return (
-    <section className="surface placeholder-card">
-      <p className="eyebrow">API detail</p>
-      <h2>User Profile API</h2>
-      <p>
-        Manage user profiles, authentication, and account information with
-        transparent pay-per-call pricing.
-      </p>
-
-      <div className="info-row">
-        <div className="info-card">
-          <h3>Endpoints</h3>
-          <p>GET /users, POST /users, PATCH /users/:id</p>
-        </div>
-        <div className="info-card">
-          <h3>Pricing</h3>
-          <p>~0.002 USDC per successful call.</p>
-        </div>
-        <div className="info-card">
-          <h3>Status</h3>
-          <p>Active and ready for vault-funded usage.</p>
-        </div>
-      </div>
-
-      <pre>
-        <code>{`curl https://api.callora.dev/users \\
-  -H "Authorization: Bearer <API_KEY>"`}</code>
-      </pre>
-    </section>
-  );
-}
-
-interface ServerErrorProps {
-  code: string;
-  title: string;
-  message: string;
-  primaryAction: { label: string; onClick: () => void };
-  secondaryAction: { label: string; onClick: () => void };
-}
-
-const ServerError = ({ 
-  code, 
-  title, 
-  message, 
-  primaryAction, 
-  secondaryAction 
-}: ServerErrorProps) => {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
-      <h1 className="text-6xl font-bold text-red-500 mb-4">{code}</h1>
-      <h2 className="text-2xl font-semibold mb-2">{title}</h2>
-      <p className="text-gray-400 mb-8 max-w-md">{message}</p>
-      <div className="flex gap-4">
-        <button 
-          onClick={primaryAction.onClick}
-          className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition"
-        >
-          {primaryAction.label}
-        </button>
-        <button 
-          onClick={secondaryAction.onClick}
-          className="px-6 py-2 bg-gray-700 rounded-lg hover:bg-gray-800 transition"
-        >
-          {secondaryAction.label}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// 1. Define the "Rules" (Interface) for the component
-interface NotFoundProps {
-  onGoHome: () => void;
-  onRetry?: () => void;
-  code?: string;
-  title?: string;
-  message?: string;
-  primaryAction?: { label: string; onClick: () => void };
-  secondaryAction?: { label: string; onClick: () => void };
-}
-
-// 2. Apply the rules to the function
-function NotFound({ onGoHome, code, title, message }: NotFoundProps) {
-  return (
-    <div className="flex flex-col items-center justify-center p-10">
-      <h1 className="text-6xl font-bold">{code}</h1>
-      <h2 className="text-2xl mt-4">{title}</h2>
-      <p className="mt-2 text-gray-400">{message}</p>
-      <button onClick={onGoHome} className="mt-6 px-4 py-2 bg-blue-600 rounded">
-        Go Home
-      </button>
-    </div>
-  );
-}
-
-// Define what "ViewMode" can be
-type ViewMode = 'landing' | 'dashboard' | 'marketplace' | 'api-usage';
-
-// Define what "Tab" can be
-type Tab = 'dashboard' | 'overview' | 'history' | 'settings';
-
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [_view, _setView] = useState<ViewMode>('landing');
-  const [_tab, _setTab] = useState<Tab>('dashboard');
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
@@ -759,17 +655,8 @@ function App() {
             path={APP_ROUTES.serverError}
             element={
               <ServerError
-                code="500"
-                title="Server Error"
-                message="Something went wrong. Please try again or contact support."
-                primaryAction={{
-                  label: "Go Home",
-                  onClick: () => navigate(APP_ROUTES.landing)
-                }}
-                secondaryAction={{
-                  label: "Retry",
-                  onClick: handleServerRetry
-                }}
+                onRetry={handleServerRetry}
+                onGoHome={() => navigate(APP_ROUTES.dashboard)}
               />
             }
           />

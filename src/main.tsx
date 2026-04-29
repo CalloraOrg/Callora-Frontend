@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
+import { ThemeProvider } from "./ThemeContext";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -16,9 +17,11 @@ async function renderRoute() {
   // Helper to wrap components in the necessary Router context for hooks like useLocation/useNavigate
   const wrap = (children: React.ReactNode) => (
     <React.StrictMode>
-      <BrowserRouter>
-        {children}
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          {children}
+        </BrowserRouter>
+      </ThemeProvider>
     </React.StrictMode>
   );
 
@@ -29,7 +32,7 @@ async function renderRoute() {
     return;
   }
 
-  if (pathname.startsWith("/api/")) {
+  if (pathname.startsWith("/details/")) {
     const mod = await import("./pages/ApiDetailPage");
     const ApiDetailPage = mod.default;
     root.render(
@@ -49,7 +52,9 @@ async function renderRoute() {
   root.render(
     <React.StrictMode>
       <BrowserRouter>
+      <ThemeProvider>
       <App />
+      </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,
   );

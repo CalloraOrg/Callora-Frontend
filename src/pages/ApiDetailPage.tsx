@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import { findApiById } from "../data/mockApis";
@@ -22,9 +22,8 @@ type TabType = "overview" | "documentation" | "pricing" | "examples" | "reviews"
 export default function ApiDetailPage({ onBack }: Props) {
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
-  const [_isScrolled, setIsScrolled] = useState(false);
 
-  // Extract ID from URL path: /api/[id]
+  // Extract ID from URL path: /details/[id]
   const id =
     typeof window !== "undefined"
       ? window.location.pathname.split("/").filter(Boolean).pop()
@@ -32,17 +31,10 @@ export default function ApiDetailPage({ onBack }: Props) {
 
   const api = useMemo(() => findApiById(id), [id]);
 
-  // Handle scroll effect for the sticky header
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
   if (!api) {
     return (
-      <div style={{ padding: 20 }}>
-        <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
+      <div className="api-detail-page">
+        <div className="api-detail-container">
           <Breadcrumb
             items={[
               { label: "Marketplace", href: "/marketplace" },
@@ -122,8 +114,8 @@ print(data)`;
     `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
 
   return (
-    <div style={{ padding: 20 }}>
-      <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
+    <div className="api-detail-page">
+      <div className="api-detail-container">
         <Breadcrumb
           items={[
             { label: "Marketplace", href: "/marketplace" },
@@ -131,45 +123,28 @@ print(data)`;
           ]}
         />
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) 320px",
-            gap: 0,
-          }}
+          className="api-detail-shell"
         >
-          <div style={{ padding: 24 }}>
-            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <div className="api-detail-hero">
+            <div className="api-detail-heading">
               <button
                 className="ghost-button"
                 onClick={onBack}
-                style={{ marginRight: 8 }}
+                type="button"
               >
                 Back
               </button>
               <div
-                style={{
-                  display: "flex",
-                  gap: 16,
-                  alignItems: "center",
-                  flex: 1,
-                }}
+                className="api-detail-brand"
               >
                 <div
-                  style={{
-                    width: 84,
-                    height: 84,
-                    borderRadius: 14,
-                    background: "rgba(255,255,255,0.04)",
-                    display: "grid",
-                    placeItems: "center",
-                    fontWeight: 700,
-                  }}
+                  className="api-detail-logo"
                 >
                   W
                 </div>
-                <div>
-                  <h2 style={{ margin: 0 }}>{api.name}</h2>
-                  <div style={{ color: "var(--muted)", marginTop: 6 }}>
+                <div className="api-detail-title">
+                  <h2>{api.name}</h2>
+                  <div className="api-detail-meta">
                     <a href={api.provider?.url}>{api.provider?.name}</a> ·{" "}
                     <strong style={{ color: "var(--accent-strong)" }}>
                       {currency(api.pricePerRequest ?? 0)}
@@ -177,35 +152,26 @@ print(data)`;
                     per request
                   </div>
                 </div>
-                <div style={{ color: "var(--muted)", marginTop: 8, fontSize: 16 }}>
+                <div className="api-detail-provider">
                   Published by <a href={api.provider?.url} style={{ color: "var(--text-main)", textDecoration: "none" }}>{api.provider?.name}</a>
                 </div>
               </div>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--accent-strong)" }}>
+            <div className="api-detail-price-panel">
+              <div className="api-detail-price">
                 {currency(api.pricePerRequest ?? 0)}
               </div>
-              <div style={{ color: "var(--muted)", fontSize: 13 }}>per successful request</div>
-              <button className="primary-button" style={{ marginTop: 16, padding: "12px 32px" }}>
+              <div className="api-detail-price-label">per successful request</div>
+              <button className="primary-button">
                 Connect API
               </button>
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 40 }}>
+          <div className="api-detail-content-grid">
             <div className="content-left">
               {/* Tabs Navigation */}
-              <nav style={{
-                display: "flex",
-                gap: 24,
-                borderBottom: "1px solid var(--border-subtle)",
-                marginBottom: 32,
-                position: "sticky",
-                top: 60,
-                background: "var(--bg-main)",
-                zIndex: 90
-              }}>
+              <nav className="api-detail-tabs">
                 {(["overview", "documentation", "pricing", "examples", "reviews"] as TabType[]).map((t) => (
                   <button
                     key={t}
@@ -246,7 +212,7 @@ print(data)`;
                        <p style={{ lineHeight: 1.6, fontSize: 16, color: "var(--text-secondary)" }}>{api.description}</p>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
+                    <div className="api-detail-two-column">
                       <div>
                         <h3>Key Features</h3>
                         <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
@@ -266,7 +232,7 @@ print(data)`;
                     </div>
 
                     <h3 style={{ marginTop: 40 }}>Performance Metrics</h3>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                    <div className="api-detail-metrics">
                       <div className="stat-card" style={{ padding: 20, background: "var(--bg-subtle)", borderRadius: 12 }}>
                         <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase" }}>Total Requests</div>
                         <div style={{ fontSize: 24, fontWeight: 700, marginTop: 8 }}>{(api.stats?.totalCalls ?? 0).toLocaleString()}</div>
@@ -286,7 +252,7 @@ print(data)`;
                 {/* DOCUMENTATION TAB */}
                 {tab === "documentation" && (
                   <section>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div className="endpoint-section-header">
                       <h3>Available Endpoints</h3>
                       <span style={{ fontSize: 13, color: "var(--muted)" }}>Base URL: <code>{baseUrl}</code></span>
                     </div>
@@ -294,14 +260,8 @@ print(data)`;
                     <div style={{ display: "grid", gap: 20, marginTop: 16 }}>
                       {(api.endpoints || []).map((ep: any) => (
                         <div key={ep.id} className="preview-card" style={{ padding: 0, overflow: "hidden" }}>
-                          <div style={{ 
-                            padding: "16px 24px", 
-                            background: "var(--bg-highlight)", 
-                            display: "flex", 
-                            justifyContent: "space-between",
-                            alignItems: "center"
-                          }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div className="endpoint-card-header">
+                            <div className="endpoint-title-row">
                               <span style={{ 
                                 padding: "4px 8px", 
                                 background: ep.method === "GET" ? "#3b82f6" : "#10b981",
@@ -312,31 +272,33 @@ print(data)`;
                               }}>{ep.method}</span>
                               <strong style={{ fontSize: 15 }}>{ep.title}</strong>
                             </div>
-                            <code style={{ fontSize: 12, color: "var(--muted)" }}>{ep.url}</code>
+                            <code className="endpoint-url">{ep.url}</code>
                           </div>
                           
                           <div style={{ padding: 24 }}>
                             <h4 style={{ margin: "0 0 12px 0", fontSize: 14 }}>Request Parameters</h4>
-                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                              <thead>
-                                <tr style={{ textAlign: "left", color: "var(--muted)", borderBottom: "1px solid var(--border-subtle)" }}>
-                                  <th style={{ padding: "8px 0" }}>Parameter</th>
-                                  <th>Type</th>
-                                  <th>Required</th>
-                                  <th>Description</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {ep.params.map((p: any) => (
-                                  <tr key={p.name} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                                    <td style={{ padding: "12px 0", fontFamily: "monospace", color: "var(--accent)" }}>{p.name}</td>
-                                    <td><span className="type-tag">{p.type}</span></td>
-                                    <td>{p.required ? "✅ Yes" : "Optional"}</td>
-                                    <td style={{ color: "var(--muted)" }}>Standard filter for this endpoint.</td>
+                            <div className="endpoint-table-wrap">
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                                <thead>
+                                  <tr style={{ textAlign: "left", color: "var(--muted)", borderBottom: "1px solid var(--border-subtle)" }}>
+                                    <th style={{ padding: "8px 0" }}>Parameter</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody>
+                                  {ep.params.map((p: any) => (
+                                    <tr key={p.name} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                                      <td style={{ padding: "12px 0", fontFamily: "monospace", color: "var(--accent)" }}>{p.name}</td>
+                                      <td><span className="type-tag">{p.type}</span></td>
+                                      <td>{p.required ? "Yes" : "Optional"}</td>
+                                      <td style={{ color: "var(--muted)" }}>Standard filter for this endpoint.</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
 
                             <h4 style={{ margin: "24px 0 12px 0", fontSize: 14 }}>Implementation</h4>
                             <CodeExample snippets={allSnippets} defaultLanguage="bash" />
@@ -351,10 +313,10 @@ print(data)`;
                 {tab === "pricing" && (
                   <section>
                     <h3>Pricing Plans</h3>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 40 }}>
+                    <div className="api-detail-pricing-grid">
                       <div className="preview-card" style={{ padding: 24, border: "2px solid var(--accent)" }}>
                         <div style={{ color: "var(--accent)", fontWeight: 700, fontSize: 12, textTransform: "uppercase" }}>Standard</div>
-                        <div style={{ fontSize: 32, fontWeight: 800, margin: "12px 0" }}>{currency(api.pricePerRequest ?? 0)} <span style={{ fontSize: 14, color: "var(--muted)" }}>/ call</span></div>
+                        <div className="api-detail-plan-price">{currency(api.pricePerRequest ?? 0)} <span style={{ fontSize: 14, color: "var(--muted)" }}>/ call</span></div>
                         <p style={{ fontSize: 14, color: "var(--muted)" }}>Perfect for startups and scaling applications. Pay only for what you use.</p>
                         <ul style={{ padding: 0, listStyle: "none", fontSize: 14, marginTop: 20 }}>
                           <li style={{ marginBottom: 10 }}>✅ Unlimited Throughput</li>
@@ -364,7 +326,7 @@ print(data)`;
                       </div>
                       <div className="preview-card" style={{ padding: 24 }}>
                         <div style={{ color: "var(--muted)", fontWeight: 700, fontSize: 12, textTransform: "uppercase" }}>Enterprise</div>
-                        <div style={{ fontSize: 32, fontWeight: 800, margin: "12px 0" }}>Custom</div>
+                        <div className="api-detail-plan-price">Custom</div>
                         <p style={{ fontSize: 14, color: "var(--muted)" }}>For high-volume needs requiring dedicated infrastructure and support.</p>
                         <ul style={{ padding: 0, listStyle: "none", fontSize: 14, marginTop: 20 }}>
                           <li style={{ marginBottom: 10 }}>✅ Dedicated Node</li>
@@ -394,15 +356,7 @@ print(data)`;
                           style={{ width: "100%", height: 6, borderRadius: 3, appearance: "none", background: "var(--border-subtle)" }}
                         />
                         
-                        <div style={{ 
-                          marginTop: 32, 
-                          padding: 20, 
-                          background: "var(--bg-highlight)", 
-                          borderRadius: 8,
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center"
-                        }}>
+                        <div className="api-detail-calculator-total">
                           <div>
                             <div style={{ fontSize: 12, color: "var(--muted)" }}>Estimated Monthly Total</div>
                             <div style={{ fontSize: 28, fontWeight: 800, color: "var(--text-main)" }}>{estimatedCost(requests)}</div>
@@ -424,7 +378,7 @@ print(data)`;
                     <p style={{ color: "var(--muted)", marginBottom: 24 }}>Explore these Boilerplate examples to get integrated in minutes.</p>
                     
                     <div className="preview-card" style={{ padding: 24, marginBottom: 24 }}>
-                      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                      <div className="api-detail-example-tags">
                         <span style={{ padding: "4px 12px", background: "#e0f2fe", color: "#0369a1", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>React / Next.js</span>
                         <span style={{ padding: "4px 12px", background: "#fef3c7", color: "#92400e", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>Server-side</span>
                       </div>
@@ -442,7 +396,7 @@ print(data)`;
                 {/* REVIEWS TAB */}
                 {tab === "reviews" && (
                   <section>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                    <div className="api-detail-reviews-header">
                       <h3>Developer Feedback</h3>
                       <button className="secondary-button">Write a Review</button>
                     </div>
@@ -461,8 +415,8 @@ print(data)`;
             </div>
 
             {/* Sidebar Sticky Column */}
-            <aside>
-              <div style={{ position: "sticky", top: 100 }}>
+            <aside className="api-detail-sidebar">
+              <div className="api-detail-sidebar-inner">
                 <div className="stat-card" style={{ padding: 24, marginBottom: 20 }}>
                   <h4 style={{ marginTop: 0 }}>API Health</h4>
                   <div style={{ display: "grid", gap: 16, marginTop: 20 }}>
