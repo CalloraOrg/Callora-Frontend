@@ -22,7 +22,7 @@ type TabType = "overview" | "documentation" | "pricing" | "examples" | "reviews"
 export default function ApiDetailPage({ onBack }: Props) {
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [_isScrolled, setIsScrolled] = useState(false);
 
   // Extract ID from URL path: /api/[id]
   const id =

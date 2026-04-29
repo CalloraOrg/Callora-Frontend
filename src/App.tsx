@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
-import ApiUsage from './ApiUsage';
-import { ServerError } from './components/ServerError';
-import NotFound from './components/NotFound';
 
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
 type DemoOutcome = 'confirmed' | 'failed';
@@ -306,49 +303,80 @@ function ApiUsage() {
   );
 }
 
-function ServerError({
-  onRetry,
-  onGoHome,
-}: {
-  onRetry: () => void;
-  onGoHome: () => void;
-}) {
-  return (
-    <section className="surface placeholder-card">
-      <p className="eyebrow">Server error</p>
-      <h2>Something went wrong.</h2>
-      <p>Please retry or return to the dashboard.</p>
+interface ServerErrorProps {
+  code: string;
+  title: string;
+  message: string;
+  primaryAction: { label: string; onClick: () => void };
+  secondaryAction: { label: string; onClick: () => void };
+}
 
-      <div className="hero-actions">
-        <button className="primary-button" onClick={onRetry}>
-          Retry
+const ServerError = ({ 
+  code, 
+  title, 
+  message, 
+  primaryAction, 
+  secondaryAction 
+}: ServerErrorProps) => {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+      <h1 className="text-6xl font-bold text-red-500 mb-4">{code}</h1>
+      <h2 className="text-2xl font-semibold mb-2">{title}</h2>
+      <p className="text-gray-400 mb-8 max-w-md">{message}</p>
+      <div className="flex gap-4">
+        <button 
+          onClick={primaryAction.onClick}
+          className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+        >
+          {primaryAction.label}
         </button>
-        <button className="secondary-button" onClick={onGoHome}>
-          Go home
+        <button 
+          onClick={secondaryAction.onClick}
+          className="px-6 py-2 bg-gray-700 rounded-lg hover:bg-gray-800 transition"
+        >
+          {secondaryAction.label}
         </button>
       </div>
-    </section>
+    </div>
+  );
+};
+
+// 1. Define the "Rules" (Interface) for the component
+interface NotFoundProps {
+  onGoHome: () => void;
+  onRetry?: () => void;
+  code?: string;
+  title?: string;
+  message?: string;
+  primaryAction?: { label: string; onClick: () => void };
+  secondaryAction?: { label: string; onClick: () => void };
+}
+
+// 2. Apply the rules to the function
+function NotFound({ onGoHome, code, title, message }: NotFoundProps) {
+  return (
+    <div className="flex flex-col items-center justify-center p-10">
+      <h1 className="text-6xl font-bold">{code}</h1>
+      <h2 className="text-2xl mt-4">{title}</h2>
+      <p className="mt-2 text-gray-400">{message}</p>
+      <button onClick={onGoHome} className="mt-6 px-4 py-2 bg-blue-600 rounded">
+        Go Home
+      </button>
+    </div>
   );
 }
 
-function NotFound({ onGoHome }: { onGoHome: () => void }) {
-  return (
-    <section className="surface placeholder-card">
-      <p className="eyebrow">404</p>
-      <h2>Page not found.</h2>
-      <p>The page you are looking for does not exist.</p>
-      <button className="primary-button" onClick={onGoHome}>
-        Go to dashboard
-      </button>
-    </section>
-  );
-}
+// Define what "ViewMode" can be
+type ViewMode = 'landing' | 'dashboard' | 'marketplace' | 'api-usage';
+
+// Define what "Tab" can be
+type Tab = 'dashboard' | 'overview' | 'history' | 'settings';
 
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [view, setView] = useState<ViewMode>('landing');
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const [_view, _setView] = useState<ViewMode>('landing');
+  const [_tab, _setTab] = useState<Tab>('dashboard');
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
@@ -736,7 +764,7 @@ function App() {
                 message="Something went wrong. Please try again or contact support."
                 primaryAction={{
                   label: "Go Home",
-                  onClick: () => navigate(APP_ROUTES.home)
+                  onClick: () => navigate(APP_ROUTES.landing)
                 }}
                 secondaryAction={{
                   label: "Retry",
