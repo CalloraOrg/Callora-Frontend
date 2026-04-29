@@ -28,7 +28,7 @@ export default function FiltersSidebar({
   clearFilters: () => void;
 }) {
   return (
-    <aside style={{ width: 320 }}>
+    <aside className="filters-sidebar">
       <div style={{ marginBottom: 12 }}>
         <strong>Categories</strong>
         <div style={{ marginTop: 8, display: "grid", gap: 8 }}>

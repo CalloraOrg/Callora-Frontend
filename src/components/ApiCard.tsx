@@ -4,7 +4,7 @@ import Skeleton from "./Skeleton";
 export function ApiCardSkeleton() {
   return (
     <article
-      className="preview-card"
+      className="preview-card api-marketplace-card"
       style={{
         padding: 12,
         display: "flex",
@@ -70,7 +70,7 @@ export default function ApiCard({
 
   return (
     <article
-      className="preview-card"
+      className="preview-card api-marketplace-card"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter") onViewDetails?.(api);
@@ -91,8 +91,9 @@ export default function ApiCard({
         gap: 8,
       }}
     >
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <div
+          className="api-marketplace-card-icon"
           style={{
             width: 56,
             height: 56,
@@ -107,8 +108,8 @@ export default function ApiCard({
           {api.name[0]}
         </div>
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+        <div className="api-marketplace-card-body" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
             <strong>{api.name}</strong>
             <div style={{ color: "var(--muted)", fontSize: 12 }}>
               {api.provider?.name}
@@ -129,7 +130,7 @@ export default function ApiCard({
           </div>
         </div>
 
-        <div style={{ textAlign: "right" }}>
+        <div className="api-marketplace-card-price" style={{ textAlign: "right" }}>
           <div style={{ color: "var(--muted)", fontSize: 12 }}>
             {currency(api.pricePerRequest)} / req
           </div>
@@ -141,7 +142,7 @@ export default function ApiCard({
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className="api-marketplace-card-tags" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {((api.tags as string[]) || []).slice(0, 4).map((t: string) => (
           <span
             key={t}
@@ -159,6 +160,7 @@ export default function ApiCard({
       </div>
 
       <div
+        className="api-marketplace-card-footer"
         style={{
           marginTop: "auto",
           display: "flex",

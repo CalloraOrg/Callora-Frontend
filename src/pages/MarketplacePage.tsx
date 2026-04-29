@@ -95,38 +95,29 @@ export default function MarketplacePage(): JSX.Element {
 
   const displayedItems = filtered.slice(0, shown);
 
-  const handleViewDetails = (api: APIItem | any) => {
-    history.pushState({}, "", `/api/${api.id}`);
+  const handleViewDetails = (api: APIItem) => {
+    history.pushState({}, "", `/details/${api.id}`);
     // inform our small client router that the URL changed
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
   return (
-    <div style={{ padding: 20 }}>
+    <div className="marketplace-page">
       {/* Top row: title + search only */}
       <div
-        style={{
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-          marginBottom: 18,
-        }}
+        className="marketplace-header"
       >
-        <h1 style={{ margin: 0, flex: "0 0 auto" }}>API Marketplace</h1>
-        <div style={{ flex: 1 }}>
+        <h1>API Marketplace</h1>
+        <div className="marketplace-search">
           <SearchBar value={search} onChange={setSearch} />
         </div>
       </div>
 
       {/* Bottom: filters left, content right */}
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "320px minmax(0, 1fr)",
-          gap: 24,
-        }}
+        className="marketplace-layout"
       >
-        <aside style={{ paddingLeft: 8 }}>
+        <aside className="marketplace-sidebar">
           <FiltersSidebar
             selectedCategories={selectedCategories}
             toggleCategory={toggleCategory}
@@ -140,16 +131,11 @@ export default function MarketplacePage(): JSX.Element {
           />
         </aside>
 
-        <main>
+        <main className="marketplace-results">
           <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 12,
-            }}
+            className="marketplace-toolbar"
           >
-            <div style={{ color: "var(--muted)" }}>
+            <div className="marketplace-count">
               {filtered.length === 0 ? (
                 <>Showing 0 of 0 APIs</>
               ) : (
@@ -160,7 +146,7 @@ export default function MarketplacePage(): JSX.Element {
               )}
             </div>
 
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div className="marketplace-actions">
               <select value={sort} onChange={(e) => setSort(e.target.value)}>
                 <option value="relevance">Relevance</option>
                 <option value="priceAsc">Price: low → high</option>
@@ -169,7 +155,7 @@ export default function MarketplacePage(): JSX.Element {
                 <option value="newest">Newest</option>
               </select>
               <button
-                className="ghost-button"
+                className="ghost-button marketplace-filter-button"
                 onClick={() => setShowFiltersMobile((s) => !s)}
               >
                 Filters
@@ -181,11 +167,7 @@ export default function MarketplacePage(): JSX.Element {
             <EmptyState />
           ) : (
             <div
-              style={{
-                display: "grid",
-                gap: 12,
-                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-              }}
+              className="marketplace-grid"
             >
               {isLoading ? (
                 Array.from({ length: shown }).map((_, i) => (
@@ -216,27 +198,14 @@ export default function MarketplacePage(): JSX.Element {
         <div
           role="dialog"
           aria-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 60,
-          }}
+          className="marketplace-filter-modal"
           onClick={() => setShowFiltersMobile(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "90%",
-              maxWidth: 480,
-              background: "var(--bg)",
-              padding: 16,
-              borderRadius: 8,
-            }}
+            className="marketplace-filter-panel"
           >
-            <h3 style={{ marginTop: 0 }}>Filters</h3>
+            <h3>Filters</h3>
             <FiltersSidebar
               selectedCategories={selectedCategories}
               toggleCategory={toggleCategory}
@@ -248,7 +217,7 @@ export default function MarketplacePage(): JSX.Element {
               setPopularity={setPopularity}
               clearFilters={clearFilters}
             />
-            <div style={{ textAlign: "right", marginTop: 8 }}>
+            <div className="marketplace-filter-footer">
               <button
                 className="primary-button"
                 onClick={() => setShowFiltersMobile(false)}

@@ -17,9 +17,11 @@ async function renderRoute() {
   // Helper to wrap components in the necessary Router context for hooks like useLocation/useNavigate
   const wrap = (children: React.ReactNode) => (
     <React.StrictMode>
-      <BrowserRouter>
-        {children}
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          {children}
+        </BrowserRouter>
+      </ThemeProvider>
     </React.StrictMode>
   );
 
@@ -30,7 +32,7 @@ async function renderRoute() {
     return;
   }
 
-  if (pathname.startsWith("/api/")) {
+  if (pathname.startsWith("/details/")) {
     const mod = await import("./pages/ApiDetailPage");
     const ApiDetailPage = mod.default;
     root.render(

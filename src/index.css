@@ -143,6 +143,7 @@ body {
   min-height: 100vh;
   background: var(--page-bg);
   color: var(--text);
+  overflow-x: hidden;
   /* Ensure all components transition smoothly */
   transition: background-color var(--transition-speed) ease, 
               color var(--transition-speed) ease,
@@ -1112,6 +1113,329 @@ code,
   gap: 20px;
 }
 
+/* Marketplace and API detail responsive layout */
+.marketplace-page,
+.api-detail-page {
+  width: 100%;
+  padding: 20px;
+}
+
+.marketplace-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+  min-width: 0;
+}
+
+.marketplace-header h1 {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  line-height: 1.05;
+}
+
+.marketplace-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.marketplace-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.marketplace-sidebar {
+  padding-left: 8px;
+  min-width: 0;
+}
+
+.filters-sidebar {
+  width: 100%;
+  max-width: 320px;
+}
+
+.filters-sidebar input,
+.filters-sidebar select,
+.marketplace-actions select {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.marketplace-results {
+  min-width: 0;
+}
+
+.marketplace-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.marketplace-count {
+  color: var(--muted);
+  min-width: 0;
+}
+
+.marketplace-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.marketplace-filter-button {
+  display: none;
+}
+
+.marketplace-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.api-marketplace-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.api-marketplace-card-header,
+.api-marketplace-card-body,
+.api-marketplace-card-title-row,
+.api-marketplace-card-footer {
+  min-width: 0;
+}
+
+.api-marketplace-card-title-row strong,
+.api-marketplace-card-title-row div {
+  overflow-wrap: anywhere;
+}
+
+.marketplace-filter-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+  padding: 16px;
+}
+
+.marketplace-filter-panel {
+  width: min(100%, 480px);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: var(--surface-strong);
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.marketplace-filter-panel h3 {
+  margin-top: 0;
+}
+
+.marketplace-filter-footer {
+  text-align: right;
+  margin-top: 8px;
+}
+
+.api-detail-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.api-detail-shell {
+  min-width: 0;
+}
+
+.api-detail-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  padding: 24px;
+}
+
+.api-detail-heading,
+.api-detail-brand {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  min-width: 0;
+}
+
+.api-detail-logo {
+  width: 84px;
+  height: 84px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+
+.api-detail-title {
+  min-width: 0;
+}
+
+.api-detail-title h2 {
+  margin: 0;
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.api-detail-meta,
+.api-detail-provider,
+.api-detail-price-label {
+  color: var(--muted);
+}
+
+.api-detail-meta {
+  margin-top: 6px;
+}
+
+.api-detail-provider {
+  margin-top: 8px;
+  font-size: 1rem;
+}
+
+.api-detail-price-panel {
+  text-align: right;
+}
+
+.api-detail-price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.api-detail-price-label {
+  font-size: 0.8125rem;
+}
+
+.api-detail-price-panel .primary-button {
+  margin-top: 16px;
+  padding: 12px 32px;
+}
+
+.api-detail-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 40px;
+}
+
+.api-detail-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 32px;
+  position: sticky;
+  top: 0;
+  background: var(--page-bg);
+  z-index: 20;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.api-detail-tabs button {
+  flex: 0 0 auto;
+}
+
+.api-detail-two-column,
+.api-detail-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+
+.api-detail-pricing-grid {
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.api-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.endpoint-section-header,
+.endpoint-card-header,
+.api-detail-calculator-total,
+.api-detail-reviews-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.endpoint-card-header {
+  padding: 16px 24px;
+  background: var(--surface-soft);
+}
+
+.endpoint-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.endpoint-url {
+  max-width: 45%;
+  font-size: 0.75rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.endpoint-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.endpoint-table-wrap table {
+  min-width: 560px;
+}
+
+.api-detail-plan-price {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 12px 0;
+}
+
+.api-detail-calculator-total {
+  margin-top: 32px;
+  padding: 20px;
+  background: var(--surface-soft);
+  border-radius: 8px;
+}
+
+.api-detail-example-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.api-detail-sidebar {
+  min-width: 0;
+}
+
+.api-detail-sidebar-inner {
+  position: sticky;
+  top: 100px;
+}
+
 /* API Usage Page Styles */
 .api-usage-page {
   display: flex;
@@ -1589,6 +1913,54 @@ code,
 
 /* Responsive Design */
 @media (max-width: 980px) {
+  .marketplace-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .marketplace-sidebar {
+    display: none;
+  }
+
+  .marketplace-filter-button {
+    display: inline-flex;
+  }
+
+  .marketplace-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .api-detail-hero {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .api-detail-price-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    text-align: left;
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+  }
+
+  .api-detail-content-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .api-detail-sidebar-inner {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .api-detail-sidebar-inner > * {
+    margin-bottom: 0 !important;
+  }
+
   .api-header {
     flex-direction: column;
     align-items: flex-start;
@@ -1634,6 +2006,147 @@ code,
 }
 
 @media (max-width: 720px) {
+  .marketplace-page,
+  .api-detail-page {
+    padding: 14px;
+  }
+
+  .marketplace-header,
+  .marketplace-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .marketplace-actions {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .marketplace-actions select {
+    flex: 1;
+  }
+
+  .marketplace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .api-marketplace-card {
+    min-height: 0 !important;
+  }
+
+  .api-marketplace-card-header {
+    display: grid !important;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: flex-start !important;
+  }
+
+  .api-marketplace-card-icon {
+    width: 48px !important;
+    height: 48px !important;
+    flex: 0 0 48px;
+  }
+
+  .api-marketplace-card-title-row {
+    flex-wrap: wrap;
+    gap: 4px 8px !important;
+  }
+
+  .api-marketplace-card-body > div:last-child {
+    overflow-wrap: anywhere;
+  }
+
+  .api-marketplace-card-price {
+    display: none;
+  }
+
+  .api-marketplace-card-footer {
+    align-items: center;
+    gap: 12px;
+  }
+
+  .marketplace-filter-footer .primary-button {
+    width: 100%;
+  }
+
+  .api-detail-hero {
+    padding: 16px 0 20px;
+  }
+
+  .api-detail-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .api-detail-brand {
+    width: 100%;
+    gap: 12px;
+  }
+
+  .api-detail-logo {
+    width: 58px;
+    height: 58px;
+    border-radius: 10px;
+  }
+
+  .api-detail-title h2 {
+    font-size: 1.45rem;
+  }
+
+  .api-detail-provider {
+    display: none;
+  }
+
+  .api-detail-price-panel {
+    display: block;
+  }
+
+  .api-detail-price-panel .primary-button {
+    width: 100%;
+    margin-top: 12px;
+  }
+
+  .api-detail-tabs {
+    gap: 18px;
+    margin-bottom: 22px;
+    padding-bottom: 2px;
+  }
+
+  .api-detail-two-column,
+  .api-detail-pricing-grid,
+  .api-detail-metrics,
+  .api-detail-sidebar-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .endpoint-section-header,
+  .endpoint-card-header,
+  .api-detail-calculator-total,
+  .api-detail-reviews-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .endpoint-card-header {
+    padding: 14px 16px;
+  }
+
+  .endpoint-url {
+    max-width: 100%;
+    text-align: left;
+  }
+
+  .api-detail-calculator-total {
+    gap: 12px;
+  }
+
+  .api-detail-calculator-total > div:last-child {
+    text-align: left !important;
+  }
+
+  .api-detail-plan-price {
+    font-size: 1.75rem;
+  }
+
   .api-usage-page {
     gap: 16px;
   }
