@@ -52,9 +52,15 @@ Key principles:
 ```
 callora-frontend/
 ├── src/
-│   ├── App.tsx       # Main app and tabs
-│   ├── main.tsx      # Entry
-│   ├── index.css     # Global styles
+│   ├── App.tsx              # Main app and tabs
+│   ├── main.tsx             # Entry
+│   ├── index.css            # Global styles
+│   ├── config/
+│   │   └── constants.ts     # Shared app constants (URLs, deposit limits, loading delay)
+│   ├── utils/
+│   │   └── format.ts        # Currency formatters (formatUsdc, formatUsdShortcut, formatPrice)
+│   ├── components/          # Reusable UI components
+│   ├── pages/               # Route-level page components
 │   └── vite-env.d.ts
 ├── index.html
 ├── package.json

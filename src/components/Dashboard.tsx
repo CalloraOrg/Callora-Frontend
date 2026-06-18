@@ -3,7 +3,8 @@ import './Dashboard.css';
 import { useNavigate } from 'react-router-dom';
 import Skeleton from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
-import { formatUsdc } from '../utils/format'; // assuming formatUsdc is exported elsewhere, otherwise import from same file
+import { formatUsdc } from '../utils/format';
+import { LOADING_DELAY_MS } from '../config/constants';
 
 // Props needed from the App state
 interface DashboardProps {
@@ -32,7 +33,7 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
         { type: 'deposit', amount: 100, date: new Date(Date.now() - 2 * 86400000).toISOString() },
       ];
       setActivity(mock);
-    }, 1200);
+    }, LOADING_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 

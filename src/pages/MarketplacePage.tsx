@@ -5,6 +5,7 @@ import FiltersSidebar from "../components/FiltersSidebar";
 import EmptyState from "../components/EmptyState";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
+import { LOADING_DELAY_MS } from "../config/constants";
 
 export default function MarketplacePage(): JSX.Element {
   const [search, setSearch] = useState("");
@@ -25,7 +26,7 @@ export default function MarketplacePage(): JSX.Element {
     // Simulate initial data loading
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 1500);
+    }, LOADING_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 

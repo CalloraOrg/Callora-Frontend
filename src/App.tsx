@@ -5,7 +5,13 @@ import ApiUsage from './ApiUsage';
 import Dashboard from './components/Dashboard';
 import ServerError from './components/ServerError';
 import NotFound from './components/NotFound';
-import Dashboard from './components/Dashboard';
+import { formatUsdc, formatUsdShortcut } from './utils/format';
+import {
+  EXPLORER_BASE_URL,
+  MIN_DEPOSIT,
+  NETWORK_FEE,
+  PRESET_AMOUNTS,
+} from './config/constants';
 
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
 type DemoOutcome = 'confirmed' | 'failed';
@@ -91,10 +97,7 @@ const developerSteps: Step[] = [
   },
 ];
 
-const PRESET_AMOUNTS = [10, 50, 100, 500] as const;
-const MIN_DEPOSIT = 10;
-const NETWORK_FEE = "0.00001 XLM";
-const EXPLORER_BASE_URL = "https://stellar.expert/explorer/testnet/tx/";
+
 
 const APP_ROUTES = {
   landing: "/",
@@ -107,18 +110,7 @@ const APP_ROUTES = {
   serverError: "/500",
 } as const;
 
-function formatUsdc(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
 
-function formatUsdShortcut(value: number) {
-  return `$${new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: value >= 100 ? 0 : 2,
-  }).format(value)}`;
-}
 
 function createMockHash() {
   const seed = `${Date.now().toString(16)}${Math.random()

@@ -1,4 +1,5 @@
 import Skeleton from "./Skeleton";
+import { formatPrice } from "../utils/format";
 
 export function ApiCardSkeleton() {
   return (
@@ -63,7 +64,7 @@ export default function ApiCard({
   api: any;
   onViewDetails?: (api: any) => void;
 }) {
-  const currency = (n: number) => `$${n.toFixed(3)}`;
+
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -129,7 +130,7 @@ export default function ApiCard({
 
         <div className="api-marketplace-card-price" style={{ textAlign: "right" }}>
           <div style={{ color: "var(--muted)", fontSize: 12 }}>
-            {currency(api.pricePerRequest)} / req
+            {`$${formatPrice(api.pricePerRequest)}`} / req
           </div>
           {api.rating !== undefined && (
             <div style={{ color: "var(--muted)", marginTop: 6 }}>

@@ -4,6 +4,8 @@ import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
 import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
+import { formatPrice } from "../utils/format";
+import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 
 /**
  * ApiDetailPage Component
@@ -43,7 +45,7 @@ export default function ApiDetailPage({ onBack }: Props) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 1500);
+    }, LOADING_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 
@@ -234,23 +236,22 @@ export default function ApiDetailPage({ onBack }: Props) {
     return null; // This should not happen due to the check above, but kept for safety
   }
 
-  const currency = (n: number) => `$${n.toFixed(3)}`;
+
 
   // Example Generation Logic
   const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
     url: "/v1/data",
     method: "GET",
   };
-  const baseUrl = "https://api.callora.com";
 
-  const curlExample = `curl -X ${firstEndpoint.method} "${baseUrl}${firstEndpoint.url}?lat=37.78&lon=-122.41" \\
+  const curlExample = `curl -X ${firstEndpoint.method} "${API_BASE_URL}${firstEndpoint.url}?lat=37.78&lon=-122.41" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json"`;
 
   const jsExample = `import fetch from 'node-fetch';
 
 const getApiData = async () => {
-  const response = await fetch('${baseUrl}${firstEndpoint.url}', {
+  const response = await fetch('${API_BASE_URL}${firstEndpoint.url}', {
     method: '${firstEndpoint.method}',
     headers: { 
       'Authorization': 'Bearer YOUR_API_KEY',
@@ -268,7 +269,7 @@ getApiData().then(console.log).catch(console.error);`;
 
   const pyExample = `import requests
 
-url = "${baseUrl}${firstEndpoint.url}"
+url = "${API_BASE_URL}${firstEndpoint.url}"
 headers = {
     "Authorization": "Bearer YOUR_API_KEY",
     "Content-Type": "application/json"
@@ -314,7 +315,7 @@ print(data)`;
                   <div className="api-detail-meta">
                     <a href={api.provider?.url}>{api.provider?.name}</a> ·{" "}
                     <strong style={{ color: "var(--accent-strong)" }}>
-                      {currency(api.pricePerRequest ?? 0)}
+                      {`$${formatPrice(api.pricePerRequest ?? 0)}`}
                     </strong>{" "}
                     per request
                   </div>
@@ -335,7 +336,7 @@ print(data)`;
             </div>
             <div className="api-detail-price-panel">
               <div className="api-detail-price">
-                {currency(api.pricePerRequest ?? 0)}
+                {`$${formatPrice(api.pricePerRequest ?? 0)}`}
               </div>
               <div className="api-detail-price-label">
                 per successful request
@@ -535,7 +536,7 @@ print(data)`;
                     <div className="endpoint-section-header">
                       <h3>Available Endpoints</h3>
                       <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                        Base URL: <code>{baseUrl}</code>
+                        Base URL: <code>{API_BASE_URL}</code>
                       </span>
                     </div>
 
@@ -661,7 +662,7 @@ print(data)`;
                           Standard
                         </div>
                         <div className="api-detail-plan-price">
-                          {currency(api.pricePerRequest ?? 0)}{" "}
+                          {`$${formatPrice(api.pricePerRequest ?? 0)}`}{" "}
                           <span style={{ fontSize: 14, color: "var(--muted)" }}>
                             / call
                           </span>

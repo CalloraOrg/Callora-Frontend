@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import EmptyState from './components/EmptyState';
+import Skeleton from './components/Skeleton';
+import { formatPrice } from './utils/format';
 
 type ApiEndpoint = {
   id: string;
@@ -114,12 +116,7 @@ curl -X GET "https://api.callora.com/v1/user/profile" \\
   -H "Content-Type: application/json"`
 };
 
-function formatUsdc(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
-  }).format(value);
-}
+
 
 function formatTime(ms: number) {
   if (ms < 1000) return `${ms}ms`;
@@ -147,7 +144,7 @@ export default function ApiUsage() {
   const [callCost, setCallCost] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
+
   const filteredCallHistory = statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter);
   const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
@@ -403,7 +400,7 @@ export default function ApiUsage() {
               <div className="response-content">
                 <div className="response-meta">
                   <span className="response-time">Response time: {formatTime(responseTime || 0)}</span>
-                  <span className="response-cost">Cost: {formatUsdc(callCost || 0)} USDC</span>
+                  <span className="response-cost">Cost: {formatPrice(callCost || 0)} USDC</span>
                 </div>
                 <pre className="response-json">
                   {JSON.stringify(apiResponse, null, 2)}
@@ -428,7 +425,7 @@ export default function ApiUsage() {
           </div>
           <div className="stat-card">
             <span className="stat-label">Total Spent</span>
-            <strong className="stat-value">{formatUsdc(usageStats.totalSpent)} USDC</strong>
+            <strong className="stat-value">{formatPrice(usageStats.totalSpent)} USDC</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Avg Response Time</span>
@@ -507,7 +504,7 @@ export default function ApiUsage() {
                       {call.status === 'success' ? '✓' : '✗'} {call.status}
                     </span>
                     <span>{formatTime(call.responseTime)}</span>
-                    <span>{formatUsdc(call.cost)} USDC</span>
+                    <span>{formatPrice(call.cost)} USDC</span>
                     <span>
                       <button
                         className="ghost-button"
