@@ -74,6 +74,8 @@ callora-frontend/
 │   ├── ThemeContext.tsx      # Light/dark theme context
 │   ├── ThemeToggle.tsx      # Theme toggle component
 │   ├── ApiUsage.tsx         # API usage analytics view
+│   ├── config/              # Shared app configuration
+│   │   └── constants.ts     # App constants (URLs, deposit limits, loading delay)
 │   ├── components/          # Shared UI components
 │   │   ├── ApiCard.tsx
 │   │   ├── Breadcrumb.tsx
@@ -94,7 +96,7 @@ callora-frontend/
 │   ├── data/                # Static and mock data
 │   │   └── mockApis.ts
 │   ├── utils/               # Utility functions
-│   │   └── format.ts
+│   │   └── format.ts        # Currency formatters (formatUsdc, formatUsdShortcut, formatPrice)
 │   └── vite-env.d.ts
 ├── docs/
 │   └── UI-Design-System.md
