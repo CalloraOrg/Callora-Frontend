@@ -107,7 +107,7 @@ All shared components are located in `src/components/`. Use these components ins
 Displays API information in a card format for marketplace listings.
 
 **Props:**
-- `api: any` - API object containing name, description, provider, price, rating, tags
+- `api: any` - API object containing name, description, provider, tags, rating, and footer stats (`pricePerCall`, `avgLatencyMs`, `uptimePercent`)
 - `onViewDetails?: (api: any) => void` - Callback when "View Details" is clicked
 
 **Variants:**
@@ -121,6 +121,9 @@ Displays API information in a card format for marketplace listings.
 - Hover: Lift effect (translateY -4px), enhanced shadow, accent border
 - Background: Uses `--surface-soft` token
 - Tags: Rounded pills (8px radius) with `--muted` text
+- Footer: Three-column micro-stat row with a muted label above a prominent value for price, latency, and uptime
+- Numeric values: Use tabular numerals for easier comparison across marketplace rows
+- Missing stats: Render a muted em dash so card heights remain consistent
 
 **States:**
 - Default: Subtle border, no shadow
