@@ -841,53 +841,17 @@ function App() {
                 </div>
               </div>
 
-              <div className="preview-panel">
-                <article className="preview-card">
-                  <div className="preview-header">
-                    <div>
-                      <span className="eyebrow">Transaction preview</span>
-                      <h3>Review before wallet approval</h3>
-                    </div>
-                    <span className="preview-highlight">Secure preview</span>
-                  </div>
-
-                  <div className="preview-row">
-                    <span>Deposit amount</span>
-                    <strong>
-                      {hasAmount || submittedAmount
-                        ? `${balanceDelta} USDC`
-                        : "--"}
-                    </strong>
-                  </div>
-
-                  <div className="preview-row">
-                    <span>Current balance</span>
-                    <strong>{formatUsdc(previewCurrentBalance)} USDC</strong>
-                  </div>
-
-                  <div className="preview-row emphasis">
-                    <span>New balance</span>
-                    <strong>
-                      {hasAmount || submittedAmount
-                        ? `${formatUsdc(projectedBalance)} USDC`
-                        : "--"}
-                    </strong>
-                  </div>
-
-                  <div className="preview-row">
-                    <span>Network fee</span>
-                    <strong>{NETWORK_FEE}</strong>
-                  </div>
-
-                  <div className="preview-row total">
-                    <span>Total cost</span>
-                    <strong>
-                      {hasAmount || submittedAmount
-                        ? `${balanceDelta} USDC + ${NETWORK_FEE}`
-                        : `0.00 USDC + ${NETWORK_FEE}`}
-                    </strong>
-                  </div>
-                </article>
+          <div className="preview-panel">
+            <DepositPreview
+              previewCurrentBalance={previewCurrentBalance}
+              projectedBalance={projectedBalance}
+              networkFee={NETWORK_FEE}
+              amount={activeAmount}
+              walletBalance={walletBalance}
+              hasAmount={hasAmount || submittedAmount !== null}
+              ariaLabel="Deposit transaction preview"
+            />
+          </div>
 
                 {(depositStage === "pending" ||
                   depositStage === "confirmed" ||
