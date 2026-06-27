@@ -2,6 +2,8 @@ import { useMemo, useState, useEffect } from "react";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
+import EmbedPreview from "../components/EmbedPreview";
+import useDocumentTitle from "../hooks/useDocumentTitle";
 import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 import { formatPrice } from "../utils/format";
@@ -26,7 +28,8 @@ type TabType =
   | "documentation"
   | "pricing"
   | "examples"
-  | "reviews";
+  | "reviews"
+  | "embed";
 
 export default function ApiDetailPage({ onBack }: Props) {
   const [tab, setTab] = useState<TabType>("overview");
@@ -357,6 +360,7 @@ print(data)`;
                     "pricing",
                     "examples",
                     "reviews",
+                    "embed",
                   ] as TabType[]
                 ).map((t) => (
                   <button
@@ -895,6 +899,39 @@ print(data)`;
                         choices.
                       </p>
                     </div>
+                  </section>
+                )}
+
+                {/* EMBED TAB */}
+                {tab === "embed" && (
+                  <section>
+                    <div
+                      className="preview-card"
+                      style={{ padding: 24, marginBottom: 24 }}
+                    >
+                      <h3 style={{ marginTop: 0 }}>Embed Widget</h3>
+                      <p
+                        style={{
+                          color: "var(--muted)",
+                          marginBottom: 24,
+                          fontSize: 14,
+                        }}
+                      >
+                        Embed a real-time widget on your website to showcase
+                        this API's performance metrics. Customize the size and
+                        copy the embed code below.
+                      </p>
+                    </div>
+
+                    <EmbedPreview
+                      providerName={api.provider?.name || "Unknown Provider"}
+                      stats={{
+                        totalCalls: api.stats?.totalCalls ?? 0,
+                        avgLatencyMs: api.stats?.avgResponseMs ?? 0,
+                        uptime: api.stats?.uptimePct ?? 0,
+                      }}
+                      apiId={id || "unknown"}
+                    />
                   </section>
                 )}
               </div>
