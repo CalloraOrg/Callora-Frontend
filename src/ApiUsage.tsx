@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import EmptyState from './components/EmptyState';
-import PlanNudge from './components/PlanNudge';
-import Skeleton from './components/Skeleton';
-import { useQuota } from './hooks/useQuota';
+import Skeleton, { SkeletonRow } from './components/Skeleton';
 import { formatPrice } from './utils/format';
 import RequestBodyEditor from './components/RequestBodyEditor';
 import type { JsonSchema } from './components/RequestBodyEditor';
@@ -627,53 +625,54 @@ export default function ApiUsage() {
           </div>
         </div>
         
-        <div className="call-history-table">
-          <div className="table-header">
-            <span>Timestamp</span>
-            <span>Endpoint</span>
-            <span>Status</span>
-            <span>Response Time</span>
-            <span>Cost</span>
-            <span>Actions</span>
-          </div>
-          
-        {filteredCallHistory.length === 0 ? (
-                <EmptyState message="No call records match the selected filter." />
-              ) : (
-                filteredCallHistory.map(call => (
-                  <div key={call.id} className="table-row">
-                    <span>{formatTimestamp(call.timestamp)}</span>
-                    <span className="endpoint-cell">{call.endpoint}</span>
-                    <span className={`status-cell ${call.status}`}>
-                      {call.status === 'success' ? <Icons.Success size={16} /> : <Icons.Error size={16} />} {call.status}
-                    </span>
-                    <span>{formatTime(call.responseTime)}</span>
-                    <span>{formatPrice(call.cost)} USDC</span>
-                    <span>
-                      <button
-                        className="ghost-button"
-                        onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
-                      >
-                        {expandedCall === call.id ? 'Hide' : 'View'}
-                      </button>
-                    </span>
+        <div className="call-history-table" aria-busy={isLoading}>
+           <div className="table-header">
+             <span>Timestamp</span>
+             <span>Endpoint</span>
+             <span>Status</span>
+             <span>Response Time</span>
+             <span>Cost</span>
+             <span>Actions</span>
+           </div>
 
-                    {expandedCall === call.id && (
-                      <div className="expanded-details">
-                        <div className="detail-section">
-                          <h4>Request</h4>
-                          <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
-                        </div>
-                        <div className="detail-section">
-                          <h4>Response</h4>
-                          <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-        </div>
+           {isLoading ? (
+             <SkeletonRow rows={5} />
+           ) : filteredCallHistory.length === 0 ? (
+             <EmptyState message="No call records match the selected filter." />
+           ) : (
+             filteredCallHistory.map(call => (
+               <div key={call.id} className="table-row">
+                 <span>{formatTimestamp(call.timestamp)}</span>
+                 <span className="endpoint-cell">{call.endpoint}</span>
+                 <span className={`status-cell ${call.status}`}>
+                   {call.status === 'success' ? '✓' : '✗'} {call.status}
+                 </span>
+                 <span>{formatTime(call.responseTime)}</span>
+                 <span>{formatPrice(call.cost)} USDC</span>
+                 <span>
+                   <button
+                     className="ghost-button"
+                     onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
+                   >
+                     {expandedCall === call.id ? 'Hide' : 'View'}
+                   </button>
+                 </span>
+                 {expandedCall === call.id && (
+                   <div className="expanded-details">
+                     <div className="detail-section">
+                       <h4>Request</h4>
+                       <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
+                     </div>
+                     <div className="detail-section">
+                       <h4>Response</h4>
+                       <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
+                     </div>
+                   </div>
+                 )}
+               </div>
+             ))
+           )}
+         </div></div>
       </div>
 
       {/* Integration Guide */}
