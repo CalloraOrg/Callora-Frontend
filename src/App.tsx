@@ -909,9 +909,23 @@ function App() {
                   </div>
                 </div>
 
-                <div className="preview-panel">
-                  <article className="preview-card">
-                    <div className="preview-header">
+          <div className="preview-panel">
+            <DepositPreview
+              previewCurrentBalance={previewCurrentBalance}
+              projectedBalance={projectedBalance}
+              networkFee={NETWORK_FEE}
+              amount={activeAmount}
+              walletBalance={walletBalance}
+              hasAmount={hasAmount || submittedAmount !== null}
+              ariaLabel="Deposit transaction preview"
+            />
+          </div>
+
+                {(depositStage === "pending" ||
+                  depositStage === "confirmed" ||
+                  depositStage === "failed") &&
+                  txHash && (
+                    <article className="hash-card">
                       <div>
                         <span className="eyebrow">Transaction preview</span>
                         <h3>Review before wallet approval</h3>
