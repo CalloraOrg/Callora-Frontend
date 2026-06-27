@@ -446,7 +446,7 @@ print(data)`;
                 <div className="api-detail-title">
                   <h1>{api.name}</h1>
                   <div className="api-detail-meta">
-                    <a href={api.provider?.url}>{api.provider?.name}</a> ·{" "}
+                    <a href={api.provider?.url} className="link-body">{api.provider?.name}</a> ·{" "}
                     <strong style={{ color: "var(--accent-strong)" }}>
                       {`$${formatPrice(api.pricePerRequest ?? 0)}`}
                     </strong>{" "}
@@ -457,10 +457,7 @@ print(data)`;
                   Published by{" "}
                   <a
                     href={api.provider?.url}
-                    style={{
-                      color: "var(--text-main)",
-                      textDecoration: "none",
-                    }}
+                    className="link-body"
                   >
                     {api.provider?.name}
                   </a>

@@ -24,7 +24,7 @@ function BreadcrumbLink({ item }: { item: BreadcrumbItem }) {
   }
 
   return (
-    <a className="breadcrumb-link" href={item.href} title={item.label}>
+    <a className="breadcrumb-link link-nav" href={item.href} title={item.label}>
       {item.label}
     </a>
   );
@@ -108,7 +108,6 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
           .breadcrumb-link,
           .breadcrumb-popover-link {
             color: var(--accent);
-            text-decoration: none;
             padding: 4px 0;
           }
 
@@ -245,7 +244,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                         {middleItems.map((middleItem) => (
                           <li key={middleItem.href} role="none">
                             <a
-                              className="breadcrumb-popover-link"
+                              className="breadcrumb-popover-link link-nav"
                               href={middleItem.href}
                               role="menuitem"
                             >
