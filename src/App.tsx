@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import useDocumentTitle from './hooks/useDocumentTitle';
 import { ThemeToggle } from './ThemeToggle';
 import ApiUsage from './ApiUsage';
 import Dashboard from './components/Dashboard';
@@ -272,6 +273,7 @@ function LandingPage({
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: 'Marketplace – Callora',
     [APP_ROUTES.dashboard]: 'Dashboard – Callora',
