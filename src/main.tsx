@@ -25,6 +25,13 @@ async function renderRoute() {
     </React.StrictMode>
   );
 
+  if (pathname.startsWith("/publish")) {
+    const mod = await import("./pages/PublishApi");
+    const PublishApi = mod.default;
+    root.render(wrap(<PublishApi />));
+    return;
+  }
+
   if (pathname.startsWith("/marketplace")) {
     const mod = await import("./pages/MarketplacePage");
     const MarketplacePage = mod.default;
