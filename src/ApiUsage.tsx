@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import EmptyState from './components/EmptyState';
+import Skeleton from './components/Skeleton';
+import { formatPrice } from './utils/format';
 
 type ApiEndpoint = {
   id: string;
@@ -113,12 +116,7 @@ curl -X GET "https://api.callora.com/v1/user/profile" \\
   -H "Content-Type: application/json"`
 };
 
-function formatUsdc(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
-  }).format(value);
-}
+
 
 function formatTime(ms: number) {
   if (ms < 1000) return `${ms}ms`;
@@ -144,7 +142,10 @@ export default function ApiUsage() {
   const [apiResponse, setApiResponse] = useState<any>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
+
+  const filteredCallHistory = statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter);
   const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
   
@@ -365,24 +366,41 @@ export default function ApiUsage() {
           </div>
           
           <button
-            className="primary-button"
+            className={`primary-button ${isLoading ? 'button-loading' : ''}`}
             onClick={handleMakeTestCall}
             disabled={isLoading}
           >
+            {isLoading && <span className="button-spinner" aria-hidden="true" />}
             {isLoading ? 'Making Call...' : 'Make Test Call'}
           </button>
         </div>
         
         {(apiResponse || isLoading) && (
-          <div className="response-display">
+          <div 
+            className="response-display"
+            aria-live="polite"
+            aria-busy={isLoading}
+          >
             <h3>Response</h3>
             {isLoading ? (
-              <div className="loading-placeholder">Loading...</div>
+              <div className="response-content">
+                <div className="response-meta">
+                  <Skeleton width="120px" height="18px" borderRadius="4px" />
+                  <Skeleton width="100px" height="18px" borderRadius="4px" />
+                </div>
+                <div className="response-json-skeleton">
+                  <Skeleton width="60%" height="16px" borderRadius="4px" />
+                  <Skeleton width="80%" height="16px" borderRadius="4px" />
+                  <Skeleton width="45%" height="16px" borderRadius="4px" />
+                  <Skeleton width="70%" height="16px" borderRadius="4px" />
+                  <Skeleton width="30%" height="16px" borderRadius="4px" />
+                </div>
+              </div>
             ) : (
               <div className="response-content">
                 <div className="response-meta">
                   <span className="response-time">Response time: {formatTime(responseTime || 0)}</span>
-                  <span className="response-cost">Cost: {formatUsdc(callCost || 0)} USDC</span>
+                  <span className="response-cost">Cost: {formatPrice(callCost || 0)} USDC</span>
                 </div>
                 <pre className="response-json">
                   {JSON.stringify(apiResponse, null, 2)}
@@ -407,7 +425,7 @@ export default function ApiUsage() {
           </div>
           <div className="stat-card">
             <span className="stat-label">Total Spent</span>
-            <strong className="stat-value">{formatUsdc(usageStats.totalSpent)} USDC</strong>
+            <strong className="stat-value">{formatPrice(usageStats.totalSpent)} USDC</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Avg Response Time</span>
@@ -420,7 +438,7 @@ export default function ApiUsage() {
         </div>
         
         <div className="mini-chart">
-          <h4>Calls Over Time</h4>
+          <h3>Calls Over Time</h3>
           <div className="chart-placeholder">
             {/* Simple bar chart visualization */}
             <div className="chart-bars">
@@ -446,11 +464,16 @@ export default function ApiUsage() {
         <div className="section-header">
           <h2>Call History</h2>
           <div className="history-actions">
-            <select className="filter-select">
-              <option>All Status</option>
-              <option>Success</option>
-              <option>Error</option>
-            </select>
+            <select
+                className="filter-select"
+                aria-label="Call status filter"
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value as 'all' | 'success' | 'error')}
+              >
+                <option value="all">All Status</option>
+                <option value="success">Success</option>
+                <option value="error">Error</option>
+              </select>
             <button className="secondary-button" onClick={() => handleExportHistory('csv')}>
               Export CSV
             </button>
@@ -470,38 +493,42 @@ export default function ApiUsage() {
             <span>Actions</span>
           </div>
           
-          {callHistory.map(call => (
-            <div key={call.id} className="table-row">
-              <span>{formatTimestamp(call.timestamp)}</span>
-              <span className="endpoint-cell">{call.endpoint}</span>
-              <span className={`status-cell ${call.status}`}>
-                {call.status === 'success' ? '✓' : '✗'} {call.status}
-              </span>
-              <span>{formatTime(call.responseTime)}</span>
-              <span>{formatUsdc(call.cost)} USDC</span>
-              <span>
-                <button
-                  className="ghost-button"
-                  onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
-                >
-                  {expandedCall === call.id ? 'Hide' : 'View'}
-                </button>
-              </span>
-              
-              {expandedCall === call.id && (
-                <div className="expanded-details">
-                  <div className="detail-section">
-                    <h4>Request</h4>
-                    <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
+        {filteredCallHistory.length === 0 ? (
+                <EmptyState message="No call records match the selected filter." />
+              ) : (
+                filteredCallHistory.map(call => (
+                  <div key={call.id} className="table-row">
+                    <span>{formatTimestamp(call.timestamp)}</span>
+                    <span className="endpoint-cell">{call.endpoint}</span>
+                    <span className={`status-cell ${call.status}`}>
+                      {call.status === 'success' ? '✓' : '✗'} {call.status}
+                    </span>
+                    <span>{formatTime(call.responseTime)}</span>
+                    <span>{formatPrice(call.cost)} USDC</span>
+                    <span>
+                      <button
+                        className="ghost-button"
+                        onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
+                      >
+                        {expandedCall === call.id ? 'Hide' : 'View'}
+                      </button>
+                    </span>
+
+                    {expandedCall === call.id && (
+                      <div className="expanded-details">
+                        <div className="detail-section">
+                          <h4>Request</h4>
+                          <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
+                        </div>
+                        <div className="detail-section">
+                          <h4>Response</h4>
+                          <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="detail-section">
-                    <h4>Response</h4>
-                    <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
-                  </div>
-                </div>
+                ))
               )}
-            </div>
-          ))}
         </div>
       </div>
 
