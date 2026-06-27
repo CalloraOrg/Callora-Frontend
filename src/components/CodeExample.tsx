@@ -1,78 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { usePersistedState } from "../hooks/usePersistedState";
 
 /**
- * UPDATED COMPONENT FOR ISSUE #59:
- * - Features tabbed navigation for multiple code snippets.
- * - Integrated copy-to-clipboard with visual feedback toast.
- * - Accessible roles (tablist, tab) for keyboard users.
- * - Minimalist design that respects CSS variables.
- * - Persists last-used language under localStorage key `callora.prefs.codeLang`.
+ * UPDATED COMPONENT FOR ISSUE #188:
+ * - Features tabbed navigation for multiple code snippets with roving tabindex.
+ * - Language persistence with usePersistedState hook.
+ * - Enhanced copy-to-clipboard with visual feedback and tooltip affordance.
+ * - Full WCAG 2.1 AA accessibility with keyboard navigation.
+ * - Minimalist design that respects CSS variables and focus states.
  */
 
 type CodeExampleProps = {
-  /** * An object where keys are language names and values are the code strings.
+  /** An object where keys are language names and values are the code strings.
    * Example: { "bash": "curl...", "javascript": "fetch..." }
    */
   snippets: Record<string, string>;
   defaultLanguage?: string;
 };
 
-const USER_PREFS_KEY = "callora.prefs";
-const CODE_LANG_KEY = "codeLang";
-
-function readUserPrefs(): Record<string, unknown> | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const stored = localStorage.getItem(USER_PREFS_KEY);
-  if (!stored) return null;
-
-  try {
-    return JSON.parse(stored) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function writeUserPref(key: string, value: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const currentPrefs = readUserPrefs() || {};
-  const nextPrefs = { ...currentPrefs, [key]: value };
-
-  try {
-    localStorage.setItem(USER_PREFS_KEY, JSON.stringify(nextPrefs));
-  } catch {
-    // Silently ignore storage failures to avoid runtime warnings.
-  }
-}
-
-function getPersistedLanguage(snippets: Record<string, string>): string | undefined {
-  const prefs = readUserPrefs();
-  const persisted = prefs?.[CODE_LANG_KEY];
-  return typeof persisted === "string" && persisted in snippets ? persisted : undefined;
-}
-
-function getInitialLanguage(
-  snippets: Record<string, string>,
-  defaultLanguage?: string
-): string {
-  const languages = Object.keys(snippets);
-  const persisted = getPersistedLanguage(snippets);
-
-  if (persisted) {
-    return persisted;
-  }
-
-  if (defaultLanguage && defaultLanguage in snippets) {
-    return defaultLanguage;
-  }
-
-  return languages[0] || "";
-}
+const STORAGE_KEY = "callora:codeExample:language";
 
 export default function CodeExample({
   snippets,
@@ -81,24 +27,31 @@ export default function CodeExample({
   // Extract available languages from the snippets keys
   const languages = Object.keys(snippets);
   
-  // State to manage the active language tab and the 'Copied' feedback status
-  const [activeTab, setActiveTab] = useState(() =>
-    getInitialLanguage(snippets, defaultLanguage)
+  // Use persisted state for language selection
+  const [activeLanguage, setActiveLanguage] = usePersistedState<string>(
+    STORAGE_KEY,
+    defaultLanguage && defaultLanguage in snippets
+      ? defaultLanguage
+      : languages[0] || ""
   );
+
+  // Validate persisted language is still in current languages list
+  const resolvedLanguage = languages.includes(activeLanguage)
+    ? activeLanguage
+    : languages[0] || "";
+
+  // State for copy feedback
   const [copied, setCopied] = useState(false);
 
-  // Retrieve the code string based on the currently selected tab
-  const activeCode = snippets[activeTab] || "";
+  // Ref for tab list (used for keyboard navigation)
+  const tablistRef = useRef<HTMLDivElement>(null);
 
-  // Persist the selected language across page navigation and future mounts.
-  useEffect(() => {
-    if (!activeTab) return;
-    writeUserPref(CODE_LANG_KEY, activeTab);
-  }, [activeTab]);
+  // Retrieve the code string based on the currently selected language
+  const activeCode = snippets[resolvedLanguage] || "";
 
-  // When the available languages change, ensure the active tab remains valid.
+  // When the available languages change, ensure the active language remains valid.
   useEffect(() => {
-    if (activeTab && activeTab in snippets) return;
+    if (resolvedLanguage && resolvedLanguage in snippets) return;
 
     const availableLanguages = Object.keys(snippets);
     const fallback =
@@ -106,24 +59,65 @@ export default function CodeExample({
         ? defaultLanguage
         : availableLanguages[0] || "";
 
-    if (fallback !== activeTab) {
-      setActiveTab(fallback);
+    if (fallback !== resolvedLanguage) {
+      setActiveLanguage(fallback);
     }
-  }, [snippets, activeTab, defaultLanguage]);
+  }, [snippets, resolvedLanguage, defaultLanguage, setActiveLanguage]);
 
   /**
-   * Handles the clipboard copy action. 
-   * Provides immediate visual feedback by changing the button text.
+   * Handles the clipboard copy action with fallback.
+   * Provides immediate visual feedback.
    */
   const handleCopy = async () => {
     if (!activeCode) return;
+
     try {
-      await navigator.clipboard.writeText(activeCode);
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(activeCode);
+      } else {
+        // Fallback for browsers without clipboard API
+        const textarea = document.createElement("textarea");
+        textarea.value = activeCode;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+
       setCopied(true);
-      // Revert the button text back to 'Copy' after 1.5 seconds
-      window.setTimeout(() => setCopied(false), 1500);
+      // Revert the button text after 2 seconds
+      window.setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy text: ", err);
+    }
+  };
+
+  /**
+   * Handles keyboard navigation in tab strip (arrow keys, Home, End).
+   * Implements roving tabindex pattern.
+   */
+  const handleTabKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
+    let nextIndex: number | null = null;
+
+    if (e.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % languages.length;
+    } else if (e.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + languages.length) % languages.length;
+    } else if (e.key === "Home") {
+      nextIndex = 0;
+    } else if (e.key === "End") {
+      nextIndex = languages.length - 1;
+    }
+
+    if (nextIndex !== null) {
+      e.preventDefault();
+      setActiveLanguage(languages[nextIndex]);
+
+      // Move DOM focus to the newly selected tab
+      const tabs = tablistRef.current?.querySelectorAll("[role=\"tab\"]");
+      (tabs?.[nextIndex] as HTMLElement)?.focus();
     }
   };
 
@@ -147,26 +141,43 @@ export default function CodeExample({
           borderBottom: "1px solid var(--border-subtle)",
         }}
       >
-        {/* Navigation Tabs List */}
-        <div style={{ display: "flex", gap: "4px" }} role="tablist">
-          {languages.map((lang) => (
+        {/* Navigation Tabs List with Roving Tabindex */}
+        <div 
+          ref={tablistRef}
+          style={{ display: "flex", gap: "4px" }} 
+          role="tablist"
+          aria-label="Code language"
+        >
+          {languages.map((lang, index) => (
             <button
               key={lang}
               role="tab"
-              aria-selected={activeTab === lang}
-              onClick={() => setActiveTab(lang)}
+              id={`tab-${lang}`}
+              aria-selected={resolvedLanguage === lang}
+              aria-controls={`tabpanel-${lang}`}
+              tabIndex={resolvedLanguage === lang ? 0 : -1}
+              onClick={() => setActiveLanguage(lang)}
+              onKeyDown={(e) => handleTabKeyDown(e, index)}
               style={{
                 padding: "4px 10px",
                 fontSize: "11px",
-                fontWeight: activeTab === lang ? 600 : 400,
-                color: activeTab === lang ? "var(--text-main)" : "var(--muted)",
-                background: activeTab === lang ? "var(--bg-highlight, #fff)" : "transparent",
+                fontWeight: resolvedLanguage === lang ? 600 : 400,
+                color: resolvedLanguage === lang ? "var(--text-main)" : "var(--muted)",
+                background: resolvedLanguage === lang ? "var(--bg-highlight, #fff)" : "transparent",
                 border: "1px solid",
-                borderColor: activeTab === lang ? "var(--border-subtle)" : "transparent",
+                borderColor: resolvedLanguage === lang ? "var(--border-subtle)" : "transparent",
                 borderRadius: "4px",
                 cursor: "pointer",
                 textTransform: "uppercase",
                 transition: "all 0.2s ease",
+                outline: "none",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.outline = "2px solid var(--accent, #4e85ff)";
+                e.currentTarget.style.outlineOffset = "2px";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.outline = "none";
               }}
             >
               {lang}
@@ -174,37 +185,82 @@ export default function CodeExample({
           ))}
         </div>
 
-        {/* Action: Copy to Clipboard */}
-        <button
-          className="ghost-button"
-          onClick={handleCopy}
-          aria-label="Copy code snippet to clipboard"
-          style={{
-            padding: "5px 12px",
-            fontSize: "11px",
-            minWidth: "75px",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          {copied ? (
-            <span style={{ 
-              color: "var(--success, #10b981)", 
-              display: "flex", 
-              alignItems: "center", 
-              gap: "4px" 
-            }}>
-              ✓ Copied
-            </span>
-          ) : (
-            "Copy"
-          )}
-        </button>
+        {/* Action: Copy to Clipboard with Enhanced Affordance */}
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={handleCopy}
+            aria-label={copied ? "Copied to clipboard" : "Copy code snippet"}
+            style={{
+              padding: "5px 12px",
+              fontSize: "11px",
+              fontWeight: 500,
+              minWidth: "75px",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: "4px",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "4px",
+              background: "var(--bg-highlight, #fff)",
+              color: copied ? "var(--success, #10b981)" : "var(--text-main)",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              outline: "none",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.outline = "2px solid var(--accent, #4e85ff)";
+              e.currentTarget.style.outlineOffset = "2px";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.outline = "none";
+            }}
+          >
+            {copied ? (
+              <>
+                <span style={{ fontSize: "12px" }}>✓</span>
+                Copied
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: "12px" }}>📋</span>
+                Copy
+              </>
+            )}
+          </button>
+
+          {/* Tooltip for copy affordance */}
+          <span
+            role="tooltip"
+            style={{
+              position: "absolute",
+              bottom: "110%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              padding: "4px 8px",
+              fontSize: "11px",
+              whiteSpace: "nowrap",
+              background: "var(--text-main)",
+              color: "var(--bg-soft)",
+              borderRadius: "4px",
+              opacity: copied ? 1 : 0,
+              pointerEvents: "none",
+              transition: "opacity 0.2s ease",
+              zIndex: 10,
+            }}
+          >
+            {copied ? "Copied!" : "Copy"}
+          </span>
+        </div>
       </div>
 
       {/* Code Display Area */}
-      <div style={{ padding: "16px 12px" }}>
+      <div
+        role="tabpanel"
+        id={`tabpanel-${resolvedLanguage}`}
+        aria-labelledby={`tab-${resolvedLanguage}`}
+        tabIndex={0}
+        style={{ padding: "16px 12px" }}
+      >
         <pre
           style={{
             margin: 0,
@@ -219,6 +275,33 @@ export default function CodeExample({
           <code>{activeCode}</code>
         </pre>
       </div>
+
+      {/* Screen reader announcement for copy success */}
+      <span
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: "absolute",
+          left: "-10000px",
+          width: "1px",
+          height: "1px",
+          overflow: "hidden",
+        }}
+      >
+        {copied ? "Code copied to clipboard" : ""}
+      </span>
+
+      <style>{`
+        .code-example-tab:focus-visible {
+          outline: 2px solid var(--accent, #4e85ff);
+          outline-offset: 2px;
+        }
+
+        .code-example-copy:focus-visible {
+          outline: 2px solid var(--accent, #4e85ff);
+          outline-offset: 2px;
+        }
+      `}</style>
     </div>
   );
 }
