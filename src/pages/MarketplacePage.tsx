@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-
+import { useEffect, useMemo, useRef, useState } from "react";
 import ApiCard, { ApiCardSkeleton } from "../components/ApiCard";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import FiltersSidebar from "../components/FiltersSidebar";
-import EmptyState from "../components/EmptyState";
+import FiltersBottomSheet from "../components/FiltersBottomSheet";
+import EmptyState, { type EmptyStateProps } from "../components/EmptyState";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
 import { LOADING_DELAY_MS } from "../config/constants";
@@ -50,6 +49,9 @@ export default function MarketplacePage(): JSX.Element {
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Ref used to restore focus to the Filters trigger after the sheet closes
+  const filtersTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     // Simulate initial data loading with occasional error for testing
@@ -94,6 +96,16 @@ export default function MarketplacePage(): JSX.Element {
       popularity !== "any"
     );
   };
+
+  /**
+   * Count of actively-applied filter dimensions — shown as a badge on the
+   * mobile Filters trigger button.
+   */
+  const activeFilterCount =
+    selectedCategories.size +
+    (minPrice !== null ? 1 : 0) +
+    (maxPrice !== null ? 1 : 0) +
+    (popularity !== "any" ? 1 : 0);
 
   /**
    * Handle retry for fetch errors.
@@ -239,11 +251,31 @@ export default function MarketplacePage(): JSX.Element {
             </div>
 
             <div className="marketplace-actions">
+              <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="relevance">Relevance</option>
+                <option value="priceAsc">Price: low → high</option>
+                <option value="priceDesc">Price: high → low</option>
+                <option value="popularity">Popularity</option>
+                <option value="newest">Newest</option>
+              </select>
+
+              {/* Mobile Filters trigger — hidden on desktop via CSS */}
               <button
+                ref={filtersTriggerRef}
                 className="ghost-button marketplace-filter-button"
-                onClick={() => setShowFiltersMobile((s) => !s)}
+                onClick={() => setShowFiltersMobile(true)}
+                aria-haspopup="dialog"
+                aria-expanded={showFiltersMobile}
               >
                 Filters
+                {activeFilterCount > 0 && (
+                  <span
+                    className="marketplace-filter-badge"
+                    aria-label={`${activeFilterCount} active filter${activeFilterCount !== 1 ? "s" : ""}`}
+                  >
+                    {activeFilterCount}
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -292,40 +324,22 @@ export default function MarketplacePage(): JSX.Element {
         </main>
       </div>
 
-      {showFiltersMobile && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="marketplace-filter-modal"
-          onClick={() => setShowFiltersMobile(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="marketplace-filter-panel"
-          >
-            <h3>Filters</h3>
-            <FiltersSidebar
-              selectedCategories={selectedCategories}
-              toggleCategory={toggleCategory}
-              minPrice={minPrice}
-              maxPrice={maxPrice}
-              setMinPrice={setMinPrice}
-              setMaxPrice={setMaxPrice}
-              popularity={popularity}
-              setPopularity={setPopularity}
-              clearFilters={clearFilters}
-            />
-            <div className="marketplace-filter-footer">
-              <button
-                className="primary-button"
-                onClick={() => setShowFiltersMobile(false)}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Mobile bottom-sheet — only rendered when open */}
+      <FiltersBottomSheet
+        open={showFiltersMobile}
+        onClose={() => setShowFiltersMobile(false)}
+        resultCount={filtered.length}
+        selectedCategories={selectedCategories}
+        toggleCategory={toggleCategory}
+        minPrice={minPrice}
+        maxPrice={maxPrice}
+        setMinPrice={setMinPrice}
+        setMaxPrice={setMaxPrice}
+        popularity={popularity}
+        setPopularity={setPopularity}
+        clearFilters={clearFilters}
+        triggerRef={filtersTriggerRef}
+      />
     </div>
   );
 }
