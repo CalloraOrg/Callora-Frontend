@@ -19,6 +19,14 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - 500 error page with retry flow
 - 404 catch-all page
 - Dev proxy to backend at `http://localhost:3000` for `/api`
+- **Global Command Palette**: Instantly jump to views, search APIs by name, cycle/toggle light & dark themes, or trigger vault deposits. Use `Cmd+K` on macOS or `Ctrl+K` on Windows/Linux to open.
+
+## Keyboard shortcuts
+
+- **Open Command Palette**: `Cmd + K` (macOS) or `Ctrl + K` (Windows/Linux)
+- **Navigate options**: `Up / Down Arrow` keys
+- **Select option**: `Enter`
+- **Close Palette**: `Escape` or backdrop click
 
 ## UI Design System
 
@@ -80,6 +88,10 @@ callora-frontend/
 │   │   ├── ApiCard.tsx
 │   │   ├── Breadcrumb.tsx
 │   │   ├── CodeExample.tsx
+│   │   ├── CommandPalette.css
+│   │   ├── CommandPalette.test.tsx
+│   │   ├── CommandPalette.tsx
+│   │   ├── CommandPalette_MANUAL_TEST_PLAN.md
 │   │   ├── Dashboard.tsx
 │   │   ├── EmptyState.tsx
 │   │   ├── FiltersSidebar.tsx

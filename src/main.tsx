@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import RouteProgressBar from "./components/RouteProgressBar";
+import CommandPalette from "./components/CommandPalette";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import "./index.css";
 import "./styles/print.css";
@@ -24,6 +25,7 @@ async function renderRoute() {
         <BrowserRouter>
           <RouteProgressBar />
           {children}
+          <CommandPalette />
         </BrowserRouter>
       </ThemeProvider>
     </React.StrictMode>
@@ -70,6 +72,7 @@ async function renderRoute() {
       <ThemeProvider>
       <RouteProgressBar />
       <App />
+      <CommandPalette />
       </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,

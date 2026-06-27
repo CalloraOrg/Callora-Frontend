@@ -380,9 +380,25 @@ function App() {
     setIsDepositOpen(true);
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (location.pathname === APP_ROUTES.billing && params.get('deposit') === 'true') {
+      if (!isDepositOpen) {
+        openDeposit();
+      }
+    }
+  }, [location.pathname, location.search, isDepositOpen]);
+
   const closeDeposit = () => {
     if (isBusy) return;
     setIsDepositOpen(false);
+    
+    // Clean up url parameter if it exists
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('deposit')) {
+      url.searchParams.delete('deposit');
+      window.history.replaceState({}, '', url.pathname + url.search);
+    }
   };
 
   const handleAmountChange = (
