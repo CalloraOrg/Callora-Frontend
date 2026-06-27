@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Skeleton from "./Skeleton";
 import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
+import type { APIItem } from "../data/mockApis";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -30,7 +31,9 @@ export function ApiCardSkeleton() {
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <Skeleton width={56} height={56} borderRadius={10} />
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div
+          style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}
+        >
           <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
             <Skeleton width="60%" height={18} />
             <Skeleton width="20%" height={12} />
@@ -42,7 +45,15 @@ export function ApiCardSkeleton() {
           </div>
         </div>
 
-        <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+        <div
+          style={{
+            textAlign: "right",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 6,
+          }}
+        >
           <Skeleton width={50} height={12} />
           <Skeleton width={40} height={16} />
         </div>
@@ -58,12 +69,30 @@ export function ApiCardSkeleton() {
         style={{
           marginTop: "auto",
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          flexDirection: "column",
+          gap: 12,
         }}
       >
-        <Skeleton width={100} height={36} borderRadius={14} />
-        <Skeleton width={60} height={14} />
+        <div className="api-card__stats" aria-hidden="true">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="api-card__stat">
+              <Skeleton width="55%" height={10} />
+              <Skeleton width="75%" height={16} />
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <Skeleton width={100} height={36} borderRadius={14} />
+          <Skeleton width={60} height={14} />
+        </div>
       </div>
     </article>
   );
@@ -284,13 +313,28 @@ function BookmarkButton({ endpointId }: BookmarkButtonProps) {
 
 // ─── ApiCard ─────────────────────────────────────────────────────────────────
 
+const EM_DASH = "—";
+
+function renderStatValue(value: string | undefined) {
+  if (!value) {
+    return (
+      <span className="api-card__stat-value api-card__stat-value--empty">
+        {EM_DASH}
+      </span>
+    );
+  }
+  return <span className="api-card__stat-value">{value}</span>;
+}
 export default function ApiCard({
   api,
   onViewDetails,
 }: {
-  api: any;
-  onViewDetails?: (api: any) => void;
+  api: APIItem;
+  onViewDetails?: (api: APIItem) => void;
 }) {
+  const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
+  const avgLatencyMs = api.avgLatencyMs;
+  const uptimePercent = api.uptimePercent;
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -318,7 +362,10 @@ export default function ApiCard({
       {/* Absolutely-positioned bookmark button in the top-right corner */}
       <BookmarkButton endpointId={api.id} />
 
-      <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div
+        className="api-marketplace-card-header"
+        style={{ display: "flex", gap: 12, alignItems: "center" }}
+      >
         <div
           className="api-marketplace-card-icon"
           style={{
@@ -336,8 +383,14 @@ export default function ApiCard({
           {api.name[0]}
         </div>
 
-        <div className="api-marketplace-card-body" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+        <div
+          className="api-marketplace-card-body"
+          style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}
+        >
+          <div
+            className="api-marketplace-card-title-row"
+            style={{ display: "flex", gap: 8, alignItems: "baseline" }}
+          >
             <strong>{api.name}</strong>
             <div style={{ color: "var(--muted)", fontSize: 12 }}>
               {api.provider?.name}
@@ -358,13 +411,14 @@ export default function ApiCard({
           </div>
         </div>
 
-        {/* Price — bookmark moved out of here */}
+        {/* Price — bookmark moved out of here, paddingRight leaves room for it */}
         <div
           className="api-marketplace-card-price"
           style={{ textAlign: "right", paddingRight: 36, flexShrink: 0 }}
         >
+        >
           <div style={{ color: "var(--muted)", fontSize: 12 }}>
-            {`$${formatPrice(api.pricePerRequest)}`} / req
+            {`$${formatPrice(pricePerCall)}`} / call
           </div>
           {api.rating !== undefined && (
             <div style={{ color: "var(--muted)", marginTop: 2 }}>
@@ -374,7 +428,10 @@ export default function ApiCard({
         </div>
       </div>
 
-      <div className="api-marketplace-card-tags" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div
+        className="api-marketplace-card-tags"
+        style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+      >
         {((api.tags as string[]) || []).slice(0, 4).map((t: string) => (
           <span
             key={t}
@@ -396,18 +453,56 @@ export default function ApiCard({
         style={{
           marginTop: "auto",
           display: "flex",
-          justifyContent: "space-between",
+          flexDirection: "column",
+          gap: 12,
         }}
       >
-        <span
-          className="ghost-button"
-          aria-hidden="true"
-          style={{ display: "inline-flex", alignItems: "center" }}
+        {/* Always render three cells so marketplace rows keep consistent heights while missing values stay scannable. */}
+        <div className="api-card__stats" aria-label="API stats">
+          <div className="api-card__stat">
+            <span className="api-card__stat-label">Price / call</span>
+            {renderStatValue(
+              pricePerCall !== undefined
+                ? `$${formatPrice(pricePerCall)}`
+                : undefined,
+            )}
+          </div>
+
+          <div className="api-card__stat">
+            <span className="api-card__stat-label">Latency</span>
+            {renderStatValue(
+              avgLatencyMs !== undefined ? `${avgLatencyMs} ms` : undefined,
+            )}
+          </div>
+
+          <div className="api-card__stat">
+            <span className="api-card__stat-label">Uptime</span>
+            {renderStatValue(
+              uptimePercent !== undefined
+                ? `${uptimePercent.toFixed(2)}%`
+                : undefined,
+            )}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+          }}
         >
-          View Details
-        </span>
-        <div style={{ color: "var(--muted)", fontSize: 12 }}>
-          {api.rating ? `${api.rating} ★` : "No reviews"}
+          <span
+            className="ghost-button"
+            aria-hidden="true"
+            style={{ display: "inline-flex", alignItems: "center" }}
+          >
+            View Details
+          </span>
+          <div style={{ color: "var(--muted)", fontSize: 12 }}>
+            {api.rating ? `${api.rating} ★` : "No reviews"}
+          </div>
         </div>
       </div>
     </article>

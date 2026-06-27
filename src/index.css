@@ -1366,13 +1366,50 @@ code,
 .api-marketplace-card-header,
 .api-marketplace-card-body,
 .api-marketplace-card-title-row,
-.api-marketplace-card-footer {
+.api-marketplace-card-footer,
+.api-card__stat {
   min-width: 0;
 }
 
 .api-marketplace-card-title-row strong,
 .api-marketplace-card-title-row div {
   overflow-wrap: anywhere;
+}
+
+.api-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.api-card__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.api-card__stat-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.api-card__stat-value {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.api-card__stat-value--empty {
+  color: var(--muted);
 }
 
 .marketplace-filter-modal {
@@ -2224,8 +2261,15 @@ code,
     display: none;
   }
 
+  .api-card__stats {
+    gap: 10px;
+  }
+
+  .api-card__stat-value {
+    white-space: normal;
+  }
+
   .api-marketplace-card-footer {
-    align-items: center;
     gap: 12px;
   }
 
@@ -2646,6 +2690,56 @@ code,
   }
 }
 
+/* ─── Route Progress Bar ────────────────────────────────────────────────────
+   Fixed thin bar at the top of the viewport. Uses var(--accent) to stay
+   theme-aware in both light and dark mode. The indeterminate animation only
+   runs when the user has not requested reduced motion.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@keyframes route-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.route-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-speed) ease;
+}
+
+.route-progress-bar--active {
+  opacity: 1;
+}
+
+.route-progress-bar-track {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.route-progress-bar-indicator {
+  width: 33.33%;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .route-progress-bar-indicator {
+    animation: route-progress-indeterminate 1.4s ease-in-out infinite;
+  }
+}
+
 /* Skeleton Loading */
 @keyframes shimmer {
   0% {
@@ -2806,6 +2900,3 @@ code,
   outline: 2px solid var(--danger) !important;
   box-shadow: 0 0 0 3px rgba(255, 125, 141, 0.4) !important;
 }
-
-
-

@@ -2,7 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import RouteProgressBar from "./components/RouteProgressBar";
+import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import "./index.css";
+import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
 
@@ -21,6 +24,7 @@ async function renderRoute() {
       <ThemeProvider>
         <CollectionsProvider>
           <BrowserRouter>
+            <RouteProgressBar />
             {children}
           </BrowserRouter>
         </CollectionsProvider>
@@ -28,14 +32,24 @@ async function renderRoute() {
     </React.StrictMode>
   );
 
+  if (pathname.startsWith("/publish")) {
+    const mod = await import("./pages/PublishApi");
+    const PublishApi = mod.default;
+    root.render(wrap(<PublishApi />));
+    return;
+  }
+
   if (pathname.startsWith("/marketplace")) {
+    startRouteLoading();
     const mod = await import("./pages/MarketplacePage");
     const MarketplacePage = mod.default;
     root.render(wrap(<MarketplacePage />));
+    stopRouteLoading();
     return;
   }
 
   if (pathname.startsWith("/details/")) {
+    startRouteLoading();
     const mod = await import("./pages/ApiDetailPage");
     const ApiDetailPage = mod.default;
     root.render(
@@ -48,6 +62,7 @@ async function renderRoute() {
         />
       )
     );
+    stopRouteLoading();
     return;
   }
 
@@ -57,6 +72,7 @@ async function renderRoute() {
       <BrowserRouter>
         <ThemeProvider>
           <CollectionsProvider>
+            <RouteProgressBar />
             <App />
           </CollectionsProvider>
         </ThemeProvider>
