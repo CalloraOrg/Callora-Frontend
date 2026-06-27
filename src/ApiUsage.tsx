@@ -4,7 +4,8 @@ import PlanNudge from './components/PlanNudge';
 import Skeleton from './components/Skeleton';
 import { useQuota } from './hooks/useQuota';
 import { formatPrice } from './utils/format';
-import DateRangePicker from './components/DateRangePicker';
+import RequestBodyEditor from './components/RequestBodyEditor';
+import type { JsonSchema } from './components/RequestBodyEditor';
 
 type ApiEndpoint = {
   id: string;
@@ -12,6 +13,12 @@ type ApiEndpoint = {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
   description: string;
+  /**
+   * Optional JSON Schema (Draft-07 subset) describing the expected request
+   * body for this endpoint.  When present, RequestBodyEditor validates the
+   * user's JSON input against it in real time.
+   */
+  requestBodySchema?: JsonSchema;
 };
 
 type CallRecord = {
@@ -45,22 +52,66 @@ const MOCK_ENDPOINTS: ApiEndpoint[] = [
     name: 'Get User Profile',
     method: 'GET',
     path: '/api/v1/user/profile',
-    description: 'Retrieve user profile information'
+    description: 'Retrieve user profile information',
+    // GET endpoints typically have no request body; schema intentionally omitted.
   },
   {
     id: '2',
     name: 'Create Transaction',
     method: 'POST',
     path: '/api/v1/transactions',
-    description: 'Create a new transaction'
+    description: 'Create a new transaction',
+    requestBodySchema: {
+      type: 'object',
+      required: ['amount', 'currency'],
+      properties: {
+        amount: {
+          type: 'number',
+          minimum: 0.01,
+          description: 'Transaction amount (positive, non-zero)',
+        },
+        currency: {
+          type: 'string',
+          enum: ['USD', 'EUR', 'GBP', 'USDC'],
+          description: 'ISO 4217 currency code or USDC',
+        },
+        recipient: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 100,
+          description: 'Optional recipient identifier',
+        },
+        note: {
+          type: 'string',
+          maxLength: 255,
+          description: 'Optional transaction note',
+        },
+      },
+    },
   },
   {
     id: '3',
     name: 'Update Balance',
     method: 'PUT',
     path: '/api/v1/user/balance',
-    description: 'Update user balance'
-  }
+    description: 'Update user balance',
+    requestBodySchema: {
+      type: 'object',
+      required: ['balance'],
+      properties: {
+        balance: {
+          type: 'number',
+          minimum: 0,
+          description: 'New balance value (must be non-negative)',
+        },
+        reason: {
+          type: 'string',
+          maxLength: 200,
+          description: 'Reason for the balance update',
+        },
+      },
+    },
+  },
 ];
 
 const MOCK_CALL_HISTORY: CallRecord[] = [
@@ -244,6 +295,18 @@ export default function ApiUsage() {
   };
 
   const handleMakeTestCall = async () => {
+    // Guard: do not submit when the request body has a JSON syntax error.
+    // (Schema constraint violations are warnings — we allow submission but
+    //  still show the error to inform the user.)
+    const trimmed = requestParams.trim();
+    if (trimmed !== '' && trimmed !== '{}') {
+      try {
+        JSON.parse(requestParams);
+      } catch {
+        return; // Textarea will already show the syntax error inline.
+      }
+    }
+
     setIsLoading(true);
     setApiResponse(null);
     setResponseTime(null);
@@ -416,7 +479,12 @@ export default function ApiUsage() {
               value={selectedEndpoint.id}
               onChange={(e) => {
                 const endpoint = MOCK_ENDPOINTS.find(ep => ep.id === e.target.value);
-                if (endpoint) setSelectedEndpoint(endpoint);
+                if (endpoint) {
+                  setSelectedEndpoint(endpoint);
+                  // Reset the request body when switching endpoints so stale
+                  // JSON from a previous endpoint doesn't fail the new schema.
+                  setRequestParams('{}');
+                }
               }}
               className="endpoint-select"
             >
@@ -429,13 +497,14 @@ export default function ApiUsage() {
           </div>
           
           <div className="form-row">
-            <label>Parameters (JSON)</label>
-            <textarea
+            <RequestBodyEditor
               value={requestParams}
-              onChange={(e) => setRequestParams(e.target.value)}
-              placeholder='{"key": "value"}'
-              className="params-textarea"
-              rows={4}
+              onChange={setRequestParams}
+              schema={selectedEndpoint.requestBodySchema}
+              label="Parameters (JSON)"
+              placeholder={'{\n  "key": "value"\n}'}
+              rows={6}
+              disabled={isLoading}
             />
           </div>
           
