@@ -266,7 +266,7 @@ export default function ApiUsage() {
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState(null, '', newUrl);
   }, [selectedRange]);
-  
+
   const { usagePercent, isDismissed, dismiss } = useQuota(MOCK_USAGE_PERCENT);
 
   const [usageStats, setUsageStats] = useState<UsageStats>({
@@ -309,18 +309,18 @@ export default function ApiUsage() {
     setApiResponse(null);
     setResponseTime(null);
     setCallCost(null);
-    
+
     const startTime = Date.now();
-    
+
     // Simulate API call
     setTimeout(() => {
       const endTime = Date.now();
       const time = endTime - startTime;
       const cost = Math.random() * 0.005 + 0.001;
-      
+
       setResponseTime(time);
       setCallCost(cost);
-      
+
       // Mock response
       const mockResponse = {
         success: true,
@@ -333,9 +333,9 @@ export default function ApiUsage() {
         },
         timestamp: new Date().toISOString()
       };
-      
+
       setApiResponse(mockResponse);
-      
+
       // Add to call history
       const newCall: CallRecord = {
         id: Date.now().toString(),
@@ -347,9 +347,9 @@ export default function ApiUsage() {
         request: requestParams,
         response: mockResponse
       };
-      
+
       setCallHistory(prev => [newCall, ...prev]);
-      
+
       // Update stats
       setUsageStats(prev => ({
         ...prev,
@@ -358,7 +358,7 @@ export default function ApiUsage() {
         totalSpent: prev.totalSpent + cost,
         avgResponseTime: (prev.avgResponseTime * prev.callsToday + time) / (prev.callsToday + 1)
       }));
-      
+
       setIsLoading(false);
     }, 1000 + Math.random() * 2000);
   };
@@ -381,7 +381,7 @@ export default function ApiUsage() {
       responseTime: call.responseTime,
       cost: call.cost
     }));
-    
+
     if (format === 'json') {
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -392,11 +392,11 @@ export default function ApiUsage() {
     } else {
       const csv = [
         'Timestamp,Endpoint,Status,Response Time,Cost',
-        ...data.map(call => 
+        ...data.map(call =>
           `${call.timestamp},${call.endpoint},${call.status},${call.responseTime},${call.cost}`
         )
       ].join('\n');
-      
+
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -493,7 +493,7 @@ export default function ApiUsage() {
               ))}
             </select>
           </div>
-          
+
           <div className="form-row">
             <RequestBodyEditor
               value={requestParams}
@@ -505,7 +505,7 @@ export default function ApiUsage() {
               disabled={isLoading}
             />
           </div>
-          
+
           <button
             className={`primary-button ${isLoading ? 'button-loading' : ''}`}
             onClick={handleMakeTestCall}
@@ -515,9 +515,9 @@ export default function ApiUsage() {
             {isLoading ? 'Making Call...' : 'Make Test Call'}
           </button>
         </div>
-        
+
         {(apiResponse || isLoading) && (
-          <div 
+          <div
             className="response-display"
             aria-live="polite"
             aria-busy={isLoading}
@@ -577,7 +577,7 @@ export default function ApiUsage() {
             <strong className="stat-value">{usageStats.successRate}%</strong>
           </div>
         </div>
-        
+
         <div className="mini-chart">
           <h3>Calls Over Time</h3>
           <CallsHeatmap />
@@ -585,7 +585,7 @@ export default function ApiUsage() {
             {/* Simple bar chart visualization */}
             <div className="chart-bars">
               {[65, 59, 80, 81, 56, 55, 47].map((height, i) => (
-                <div key={i} className="chart-bar" style={{height: `${height}%`}}></div>
+                <div key={i} className="chart-bar" style={{ height: `${height}%` }}></div>
               ))}
             </div>
             <div className="chart-labels">
@@ -606,16 +606,17 @@ export default function ApiUsage() {
         <div className="section-header">
           <h2>Call History</h2>
           <div className="history-actions">
-            <select
-                className="filter-select"
-                aria-label="Call status filter"
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as 'all' | 'success' | 'error')}
-              >
-                <option value="all">All Status</option>
-                <option value="success">Success</option>
-                <option value="error">Error</option>
-              </select>
+            <Tabs
+              tabs={[
+                { id: 'all', label: 'All Status' },
+                { id: 'success', label: 'Success' },
+                { id: 'error', label: 'Error' },
+              ]}
+              activeTab={statusFilter}
+              onChange={(id) =>
+                setStatusFilter(id as 'all' | 'success' | 'error')
+              }
+            />
             <button className="secondary-button" onClick={() => handleExportHistory('csv')}>
               Export CSV
             </button>
@@ -624,92 +625,92 @@ export default function ApiUsage() {
             </button>
           </div>
         </div>
-        
+
         <div className="call-history-table" aria-busy={isLoading}>
-           <div className="table-header">
-             <span>Timestamp</span>
-             <span>Endpoint</span>
-             <span>Status</span>
-             <span>Response Time</span>
-             <span>Cost</span>
-             <span>Actions</span>
-           </div>
-
-           {isLoading ? (
-             <SkeletonRow rows={5} />
-           ) : filteredCallHistory.length === 0 ? (
-             <EmptyState message="No call records match the selected filter." />
-           ) : (
-             filteredCallHistory.map(call => (
-               <div key={call.id} className="table-row">
-                 <span>{formatTimestamp(call.timestamp)}</span>
-                 <span className="endpoint-cell">{call.endpoint}</span>
-                 <span className={`status-cell ${call.status}`}>
-                   {call.status === 'success' ? '✓' : '✗'} {call.status}
-                 </span>
-                 <span>{formatTime(call.responseTime)}</span>
-                 <span>{formatPrice(call.cost)} USDC</span>
-                 <span>
-                   <button
-                     className="ghost-button"
-                     onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
-                   >
-                     {expandedCall === call.id ? 'Hide' : 'View'}
-                   </button>
-                 </span>
-                 {expandedCall === call.id && (
-                   <div className="expanded-details">
-                     <div className="detail-section">
-                       <h4>Request</h4>
-                       <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
-                     </div>
-                     <div className="detail-section">
-                       <h4>Response</h4>
-                       <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
-                     </div>
-                   </div>
-                 )}
-               </div>
-             ))
-           )}
-         </div></div>
-      </div>
-
-      {/* Integration Guide */}
-      <div className="surface integration-guide-section">
-        <h2>Integration Guide</h2>
-        
-        <div className="language-tabs">
-          {(['javascript', 'python', 'curl'] as const).map(lang => (
-            <button
-              key={lang}
-              className={`tab-button ${selectedLanguage === lang ? 'active' : ''}`}
-              onClick={() => setSelectedLanguage(lang)}
-            >
-              {lang.charAt(0).toUpperCase() + lang.slice(1)}
-            </button>
-          ))}
-        </div>
-        
-        <div className="code-example">
-          <div className="code-header">
-            <h3>{selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)} Example</h3>
-            <button
-              className="secondary-button"
-              onClick={() => handleCopyCode(CODE_EXAMPLES[selectedLanguage])}
-            >
-              {copied ? 'Copied!' : 'Copy Code'}
-            </button>
+          <div className="table-header">
+            <span>Timestamp</span>
+            <span>Endpoint</span>
+            <span>Status</span>
+            <span>Response Time</span>
+            <span>Cost</span>
+            <span>Actions</span>
           </div>
-          <pre className="code-block">
-            <code>{CODE_EXAMPLES[selectedLanguage]}</code>
-          </pre>
-        </div>
-        
-        <div className="documentation-link">
-          <a href="#" className="primary-button">View Full Documentation →</a>
-        </div>
-      </div>
+
+          {isLoading ? (
+            <SkeletonRow rows={5} />
+          ) : filteredCallHistory.length === 0 ? (
+            <EmptyState message="No call records match the selected filter." />
+          ) : (
+            filteredCallHistory.map(call => (
+              <div key={call.id} className="table-row">
+                <span>{formatTimestamp(call.timestamp)}</span>
+                <span className="endpoint-cell">{call.endpoint}</span>
+                <span className={`status-cell ${call.status}`}>
+                  {call.status === 'success' ? '✓' : '✗'} {call.status}
+                </span>
+                <span>{formatTime(call.responseTime)}</span>
+                <span>{formatPrice(call.cost)} USDC</span>
+                <span>
+                  <button
+                    className="ghost-button"
+                    onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
+                  >
+                    {expandedCall === call.id ? 'Hide' : 'View'}
+                  </button>
+                </span>
+                {expandedCall === call.id && (
+                  <div className="expanded-details">
+                    <div className="detail-section">
+                      <h4>Request</h4>
+                      <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
+                    </div>
+                    <div className="detail-section">
+                      <h4>Response</h4>
+                      <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div></div>
     </div>
+
+      {/* Integration Guide */ }
+  <div className="surface integration-guide-section">
+    <h2>Integration Guide</h2>
+
+    <div className="language-tabs">
+      {(['javascript', 'python', 'curl'] as const).map(lang => (
+        <button
+          key={lang}
+          className={`tab-button ${selectedLanguage === lang ? 'active' : ''}`}
+          onClick={() => setSelectedLanguage(lang)}
+        >
+          {lang.charAt(0).toUpperCase() + lang.slice(1)}
+        </button>
+      ))}
+    </div>
+
+    <div className="code-example">
+      <div className="code-header">
+        <h3>{selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)} Example</h3>
+        <button
+          className="secondary-button"
+          onClick={() => handleCopyCode(CODE_EXAMPLES[selectedLanguage])}
+        >
+          {copied ? 'Copied!' : 'Copy Code'}
+        </button>
+      </div>
+      <pre className="code-block">
+        <code>{CODE_EXAMPLES[selectedLanguage]}</code>
+      </pre>
+    </div>
+
+    <div className="documentation-link">
+      <a href="#" className="primary-button">View Full Documentation →</a>
+    </div>
+  </div>
+    </div >
   );
 }
