@@ -1,3 +1,5 @@
+import { WarningIcon } from "./icons";
+
 export const ALL_CATEGORIES = [
   "Data & Analytics",
   "Payment Processing",
@@ -100,7 +102,7 @@ export default function FiltersSidebar({
                 }}
                 role="alert"
               >
-                <span>⚠️</span> Min price cannot exceed max price.
+                <WarningIcon size={16} /> Min price cannot exceed max price.
               </div>
             )}
           </fieldset>

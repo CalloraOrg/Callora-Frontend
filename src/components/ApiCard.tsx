@@ -1,6 +1,7 @@
 import Skeleton from "./Skeleton";
 import { formatPrice } from "../utils/format";
 import type { APIItem } from "../data/mockApis";
+import { TagIcon, ClockIcon, BoltIcon } from "./icons";
 
 export function ApiCardSkeleton() {
   return (
@@ -210,8 +211,12 @@ export default function ApiCard({
               background: "rgba(255,255,255,0.02)",
               padding: "4px 8px",
               borderRadius: 8,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
             }}
           >
+            <TagIcon size={16} />
             {t}
           </span>
         ))}
@@ -238,14 +243,18 @@ export default function ApiCard({
           </div>
 
           <div className="api-card__stat">
-            <span className="api-card__stat-label">Latency</span>
+            <span className="api-card__stat-label" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <ClockIcon size={16} /> Latency
+            </span>
             {renderStatValue(
               avgLatencyMs !== undefined ? `${avgLatencyMs} ms` : undefined,
             )}
           </div>
 
           <div className="api-card__stat">
-            <span className="api-card__stat-label">Uptime</span>
+            <span className="api-card__stat-label" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <BoltIcon size={16} /> Uptime
+            </span>
             {renderStatValue(
               uptimePercent !== undefined
                 ? `${uptimePercent.toFixed(2)}%`

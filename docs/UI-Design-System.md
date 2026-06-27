@@ -98,6 +98,26 @@ These tokens are shared across both light and dark themes.
 
 ---
 
+## Iconography
+
+To keep the bundle size small and ensure theme consistency, Callora uses a custom, lightweight SVG icon set instead of external libraries.
+
+### Guidelines for Icons
+- **Theme Awareness**: All custom SVG icons must use `fill="none" stroke="currentColor"` so that they automatically adapt to theme switches.
+- **Stroke Style**: Keep the stroke width consistent at `1.6px` across all icons.
+- **Allowed Sizes**: Custom SVG icons must be used in **16px** (`size={16}`) or **20px** (`size={20}`) sizes only. No other sizes are allowed to prevent blurriness and maintain visual alignment.
+- **Accessibility**: All icons must have `aria-hidden="true"` when decorative (default behaviour) or carry a descriptive `aria-label` when used standalone.
+- **Barrel Export**: Export new icons as named exports in `src/components/icons/index.tsx`.
+
+### Available Icons
+- `TagIcon` (16px/20px) - Represents category tags or categories.
+- `CheckIcon` (16px/20px) - Represents successful statuses, features list items, or checkmarks.
+- `WarningIcon` (16px/20px) - Represents validation errors, price range warnings, or alert messages.
+- `BoltIcon` (16px/20px) - Represents system uptime, fast status, or performance.
+- `ClockIcon` (16px/20px) - Represents latency, response times, or duration.
+
+---
+
 ## Component Library
 
 All shared components are located in `src/components/`. Use these components instead of building custom UI elements.
