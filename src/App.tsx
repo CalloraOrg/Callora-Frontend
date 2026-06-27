@@ -8,6 +8,7 @@ import MarketplacePage from './pages/MarketplacePage';
 import RouteProgressBar from './components/RouteProgressBar';
 import ServerError from './components/ServerError';
 import NotFound from './components/NotFound';
+import A11yAudit from './pages/A11yAudit';
 import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
 import { formatUsdc, formatUsdShortcut } from './utils/format';
 import {
@@ -690,6 +691,11 @@ function App() {
                 onGoHome={() => navigate(APP_ROUTES.dashboard)}
               />
             }
+          />
+
+          <Route
+            path="/a11y-audit"
+            element={<A11yAudit />}
           />
 
           <Route
