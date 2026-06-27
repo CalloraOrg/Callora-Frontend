@@ -1929,6 +1929,168 @@ code,
     min-width: 560px;
 }
 
+.endpoint-group-hover {
+    display: grid;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.endpoint-group-hover__header h4 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.endpoint-group-hover__header p {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.endpoint-group-hover__shell {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.endpoint-group-hover__triggers {
+    display: grid;
+    gap: 10px;
+}
+
+.endpoint-group-hover__trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 52px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--surface-soft);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    transition:
+        border-color 180ms ease,
+        background 180ms ease,
+        transform 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.endpoint-group-hover__trigger:hover,
+.endpoint-group-hover__trigger:focus-visible,
+.endpoint-group-hover__trigger--active {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface-soft));
+    transform: translateY(-1px);
+}
+
+.endpoint-group-hover__trigger-label,
+.endpoint-group-hover__trigger-meta,
+.endpoint-group-hover__preview h5,
+.endpoint-group-hover__endpoint-row span,
+.endpoint-group-hover__endpoint-row code {
+    overflow-wrap: anywhere;
+}
+
+.endpoint-group-hover__trigger-label {
+    font-weight: 700;
+}
+
+.endpoint-group-hover__trigger-meta {
+    color: var(--muted);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.endpoint-group-hover__preview-region {
+    min-width: 0;
+}
+
+.endpoint-group-hover__preview,
+.endpoint-group-hover__empty {
+    padding: 18px;
+}
+
+.endpoint-group-hover__empty {
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+.endpoint-group-hover__preview-topline {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.endpoint-group-hover__eyebrow,
+.endpoint-group-hover__count {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.endpoint-group-hover__eyebrow {
+    color: var(--accent-strong);
+}
+
+.endpoint-group-hover__count {
+    color: var(--muted);
+}
+
+.endpoint-group-hover__preview h5 {
+    margin: 12px 0 8px;
+    font-size: 1rem;
+}
+
+.endpoint-group-hover__preview p {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+.endpoint-group-hover__methods {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.endpoint-group-hover__endpoint-list {
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.endpoint-group-hover__endpoint-list li {
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}
+
+.endpoint-group-hover__endpoint-row,
+.endpoint-group-hover__endpoint-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.endpoint-group-hover__endpoint-row span {
+    font-weight: 600;
+}
+
+.endpoint-group-hover__endpoint-row code,
+.endpoint-group-hover__endpoint-meta {
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
 .api-detail-plan-price {
     font-size: 2rem;
     font-weight: 800;
@@ -2662,6 +2824,16 @@ code,
 
     .endpoint-card-header {
         padding: 14px 16px;
+    }
+
+    .endpoint-group-hover__shell {
+        grid-template-columns: 1fr;
+    }
+
+    .endpoint-group-hover__endpoint-row,
+    .endpoint-group-hover__endpoint-meta {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .endpoint-url {

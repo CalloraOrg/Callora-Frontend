@@ -3,7 +3,9 @@ import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
 import EmbedPreview from "../components/EmbedPreview";
-import RatingHistogram from "../components/RatingHistogram";
+import EndpointGroupHover, {
+  type EndpointGroupPreview,
+} from "../components/EndpointGroupHover";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { findApiById } from "../data/mockApis";
 import type { Review } from "../data/mockApis";
@@ -27,12 +29,67 @@ type Props = {
 };
 
 type TabType =
-  | "overview"
-  | "documentation"
-  | "pricing"
-  | "examples"
-  | "reviews"
-  | "embed";
+  "overview" | "documentation" | "pricing" | "examples" | "reviews" | "embed";
+
+type EndpointParameter = {
+  name: string;
+  type: string;
+  required?: boolean;
+};
+
+type ApiEndpoint = {
+  id: string;
+  title: string;
+  url: string;
+  method: string;
+  params: EndpointParameter[];
+  response?: string;
+  group?: string;
+};
+
+const GENERIC_ENDPOINT_VERBS = new Set([
+  "get",
+  "list",
+  "create",
+  "update",
+  "delete",
+  "remove",
+  "fetch",
+]);
+
+function toTitleCase(value: string) {
+  return value.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function deriveEndpointGroupLabel(endpoint: ApiEndpoint): string {
+  if (endpoint.group?.trim()) {
+    return endpoint.group.trim();
+  }
+
+  if (endpoint.title?.trim()) {
+    const words = endpoint.title.trim().split(/\s+/);
+
+    if (
+      words.length > 1 &&
+      GENERIC_ENDPOINT_VERBS.has(words[0].toLowerCase())
+    ) {
+      return words.slice(1).join(" ");
+    }
+
+    return endpoint.title.trim();
+  }
+
+  const firstMeaningfulSegment = endpoint.url
+    .split("/")
+    .filter(Boolean)
+    .find((segment) => !/^v\d+$/i.test(segment) && !segment.startsWith("{"));
+
+  if (!firstMeaningfulSegment) {
+    return "General";
+  }
+
+  return toTitleCase(firstMeaningfulSegment.replace(/[-_]+/g, " "));
+}
 
 export default function ApiDetailPage({ onBack }: Props) {
   const [tab, setTab] = useState<TabType>("overview");
@@ -46,7 +103,70 @@ export default function ApiDetailPage({ onBack }: Props) {
       : undefined;
 
   const api = useMemo(() => findApiById(id), [id]);
-  useDocumentTitle(api?.name ?? 'API Detail – Callora', api?.description);
+  useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
+
+  const documentationEndpoints = useMemo(
+    () => (api?.endpoints || []) as ApiEndpoint[],
+    [api],
+  );
+
+  const endpointGroups = useMemo<EndpointGroupPreview[]>(() => {
+    const groups = new Map<
+      string,
+      {
+        id: string;
+        label: string;
+        methods: Set<string>;
+        endpoints: EndpointGroupPreview["endpoints"];
+        totalParams: number;
+      }
+    >();
+
+    documentationEndpoints.forEach((endpoint) => {
+      const label = deriveEndpointGroupLabel(endpoint);
+      const id = label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const method = (endpoint.method || "GET").toUpperCase();
+      const paramsCount = endpoint.params?.length ?? 0;
+      const requiredCount =
+        endpoint.params?.filter((param) => param.required).length ?? 0;
+
+      const existingGroup = groups.get(id) ?? {
+        id,
+        label,
+        methods: new Set<string>(),
+        endpoints: [],
+        totalParams: 0,
+      };
+
+      existingGroup.methods.add(method);
+      existingGroup.totalParams += paramsCount;
+      existingGroup.endpoints.push({
+        id: endpoint.id,
+        title: endpoint.title,
+        url: endpoint.url,
+        method,
+        paramsCount,
+        requiredCount,
+      });
+
+      groups.set(id, existingGroup);
+    });
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        id: group.id,
+        label: group.label,
+        methods: Array.from(group.methods).sort(),
+        endpointCount: group.endpoints.length,
+        totalParams: group.totalParams,
+        endpoints: group.endpoints,
+        summary: `${group.endpoints.length} endpoint${group.endpoints.length === 1 ? "" : "s"} and ${group.totalParams} request parameter${group.totalParams === 1 ? "" : "s"}.`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [documentationEndpoints]);
 
   // Simulate initial data loading with 1.5s delay (consistent with MarketplacePage)
   useEffect(() => {
@@ -243,29 +363,6 @@ export default function ApiDetailPage({ onBack }: Props) {
     return null; // This should not happen due to the check above, but kept for safety
   }
 
-
-
-  type ReviewSort = "newest" | "highest" | "lowest";
-  const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
-
-  const rawReviews: Review[] = api.reviews ?? [];
-
-  const sortedReviews = useMemo(() => {
-    const copy = [...rawReviews];
-    if (reviewSort === "newest") {
-      copy.sort((a, b) => b.date.localeCompare(a.date));
-    } else if (reviewSort === "highest") {
-      copy.sort((a, b) => b.rating - a.rating || b.date.localeCompare(a.date));
-    } else {
-      copy.sort((a, b) => a.rating - b.rating || b.date.localeCompare(a.date));
-    }
-    return copy;
-  }, [rawReviews, reviewSort]);
-
-  const averageRating = rawReviews.length
-    ? rawReviews.reduce((sum, r) => sum + r.rating, 0) / rawReviews.length
-    : (api.rating ?? 0);
-
   // Example Generation Logic
   const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
     url: "/v1/data",
@@ -281,14 +378,14 @@ export default function ApiDetailPage({ onBack }: Props) {
 const getApiData = async () => {
   const response = await fetch('${API_BASE_URL}${firstEndpoint.url}', {
     method: '${firstEndpoint.method}',
-    headers: { 
+    headers: {
       'Authorization': 'Bearer YOUR_API_KEY',
       'Content-Type': 'application/json'
     }
   });
-  
+
   if (!response.ok) throw new Error('API request failed');
-  
+
   const data = await response.json();
   return data;
 };
@@ -569,8 +666,12 @@ print(data)`;
                       </span>
                     </div>
 
+                    {endpointGroups.length > 0 && (
+                      <EndpointGroupHover groups={endpointGroups} />
+                    )}
+
                     <div style={{ display: "grid", gap: 20, marginTop: 16 }}>
-                      {(api.endpoints || []).map((ep: any) => (
+                      {documentationEndpoints.map((ep: ApiEndpoint) => (
                         <div
                           key={ep.id}
                           className="preview-card"
@@ -579,7 +680,7 @@ print(data)`;
                           <div className="endpoint-card-header">
                             <div className="endpoint-title-row">
                               <span
-                                className={`method-badge method-badge--${(ep.method || 'get').toLowerCase()}`}
+                                className={`method-badge method-badge--${(ep.method || "get").toLowerCase()}`}
                               >
                                 {ep.method}
                               </span>
