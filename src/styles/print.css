@@ -1,0 +1,237 @@
+@page {
+  margin: 1.5cm;
+  size: auto;
+}
+
+@media print {
+  /* ── Force light theme ─────────────────────────────────────────────────── */
+  html,
+  html[data-theme="dark"],
+  html[data-theme="light"] {
+    --page-bg: #f5f7fa !important;
+    --surface: #ffffff !important;
+    --surface-strong: rgba(255, 255, 255, 0.92) !important;
+    --surface-soft: rgba(0, 0, 0, 0.06) !important;
+    --line: rgba(0, 0, 0, 0.08) !important;
+    --line-strong: rgba(0, 0, 0, 0.12) !important;
+    --text: #1a2332 !important;
+    --muted: #64748b !important;
+    --accent: #2563eb !important;
+    --accent-strong: #059669 !important;
+    --danger: #dc2626 !important;
+    --success: #10b981 !important;
+    --shadow: none !important;
+    --ambient-a: transparent !important;
+    --ambient-b: transparent !important;
+    --backdrop: transparent !important;
+    --modal-bg: #ffffff !important;
+
+    --method-get-color: #1e40af !important;
+    --method-post-color: #065f46 !important;
+    --method-put-color: #92400e !important;
+    --method-delete-color: #991b1b !important;
+    --method-patch-color: #5b21b6 !important;
+
+    color-scheme: light !important;
+  }
+
+  /* ── Remove decorative / background effects ────────────────────────────── */
+  .ambient,
+  .api-detail-hero {
+    backdrop-filter: none !important;
+  }
+
+  * {
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  body {
+    background: #f5f7fa !important;
+    color: #1a2332 !important;
+  }
+
+  /* ── Hide chrome ───────────────────────────────────────────────────────── */
+  .topbar,
+  .nav,
+  .app-footer,
+  .footer-nav,
+  .theme-toggle,
+  .skip-link,
+  .modal-backdrop,
+  .skeleton,
+  .ambient,
+  .ghost-button,
+  .primary-button,
+  .secondary-button,
+  .close-button,
+  .danger-button,
+  .hash-actions button,
+  .hash-actions a,
+  .preset-row,
+  .outcome-toggle,
+  .lp-btn,
+  .lp-footer,
+  .launch-home,
+  .error-link-pill,
+  .not-found-links a,
+  .button-spinner,
+  input[type="range"],
+  .api-detail-tabs {
+    display: none !important;
+  }
+
+  .api-detail-sidebar {
+    display: none !important;
+  }
+
+  /* ── Single-column layout ──────────────────────────────────────────────── */
+  .api-detail-content-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+  }
+
+  .api-detail-hero {
+    grid-template-columns: 1fr !important;
+    padding: 0 0 12px 0 !important;
+  }
+
+  .api-detail-price-panel {
+    text-align: left !important;
+    border-top: 1px solid var(--line);
+    padding-top: 12px !important;
+    margin-top: 12px;
+  }
+
+  .api-detail-price {
+    font-size: 1.25rem !important;
+  }
+
+  .api-detail-two-column,
+  .api-detail-pricing-grid,
+  .api-detail-metrics {
+    grid-template-columns: 1fr !important;
+  }
+
+  .endpoint-section-header,
+  .endpoint-card-header,
+  .api-detail-calculator-total,
+  .api-detail-reviews-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .api-detail-sidebar-inner {
+    position: static !important;
+  }
+
+  .content-left {
+    max-width: 100% !important;
+  }
+
+  /* ── Page-break avoidance ──────────────────────────────────────────────── */
+  .preview-card,
+  .stat-card,
+  .stat-card-skeleton,
+  .preview-card-skeleton,
+  .endpoint-section-header,
+  .endpoint-card-header,
+  .endpoint-table-wrap,
+  .api-detail-pricing-grid > *,
+  .api-detail-calculator-total,
+  .api-detail-plan-price,
+  .api-detail-two-column > *,
+  .api-detail-metrics > *,
+  .tab-content section,
+  .api-detail-plan-price,
+  .billing-panel,
+  .prototype-panel,
+  .vault-balance-card,
+  .info-card,
+  .marketplace-sidebar,
+  .filters-sidebar,
+  .marketplace-results,
+  .lp-section,
+  .lp-card,
+  h2,
+  h3,
+  h4,
+  table {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ── Content polish ────────────────────────────────────────────────────── */
+  .tab-content {
+    animation: none !important;
+  }
+
+  .tab-content section {
+    display: block !important;
+    margin-bottom: 24px;
+  }
+
+  .preview-card {
+    border: 1px solid #ddd !important;
+    background: #ffffff !important;
+    border-radius: 8px !important;
+  }
+
+  .api-detail-logo {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: #1a2332 !important;
+  }
+
+  .endpoint-card-header {
+    background: rgba(0, 0, 0, 0.03) !important;
+  }
+
+  .endpoint-table-wrap {
+    overflow: visible !important;
+  }
+
+  .endpoint-table-wrap table {
+    min-width: auto !important;
+    width: 100% !important;
+  }
+
+  .api-detail-calculator-total {
+    background: rgba(0, 0, 0, 0.03) !important;
+    border-radius: 8px !important;
+  }
+
+  .api-detail-metrics .stat-card {
+    background: rgba(0, 0, 0, 0.03) !important;
+    border-radius: 8px !important;
+  }
+
+  .api-detail-sidebar-inner > * {
+    margin-bottom: 0 !important;
+  }
+
+  .code-block,
+  pre,
+  code {
+    background: #f4f4f5 !important;
+    border: 1px solid #ddd !important;
+    color: #1a2332 !important;
+  }
+
+  .api-detail-page {
+    padding: 0 !important;
+  }
+
+  .api-detail-container {
+    max-width: 100% !important;
+  }
+
+  .breadcrumb {
+    margin-bottom: 8px !important;
+  }
+
+  a {
+    color: #2563eb !important;
+    text-decoration: underline !important;
+  }
+}

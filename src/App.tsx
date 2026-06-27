@@ -3,8 +3,10 @@ import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-d
 import { ThemeToggle } from './ThemeToggle';
 import ApiUsage from './ApiUsage';
 import Dashboard from './components/Dashboard';
+import RouteProgressBar from './components/RouteProgressBar';
 import ServerError from './components/ServerError';
 import NotFound from './components/NotFound';
+import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
 import { formatUsdc, formatUsdShortcut } from './utils/format';
 import {
   EXPLORER_BASE_URL,
@@ -103,6 +105,7 @@ const APP_ROUTES = {
   landing: "/",
   dashboard: "/dashboard",
   marketplace: "/marketplace",
+  publish: "/publish",
   apiUsage: "/api-usage",
   billing: "/billing",
   documentation: "/documentation",
@@ -268,8 +271,26 @@ function LandingPage({
 }
 
 function App() {
-  const navigate = useNavigate();
   const location = useLocation();
+  const routeTitleMap: Record<string, string> = {
+    [APP_ROUTES.marketplace]: 'Marketplace – Callora',
+    [APP_ROUTES.dashboard]: 'Dashboard – Callora',
+    [APP_ROUTES.billing]: 'Billing – Callora',
+    '/api-usage': 'API Usage – Callora',
+    [APP_ROUTES.landing]: 'Callora',
+  };
+  const routeDescriptionMap: Record<string, string> = {
+    [APP_ROUTES.marketplace]: 'Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.',
+    [APP_ROUTES.dashboard]: 'Your Callora dashboard showing balances, recent activity and quick actions.',
+    [APP_ROUTES.billing]: 'Manage your USDC vault, deposit funds, and view transaction status.',
+    '/api-usage': 'Monitor API usage, request stats, and view call history.',
+    [APP_ROUTES.landing]: 'Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.',
+  };
+  const currentTitle = routeTitleMap[location.pathname] ?? 'Callora';
+  const currentDescription = routeDescriptionMap[location.pathname];
+  useDocumentTitle(currentTitle, currentDescription);
+
+
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
@@ -327,6 +348,12 @@ function App() {
       setIsDepositOpen(false);
     }
   }, [isDepositOpen, location.pathname]);
+
+  useEffect(() => {
+    startRouteLoading();
+    const timer = setTimeout(() => stopRouteLoading(), 400);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
 
   const clearTimers = () => {
     timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
@@ -452,6 +479,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      <RouteProgressBar />
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -481,7 +509,10 @@ function App() {
             element={
               <LandingPage
                 onStartUsingApis={() => navigate(APP_ROUTES.marketplace)}
-                onPublishApi={() => navigate(APP_ROUTES.billing)}
+                onPublishApi={() => {
+                  window.history.pushState({}, '', APP_ROUTES.publish);
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
               />
             }
           />

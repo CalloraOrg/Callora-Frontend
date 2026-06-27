@@ -2,16 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import ApiCard, { ApiCardSkeleton } from "../components/ApiCard";
+import useDocumentTitle from "../hooks/useDocumentTitle";
 import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import FiltersSidebar from "../components/FiltersSidebar";
-import EmptyState from "../components/EmptyState";
+import EmptyState, { type EmptyStateProps } from "../components/EmptyState";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
 import { LOADING_DELAY_MS } from "../config/constants";
 
 export default function MarketplacePage(): JSX.Element {
+  useDocumentTitle('Marketplace – Callora', 'Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.');
   const [search, setSearch] = useState("");
   // Debounce search input to prevent excessive re-renders on large lists
   const debouncedSearch = useDebounce(search, 300);
@@ -39,11 +41,14 @@ export default function MarketplacePage(): JSX.Element {
   const [shown, setShown] = useState<number>(12);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate initial data loading
+    // Simulate initial data loading with occasional error for testing
     const timer = setTimeout(() => {
       setIsLoading(false);
+      // Uncomment below to test error state
+      // setFetchError("Failed to fetch APIs. Please try again.");
     }, LOADING_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
@@ -61,6 +66,33 @@ export default function MarketplacePage(): JSX.Element {
     setMaxPrice(null);
     setPopularity("any");
     setSortParam("popularity");
+    setSearch("");
+  };
+
+  /**
+   * Determine if any filters are currently active.
+   * Used to distinguish between "no APIs exist" vs "filters too narrow" empty states.
+   */
+  const hasActiveFilters = () => {
+    return (
+      search.trim() !== "" ||
+      selectedCategories.size > 0 ||
+      minPrice !== null ||
+      maxPrice !== null ||
+      popularity !== "any"
+    );
+  };
+
+  /**
+   * Handle retry for fetch errors.
+   * Clears error state and simulates refetch.
+   */
+  const handleRetryFetch = async () => {
+    setFetchError(null);
+    setIsLoading(true);
+    // Simulate network request
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    setIsLoading(false);
   };
 
   const filtered = useMemo(() => {
@@ -186,8 +218,16 @@ export default function MarketplacePage(): JSX.Element {
             </div>
           </div>
 
-          {filtered.length === 0 ? (
-            <EmptyState />
+          {fetchError ? (
+            <EmptyState
+              variant="error"
+              onRetry={handleRetryFetch}
+            />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              variant={hasActiveFilters() ? "filtered" : "empty"}
+              onClearFilters={hasActiveFilters() ? clearFilters : undefined}
+            />
           ) : (
             <div
               className="marketplace-grid"

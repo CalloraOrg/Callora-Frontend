@@ -1,0 +1,58 @@
+/* MethodChip.css */
+
+.method-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  margin: 2px;
+  min-width: 60px; /* uniform width */
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: default;
+  user-select: none;
+  /* fallback colors if CSS vars are not defined */
+  background-color: var(--method-default-bg, #e0e0e0);
+  color: var(--method-default-fg, #333);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.method-chip:focus {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+.method-icon {
+  margin-right: 4px;
+  font-size: 0.85rem;
+}
+
+.method-tooltip {
+  position: absolute;
+  top: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--tooltip-bg, #333);
+  color: var(--tooltip-fg, #fff);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  z-index: 10;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+/* Arrow for tooltip */
+.method-tooltip::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px 5px 0 5px;
+  border-style: solid;
+  border-color: var(--tooltip-bg, #333) transparent transparent transparent;
+}

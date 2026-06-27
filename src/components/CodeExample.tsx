@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * UPDATED COMPONENT FOR ISSUE #59:
@@ -6,6 +6,7 @@ import { useState } from "react";
  * - Integrated copy-to-clipboard with visual feedback toast.
  * - Accessible roles (tablist, tab) for keyboard users.
  * - Minimalist design that respects CSS variables.
+ * - Persists last-used language under localStorage key `callora.prefs.codeLang`.
  */
 
 type CodeExampleProps = {
@@ -16,6 +17,63 @@ type CodeExampleProps = {
   defaultLanguage?: string;
 };
 
+const USER_PREFS_KEY = "callora.prefs";
+const CODE_LANG_KEY = "codeLang";
+
+function readUserPrefs(): Record<string, unknown> | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const stored = localStorage.getItem(USER_PREFS_KEY);
+  if (!stored) return null;
+
+  try {
+    return JSON.parse(stored) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function writeUserPref(key: string, value: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const currentPrefs = readUserPrefs() || {};
+  const nextPrefs = { ...currentPrefs, [key]: value };
+
+  try {
+    localStorage.setItem(USER_PREFS_KEY, JSON.stringify(nextPrefs));
+  } catch {
+    // Silently ignore storage failures to avoid runtime warnings.
+  }
+}
+
+function getPersistedLanguage(snippets: Record<string, string>): string | undefined {
+  const prefs = readUserPrefs();
+  const persisted = prefs?.[CODE_LANG_KEY];
+  return typeof persisted === "string" && persisted in snippets ? persisted : undefined;
+}
+
+function getInitialLanguage(
+  snippets: Record<string, string>,
+  defaultLanguage?: string
+): string {
+  const languages = Object.keys(snippets);
+  const persisted = getPersistedLanguage(snippets);
+
+  if (persisted) {
+    return persisted;
+  }
+
+  if (defaultLanguage && defaultLanguage in snippets) {
+    return defaultLanguage;
+  }
+
+  return languages[0] || "";
+}
+
 export default function CodeExample({
   snippets,
   defaultLanguage,
@@ -24,11 +82,34 @@ export default function CodeExample({
   const languages = Object.keys(snippets);
   
   // State to manage the active language tab and the 'Copied' feedback status
-  const [activeTab, setActiveTab] = useState(defaultLanguage || languages[0] || "");
+  const [activeTab, setActiveTab] = useState(() =>
+    getInitialLanguage(snippets, defaultLanguage)
+  );
   const [copied, setCopied] = useState(false);
 
   // Retrieve the code string based on the currently selected tab
   const activeCode = snippets[activeTab] || "";
+
+  // Persist the selected language across page navigation and future mounts.
+  useEffect(() => {
+    if (!activeTab) return;
+    writeUserPref(CODE_LANG_KEY, activeTab);
+  }, [activeTab]);
+
+  // When the available languages change, ensure the active tab remains valid.
+  useEffect(() => {
+    if (activeTab && activeTab in snippets) return;
+
+    const availableLanguages = Object.keys(snippets);
+    const fallback =
+      defaultLanguage && defaultLanguage in snippets
+        ? defaultLanguage
+        : availableLanguages[0] || "";
+
+    if (fallback !== activeTab) {
+      setActiveTab(fallback);
+    }
+  }, [snippets, activeTab, defaultLanguage]);
 
   /**
    * Handles the clipboard copy action. 
