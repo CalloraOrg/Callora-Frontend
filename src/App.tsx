@@ -7,6 +7,7 @@ import RouteProgressBar from './components/RouteProgressBar';
 import ServerError from './components/ServerError';
 import NotFound from './components/NotFound';
 import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
+import useDocumentTitle from './hooks/useDocumentTitle';
 import { formatUsdc, formatUsdShortcut } from './utils/format';
 import {
   EXPLORER_BASE_URL,
@@ -272,6 +273,7 @@ function LandingPage({
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: 'Marketplace – Callora',
     [APP_ROUTES.dashboard]: 'Dashboard – Callora',

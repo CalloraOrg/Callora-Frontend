@@ -16,6 +16,7 @@ export type APIItem = {
   useCases?: string[];
   endpoints?: Array<any>;
   stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
+  ratingDistribution?: Record<number, number>;
 };
 
 export const MOCK_APIS: APIItem[] = [
@@ -67,6 +68,7 @@ export const MOCK_APIS: APIItem[] = [
       },
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
+    ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
   },
   {
     id: "pay-qr",

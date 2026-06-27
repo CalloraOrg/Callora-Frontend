@@ -1,6 +1,7 @@
 import Skeleton from "./Skeleton";
 import { formatPrice } from "../utils/format";
 import type { APIItem } from "../data/mockApis";
+import RatingHistogram from "./RatingHistogram";
 
 export function ApiCardSkeleton() {
   return (
@@ -191,7 +192,9 @@ export default function ApiCard({
           </div>
           {api.rating !== undefined && (
             <div style={{ color: "var(--muted)", marginTop: 6 }}>
-              ⭐ {api.rating}
+              <RatingHistogram rating={api.rating} distribution={api.ratingDistribution}>
+                ⭐ {api.rating}
+              </RatingHistogram>
             </div>
           )}
         </div>
@@ -270,7 +273,13 @@ export default function ApiCard({
             View Details
           </span>
           <div style={{ color: "var(--muted)", fontSize: 12 }}>
-            {api.rating ? `${api.rating} ★` : "No reviews"}
+            {api.rating ? (
+              <RatingHistogram rating={api.rating} distribution={api.ratingDistribution}>
+                {api.rating} ★
+              </RatingHistogram>
+            ) : (
+              "No reviews"
+            )}
           </div>
         </div>
       </div>
