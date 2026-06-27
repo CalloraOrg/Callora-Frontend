@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Icons } from "../utils/icons";
 
 /**
  * UPDATED COMPONENT FOR ISSUE #59:
@@ -195,7 +196,7 @@ export default function CodeExample({
               alignItems: "center", 
               gap: "4px" 
             }}>
-              ✓ Copied
+              <Icons.Check size={14} /> Copied
             </span>
           ) : (
             "Copy"
