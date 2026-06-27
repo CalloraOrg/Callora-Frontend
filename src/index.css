@@ -1856,21 +1856,18 @@ code,
 }
 
 .api-detail-tabs {
-    display: flex;
-    gap: 24px;
-    border-bottom: 1px solid var(--line);
-    margin-bottom: 32px;
-    position: sticky;
-    top: 0;
-    background: var(--page-bg);
-    z-index: 20;
-    overflow-x: auto;
-    scrollbar-width: thin;
+  /* Layout placement — sticks below topbar while scrolling */
+  margin-bottom: 32px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  /* The Tabs component (.tabs-nav) provides border-bottom, overflow-x,
+     display:flex, and background. We only need to ensure the sticky
+     background matches the page background here. */
+  background: var(--page-bg);
 }
 
-.api-detail-tabs button {
-    flex: 0 0 auto;
-}
+/* The .api-detail-tabs button rule is now handled by .tabs-tab inside Tabs.tsx */
 
 .api-detail-two-column,
 .api-detail-pricing-grid {
@@ -2801,11 +2798,15 @@ code,
         margin-top: 12px;
     }
 
-    .api-detail-tabs {
-        gap: 18px;
-        margin-bottom: 22px;
-        padding-bottom: 2px;
-    }
+  .api-detail-tabs {
+    margin-bottom: 22px;
+  }
+
+  /* Tighten tab button spacing on narrow viewports */
+  .api-detail-tabs .tabs-tab {
+    margin: 0 8px;
+    font-size: 14px;
+  }
 
     .api-detail-two-column,
     .api-detail-pricing-grid,
