@@ -103,6 +103,7 @@ const APP_ROUTES = {
   landing: "/",
   dashboard: "/dashboard",
   marketplace: "/marketplace",
+  publish: "/publish",
   apiUsage: "/api-usage",
   billing: "/billing",
   documentation: "/documentation",
@@ -481,7 +482,10 @@ function App() {
             element={
               <LandingPage
                 onStartUsingApis={() => navigate(APP_ROUTES.marketplace)}
-                onPublishApi={() => navigate(APP_ROUTES.billing)}
+                onPublishApi={() => {
+                  window.history.pushState({}, '', APP_ROUTES.publish);
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
               />
             }
           />
