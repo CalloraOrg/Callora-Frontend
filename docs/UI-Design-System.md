@@ -107,10 +107,8 @@ All shared components are located in `src/components/`. Use these components ins
 Displays API information in a card format for marketplace listings.
 
 **Props:**
-- `api: any` - API object containing name, description, provider, tags, rating, and footer stats (`pricePerCall`, `avgLatencyMs`, `uptimePercent`)
-- `onViewDetails?: (api: any) => void` - Callback when the card opens API details
-- `onTagClick?: (tag: string) => void` - Callback when a tag chip is activated
-- `activeTag?: string | null` - Currently active marketplace tag filter
+- `api: any` - API object containing name, description, provider, tags, rating, ratingDistribution, and footer stats (`pricePerCall`, `avgLatencyMs`, `uptimePercent`)
+- `onViewDetails?: (api: any) => void` - Callback when "View Details" is clicked
 
 **Variants:**
 - `ApiCard` - Standard card with hover effects
@@ -129,7 +127,7 @@ Displays API information in a card format for marketplace listings.
 
 **States:**
 - Default: Subtle border, no shadow
-- Hover: Accent border (#4666ff), shadow, lift effect
+- Hover: Accent border (#4666ff), shadow, lift effect. Rating display shows a pop-up distribution histogram on hover or long-press.
 - Focus: Keyboard accessible with tabIndex=0, Enter key triggers onViewDetails
 - Tag active: Matching tag chip uses the accent token and `aria-pressed=true`
 - Loading: Skeleton variant with placeholder elements
@@ -414,6 +412,40 @@ Sidebar for filtering marketplace results.
 **Usage Example:**
 ```tsx
 <NotFound onGoHome={() => navigate("/")} />
+```
+
+---
+
+### RatingHistogram
+
+Displays a tooltip with a 5-star rating distribution breakdown upon hovering or long-pressing the wrapped element.
+
+**Props:**
+- `rating: number` - The aggregate average rating (out of 5).
+- `distribution?: Record<number, number>` - Optional object containing the count of reviews for each star (1-5). If omitted, a mock distribution is dynamically generated based on the rating.
+- `children?: React.ReactNode` - The trigger element (e.g. text or icon) that the user hovers or long-presses.
+
+**Visual Spec:**
+- Layout: Overlay tooltip (`role="tooltip"`) anchored below the trigger element.
+- Header: Large display of the average rating next to "out of 5".
+- Rows: Flex layout for 5 to 1 stars, showing star label, progress bar, and raw count.
+- Progress bar: 8px height, `var(--surface-soft)` background, with a `var(--accent)` filled area based on percentage of total reviews.
+
+**States:**
+- Hidden (Default): Tooltip is not rendered.
+- Hovered (Mouse) / Long-press (Touch): Tooltip becomes visible after a short delay on touch (400ms) or instantly on mouse hover.
+
+**Accessibility:**
+- Tooltip is marked with `role="tooltip"`.
+- Each row uses `aria-label` to announce the star level and number of reviews.
+- Trigger handles both mouse events (`onMouseEnter`, `onMouseLeave`) and touch events (`onTouchStart`, `onTouchEnd`, `onTouchCancel`).
+- Click propagation is stopped within the tooltip to prevent unintended interactions if wrapped inside a button or clickable card.
+
+**Usage Example:**
+```tsx
+<RatingHistogram rating={4.5} distribution={{ 5: 100, 4: 50, 3: 10, 2: 5, 1: 0 }}>
+  <span>⭐ 4.5</span>
+</RatingHistogram>
 ```
 
 ---

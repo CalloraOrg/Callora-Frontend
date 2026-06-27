@@ -12,6 +12,7 @@ import TagChip from "./TagChip";
 import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import type { APIItem } from "../data/mockApis";
+import RatingHistogram from "./RatingHistogram";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -432,8 +433,10 @@ export default function ApiCard({
             {`$${formatPrice(pricePerCall)}`} / call
           </div>
           {api.rating !== undefined && (
-            <div style={{ color: "var(--muted)", marginTop: 2 }}>
-              ⭐ {api.rating}
+            <div style={{ color: "var(--muted)", marginTop: 6 }}>
+              <RatingHistogram rating={api.rating} distribution={api.ratingDistribution}>
+                ⭐ {api.rating}
+              </RatingHistogram>
             </div>
           )}
         </div>
@@ -506,7 +509,13 @@ export default function ApiCard({
             View Details
           </span>
           <div style={{ color: "var(--muted)", fontSize: 12 }}>
-            {api.rating ? `${api.rating} ★` : "No reviews"}
+            {api.rating ? (
+              <RatingHistogram rating={api.rating} distribution={api.ratingDistribution}>
+                {api.rating} ★
+              </RatingHistogram>
+            ) : (
+              "No reviews"
+            )}
           </div>
         </div>
       </div>

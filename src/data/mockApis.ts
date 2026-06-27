@@ -25,7 +25,7 @@ export type APIItem = {
   useCases?: string[];
   endpoints?: Array<any>;
   stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
-  reviews?: Review[];
+  ratingDistribution?: Record<number, number>;
 };
 
 export const MOCK_APIS: APIItem[] = [
@@ -77,56 +77,7 @@ export const MOCK_APIS: APIItem[] = [
       },
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
-    reviews: [
-      {
-        id: "r1",
-        author: "Sofia M.",
-        rating: 5,
-        date: "2026-06-10",
-        body: "Incredibly accurate forecasts and blazing fast. Integrated in under an hour.",
-        verified: true,
-      },
-      {
-        id: "r2",
-        author: "James K.",
-        rating: 4,
-        date: "2026-05-22",
-        body: "Great coverage. Geo-aware querying is a killer feature. Minor latency spikes occasionally.",
-        verified: true,
-      },
-      {
-        id: "r3",
-        author: "Priya N.",
-        rating: 5,
-        date: "2026-04-15",
-        body: "Best weather API I've used. The historical data endpoint alone is worth it.",
-        verified: false,
-      },
-      {
-        id: "r4",
-        author: "Carlos R.",
-        rating: 3,
-        date: "2026-03-30",
-        body: "Solid API but documentation could be more detailed for edge cases.",
-        verified: false,
-      },
-      {
-        id: "r5",
-        author: "Ava T.",
-        rating: 5,
-        date: "2026-02-18",
-        body: "Fantastic uptime and support. Has never let us down in production.",
-        verified: true,
-      },
-      {
-        id: "r6",
-        author: "Liam W.",
-        rating: 2,
-        date: "2026-01-05",
-        body: "Had reliability issues in January. Support was responsive but the outage hurt us.",
-        verified: true,
-      },
-    ],
+    ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
   },
   {
     id: "pay-qr",

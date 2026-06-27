@@ -1,217 +1,182 @@
-import React from "react";
-import type { Review } from "../data/mockApis";
+import React, { useState, useRef, useEffect } from "react";
 
-interface RatingHistogramProps {
-  reviews: Review[];
-  averageRating: number;
+export interface RatingHistogramProps {
+  rating: number;
+  distribution?: Record<number, number>;
+  children?: React.ReactNode;
 }
 
-/** A single filled or empty SVG star, accessible via aria-label on the parent. */
-function Star({ filled, half }: { filled: boolean; half?: boolean }) {
-  const id = React.useId();
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      focusable="false"
-      style={{ display: "block" }}
-    >
-      {half && (
-        <defs>
-          <linearGradient id={id}>
-            <stop offset="50%" stopColor="var(--accent, #f59e0b)" />
-            <stop offset="50%" stopColor="var(--border-subtle, #374151)" />
-          </linearGradient>
-        </defs>
-      )}
-      <path
-        d="M10 1.5l2.39 4.84 5.34.78-3.87 3.77.91 5.32L10 13.77l-4.77 2.44.91-5.32L2.27 7.12l5.34-.78L10 1.5z"
-        fill={
-          half
-            ? `url(#${id})`
-            : filled
-            ? "var(--accent, #f59e0b)"
-            : "var(--border-subtle, #374151)"
-        }
-      />
-    </svg>
-  );
-}
-
-/** Five stars representing the given rating value (supports half-stars). */
-function StarRating({ value }: { value: number }) {
-  return (
-    <span
-      aria-label={`${value.toFixed(1)} out of 5 stars`}
-      role="img"
-      style={{ display: "flex", gap: 2 }}
-    >
-      {Array.from({ length: 5 }, (_, i) => {
-        const full = value >= i + 1;
-        const half = !full && value >= i + 0.5;
-        return <Star key={i} filled={full} half={half} />;
-      })}
-    </span>
-  );
-}
-
-/**
- * RatingHistogram – displays the average score, total review count, and a
- * 5-bar rating distribution (5→1 star). Bars scale relative to the highest
- * bucket count, not total reviews.
- */
 export default function RatingHistogram({
-  reviews,
-  averageRating,
+  rating,
+  distribution,
+  children,
 }: RatingHistogramProps) {
-  // Count reviews per star bucket (1–5)
-  const counts = React.useMemo(() => {
-    const tally = [0, 0, 0, 0, 0]; // index 0 = 1 star, index 4 = 5 stars
-    for (const r of reviews) {
-      const bucket = Math.min(5, Math.max(1, Math.round(r.rating)));
-      tally[bucket - 1] += 1;
-    }
-    return tally;
-  }, [reviews]);
+  const [isVisible, setIsVisible] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const maxCount = Math.max(...counts, 1); // avoid div-by-zero
-  const total = reviews.length;
+  const dist = distribution || generateMockDistribution(rating);
+  const total = Object.values(dist).reduce((sum, val) => sum + val, 0) || 1;
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const handleMouseEnter = () => {
+    setIsVisible(true);
+  };
+  const handleMouseLeave = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setIsVisible(false);
+  };
+
+  const handleTouchStart = () => {
+    // 400ms long press to show histogram on touch devices
+    timerRef.current = setTimeout(() => {
+      setIsVisible(true);
+    }, 400);
+  };
+
+  const handleTouchEnd = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setIsVisible(false);
+  };
 
   return (
     <div
+      className="rating-histogram-trigger"
       style={{
-        display: "flex",
-        gap: "clamp(16px, 5vw, 40px)",
-        alignItems: "flex-start",
-        flexWrap: "wrap",
-        padding: "20px 24px",
-        background: "var(--bg-subtle, rgba(255,255,255,0.04))",
-        borderRadius: 12,
-        border: "1px solid var(--border-subtle, rgba(255,255,255,0.08))",
-        marginBottom: 24,
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
       }}
-      aria-label="Rating distribution summary"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
     >
-      {/* Left: aggregate score */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 6,
-          minWidth: 80,
-        }}
-      >
-        <span
+      {children}
+      {isVisible && (
+        <div
+          className="surface rating-tooltip"
+          role="tooltip"
           style={{
-            fontSize: "clamp(2rem, 6vw, 3rem)",
-            fontWeight: 800,
-            lineHeight: 1,
-            color: "var(--text-main)",
+            position: "absolute",
+            bottom: "100%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            marginBottom: "8px",
+            padding: "16px",
+            width: "240px",
+            zIndex: 50,
+            boxShadow: "var(--shadow)",
+            cursor: "default",
           }}
-          aria-label={`Average rating: ${averageRating.toFixed(1)}`}
+          onClick={(e) => e.stopPropagation()} // Prevent clicking through to parent card
         >
-          {averageRating.toFixed(1)}
-        </span>
-        <StarRating value={averageRating} />
-        <span
-          style={{
-            fontSize: 12,
-            color: "var(--muted)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {total} {total === 1 ? "review" : "reviews"}
-        </span>
-      </div>
-
-      {/* Right: histogram bars (5 star → 1 star) */}
-      <div
-        style={{
-          flex: "1 1 160px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          minWidth: 0,
-        }}
-        role="list"
-        aria-label="Reviews by star rating"
-      >
-        {[5, 4, 3, 2, 1].map((star) => {
-          const count = counts[star - 1];
-          const pct = Math.round((count / maxCount) * 100);
-          return (
-            <div
-              key={star}
-              role="listitem"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                minWidth: 0,
-              }}
-              aria-label={`${star} star: ${count} ${count === 1 ? "review" : "reviews"}`}
-            >
-              {/* Star label with SVG star icon */}
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3,
-                  fontSize: 12,
-                  color: "var(--muted)",
-                  whiteSpace: "nowrap",
-                  width: 36,
-                  flexShrink: 0,
-                }}
-                aria-hidden="true"
-              >
-                {star}
-                <Star filled />
-              </span>
-
-              {/* Bar track */}
-              <div
-                aria-hidden="true"
-                style={{
-                  flex: 1,
-                  height: 8,
-                  borderRadius: 4,
-                  background: "var(--border-subtle, rgba(255,255,255,0.1))",
-                  overflow: "hidden",
-                  minWidth: 0,
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${pct}%`,
-                    borderRadius: 4,
-                    background: "var(--accent, #f59e0b)",
-                    transition: "width 0.4s ease",
-                  }}
-                />
-              </div>
-
-              {/* Count */}
-              <span
-                aria-hidden="true"
-                style={{
-                  fontSize: 12,
-                  color: "var(--muted)",
-                  width: 20,
-                  textAlign: "right",
-                  flexShrink: 0,
-                }}
-              >
-                {count}
-              </span>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              gap: "8px",
+              marginBottom: "12px",
+            }}
+          >
+            <strong style={{ fontSize: "1.5rem", color: "var(--text)" }}>
+              {rating.toFixed(1)}
+            </strong>
+            <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+              out of 5
             </div>
-          );
-        })}
-      </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {[5, 4, 3, 2, 1].map((star) => {
+              const count = dist[star] || 0;
+              const percent = (count / total) * 100;
+              return (
+                <div
+                  key={star}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "0.75rem",
+                  }}
+                  aria-label={`${star} stars: ${count} reviews`}
+                >
+                  <div
+                    style={{
+                      width: "32px",
+                      textAlign: "right",
+                      color: "var(--text)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {star} ★
+                  </div>
+                  <div
+                    style={{
+                      flex: 1,
+                      height: "8px",
+                      background: "var(--surface-soft)",
+                      borderRadius: "999px",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${percent}%`,
+                        height: "100%",
+                        background: "var(--accent)",
+                        borderRadius: "999px",
+                        transition: "width var(--transition-speed) ease",
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      width: "28px",
+                      textAlign: "right",
+                      color: "var(--muted)",
+                    }}
+                  >
+                    {count}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function generateMockDistribution(rating: number): Record<number, number> {
+  const total = 124;
+  const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  if (rating >= 4.5) {
+    dist[5] = Math.floor(total * 0.7);
+    dist[4] = Math.floor(total * 0.2);
+    dist[3] = Math.floor(total * 0.05);
+    dist[2] = Math.floor(total * 0.03);
+    dist[1] = total - dist[5] - dist[4] - dist[3] - dist[2];
+  } else if (rating >= 4.0) {
+    dist[5] = Math.floor(total * 0.4);
+    dist[4] = Math.floor(total * 0.4);
+    dist[3] = Math.floor(total * 0.1);
+    dist[2] = Math.floor(total * 0.05);
+    dist[1] = total - dist[5] - dist[4] - dist[3] - dist[2];
+  } else {
+    dist[5] = Math.floor(total * 0.2);
+    dist[4] = Math.floor(total * 0.3);
+    dist[3] = Math.floor(total * 0.3);
+    dist[2] = Math.floor(total * 0.15);
+    dist[1] = total - dist[5] - dist[4] - dist[3] - dist[2];
+  }
+  return dist;
 }
