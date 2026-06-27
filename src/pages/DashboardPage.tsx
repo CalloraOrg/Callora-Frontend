@@ -1,5 +1,5 @@
-import Dashboard from "../components/Dashboard";
-import useDocumentTitle from "../hooks/useDocumentTitle";
+import Dashboard from '../components/Dashboard';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 /**
  * DashboardPage – wrapper for the Dashboard component to set page title.

@@ -3,6 +3,7 @@ import './Dashboard.css';
 import { useNavigate } from 'react-router-dom';
 import Skeleton from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
+import UsageGauge from '../components/UsageGauge';
 import { formatUsdc } from '../utils/format';
 import { LOADING_DELAY_MS } from '../config/constants';
 
@@ -38,6 +39,7 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
   }, []);
 
   const isLoading = activity === null;
+  const totalUsage = activity?.reduce((sum, item) => (item.type === 'usage' ? sum + item.amount : sum), 0) ?? 0;
 
   return (
     <section className="dashboard-grid surface">
@@ -50,6 +52,14 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
         <h3 className="eyebrow">Wallet available</h3>
         <strong>{formatUsdc(walletBalance)} USDC</strong>
       </div>
+
+      {/* Screen-reader-friendly usage state */}
+      <UsageGauge
+        label="API usage this cycle"
+        used={totalUsage}
+        limit={vaultBalance}
+        unit="USDC"
+      />
 
       {/* Quick actions */}
       <div className="dashboard-actions">
