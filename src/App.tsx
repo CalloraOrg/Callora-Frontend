@@ -1,20 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  Routes,
-  Route,
-  NavLink,
-  useNavigate,
-  useLocation,
-} from "react-router-dom";
-import { ThemeToggle } from "./ThemeToggle";
-import ApiUsage from "./ApiUsage";
-import Dashboard from "./components/Dashboard";
-import RouteProgressBar from "./components/RouteProgressBar";
-import ServerError from "./components/ServerError";
-import NotFound from "./components/NotFound";
-import ThemePlayground from "./pages/ThemePlayground";
-import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
-import { formatUsdc, formatUsdShortcut } from "./utils/format";
+import { useEffect, useRef, useState } from 'react';
+import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import useDocumentTitle from './hooks/useDocumentTitle';
+import { ThemeToggle } from './ThemeToggle';
+import ApiUsage from './ApiUsage';
+import Dashboard from './components/Dashboard';
+import MarketplacePage from './pages/MarketplacePage';
+import RouteProgressBar from './components/RouteProgressBar';
+import ServerError from './components/ServerError';
+import NotFound from './components/NotFound';
+import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
+import { formatUsdc, formatUsdShortcut } from './utils/format';
 import {
   EXPLORER_BASE_URL,
   MIN_DEPOSIT,
@@ -560,17 +555,7 @@ function App() {
           />
           <Route
             path={APP_ROUTES.marketplace}
-            element={
-              <section className="surface placeholder-card">
-                <p className="eyebrow">Marketplace</p>
-                <h1>Discover premium APIs ready for production usage.</h1>
-                <p>
-                  Compare APIs, review pricing, and route high-priority
-                  workloads with confidence. Use the billing tab whenever you
-                  need to top up your USDC vault.
-                </p>
-              </section>
-            }
+            element={<MarketplacePage />}
           />
 
           <Route

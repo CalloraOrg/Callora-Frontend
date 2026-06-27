@@ -8,6 +8,7 @@ import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import "./index.css";
 import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
+import { CollectionsProvider } from "./state/collectionsStore";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -22,11 +23,12 @@ async function renderRoute() {
   const wrap = (children: React.ReactNode) => (
     <React.StrictMode>
       <ThemeProvider>
-        <BrowserRouter>
-          <RouteProgressBar />
-          {children}
-          <CommandPalette />
-        </BrowserRouter>
+        <CollectionsProvider>
+          <BrowserRouter>
+            <RouteProgressBar />
+            {children}
+          </BrowserRouter>
+        </CollectionsProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
@@ -69,11 +71,12 @@ async function renderRoute() {
   root.render(
     <React.StrictMode>
       <BrowserRouter>
-      <ThemeProvider>
-      <RouteProgressBar />
-      <App />
-      <CommandPalette />
-      </ThemeProvider>
+        <ThemeProvider>
+          <CollectionsProvider>
+            <RouteProgressBar />
+            <App />
+          </CollectionsProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,
   );
