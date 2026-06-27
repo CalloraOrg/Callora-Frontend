@@ -284,6 +284,32 @@ Reusable chip button for marketplace tag filtering.
 
 ---
 
+### EndpointGroupHover
+
+Interactive documentation helper that previews endpoint groups on hover and keyboard focus.
+
+**Props:**
+- `groups: EndpointGroupPreview[]` - Group metadata including label, supported methods, counts, and preview endpoints
+
+**Visual Spec:**
+- Two-column layout on desktop: group triggers on the left, preview card on the right
+- Trigger buttons: 14px radius, token-based border/background, minimum 52px height
+- Preview card: `preview-card` styling with group summary, method badges, and up to three endpoint rows
+- Responsive: collapses to a single column on smaller screens
+
+**States:**
+- Default: Empty helper card prompts the user to hover or focus a group
+- Hover / Focus: Matching group trigger highlights and reveals the preview card
+- Escape: Clears the active preview for keyboard users
+
+**Accessibility:**
+- Uses real `<button type="button">` triggers
+- Keyboard focus reveals the same preview shown on hover
+- `aria-describedby` links the active trigger to its preview card
+- Preview helper text remains available when no group is active
+
+---
+
 ### FiltersSidebar
 
 Sidebar for filtering marketplace results.
