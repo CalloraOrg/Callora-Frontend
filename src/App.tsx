@@ -3,8 +3,10 @@ import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-d
 import { ThemeToggle } from './ThemeToggle';
 import ApiUsage from './ApiUsage';
 import Dashboard from './components/Dashboard';
+import RouteProgressBar from './components/RouteProgressBar';
 import ServerError from './components/ServerError';
 import NotFound from './components/NotFound';
+import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
 import { formatUsdc, formatUsdShortcut } from './utils/format';
 import {
   EXPLORER_BASE_URL,
@@ -347,6 +349,12 @@ function App() {
     }
   }, [isDepositOpen, location.pathname]);
 
+  useEffect(() => {
+    startRouteLoading();
+    const timer = setTimeout(() => stopRouteLoading(), 400);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
   const clearTimers = () => {
     timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
     timersRef.current = [];
@@ -471,6 +479,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      <RouteProgressBar />
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>

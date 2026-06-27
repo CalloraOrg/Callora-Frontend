@@ -2690,6 +2690,56 @@ code,
   }
 }
 
+/* ─── Route Progress Bar ────────────────────────────────────────────────────
+   Fixed thin bar at the top of the viewport. Uses var(--accent) to stay
+   theme-aware in both light and dark mode. The indeterminate animation only
+   runs when the user has not requested reduced motion.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@keyframes route-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.route-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-speed) ease;
+}
+
+.route-progress-bar--active {
+  opacity: 1;
+}
+
+.route-progress-bar-track {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.route-progress-bar-indicator {
+  width: 33.33%;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .route-progress-bar-indicator {
+    animation: route-progress-indeterminate 1.4s ease-in-out infinite;
+  }
+}
+
 /* Skeleton Loading */
 @keyframes shimmer {
   0% {
