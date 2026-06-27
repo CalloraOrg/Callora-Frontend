@@ -1,6 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
+import { ShortcutsModal } from './components/ShortcutsModal';
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import ApiUsage from './ApiUsage';
+import ServerError from './components/ServerError';
+import NotFound from './components/NotFound';
 
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
 type DemoOutcome = 'confirmed' | 'failed';
@@ -274,10 +279,39 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
   const [amountInput, setAmountInput] = useState("50");
   const [selectedPreset, setSelectedPreset] = useState<number | "custom">(50);
+
+  // Handle global shortcuts
+  const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
+    // Open shortcuts modal with ?
+    if (event.key === '?' || (event.shiftKey && event.key === '/')) {
+      event.preventDefault();
+      setIsShortcutsModalOpen(true);
+      return;
+    }
+
+    // Navigation shortcuts (g followed by another key)
+    if (event.key === 'g') {
+      // We'll handle the next key in a separate listener for sequence
+      const handleNextKey = (e: KeyboardEvent) => {
+        if (e.key === 'h') {
+          navigate(APP_ROUTES.dashboard);
+        } else if (e.key === 'm') {
+          navigate(APP_ROUTES.marketplace);
+        } else if (e.key === 'b') {
+          navigate(APP_ROUTES.billing);
+        }
+        window.removeEventListener('keydown', handleNextKey);
+      };
+      window.addEventListener('keydown', handleNextKey, { once: true });
+    }
+  }, [navigate]);
+
+  useGlobalShortcuts(handleGlobalKeyDown);
   const [depositStage, setDepositStage] = useState<DepositStage>("input");
   const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
   const [txHash, setTxHash] = useState("");
@@ -684,6 +718,11 @@ function App() {
           <NavLink to={APP_ROUTES.documentation}>Documentation</NavLink>
         </nav>
       </footer>
+
+      <ShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
+      />
 
       {isDepositOpen && (
         <div
