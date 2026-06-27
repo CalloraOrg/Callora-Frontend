@@ -3,8 +3,10 @@ import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
 import EmbedPreview from "../components/EmbedPreview";
+import RatingHistogram from "../components/RatingHistogram";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { findApiById } from "../data/mockApis";
+import type { Review } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 import { formatPrice } from "../utils/format";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
@@ -241,6 +243,27 @@ export default function ApiDetailPage({ onBack }: Props) {
   }
 
 
+
+  type ReviewSort = "newest" | "highest" | "lowest";
+  const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
+
+  const rawReviews: Review[] = api.reviews ?? [];
+
+  const sortedReviews = useMemo(() => {
+    const copy = [...rawReviews];
+    if (reviewSort === "newest") {
+      copy.sort((a, b) => b.date.localeCompare(a.date));
+    } else if (reviewSort === "highest") {
+      copy.sort((a, b) => b.rating - a.rating || b.date.localeCompare(a.date));
+    } else {
+      copy.sort((a, b) => a.rating - b.rating || b.date.localeCompare(a.date));
+    }
+    return copy;
+  }, [rawReviews, reviewSort]);
+
+  const averageRating = rawReviews.length
+    ? rawReviews.reduce((sum, r) => sum + r.rating, 0) / rawReviews.length
+    : (api.rating ?? 0);
 
   // Example Generation Logic
   const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
@@ -870,35 +893,245 @@ print(data)`;
                 {/* REVIEWS TAB */}
                 {tab === "reviews" && (
                   <section>
+                    {/* Header row */}
                     <div className="api-detail-reviews-header">
-                      <h3>Developer Feedback</h3>
+                      <h3 style={{ margin: 0 }}>Developer Feedback</h3>
                       <button className="secondary-button">
                         Write a Review
                       </button>
                     </div>
 
-                    <div
-                      className="preview-card"
-                      style={{
-                        padding: 40,
-                        textAlign: "center",
-                        borderStyle: "dashed",
-                      }}
-                    >
-                      <div style={{ fontSize: 40, marginBottom: 16 }}>💬</div>
-                      <h4>No public reviews yet</h4>
-                      <p
+                    {rawReviews.length === 0 ? (
+                      <div
+                        className="preview-card"
                         style={{
-                          color: "var(--muted)",
-                          maxWidth: 400,
-                          margin: "0 auto",
+                          padding: 40,
+                          textAlign: "center",
+                          borderStyle: "dashed",
+                          marginTop: 16,
                         }}
                       >
-                        Be the first to share your experience with this API.
-                        Your feedback helps other developers make better
-                        choices.
-                      </p>
-                    </div>
+                        <div style={{ fontSize: 40, marginBottom: 16 }}>💬</div>
+                        <h4>No public reviews yet</h4>
+                        <p
+                          style={{
+                            color: "var(--muted)",
+                            maxWidth: 400,
+                            margin: "0 auto",
+                          }}
+                        >
+                          Be the first to share your experience with this API.
+                          Your feedback helps other developers make better
+                          choices.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Rating histogram summary */}
+                        <div style={{ marginTop: 16 }}>
+                          <RatingHistogram
+                            reviews={rawReviews}
+                            averageRating={averageRating}
+                          />
+                        </div>
+
+                        {/* Sort controls */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            marginBottom: 16,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <label
+                            htmlFor="review-sort"
+                            style={{
+                              fontSize: 13,
+                              color: "var(--muted)",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Sort by
+                          </label>
+                          <select
+                            id="review-sort"
+                            value={reviewSort}
+                            onChange={(e) =>
+                              setReviewSort(e.target.value as ReviewSort)
+                            }
+                            style={{
+                              fontSize: 13,
+                              padding: "5px 10px",
+                              borderRadius: 6,
+                              border: "1px solid var(--border-subtle)",
+                              background: "var(--bg-subtle)",
+                              color: "var(--text-main)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <option value="newest">Newest</option>
+                            <option value="highest">Highest rated</option>
+                            <option value="lowest">Lowest rated</option>
+                          </select>
+                        </div>
+
+                        {/* Review list */}
+                        <div style={{ display: "grid", gap: 16 }}>
+                          {sortedReviews.map((review) => (
+                            <div
+                              key={review.id}
+                              className="preview-card"
+                              style={{ padding: 20 }}
+                            >
+                              {/* Review header */}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "flex-start",
+                                  justifyContent: "space-between",
+                                  gap: 8,
+                                  flexWrap: "wrap",
+                                  marginBottom: 10,
+                                }}
+                              >
+                                {/* Author + badge */}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    flexWrap: "wrap",
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontWeight: 600,
+                                      fontSize: 14,
+                                      color: "var(--text-main)",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {review.author}
+                                  </span>
+
+                                  {review.verified && (
+                                    <span
+                                      title="Has called this API in the last 30 days"
+                                      aria-label="Verified Developer – has called this API in the last 30 days"
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                        padding: "2px 8px",
+                                        borderRadius: 999,
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        lineHeight: "18px",
+                                        background:
+                                          "rgba(16, 185, 129, 0.12)",
+                                        color: "#10b981",
+                                        border:
+                                          "1px solid rgba(16, 185, 129, 0.3)",
+                                        cursor: "default",
+                                        whiteSpace: "nowrap",
+                                        flexShrink: 0,
+                                        userSelect: "none",
+                                      }}
+                                    >
+                                      {/* Checkmark icon */}
+                                      <svg
+                                        width="10"
+                                        height="10"
+                                        viewBox="0 0 12 12"
+                                        fill="none"
+                                        aria-hidden="true"
+                                        focusable="false"
+                                      >
+                                        <path
+                                          d="M2 6l3 3 5-5"
+                                          stroke="currentColor"
+                                          strokeWidth="1.8"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                      Verified Developer
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Star rating + date */}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <span
+                                    role="img"
+                                    aria-label={`${review.rating} out of 5 stars`}
+                                    style={{ display: "flex", gap: 1 }}
+                                  >
+                                    {Array.from({ length: 5 }, (_, i) => (
+                                      <svg
+                                        key={i}
+                                        width="13"
+                                        height="13"
+                                        viewBox="0 0 20 20"
+                                        aria-hidden="true"
+                                        focusable="false"
+                                      >
+                                        <path
+                                          d="M10 1.5l2.39 4.84 5.34.78-3.87 3.77.91 5.32L10 13.77l-4.77 2.44.91-5.32L2.27 7.12l5.34-.78L10 1.5z"
+                                          fill={
+                                            i < review.rating
+                                              ? "var(--accent, #f59e0b)"
+                                              : "var(--border-subtle, #374151)"
+                                          }
+                                        />
+                                      </svg>
+                                    ))}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: 12,
+                                      color: "var(--muted)",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {new Date(review.date).toLocaleDateString(
+                                      "en-US",
+                                      {
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                      }
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Review body */}
+                              <p
+                                style={{
+                                  margin: 0,
+                                  fontSize: 14,
+                                  lineHeight: 1.6,
+                                  color: "var(--text-secondary)",
+                                }}
+                              >
+                                {review.body}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </section>
                 )}
 
