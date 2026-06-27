@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 import { ThemeProvider } from "./ThemeContext";
+import { CollectionsProvider } from "./state/collectionsStore";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -18,9 +19,11 @@ async function renderRoute() {
   const wrap = (children: React.ReactNode) => (
     <React.StrictMode>
       <ThemeProvider>
-        <BrowserRouter>
-          {children}
-        </BrowserRouter>
+        <CollectionsProvider>
+          <BrowserRouter>
+            {children}
+          </BrowserRouter>
+        </CollectionsProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
@@ -52,9 +55,11 @@ async function renderRoute() {
   root.render(
     <React.StrictMode>
       <BrowserRouter>
-      <ThemeProvider>
-      <App />
-      </ThemeProvider>
+        <ThemeProvider>
+          <CollectionsProvider>
+            <App />
+          </CollectionsProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,
   );

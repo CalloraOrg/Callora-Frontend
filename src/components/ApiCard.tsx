@@ -1,5 +1,17 @@
+/**
+ * ApiCard.tsx
+ *
+ * Marketplace API card.
+ * Includes a bookmark/save button that opens a small popover
+ * allowing users to add/remove the endpoint from collections.
+ */
+
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Skeleton from "./Skeleton";
 import { formatPrice } from "../utils/format";
+import { useCollections } from "../state/collectionsStore";
+
+// ─── Skeleton ────────────────────────────────────────────────────────────────
 
 export function ApiCardSkeleton() {
   return (
@@ -57,6 +69,221 @@ export function ApiCardSkeleton() {
   );
 }
 
+// ─── Save-to-collection popover ───────────────────────────────────────────────
+
+// ─── Bookmark button ─────────────────────────────────────────────────────────
+
+interface BookmarkButtonProps {
+  endpointId: string;
+}
+
+function BookmarkButton({ endpointId }: BookmarkButtonProps) {
+  const {
+    collections,
+    isEndpointSaved,
+    addEndpointToCollection,
+    removeEndpointFromCollection,
+    collectionIdsForEndpoint,
+    createCollection,
+  } = useCollections();
+
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const isSaved = isEndpointSaved(endpointId);
+  const savedIn = collectionIdsForEndpoint(endpointId);
+
+  // Close popover on outside click or Escape
+  useEffect(() => {
+    if (!popoverOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPopoverOpen(false);
+        btnRef.current?.focus();
+      }
+    };
+    const handleClick = (e: MouseEvent) => {
+      if (
+        panelRef.current && !panelRef.current.contains(e.target as Node) &&
+        btnRef.current && !btnRef.current.contains(e.target as Node)
+      ) {
+        setPopoverOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleClick);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [popoverOpen]);
+
+  const toggleSave = () => setPopoverOpen((s) => !s);
+
+  const handleToggleCollection = (colId: string) => {
+    if (savedIn.has(colId)) {
+      removeEndpointFromCollection(colId, endpointId);
+    } else {
+      addEndpointToCollection(colId, endpointId);
+    }
+  };
+
+  const [newName, setNewName] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const newInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showNew) newInputRef.current?.focus();
+  }, [showNew]);
+
+  const handleCreateAndAdd = useCallback(() => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    createCollection(trimmed);
+    setNewName("");
+    setShowNew(false);
+  }, [newName, createCollection]);
+
+  const handleNewKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); handleCreateAndAdd(); }
+    if (e.key === "Escape") { setShowNew(false); setNewName(""); }
+  };
+
+  return (
+    <>
+      {/* SVG bookmark button — absolutely positioned in card top-right */}
+      <button
+        ref={btnRef}
+        onClick={(e) => { e.stopPropagation(); toggleSave(); }}
+        style={{
+          position: "absolute",
+          top: "8px",
+          right: "8px",
+          background: isSaved ? "var(--accent, rgba(78,133,255,0.9))" : "rgba(0,0,0,0.5)",
+          border: "none",
+          borderRadius: "50%",
+          width: "32px",
+          height: "32px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          zIndex: 10,
+          transition: "background 160ms ease, transform 160ms ease",
+          flexShrink: 0,
+        }}
+        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)")}
+        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
+        aria-label={isSaved ? "Remove from collection" : "Save to collection"}
+        aria-pressed={isSaved}
+        aria-haspopup="dialog"
+        aria-expanded={popoverOpen}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill={isSaved ? "white" : "none"}
+          stroke="white"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+        </svg>
+      </button>
+
+      {/* Save-to-collection popover */}
+      {popoverOpen && (
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Save to collection"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            top: "48px",
+            right: "8px",
+            zIndex: 100,
+            width: 230,
+            background: "var(--surface-strong, rgba(17,24,46,0.98))",
+            border: "1px solid var(--line-strong, rgba(169,184,255,0.28))",
+            borderRadius: 12,
+            boxShadow: "var(--shadow, 0 24px 80px rgba(3,8,22,0.45))",
+            padding: "10px 10px 8px",
+            backdropFilter: "blur(20px)",
+          }}
+        >
+          <p style={{ margin: "0 0 8px", fontSize: "0.8rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            Save to collection
+          </p>
+
+          {collections.length === 0 && !showNew && (
+            <p style={{ color: "var(--muted)", fontSize: "0.82rem", margin: "0 0 8px" }}>
+              No collections yet.
+            </p>
+          )}
+
+          {collections.map((col) => (
+            <label
+              key={col.id}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 4px", borderRadius: 6, cursor: "pointer", fontSize: "0.88rem", color: "var(--text)" }}
+            >
+              <input
+                type="checkbox"
+                checked={savedIn.has(col.id)}
+                onChange={() => handleToggleCollection(col.id)}
+                aria-label={`${savedIn.has(col.id) ? "Remove from" : "Add to"} collection "${col.name}"`}
+                style={{ accentColor: "var(--accent)", width: 15, height: 15 }}
+              />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                {col.name}
+              </span>
+              <span style={{ color: "var(--muted)", fontSize: 11 }}>
+                {col.endpointIds.length}
+              </span>
+            </label>
+          ))}
+
+          {showNew ? (
+            <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+              <input
+                ref={newInputRef}
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={handleNewKeyDown}
+                placeholder="Collection name"
+                aria-label="New collection name"
+                style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid var(--accent)", borderRadius: 6, color: "var(--text)", padding: "4px 8px", fontSize: "0.82rem" }}
+              />
+              <button
+                onClick={handleCreateAndAdd}
+                disabled={!newName.trim()}
+                aria-label="Create collection"
+                style={{ background: "var(--accent)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", padding: "4px 8px", fontSize: "0.82rem", fontWeight: 700 }}
+              >
+                ✓
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowNew(true)}
+              style={{ display: "flex", alignItems: "center", gap: 4, width: "100%", marginTop: 8, background: "none", border: "1px dashed var(--line-strong, rgba(169,184,255,0.28))", borderRadius: 8, color: "var(--accent)", cursor: "pointer", padding: "5px 8px", fontSize: "0.82rem", fontWeight: 600 }}
+            >
+              <span aria-hidden="true">＋</span> New collection
+            </button>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── ApiCard ─────────────────────────────────────────────────────────────────
+
 export default function ApiCard({
   api,
   onViewDetails,
@@ -64,8 +291,6 @@ export default function ApiCard({
   api: any;
   onViewDetails?: (api: any) => void;
 }) {
-
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -82,6 +307,7 @@ export default function ApiCard({
       onClick={() => onViewDetails?.(api)}
       onKeyDown={handleKeyDown}
       style={{
+        position: "relative",
         padding: 12,
         display: "flex",
         flexDirection: "column",
@@ -89,6 +315,9 @@ export default function ApiCard({
         gap: 8,
       }}
     >
+      {/* Absolutely-positioned bookmark button in the top-right corner */}
+      <BookmarkButton endpointId={api.id} />
+
       <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <div
           className="api-marketplace-card-icon"
@@ -101,12 +330,13 @@ export default function ApiCard({
             placeItems: "center",
             fontWeight: 700,
             fontSize: 20,
+            flexShrink: 0,
           }}
         >
           {api.name[0]}
         </div>
 
-        <div className="api-marketplace-card-body" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <div className="api-marketplace-card-body" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
             <strong>{api.name}</strong>
             <div style={{ color: "var(--muted)", fontSize: 12 }}>
@@ -128,12 +358,16 @@ export default function ApiCard({
           </div>
         </div>
 
-        <div className="api-marketplace-card-price" style={{ textAlign: "right" }}>
+        {/* Price — bookmark moved out of here */}
+        <div
+          className="api-marketplace-card-price"
+          style={{ textAlign: "right", paddingRight: 36, flexShrink: 0 }}
+        >
           <div style={{ color: "var(--muted)", fontSize: 12 }}>
             {`$${formatPrice(api.pricePerRequest)}`} / req
           </div>
           {api.rating !== undefined && (
-            <div style={{ color: "var(--muted)", marginTop: 6 }}>
+            <div style={{ color: "var(--muted)", marginTop: 2 }}>
               ⭐ {api.rating}
             </div>
           )}
