@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import EmptyState from './components/EmptyState';
+import PlanNudge from './components/PlanNudge';
 import Skeleton from './components/Skeleton';
-import CallsHeatmap from './components/CallsHeatmap';
+import { useQuota } from './hooks/useQuota';
 import { formatPrice } from './utils/format';
 import { Icons } from './utils/icons';
+
+// TODO: replace with real quota value from your API/context
+const MOCK_USAGE_PERCENT = 87;
 
 type ApiEndpoint = {
   id: string;
@@ -151,6 +155,8 @@ export default function ApiUsage() {
   const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
   
+  const { usagePercent, isDismissed, dismiss } = useQuota(MOCK_USAGE_PERCENT);
+
   const [usageStats, setUsageStats] = useState<UsageStats>({
     callsToday: 47,
     callsWeek: 312,
@@ -278,6 +284,9 @@ export default function ApiUsage() {
 
   return (
     <div className="api-usage-page">
+      {!isDismissed && (
+        <PlanNudge usagePercent={usagePercent} onDismiss={dismiss} />
+      )}
       {/* Header Section */}
       <div className="api-header">
         <div className="api-header-info">
