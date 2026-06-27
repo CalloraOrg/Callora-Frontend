@@ -13,6 +13,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 
 - Landing page with product overview
 - Dashboard (usage stats, vault balance)
+- Screen-reader-friendly dashboard usage gauge with visible usage state and remaining allowance
 - Marketplace (browse and compare APIs)
 - Billing (USDC deposit, Stellar settlement, transaction tracking)
 - API Usage analytics view
@@ -42,6 +43,10 @@ Key principles:
    ```
 
 3. Open [http://localhost:5173](http://localhost:5173).
+
+## Accessibility notes
+
+The dashboard includes an accessible usage gauge that summarizes API spend for the current cycle. It exposes `role="progressbar"`, numeric ARIA values, and a human-readable usage state such as “Within limit”, “Approaching limit”, “Critical usage”, “Limit reached”, or “No limit configured” so screen-reader users receive the same status information as sighted users.
 
 ## Scripts
 

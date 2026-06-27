@@ -147,6 +147,32 @@ Displays API information in a card format for marketplace listings.
 
 ---
 
+### UsageGauge
+
+Summarizes consumed API budget or request allowance on the dashboard with both a visual progress bar and complete assistive text.
+
+**Props:**
+- `label?: string` - Visible and accessible name for the tracked usage metric
+- `used: number` - Consumed amount; negative and non-finite values are treated as 0
+- `limit: number` - Maximum allowance; values less than or equal to 0 render the “No limit configured” state
+- `unit?: string` - Unit displayed in visible and assistive text, defaults to `USDC`
+- `warningThreshold?: number` - Percentage at which the visible and announced state becomes “Approaching limit”, defaults to 75
+- `criticalThreshold?: number` - Percentage at which the state becomes “Critical usage”, defaults to 90
+
+**Visual Spec:**
+- Container uses `--surface-soft`, `--line`, and `--radius-lg`
+- Fill uses `--accent` to `--accent-strong` gradient for normal usage
+- Warning and critical states use `--accent-strong`; exhausted state uses `--danger`
+- Percentage uses tabular numerals and scales responsively with `clamp()`
+
+**Accessibility:**
+- Uses `role="progressbar"` with `aria-valuemin`, `aria-valuemax`, `aria-valuenow`, and `aria-valuetext`
+- `aria-valuetext` includes the usage state, consumed amount, limit, remaining allowance, and percentage used
+- A visually hidden description mirrors the announced status for screen readers
+- Color is not the only indicator; visible state text is always rendered
+
+---
+
 ### Breadcrumb
 
 Navigation breadcrumb showing page hierarchy.

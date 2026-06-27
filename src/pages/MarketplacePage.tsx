@@ -3,7 +3,7 @@ import ApiCard, { ApiCardSkeleton } from "../components/ApiCard";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import SearchBar from "../components/SearchBar";
 import FiltersSidebar from "../components/FiltersSidebar";
-import EmptyState, { type EmptyStateProps } from "../components/EmptyState";
+import EmptyState from "../components/EmptyState";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
 import { LOADING_DELAY_MS } from "../config/constants";
