@@ -1,22 +1,29 @@
-import { useEffect, useRef, useState } from 'react';
-import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { ThemeToggle } from './ThemeToggle';
-import ApiUsage from './ApiUsage';
-import Dashboard from './components/Dashboard';
-import RouteProgressBar from './components/RouteProgressBar';
-import ServerError from './components/ServerError';
-import NotFound from './components/NotFound';
-import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
-import { formatUsdc, formatUsdShortcut } from './utils/format';
+import { useEffect, useRef, useState } from "react";
+import {
+  Routes,
+  Route,
+  NavLink,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
+import { ThemeToggle } from "./ThemeToggle";
+import ApiUsage from "./ApiUsage";
+import Dashboard from "./components/Dashboard";
+import RouteProgressBar from "./components/RouteProgressBar";
+import ServerError from "./components/ServerError";
+import NotFound from "./components/NotFound";
+import ThemePlayground from "./pages/ThemePlayground";
+import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
+import { formatUsdc, formatUsdShortcut } from "./utils/format";
 import {
   EXPLORER_BASE_URL,
   MIN_DEPOSIT,
   NETWORK_FEE,
   PRESET_AMOUNTS,
-} from './config/constants';
+} from "./config/constants";
 
-type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
-type DemoOutcome = 'confirmed' | 'failed';
+type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
+type DemoOutcome = "confirmed" | "failed";
 
 type Feature = {
   icon: string;
@@ -79,8 +86,7 @@ const consumerSteps: Step[] = [
 const developerSteps: Step[] = [
   {
     title: "Register as developer",
-    description:
-      "Set up your publisher profile and prepare your API listing.",
+    description: "Set up your publisher profile and prepare your API listing.",
   },
   {
     title: "Publish your API",
@@ -99,8 +105,6 @@ const developerSteps: Step[] = [
   },
 ];
 
-
-
 const APP_ROUTES = {
   landing: "/",
   dashboard: "/dashboard",
@@ -110,10 +114,9 @@ const APP_ROUTES = {
   billing: "/billing",
   documentation: "/documentation",
   status: "/status",
+  themePlayground: "/theme-playground",
   serverError: "/500",
 } as const;
-
-
 
 function createMockHash() {
   const seed = `${Date.now().toString(16)}${Math.random()
@@ -157,7 +160,10 @@ function LandingPage({
           </p>
 
           <div className="lp-cta-row">
-            <button className="lp-btn lp-btn-primary" onClick={onStartUsingApis}>
+            <button
+              className="lp-btn lp-btn-primary"
+              onClick={onStartUsingApis}
+            >
               Start Using APIs
             </button>
             <button className="lp-btn lp-btn-secondary" onClick={onPublishApi}>
@@ -273,23 +279,29 @@ function LandingPage({
 function App() {
   const location = useLocation();
   const routeTitleMap: Record<string, string> = {
-    [APP_ROUTES.marketplace]: 'Marketplace – Callora',
-    [APP_ROUTES.dashboard]: 'Dashboard – Callora',
-    [APP_ROUTES.billing]: 'Billing – Callora',
-    '/api-usage': 'API Usage – Callora',
-    [APP_ROUTES.landing]: 'Callora',
+    [APP_ROUTES.marketplace]: "Marketplace – Callora",
+    [APP_ROUTES.dashboard]: "Dashboard – Callora",
+    [APP_ROUTES.billing]: "Billing – Callora",
+    [APP_ROUTES.themePlayground]: "Theme Playground – Callora",
+    "/api-usage": "API Usage – Callora",
+    [APP_ROUTES.landing]: "Callora",
   };
   const routeDescriptionMap: Record<string, string> = {
-    [APP_ROUTES.marketplace]: 'Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.',
-    [APP_ROUTES.dashboard]: 'Your Callora dashboard showing balances, recent activity and quick actions.',
-    [APP_ROUTES.billing]: 'Manage your USDC vault, deposit funds, and view transaction status.',
-    '/api-usage': 'Monitor API usage, request stats, and view call history.',
-    [APP_ROUTES.landing]: 'Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.',
+    [APP_ROUTES.marketplace]:
+      "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
+    [APP_ROUTES.dashboard]:
+      "Your Callora dashboard showing balances, recent activity and quick actions.",
+    [APP_ROUTES.billing]:
+      "Manage your USDC vault, deposit funds, and view transaction status.",
+    [APP_ROUTES.themePlayground]:
+      "Preview and tune primary, accent, and surface colors with the Callora theme playground.",
+    "/api-usage": "Monitor API usage, request stats, and view call history.",
+    [APP_ROUTES.landing]:
+      "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
   };
-  const currentTitle = routeTitleMap[location.pathname] ?? 'Callora';
+  const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
   useDocumentTitle(currentTitle, currentDescription);
-
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [vaultBalance, setVaultBalance] = useState(284.62);
@@ -459,7 +471,9 @@ function App() {
       window.setTimeout(() => {
         if (demoOutcome === "confirmed") {
           setDepositStage("confirmed");
-          setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
+          setVaultBalance(
+            Number((startingBalance + approvedAmount).toFixed(2)),
+          );
           setStatusMessage(
             `${formatUsdShortcut(
               approvedAmount,
@@ -513,6 +527,7 @@ function App() {
             <NavLink to={APP_ROUTES.dashboard}>Dashboard</NavLink>
             <NavLink to={APP_ROUTES.marketplace}>Marketplace</NavLink>
             <NavLink to={APP_ROUTES.billing}>Billing</NavLink>
+            <NavLink to={APP_ROUTES.themePlayground}>Theme Playground</NavLink>
           </nav>
           <ThemeToggle />
         </div>
@@ -526,8 +541,8 @@ function App() {
               <LandingPage
                 onStartUsingApis={() => navigate(APP_ROUTES.marketplace)}
                 onPublishApi={() => {
-                  window.history.pushState({}, '', APP_ROUTES.publish);
-                  window.dispatchEvent(new PopStateEvent('popstate'));
+                  window.history.pushState({}, "", APP_ROUTES.publish);
+                  window.dispatchEvent(new PopStateEvent("popstate"));
                 }}
               />
             }
@@ -536,7 +551,11 @@ function App() {
           <Route
             path={APP_ROUTES.dashboard}
             element={
-              <Dashboard vaultBalance={vaultBalance} walletBalance={walletBalance} openDeposit={openDeposit} />
+              <Dashboard
+                vaultBalance={vaultBalance}
+                walletBalance={walletBalance}
+                openDeposit={openDeposit}
+              />
             }
           />
           <Route
@@ -552,6 +571,11 @@ function App() {
                 </p>
               </section>
             }
+          />
+
+          <Route
+            path={APP_ROUTES.themePlayground}
+            element={<ThemePlayground />}
           />
 
           <Route
@@ -664,17 +688,14 @@ function App() {
                 <h1>System status updates in one place.</h1>
                 <p>
                   All core services are operational. If you are still seeing
-                  issues, please contact support and include what action you were
-                  trying to complete.
+                  issues, please contact support and include what action you
+                  were trying to complete.
                 </p>
               </section>
             }
           />
 
-          <Route
-            path="/api-usage"
-            element={<ApiUsage />}
-          />
+          <Route path="/api-usage" element={<ApiUsage />} />
 
           <Route
             path={APP_ROUTES.serverError}
@@ -688,7 +709,9 @@ function App() {
 
           <Route
             path="*"
-            element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />}
+            element={
+              <NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />
+            }
           />
         </Routes>
       </main>
@@ -705,6 +728,7 @@ function App() {
           <NavLink to={APP_ROUTES.dashboard}>Dashboard</NavLink>
           <NavLink to={APP_ROUTES.marketplace}>Marketplace</NavLink>
           <NavLink to={APP_ROUTES.billing}>Billing</NavLink>
+          <NavLink to={APP_ROUTES.themePlayground}>Theme Playground</NavLink>
           <NavLink to={APP_ROUTES.status}>Status</NavLink>
           <NavLink to={APP_ROUTES.documentation}>Documentation</NavLink>
         </nav>
@@ -775,183 +799,185 @@ function App() {
 
               <div className="modal-grid">
                 <div className="form-panel">
-                <div className="balance-row">
-                  <article className="balance-tile">
-                    <span>Vault balance</span>
-                    <strong>{formatUsdc(vaultBalance)} USDC</strong>
-                  </article>
-                  <article className="balance-tile">
-                    <span>Wallet available</span>
-                    <strong>{formatUsdc(walletBalance)} USDC</strong>
-                  </article>
-                </div>
+                  <div className="balance-row">
+                    <article className="balance-tile">
+                      <span>Vault balance</span>
+                      <strong>{formatUsdc(vaultBalance)} USDC</strong>
+                    </article>
+                    <article className="balance-tile">
+                      <span>Wallet available</span>
+                      <strong>{formatUsdc(walletBalance)} USDC</strong>
+                    </article>
+                  </div>
 
-                <label className="field-label" htmlFor="deposit-amount">
-                  Amount
-                </label>
+                  <label className="field-label" htmlFor="deposit-amount">
+                    Amount
+                  </label>
 
-                <div
-                  className={`input-shell ${
-                    validationMessage && depositStage === "input"
-                      ? "invalid"
-                      : ""
-                  }`}
-                >
-                  <input
-                    id="deposit-amount"
-                    type="text"
-                    inputMode="decimal"
-                    value={amountInput}
-                    onChange={(event) => handleAmountChange(event.target.value)}
-                    disabled={isBusy}
-                    placeholder="0.00"
-                    aria-describedby="deposit-help"
-                  />
-                  <span>USDC</span>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={handleMax}
-                    disabled={isBusy}
+                  <div
+                    className={`input-shell ${
+                      validationMessage && depositStage === "input"
+                        ? "invalid"
+                        : ""
+                    }`}
                   >
-                    Max
-                  </button>
-                </div>
-
-                <p id="deposit-help" className="helper-text">
-                  Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom
-                  deposits settle into your vault after wallet approval.
-                </p>
-
-                {validationMessage && depositStage === "input" && (
-                  <p className="error-text">{validationMessage}</p>
-                )}
-
-                <div className="preset-row">
-                  {PRESET_AMOUNTS.map((preset) => (
+                    <input
+                      id="deposit-amount"
+                      type="text"
+                      inputMode="decimal"
+                      value={amountInput}
+                      onChange={(event) =>
+                        handleAmountChange(event.target.value)
+                      }
+                      disabled={isBusy}
+                      placeholder="0.00"
+                      aria-describedby="deposit-help"
+                    />
+                    <span>USDC</span>
                     <button
-                      key={preset}
-                      className={selectedPreset === preset ? "active" : ""}
-                      onClick={() => handlePresetClick(preset)}
+                      type="button"
+                      className="ghost-button"
+                      onClick={handleMax}
                       disabled={isBusy}
                     >
-                      ${preset}
+                      Max
                     </button>
-                  ))}
-                  <button
-                    className={selectedPreset === "custom" ? "active" : ""}
-                    onClick={() => setSelectedPreset("custom")}
-                    disabled={isBusy}
-                  >
-                    Custom
-                  </button>
-                </div>
+                  </div>
 
-                <div className="security-note">
-                  <strong>What you are approving</strong>
-                  <p>
-                    Your wallet signs a USDC deposit into the Callora vault. The
-                    preview shows the exact vault credit, network fee, and
-                    post-deposit balance before submission.
+                  <p id="deposit-help" className="helper-text">
+                    Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom
+                    deposits settle into your vault after wallet approval.
                   </p>
+
+                  {validationMessage && depositStage === "input" && (
+                    <p className="error-text">{validationMessage}</p>
+                  )}
+
+                  <div className="preset-row">
+                    {PRESET_AMOUNTS.map((preset) => (
+                      <button
+                        key={preset}
+                        className={selectedPreset === preset ? "active" : ""}
+                        onClick={() => handlePresetClick(preset)}
+                        disabled={isBusy}
+                      >
+                        ${preset}
+                      </button>
+                    ))}
+                    <button
+                      className={selectedPreset === "custom" ? "active" : ""}
+                      onClick={() => setSelectedPreset("custom")}
+                      disabled={isBusy}
+                    >
+                      Custom
+                    </button>
+                  </div>
+
+                  <div className="security-note">
+                    <strong>What you are approving</strong>
+                    <p>
+                      Your wallet signs a USDC deposit into the Callora vault.
+                      The preview shows the exact vault credit, network fee, and
+                      post-deposit balance before submission.
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="preview-panel">
-                <article className="preview-card">
-                  <div className="preview-header">
-                    <div>
-                      <span className="eyebrow">Transaction preview</span>
-                      <h3>Review before wallet approval</h3>
-                    </div>
-                    <span className="preview-highlight">Secure preview</span>
-                  </div>
-
-                  <div className="preview-row">
-                    <span>Deposit amount</span>
-                    <strong>
-                      {hasAmount || submittedAmount
-                        ? `${balanceDelta} USDC`
-                        : "--"}
-                    </strong>
-                  </div>
-
-                  <div className="preview-row">
-                    <span>Current balance</span>
-                    <strong>{formatUsdc(previewCurrentBalance)} USDC</strong>
-                  </div>
-
-                  <div className="preview-row emphasis">
-                    <span>New balance</span>
-                    <strong>
-                      {hasAmount || submittedAmount
-                        ? `${formatUsdc(projectedBalance)} USDC`
-                        : "--"}
-                    </strong>
-                  </div>
-
-                  <div className="preview-row">
-                    <span>Network fee</span>
-                    <strong>{NETWORK_FEE}</strong>
-                  </div>
-
-                  <div className="preview-row total">
-                    <span>Total cost</span>
-                    <strong>
-                      {hasAmount || submittedAmount
-                        ? `${balanceDelta} USDC + ${NETWORK_FEE}`
-                        : `0.00 USDC + ${NETWORK_FEE}`}
-                    </strong>
-                  </div>
-                </article>
-
-                {(depositStage === "pending" ||
-                  depositStage === "confirmed" ||
-                  depositStage === "failed") &&
-                  txHash && (
-                    <article className="hash-card">
+                <div className="preview-panel">
+                  <article className="preview-card">
+                    <div className="preview-header">
                       <div>
-                        <span className="eyebrow">Transaction hash</span>
-                        <strong>{pendingHashLabel}</strong>
+                        <span className="eyebrow">Transaction preview</span>
+                        <h3>Review before wallet approval</h3>
                       </div>
+                      <span className="preview-highlight">Secure preview</span>
+                    </div>
 
-                      <div className="hash-actions">
-                        <a
-                          href={buildExplorerLink(txHash)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          View on Stellar Explorer
-                        </a>
-                        <button onClick={handleCopyHash}>
-                          {copied ? "Copied" : "Copy hash"}
-                        </button>
-                      </div>
+                    <div className="preview-row">
+                      <span>Deposit amount</span>
+                      <strong>
+                        {hasAmount || submittedAmount
+                          ? `${balanceDelta} USDC`
+                          : "--"}
+                      </strong>
+                    </div>
+
+                    <div className="preview-row">
+                      <span>Current balance</span>
+                      <strong>{formatUsdc(previewCurrentBalance)} USDC</strong>
+                    </div>
+
+                    <div className="preview-row emphasis">
+                      <span>New balance</span>
+                      <strong>
+                        {hasAmount || submittedAmount
+                          ? `${formatUsdc(projectedBalance)} USDC`
+                          : "--"}
+                      </strong>
+                    </div>
+
+                    <div className="preview-row">
+                      <span>Network fee</span>
+                      <strong>{NETWORK_FEE}</strong>
+                    </div>
+
+                    <div className="preview-row total">
+                      <span>Total cost</span>
+                      <strong>
+                        {hasAmount || submittedAmount
+                          ? `${balanceDelta} USDC + ${NETWORK_FEE}`
+                          : `0.00 USDC + ${NETWORK_FEE}`}
+                      </strong>
+                    </div>
+                  </article>
+
+                  {(depositStage === "pending" ||
+                    depositStage === "confirmed" ||
+                    depositStage === "failed") &&
+                    txHash && (
+                      <article className="hash-card">
+                        <div>
+                          <span className="eyebrow">Transaction hash</span>
+                          <strong>{pendingHashLabel}</strong>
+                        </div>
+
+                        <div className="hash-actions">
+                          <a
+                            href={buildExplorerLink(txHash)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            View on Stellar Explorer
+                          </a>
+                          <button onClick={handleCopyHash}>
+                            {copied ? "Copied" : "Copy hash"}
+                          </button>
+                        </div>
+                      </article>
+                    )}
+
+                  {depositStage === "failed" && (
+                    <article className="error-card">
+                      <strong>Approval not confirmed</strong>
+                      <p>
+                        No funds were added to the vault. Retry after confirming
+                        the wallet prompt or checking your network status.
+                      </p>
                     </article>
                   )}
 
-                {depositStage === "failed" && (
-                  <article className="error-card">
-                    <strong>Approval not confirmed</strong>
-                    <p>
-                      No funds were added to the vault. Retry after confirming
-                      the wallet prompt or checking your network status.
-                    </p>
-                  </article>
-                )}
-
-                {depositStage === "confirmed" && (
-                  <article className="success-card">
-                    <strong>Deposit successful</strong>
-                    <p>
-                      Your updated vault balance is {formatUsdc(vaultBalance)}{" "}
-                      USDC and ready for usage.
-                    </p>
-                  </article>
-                )}
+                  {depositStage === "confirmed" && (
+                    <article className="success-card">
+                      <strong>Deposit successful</strong>
+                      <p>
+                        Your updated vault balance is {formatUsdc(vaultBalance)}{" "}
+                        USDC and ready for usage.
+                      </p>
+                    </article>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
             <div className="modal-actions">
               {depositStage === "failed" ? (
