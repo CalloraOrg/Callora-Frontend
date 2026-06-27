@@ -1471,9 +1471,44 @@ code,
   line-height: 1.05;
 }
 
+.marketplace-search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
 .marketplace-search {
   flex: 1;
   min-width: 0;
+}
+
+.marketplace-density-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  min-height: 44px;
+}
+
+.density-toggle-button {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+.density-toggle-button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(78, 133, 255, 0.22);
 }
 
 .marketplace-layout {
@@ -1538,8 +1573,47 @@ code,
   min-width: 0;
   overflow: hidden;
   cursor: pointer;
-  transition: box-shadow 160ms ease, transform 160ms ease, border-color 160ms ease;
+  transition: box-shadow 160ms ease, transform 160ms ease, border-color 160ms ease, padding 180ms ease, gap 180ms ease, min-height 180ms ease;
   border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.api-card--compact {
+  padding: 10px;
+  gap: 6px;
+  min-height: 188px;
+}
+
+.api-card--compact .api-marketplace-card-description {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 180ms ease, opacity 180ms ease, margin-top 180ms ease;
+}
+
+.api-card--compact .api-marketplace-card-title-row {
+  gap: 4px 8px;
+}
+
+.api-card--compact .api-marketplace-card-tags {
+  gap: 6px;
+}
+
+.api-card--compact .api-marketplace-card-footer {
+  gap: 8px;
+}
+
+.api-card--compact .api-card__stats {
+  gap: 8px;
+  padding-top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .api-marketplace-card,
+  .api-card--compact .api-marketplace-card-description,
+  .density-toggle-button {
+    transition: none;
+  }
 }
 
 .api-marketplace-card:hover {

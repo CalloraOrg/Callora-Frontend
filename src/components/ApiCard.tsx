@@ -327,14 +327,18 @@ function renderStatValue(value: string | undefined) {
 }
 export default function ApiCard({
   api,
+  density = "comfortable",
   onViewDetails,
 }: {
   api: APIItem;
+  density?: "comfortable" | "compact";
   onViewDetails?: (api: APIItem) => void;
 }) {
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
   const avgLatencyMs = api.avgLatencyMs;
   const uptimePercent = api.uptimePercent;
+  const isCompact = density === "compact";
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -344,19 +348,18 @@ export default function ApiCard({
 
   return (
     <article
-      className="preview-card api-marketplace-card"
+      className={`preview-card api-marketplace-card${isCompact ? " api-card--compact" : ""}`}
       role="button"
       tabIndex={0}
       aria-label={`View details for ${api.name}`}
       onClick={() => onViewDetails?.(api)}
       onKeyDown={handleKeyDown}
       style={{
-        position: "relative",
-        padding: 12,
+        padding: isCompact ? 10 : 12,
         display: "flex",
         flexDirection: "column",
-        minHeight: 220,
-        gap: 8,
+        minHeight: isCompact ? 188 : 220,
+        gap: isCompact ? 6 : 8,
       }}
     >
       {/* Absolutely-positioned bookmark button in the top-right corner */}
@@ -397,18 +400,21 @@ export default function ApiCard({
             </div>
           </div>
 
-          <div
-            style={{
-              color: "var(--muted)",
-              marginTop: 6,
-              overflow: "hidden",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-            }}
-          >
-            {api.description}
-          </div>
+          {!isCompact && (
+            <div
+              className="api-marketplace-card-description"
+              style={{
+                color: "var(--muted)",
+                marginTop: 6,
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+              }}
+            >
+              {api.description}
+            </div>
+          )}
         </div>
 
         {/* Price — bookmark moved out of here, paddingRight leaves room for it */}

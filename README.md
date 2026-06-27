@@ -13,7 +13,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 
 - Landing page with product overview
 - Dashboard (usage stats, vault balance)
-- Marketplace (browse and compare APIs)
+- Marketplace (browse and compare APIs, with a density toggle for comfortable or compact card layouts)
 - Billing (USDC deposit, Stellar settlement, transaction tracking)
 - API Usage analytics view
 - 500 error page with retry flow
@@ -52,6 +52,10 @@ Key principles:
    ```
 
 3. Open [http://localhost:5173](http://localhost:5173).
+
+## Marketplace density toggle
+
+The marketplace results view now includes a segmented density control in the search row. Choose Comfortable for the existing card layout or Compact to reduce card padding and hide long descriptions while keeping tags and stats visible. The selection is stored in local storage under the `callora.density` key so it persists across reloads.
 
 ## Scripts
 

@@ -8,10 +8,18 @@ import CollectionsMenu from "../components/CollectionsMenu";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
 import { LOADING_DELAY_MS } from "../config/constants";
+import {
+  readDensityPreference,
+  persistDensityPreference,
+  type DensityPreference,
+} from "../utils/density";
 
 export default function MarketplacePage(): JSX.Element {
   useDocumentTitle('Marketplace – Callora', 'Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.');
   const [search, setSearch] = useState("");
+  const [density, setDensity] = useState<DensityPreference>(() =>
+    readDensityPreference(),
+  );
   // Debounce search input to prevent excessive re-renders on large lists
   const debouncedSearch = useDebounce(search, 300);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
@@ -35,6 +43,10 @@ export default function MarketplacePage(): JSX.Element {
     }, LOADING_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    persistDensityPreference(density);
+  }, [density]);
 
   const toggleCategory = (c: string) => {
     const copy = new Set(selectedCategories);
@@ -143,13 +155,31 @@ export default function MarketplacePage(): JSX.Element {
 
   return (
     <div className="marketplace-page">
-      {/* Top row: title + search + collections */}
-      <div
-        className="marketplace-header"
-      >
+      {/* Top row: title + search only */}
+      <div className="marketplace-header">
         <h1>API Marketplace</h1>
-        <div className="marketplace-search">
-          <SearchBar value={search} onChange={setSearch} />
+        <div className="marketplace-search-row">
+          <div className="marketplace-search">
+            <SearchBar value={search} onChange={setSearch} />
+          </div>
+          <div className="marketplace-density-toggle" role="group" aria-label="Results density">
+            <button
+              type="button"
+              className="density-toggle-button"
+              aria-pressed={density === "comfortable"}
+              onClick={() => setDensity("comfortable")}
+            >
+              Comfortable
+            </button>
+            <button
+              type="button"
+              className="density-toggle-button"
+              aria-pressed={density === "compact"}
+              onClick={() => setDensity("compact")}
+            >
+              Compact
+            </button>
+          </div>
         </div>
         <CollectionsMenu />
       </div>
@@ -224,7 +254,12 @@ export default function MarketplacePage(): JSX.Element {
                 ))
               ) : (
                 displayedItems.map((a) => (
-                  <ApiCard key={a.id} api={a} onViewDetails={handleViewDetails} />
+                  <ApiCard
+                    key={a.id}
+                    api={a}
+                    density={density}
+                    onViewDetails={handleViewDetails}
+                  />
                 ))
               )}
             </div>
