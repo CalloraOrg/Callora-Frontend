@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+
 import ApiCard, { ApiCardSkeleton } from "../components/ApiCard";
 import SearchBar from "../components/SearchBar";
+import SortDropdown, { type SortValue } from "../components/SortDropdown";
+
 import FiltersSidebar from "../components/FiltersSidebar";
 import EmptyState from "../components/EmptyState";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
@@ -17,7 +21,21 @@ export default function MarketplacePage(): JSX.Element {
   const [minPrice, setMinPrice] = useState<number | null>(null);
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const [popularity, setPopularity] = useState<string>("any");
-  const [sort, setSort] = useState<string>("relevance");
+  /**
+   * Sort state persisted via URL query parameter ?sort=
+   * Default is "popularity" to match existing behaviour.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sortParam = (searchParams.get("sort") ?? "popularity") as SortValue;
+  const setSortParam = (value: SortValue) => {
+    setSearchParams(
+      (prev) => {
+        prev.set("sort", value);
+        return prev;
+      },
+      { replace: true },
+    );
+  };
   const [shown, setShown] = useState<number>(12);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,7 +60,7 @@ export default function MarketplacePage(): JSX.Element {
     setMinPrice(null);
     setMaxPrice(null);
     setPopularity("any");
-    setSort("relevance");
+    setSortParam("popularity");
   };
 
   const filtered = useMemo(() => {
@@ -83,14 +101,18 @@ export default function MarketplacePage(): JSX.Element {
       );
     }
 
-    // explicit sort options
-    if (sort === "priceAsc")
+    // explicit sort options driven by the URL ?sort= param
+    if (sortParam === "price-asc")
       items = items.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
-    if (sort === "priceDesc")
-      items = items.sort((a, b) => b.pricePerRequest - a.pricePerRequest);
-    if (sort === "popularity")
+    if (sortParam === "latency-asc")
+      items = items.sort(
+        (a, b) =>
+          (a.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER) -
+          (b.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER),
+      );
+    if (sortParam === "popularity")
       items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
-    if (sort === "newest")
+    if (sortParam === "newest")
       items = items.sort(
         (a, b) =>
           Date.parse(b.createdAt ?? "1970-01-01") -
@@ -98,7 +120,7 @@ export default function MarketplacePage(): JSX.Element {
       );
 
     return items;
-  }, [debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sort]);
+  }, [debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sortParam]);
 
   const displayedItems = filtered.slice(0, shown);
 
@@ -118,6 +140,7 @@ export default function MarketplacePage(): JSX.Element {
         <div className="marketplace-search">
           <SearchBar value={search} onChange={setSearch} />
         </div>
+        <SortDropdown value={sortParam} onChange={setSortParam} />
       </div>
 
       {/* Bottom: filters left, content right */}
@@ -154,13 +177,6 @@ export default function MarketplacePage(): JSX.Element {
             </div>
 
             <div className="marketplace-actions">
-              <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="relevance">Relevance</option>
-                <option value="priceAsc">Price: low → high</option>
-                <option value="priceDesc">Price: high → low</option>
-                <option value="popularity">Popularity</option>
-                <option value="newest">Newest</option>
-              </select>
               <button
                 className="ghost-button marketplace-filter-button"
                 onClick={() => setShowFiltersMobile((s) => !s)}
