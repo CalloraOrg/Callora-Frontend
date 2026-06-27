@@ -18,6 +18,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - API Usage analytics view
 - 500 error page with retry flow
 - 404 catch-all page
+- Theme playground for previewing primary/accent/surface tokens live
 - Dev proxy to backend at `http://localhost:3000` for `/api`
 
 ## UI Design System
@@ -25,6 +26,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 Callora uses a comprehensive design token system and component library. All contributors must follow the [UI Design System guide](docs/UI-Design-System.md) when building or modifying UI.
 
 Key principles:
+
 - **Use design tokens, not inline hex values** — All colors, spacing, and shadows use CSS custom properties
 - **Reuse shared components** — Use existing components from `src/components/` before creating new ones
 - **Maintain accessibility** — All UI must be keyboard navigable and screen reader friendly
@@ -45,23 +47,24 @@ Key principles:
 
 ## Scripts
 
-| Command          | Description                          |
-|------------------|--------------------------------------|
-| `npm run dev`    | Start dev server (port 5173)         |
-| `npm run build`  | TypeScript check + production build  |
-| `npm run preview`| Serve production build locally       |
+| Command           | Description                         |
+| ----------------- | ----------------------------------- |
+| `npm run dev`     | Start dev server (port 5173)        |
+| `npm run build`   | TypeScript check + production build |
+| `npm run preview` | Serve production build locally      |
 
 ## Routes
 
-| Path        | Description                     |
-|-------------|---------------------------------|
-| `/`         | Landing page                    |
-| `/dashboard`| Developer dashboard             |
-| `/marketplace` | API marketplace              |
-| `/billing`  | USDC deposit and settlements    |
-| `/api-usage`| API usage analytics             |
-| `/500`      | Server error page               |
-| `*`         | 404 not found                   |
+| Path                | Description                               |
+| ------------------- | ----------------------------------------- |
+| `/`                 | Landing page                              |
+| `/dashboard`        | Developer dashboard                       |
+| `/marketplace`      | API marketplace                           |
+| `/billing`          | USDC deposit and settlements              |
+| `/api-usage`        | API usage analytics                       |
+| `/theme-playground` | Live theme token playground for designers |
+| `/500`              | Server error page                         |
+| `*`                 | 404 not found                             |
 
 ## Project layout
 
