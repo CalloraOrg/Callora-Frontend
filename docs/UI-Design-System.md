@@ -108,7 +108,9 @@ Displays API information in a card format for marketplace listings.
 
 **Props:**
 - `api: any` - API object containing name, description, provider, tags, rating, and footer stats (`pricePerCall`, `avgLatencyMs`, `uptimePercent`)
-- `onViewDetails?: (api: any) => void` - Callback when "View Details" is clicked
+- `onViewDetails?: (api: any) => void` - Callback when the card opens API details
+- `onTagClick?: (tag: string) => void` - Callback when a tag chip is activated
+- `activeTag?: string | null` - Currently active marketplace tag filter
 
 **Variants:**
 - `ApiCard` - Standard card with hover effects
@@ -120,7 +122,7 @@ Displays API information in a card format for marketplace listings.
 - Border: 1px solid with hover state
 - Hover: Lift effect (translateY -4px), enhanced shadow, accent border
 - Background: Uses `--surface-soft` token
-- Tags: Rounded pills (8px radius) with `--muted` text
+- Tags: Reusable clickable chips with pill styling, token-based colors, and active-state highlighting
 - Footer: Three-column micro-stat row with a muted label above a prominent value for price, latency, and uptime
 - Numeric values: Use tabular numerals for easier comparison across marketplace rows
 - Missing stats: Render a muted em dash so card heights remain consistent
@@ -129,12 +131,14 @@ Displays API information in a card format for marketplace listings.
 - Default: Subtle border, no shadow
 - Hover: Accent border (#4666ff), shadow, lift effect
 - Focus: Keyboard accessible with tabIndex=0, Enter key triggers onViewDetails
+- Tag active: Matching tag chip uses the accent token and `aria-pressed=true`
 - Loading: Skeleton variant with placeholder elements
 
 **Accessibility:**
 - `tabIndex={0}` for keyboard navigation
 - `onKeyDown` handles Enter key
-- `aria-label` on action buttons
+- Tag chips are real `<button>` elements with `aria-pressed`
+- Tag activation does not trigger card navigation
 - Semantic `<article>` element
 
 **Usage Example:**
@@ -255,6 +259,28 @@ Displayed when no results are found (e.g., empty search results).
   message="Try different search terms" 
 />
 ```
+
+---
+
+### TagChip
+
+Reusable chip button for marketplace tag filtering.
+
+**Props:**
+- `tag: string` - Visible tag label and filter value
+- `active?: boolean` - Whether the chip reflects the current active filter
+- `onClick?: (tag: string) => void` - Callback invoked when the chip is selected
+
+**Visual Spec:**
+- Pill shape with full radius (`999px`)
+- Uses `--surface-soft`, `--line`, `--muted`, and `--accent` design tokens
+- Minimum height: 32px for touch accessibility
+- Active state: Accent-filled pill with white text
+
+**Accessibility:**
+- Semantic `<button type="button">`
+- `aria-pressed` communicates toggle state
+- Keyboard activation is supported without bubbling into parent card navigation
 
 ---
 

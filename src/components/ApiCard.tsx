@@ -8,6 +8,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Skeleton from "./Skeleton";
+import TagChip from "./TagChip";
 import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import type { APIItem } from "../data/mockApis";
@@ -329,10 +330,14 @@ export default function ApiCard({
   api,
   density = "comfortable",
   onViewDetails,
+  onTagClick,
+  activeTag,
 }: {
   api: APIItem;
   density?: "comfortable" | "compact";
   onViewDetails?: (api: APIItem) => void;
+  onTagClick?: (tag: string) => void;
+  activeTag?: string | null;
 }) {
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
   const avgLatencyMs = api.avgLatencyMs;
@@ -438,19 +443,13 @@ export default function ApiCard({
         className="api-marketplace-card-tags"
         style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
       >
-        {((api.tags as string[]) || []).slice(0, 4).map((t: string) => (
-          <span
-            key={t}
-            style={{
-              fontSize: 12,
-              color: "var(--muted)",
-              background: "rgba(255,255,255,0.02)",
-              padding: "4px 8px",
-              borderRadius: 8,
-            }}
-          >
-            {t}
-          </span>
+        {((api.tags as string[]) || []).slice(0, 4).map((tag: string) => (
+          <TagChip
+            key={tag}
+            tag={tag}
+            active={activeTag?.toLowerCase() === tag.toLowerCase()}
+            onClick={onTagClick}
+          />
         ))}
       </div>
 

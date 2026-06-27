@@ -1,16 +1,20 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import useDocumentTitle from './hooks/useDocumentTitle';
-import { ThemeToggle } from './ThemeToggle';
-import ApiUsage from './ApiUsage';
-import Dashboard from './components/Dashboard';
-import MarketplacePage from './pages/MarketplacePage';
-import RouteProgressBar from './components/RouteProgressBar';
-import ServerError from './components/ServerError';
-import NotFound from './components/NotFound';
-import A11yAudit from './pages/A11yAudit';
-import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
-import { formatUsdc, formatUsdShortcut } from './utils/format';
+import { useEffect, useRef, useState } from "react";
+import {
+  Routes,
+  Route,
+  NavLink,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
+import { ThemeToggle } from "./ThemeToggle";
+import ApiUsage from "./ApiUsage";
+import Dashboard from "./components/Dashboard";
+import RouteProgressBar from "./components/RouteProgressBar";
+import ServerError from "./components/ServerError";
+import NotFound from "./components/NotFound";
+import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
+import useDocumentTitle from "./hooks/useDocumentTitle";
+import { formatUsdc, formatUsdShortcut } from "./utils/format";
 import {
   EXPLORER_BASE_URL,
   MIN_DEPOSIT,
@@ -273,13 +277,13 @@ function LandingPage({
 }
 
 function App() {
+  const navigate = useNavigate();
   const location = useLocation();
   const navigate = useNavigate();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
     [APP_ROUTES.billing]: "Billing – Callora",
-    [APP_ROUTES.themePlayground]: "Theme Playground – Callora",
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
   };
@@ -290,8 +294,6 @@ function App() {
       "Your Callora dashboard showing balances, recent activity and quick actions.",
     [APP_ROUTES.billing]:
       "Manage your USDC vault, deposit funds, and view transaction status.",
-    [APP_ROUTES.themePlayground]:
-      "Preview and tune primary, accent, and surface colors with the Callora theme playground.",
     "/api-usage": "Monitor API usage, request stats, and view call history.",
     [APP_ROUTES.landing]:
       "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
@@ -909,23 +911,9 @@ function App() {
                   </div>
                 </div>
 
-          <div className="preview-panel">
-            <DepositPreview
-              previewCurrentBalance={previewCurrentBalance}
-              projectedBalance={projectedBalance}
-              networkFee={NETWORK_FEE}
-              amount={activeAmount}
-              walletBalance={walletBalance}
-              hasAmount={hasAmount || submittedAmount !== null}
-              ariaLabel="Deposit transaction preview"
-            />
-          </div>
-
-                {(depositStage === "pending" ||
-                  depositStage === "confirmed" ||
-                  depositStage === "failed") &&
-                  txHash && (
-                    <article className="hash-card">
+                <div className="preview-panel">
+                  <article className="preview-card">
+                    <div className="preview-header">
                       <div>
                         <span className="eyebrow">Transaction preview</span>
                         <h3>Review before wallet approval</h3>

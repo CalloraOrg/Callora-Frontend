@@ -5,8 +5,7 @@ import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import FiltersSidebar from "../components/FiltersSidebar";
-import FiltersBottomSheet from "../components/FiltersBottomSheet";
-import EmptyState, { type EmptyStateProps } from "../components/EmptyState";
+import EmptyState from "../components/EmptyState";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
 import { LOADING_DELAY_MS } from "../config/constants";
@@ -17,7 +16,10 @@ import {
 } from "../utils/density";
 
 export default function MarketplacePage(): JSX.Element {
-  useDocumentTitle('Marketplace – Callora', 'Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.');
+  useDocumentTitle(
+    "Marketplace – Callora",
+    "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
+  );
   const [search, setSearch] = useState("");
   const [density, setDensity] = useState<DensityPreference>(() =>
     readDensityPreference(),
@@ -27,6 +29,7 @@ export default function MarketplacePage(): JSX.Element {
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
     new Set(),
   );
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [minPrice, setMinPrice] = useState<number | null>(null);
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const [popularity, setPopularity] = useState<string>("any");
@@ -76,11 +79,13 @@ export default function MarketplacePage(): JSX.Element {
 
   const clearFilters = () => {
     setSelectedCategories(new Set());
+    setSelectedTag(null);
     setMinPrice(null);
     setMaxPrice(null);
     setPopularity("any");
     setSortParam("popularity");
     setSearch("");
+    setShown(12);
   };
 
   /**
@@ -91,6 +96,7 @@ export default function MarketplacePage(): JSX.Element {
     return (
       search.trim() !== "" ||
       selectedCategories.size > 0 ||
+      selectedTag !== null ||
       minPrice !== null ||
       maxPrice !== null ||
       popularity !== "any"
@@ -138,7 +144,17 @@ export default function MarketplacePage(): JSX.Element {
       items = items.filter((a) => selectedCategories.has(a.category ?? ""));
     }
 
-    const hasInvertedPrice = minPrice !== null && maxPrice !== null && minPrice > maxPrice;
+    if (selectedTag) {
+      const normalizedSelectedTag = selectedTag.toLowerCase();
+      items = items.filter((a) =>
+        (a.tags || []).some(
+          (tag) => tag.toLowerCase() === normalizedSelectedTag,
+        ),
+      );
+    }
+
+    const hasInvertedPrice =
+      minPrice !== null && maxPrice !== null && minPrice > maxPrice;
     if (!hasInvertedPrice) {
       if (minPrice !== null)
         items = items.filter((a) => a.pricePerRequest >= minPrice);
@@ -176,7 +192,33 @@ export default function MarketplacePage(): JSX.Element {
       );
 
     return items;
-  }, [debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sortParam]);
+  }, [
+    debouncedSearch,
+    selectedCategories,
+    selectedTag,
+    minPrice,
+    maxPrice,
+    popularity,
+    sort,
+  ]);
+
+  useEffect(() => {
+    setShown(12);
+  }, [
+    debouncedSearch,
+    selectedCategories,
+    selectedTag,
+    minPrice,
+    maxPrice,
+    popularity,
+    sort,
+  ]);
+
+  const handleTagClick = (tag: string) => {
+    setSelectedTag((currentTag) =>
+      currentTag?.toLowerCase() === tag.toLowerCase() ? null : tag,
+    );
+  };
 
   const displayedItems = filtered.slice(0, shown);
 
@@ -218,9 +260,7 @@ export default function MarketplacePage(): JSX.Element {
       </div>
 
       {/* Bottom: filters left, content right */}
-      <div
-        className="marketplace-layout"
-      >
+      <div className="marketplace-layout">
         <aside className="marketplace-sidebar">
           <FiltersSidebar
             selectedCategories={selectedCategories}
@@ -236,9 +276,7 @@ export default function MarketplacePage(): JSX.Element {
         </aside>
 
         <main className="marketplace-results">
-          <div
-            className="marketplace-toolbar"
-          >
+          <div className="marketplace-toolbar">
             <div className="marketplace-count">
               {filtered.length === 0 ? (
                 <>Showing 0 of 0 APIs</>
@@ -247,6 +285,11 @@ export default function MarketplacePage(): JSX.Element {
                   Showing 1-{Math.min(shown, filtered.length)} of{" "}
                   {filtered.length} APIs
                 </>
+              )}
+              {selectedTag && (
+                <span className="marketplace-active-tag" aria-live="polite">
+                  Filtered by tag: #{selectedTag}
+                </span>
               )}
             </div>
 
@@ -281,33 +324,27 @@ export default function MarketplacePage(): JSX.Element {
           </div>
 
           {fetchError ? (
-            <EmptyState
-              variant="error"
-              onRetry={handleRetryFetch}
-            />
+            <EmptyState variant="error" onRetry={handleRetryFetch} />
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}
               onClearFilters={hasActiveFilters() ? clearFilters : undefined}
             />
           ) : (
-            <div
-              className="marketplace-grid"
-            >
-              {isLoading ? (
-                Array.from({ length: shown }).map((_, i) => (
-                  <ApiCardSkeleton key={i} />
-                ))
-              ) : (
-                displayedItems.map((a) => (
-                  <ApiCard
-                    key={a.id}
-                    api={a}
-                    density={density}
-                    onViewDetails={handleViewDetails}
-                  />
-                ))
-              )}
+            <div className="marketplace-grid">
+              {isLoading
+                ? Array.from({ length: shown }).map((_, i) => (
+                    <ApiCardSkeleton key={i} />
+                  ))
+                : displayedItems.map((a) => (
+                    <ApiCard
+                      key={a.id}
+                      api={a}
+                      onViewDetails={handleViewDetails}
+                      onTagClick={handleTagClick}
+                      activeTag={selectedTag}
+                    />
+                  ))}
             </div>
           )}
 
