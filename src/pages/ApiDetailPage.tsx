@@ -3,6 +3,7 @@ import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
 import EmbedPreview from "../components/EmbedPreview";
+import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
@@ -35,6 +36,16 @@ export default function ApiDetailPage({ onBack }: Props) {
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Ordered tab definitions — single source of truth for labels and ids.
+  const TAB_ITEMS = [
+    { id: "overview",       label: "Overview"       },
+    { id: "documentation",  label: "Documentation"  },
+    { id: "pricing",        label: "Pricing"        },
+    { id: "examples",       label: "Examples"       },
+    { id: "reviews",        label: "Reviews"        },
+    { id: "embed",          label: "Embed"          },
+  ] as const satisfies Array<{ id: TabType; label: string }>;
 
   // Extract ID from URL path: /details/[id]
   const id =
@@ -351,49 +362,14 @@ print(data)`;
 
           <div className="api-detail-content-grid">
             <div className="content-left">
-              {/* Tabs Navigation */}
-              <nav className="api-detail-tabs">
-                {(
-                  [
-                    "overview",
-                    "documentation",
-                    "pricing",
-                    "examples",
-                    "reviews",
-                    "embed",
-                  ] as TabType[]
-                ).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTab(t)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      padding: "12px 0",
-                      color: tab === t ? "var(--text-main)" : "var(--muted)",
-                      fontSize: 15,
-                      fontWeight: tab === t ? 600 : 400,
-                      cursor: "pointer",
-                      position: "relative",
-                      transition: "color 0.2s",
-                    }}
-                  >
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                    {tab === t && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          bottom: -1,
-                          left: 0,
-                          right: 0,
-                          height: 2,
-                          background: "var(--accent)",
-                        }}
-                      />
-                    )}
-                  </button>
-                ))}
-              </nav>
+              {/* Animated tab strip — accessible + smooth sliding indicator */}
+              <Tabs
+                tabs={TAB_ITEMS}
+                activeTab={tab}
+                onChange={(id) => setTab(id as TabType)}
+                tabPanelId={(id) => `panel-${id}`}
+                className="api-detail-tabs"
+              />
 
               <div
                 className="tab-content"
@@ -401,7 +377,12 @@ print(data)`;
               >
                 {/* OVERVIEW TAB */}
                 {tab === "overview" && (
-                  <section>
+                  <section
+                    id="panel-overview"
+                    role="tabpanel"
+                    aria-labelledby="tab-overview"
+                    tabIndex={0}
+                  >
                     <div
                       className="preview-card"
                       style={{ padding: 24, marginBottom: 32 }}
@@ -537,7 +518,12 @@ print(data)`;
 
                 {/* DOCUMENTATION TAB */}
                 {tab === "documentation" && (
-                  <section>
+                  <section
+                    id="panel-documentation"
+                    role="tabpanel"
+                    aria-labelledby="tab-documentation"
+                    tabIndex={0}
+                  >
                     <div className="endpoint-section-header">
                       <h3>Available Endpoints</h3>
                       <span style={{ fontSize: 13, color: "var(--muted)" }}>
@@ -646,7 +632,12 @@ print(data)`;
 
                 {/* PRICING TAB */}
                 {tab === "pricing" && (
-                  <section>
+                  <section
+                    id="panel-pricing"
+                    role="tabpanel"
+                    aria-labelledby="tab-pricing"
+                    tabIndex={0}
+                  >
                     <h2>Pricing Plans</h2>
                     <div className="api-detail-pricing-grid">
                       <div
@@ -813,7 +804,12 @@ print(data)`;
 
                 {/* EXAMPLES TAB */}
                 {tab === "examples" && (
-                  <section>
+                  <section
+                    id="panel-examples"
+                    role="tabpanel"
+                    aria-labelledby="tab-examples"
+                    tabIndex={0}
+                  >
                     <h3>Integration Gallery</h3>
                     <p style={{ color: "var(--muted)", marginBottom: 24 }}>
                       Explore these Boilerplate examples to get integrated in
@@ -869,7 +865,12 @@ print(data)`;
 
                 {/* REVIEWS TAB */}
                 {tab === "reviews" && (
-                  <section>
+                  <section
+                    id="panel-reviews"
+                    role="tabpanel"
+                    aria-labelledby="tab-reviews"
+                    tabIndex={0}
+                  >
                     <div className="api-detail-reviews-header">
                       <h3>Developer Feedback</h3>
                       <button className="secondary-button">
@@ -904,7 +905,12 @@ print(data)`;
 
                 {/* EMBED TAB */}
                 {tab === "embed" && (
-                  <section>
+                  <section
+                    id="panel-embed"
+                    role="tabpanel"
+                    aria-labelledby="tab-embed"
+                    tabIndex={0}
+                  >
                     <div
                       className="preview-card"
                       style={{ padding: 24, marginBottom: 24 }}
