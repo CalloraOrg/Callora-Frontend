@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import EmptyState from './components/EmptyState';
 import Skeleton from './components/Skeleton';
+import CallsHeatmap from './components/CallsHeatmap';
 import { formatPrice } from './utils/format';
 
 type ApiEndpoint = {
@@ -439,7 +440,8 @@ export default function ApiUsage() {
         
         <div className="mini-chart">
           <h3>Calls Over Time</h3>
-          <div className="chart-placeholder">
+          <CallsHeatmap />
+          <div className="chart-placeholder" style={{ marginTop: '24px' }}>
             {/* Simple bar chart visualization */}
             <div className="chart-bars">
               {[65, 59, 80, 81, 56, 55, 47].map((height, i) => (
