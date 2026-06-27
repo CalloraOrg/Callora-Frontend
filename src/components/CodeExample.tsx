@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from "react";
-import { usePersistedState } from "../hooks/usePersistedState";
+import { useEffect, useState } from "react";
+import { Icons } from "../utils/icons";
 
 /**
  * UPDATED COMPONENT FOR ISSUE #188:
@@ -185,72 +185,33 @@ export default function CodeExample({
           ))}
         </div>
 
-        {/* Action: Copy to Clipboard with Enhanced Affordance */}
-        <div style={{ position: "relative" }}>
-          <button
-            onClick={handleCopy}
-            aria-label={copied ? "Copied to clipboard" : "Copy code snippet"}
-            style={{
-              padding: "5px 12px",
-              fontSize: "11px",
-              fontWeight: 500,
-              minWidth: "75px",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              gap: "4px",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "4px",
-              background: "var(--bg-highlight, #fff)",
-              color: copied ? "var(--success, #10b981)" : "var(--text-main)",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              outline: "none",
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.outline = "2px solid var(--accent, #4e85ff)";
-              e.currentTarget.style.outlineOffset = "2px";
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.outline = "none";
-            }}
-          >
-            {copied ? (
-              <>
-                <span style={{ fontSize: "12px" }}>✓</span>
-                Copied
-              </>
-            ) : (
-              <>
-                <span style={{ fontSize: "12px" }}>📋</span>
-                Copy
-              </>
-            )}
-          </button>
-
-          {/* Tooltip for copy affordance */}
-          <span
-            role="tooltip"
-            style={{
-              position: "absolute",
-              bottom: "110%",
-              left: "50%",
-              transform: "translateX(-50%)",
-              padding: "4px 8px",
-              fontSize: "11px",
-              whiteSpace: "nowrap",
-              background: "var(--text-main)",
-              color: "var(--bg-soft)",
-              borderRadius: "4px",
-              opacity: copied ? 1 : 0,
-              pointerEvents: "none",
-              transition: "opacity 0.2s ease",
-              zIndex: 10,
-            }}
-          >
-            {copied ? "Copied!" : "Copy"}
-          </span>
-        </div>
+        {/* Action: Copy to Clipboard */}
+        <button
+          className="ghost-button"
+          onClick={handleCopy}
+          aria-label="Copy code snippet to clipboard"
+          style={{
+            padding: "5px 12px",
+            fontSize: "11px",
+            minWidth: "75px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {copied ? (
+            <span style={{ 
+              color: "var(--success, #10b981)", 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "4px" 
+            }}>
+              <Icons.Check size={14} /> Copied
+            </span>
+          ) : (
+            "Copy"
+          )}
+        </button>
       </div>
 
       {/* Code Display Area */}

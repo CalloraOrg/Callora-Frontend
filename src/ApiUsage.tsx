@@ -3,6 +3,7 @@ import EmptyState from './components/EmptyState';
 import Skeleton from './components/Skeleton';
 import CallsHeatmap from './components/CallsHeatmap';
 import { formatPrice } from './utils/format';
+import { Icons } from './utils/icons';
 
 type ApiEndpoint = {
   id: string;
@@ -503,7 +504,7 @@ export default function ApiUsage() {
                     <span>{formatTimestamp(call.timestamp)}</span>
                     <span className="endpoint-cell">{call.endpoint}</span>
                     <span className={`status-cell ${call.status}`}>
-                      {call.status === 'success' ? '✓' : '✗'} {call.status}
+                      {call.status === 'success' ? <Icons.Success size={16} /> : <Icons.Error size={16} />} {call.status}
                     </span>
                     <span>{formatTime(call.responseTime)}</span>
                     <span>{formatPrice(call.cost)} USDC</span>
