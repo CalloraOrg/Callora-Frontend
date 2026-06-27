@@ -103,76 +103,44 @@
   box-sizing: border-box;
 }
 
-/* ─── Global focus management ───────────────────────────────────────────────
-   Suppress the browser default outline on all elements, then restore a
-   high-contrast ring only on keyboard navigation (:focus-visible).
-   This satisfies WCAG 2.4.7 (Focus Visible) without adding rings on clicks.
-   ─────────────────────────────────────────────────────────────────────────── */
-*:focus {
-  outline: none;
-}
+/* ─── Global focus management (single cascade layer) ──────────────────────
+   All keyboard-focus styling lives in ONE low-priority layer named `focus`.
+   Layered rules rank below unlayered ones regardless of specificity, so
+   page-level styles can intentionally override the ring without specificity
+   wars, while suppression (:focus) and restoration (:focus-visible) stay
+   together and never fight across a layer boundary.
 
-*:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  box-shadow: var(--focus-ring);
-  border-radius: 4px;
-}
+   - Pointer/mouse focus shows NO ring (restored only on :focus-visible).
+   - Keyboard focus shows ONE uniform ring: 2px solid var(--accent) @ 3px.
+   - var(--accent) is theme-aware (#4e85ff dark / #2563eb light), so the ring
+     clears WCAG 2.4.7 / 1.4.11 (>= 3:1 contrast) against both backgrounds.
+   ──────────────────────────────────────────────────────────────────────── */
+@layer focus {
+  /* Suppress the UA default outline; restored on :focus-visible below. */
+  *:focus {
+    outline: none;
+  }
 
-/* Buttons and pill-shaped controls get a matching border-radius */
-button:focus-visible,
-.nav button:focus-visible,
-.nav a:focus-visible,
-.theme-toggle:focus-visible,
-.primary-button:focus-visible,
-.secondary-button:focus-visible,
-.ghost-button:focus-visible,
-.close-button:focus-visible,
-.launch-home:focus-visible,
-.lp-btn:focus-visible,
-.tab-button:focus-visible,
-.danger-button:focus-visible,
-.preset-row button:focus-visible,
-.outcome-toggle button:focus-visible,
-.hash-actions button:focus-visible,
-.hash-actions a:focus-visible,
-.footer-nav a:focus-visible,
-.not-found-links a:focus-visible,
-.error-link-pill:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  box-shadow: var(--focus-ring);
-}
+  /* One ring for every interactive surface — buttons, links, inputs,
+     selects, textareas, checkboxes — plus the .input-shell composite. */
+  *:focus-visible,
+  .input-shell:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 
-/* Inputs, selects, textareas */
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-.api-key-input:focus-visible,
-.endpoint-select:focus-visible,
-.params-textarea:focus-visible,
-.filter-select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 0;
-  box-shadow: var(--focus-ring);
-  border-color: var(--accent);
-}
-
-/* The input-shell composite widget: focus ring on the wrapper when the
-   inner input is focused (handled via :focus-within for keyboard users) */
-.input-shell:focus-within {
-  outline: 2px solid var(--accent);
-  outline-offset: 0;
-  box-shadow: var(--focus-ring);
-  border-color: var(--accent);
-}
-
-/* Checkboxes — keep native appearance, add ring */
-input[type="checkbox"]:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  box-shadow: var(--focus-ring);
-  border-radius: 3px;
+  /* Form controls also tint their border to reinforce the active field;
+     the outline above remains the primary focus indicator. */
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  .api-key-input:focus-visible,
+  .endpoint-select:focus-visible,
+  .params-textarea:focus-visible,
+  .filter-select:focus-visible,
+  .input-shell:focus-within {
+    border-color: var(--accent);
+  }
 }
 
 .skip-link {
@@ -1356,8 +1324,8 @@ code,
 
 .api-marketplace-card:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12), var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
   transform: translateY(-4px);
   border-color: #4666ff;
   border-radius: var(--radius-lg);
@@ -2700,8 +2668,7 @@ code,
 .filter-input:focus-visible,
 .filter-select:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  box-shadow: var(--focus-ring);
+  outline-offset: 3px;
 }
 .filter-option:hover .filter-label {
   color: var(--accent);

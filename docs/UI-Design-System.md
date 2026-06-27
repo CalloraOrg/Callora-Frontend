@@ -480,10 +480,25 @@ The following utility classes are defined in `src/index.css` and should be used 
 ## Accessibility Guidelines
 
 ### Focus Management
-- All interactive elements must have visible focus states
-- Use the predefined `--focus-ring` token for focus indicators
-- The global CSS suppresses default outlines and restores them via `:focus-visible`
-- Never remove focus styles entirely
+
+All keyboard-focus styling is centralized in a single CSS cascade layer named
+**`focus`**, declared in `src/index.css` as `@layer focus { … }`.
+
+- **One ring everywhere.** Buttons, links, inputs, selects, textareas, checkboxes
+  and the `.input-shell` composite share one indicator: `2px solid var(--accent)`
+  at `outline-offset: 3px`. `var(--accent)` is theme-aware, so the ring meets WCAG
+  2.4.7 / 1.4.11 (≥ 3:1) in both light and dark themes.
+- **Keyboard only.** The ring is restored exclusively via `:focus-visible`, so
+  mouse/pointer clicks never show a ring. Never style bare `:focus` for rings, and
+  never set inline `outline: none` on a control — let the layer handle it.
+- **Overriding intentionally.** Because layered rules rank below unlayered ones
+  regardless of specificity, a component that needs a bespoke focus treatment
+  (e.g. `.api-marketplace-card`, the danger/invalid input state) simply declares an
+  ordinary unlayered `:focus-visible` rule, which wins without specificity hacks.
+- **Never remove focus styles entirely.**
+
+
+
 
 ### Keyboard Navigation
 - All buttons and links must be keyboard accessible
