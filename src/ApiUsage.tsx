@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import EmptyState from './components/EmptyState';
 import Skeleton from './components/Skeleton';
 import { formatPrice } from './utils/format';
+import DateRangePicker from './components/DateRangePicker';
 
 type ApiEndpoint = {
   id: string;
@@ -28,6 +29,12 @@ type UsageStats = {
   totalSpent: number;
   avgResponseTime: number;
   successRate: number;
+};
+
+type DateRange = {
+  preset: '24h' | '7d' | '30d' | 'custom';
+  from?: Date;
+  to?: Date;
 };
 
 const MOCK_ENDPOINTS: ApiEndpoint[] = [
@@ -145,9 +152,69 @@ export default function ApiUsage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
 
-  const filteredCallHistory = statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter);
+  const filteredCallHistory = filterCallsByRange(statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter));
   const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
+  const [selectedRange, setSelectedRange] = useState<DateRange>({ preset: '24h' });
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
+
+  // Filter call history based on selected date range
+  const filterCallsByRange = (calls: CallRecord[]): CallRecord[] => {
+    const now = new Date();
+    let from: Date | undefined;
+    let to: Date | undefined;
+    switch (selectedRange.preset) {
+      case '24h':
+        from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        to = now;
+        break;
+      case '7d':
+        from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        to = now;
+        break;
+      case '30d':
+        from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        to = now;
+        break;
+      case 'custom':
+        from = selectedRange.from;
+        to = selectedRange.to;
+        break;
+    }
+    return calls.filter(call => {
+      const ts = call.timestamp;
+      if (from && ts < from) return false;
+      if (to && ts > to) return false;
+      return true;
+    });
+  };
+
+  // Initialize selected range from URL query on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const preset = params.get('range') as DateRange['preset'] | null;
+    const from = params.get('from');
+    const to = params.get('to');
+    if (preset && ['24h', '7d', '30d', 'custom'].includes(preset)) {
+      setSelectedRange({
+        preset,
+        ...(preset === 'custom' && from && to ? { from: new Date(from), to: new Date(to) } : {}),
+      });
+    }
+  }, []);
+
+  // Sync selected range to URL query whenever it changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (selectedRange.preset !== '24h') {
+      params.set('range', selectedRange.preset);
+      if (selectedRange.preset === 'custom' && selectedRange.from && selectedRange.to) {
+        params.set('from', selectedRange.from.toISOString());
+        params.set('to', selectedRange.to.toISOString());
+      }
+    }
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState(null, '', newUrl);
+  }, [selectedRange]);
   
   const [usageStats, setUsageStats] = useState<UsageStats>({
     callsToday: 47,
