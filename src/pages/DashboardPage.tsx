@@ -1,4 +1,3 @@
-import React from 'react';
 import Dashboard from '../components/Dashboard';
 import PlanNudge from '../components/PlanNudge';
 import useDocumentTitle from '../hooks/useDocumentTitle';
