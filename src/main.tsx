@@ -7,6 +7,7 @@ import CommandPalette from "./components/CommandPalette";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import "./index.css";
 import "./styles/print.css";
+import "./styles/tokens.css";
 import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
 
