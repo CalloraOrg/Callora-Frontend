@@ -14,6 +14,7 @@ import { useCollections } from "../state/collectionsStore";
 import type { APIItem } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
+import Sparkline from "./Sparkline";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -504,6 +505,44 @@ export default function ApiCard({
           </span>
         ))}
       </div>
+
+      <div
+  style={{
+    marginTop: 10,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  }}
+>
+  <span
+    style={{
+      fontSize: 12,
+      color: "var(--muted)",
+      fontWeight: 600,
+    }}
+  >
+    Last 24h
+  </span>
+
+  <Sparkline
+  values={[
+    18,
+    22,
+    20,
+    24,
+    26,
+    25,
+    30,
+    32,
+    31,
+    34,
+    36,
+    35,
+  ]}
+  width={90}
+  height={28}
+/>
 
       <div
         className="api-marketplace-card-footer"
