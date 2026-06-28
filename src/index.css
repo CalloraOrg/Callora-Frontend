@@ -3609,10 +3609,18 @@ code,
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 10px 0 6px;
+  /* Generous hit area (>= 44px tall) for comfortable touch dragging — WCAG 2.5.5 */
+  padding: 14px 0 10px;
   cursor: grab;
   touch-action: none;
   flex-shrink: 0;
+}
+
+/* Make the pill more prominent on hover/drag so its draggable affordance is clear. */
+.bottom-sheet__handle-area:hover .bottom-sheet__handle,
+.bottom-sheet__handle-area:active .bottom-sheet__handle {
+  width: 52px;
+  background: var(--muted);
 }
 
 .bottom-sheet__handle-area:active {
@@ -3620,10 +3628,19 @@ code,
 }
 
 .bottom-sheet__handle {
-  width: 40px;
-  height: 4px;
-  border-radius: 2px;
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
   background: var(--line-strong);
+  /* Smooth visual feedback while the handle widens on hover/drag. */
+  transition: width var(--transition-speed) ease, background var(--transition-speed) ease;
+}
+
+/* Respect reduced-motion preference: drop the resize animation. */
+@media (prefers-reduced-motion: reduce) {
+  .bottom-sheet__handle {
+    transition: none;
+  }
 }
 
 /* Header row */
