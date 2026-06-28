@@ -28,6 +28,7 @@ export type APIItem = {
   endpoints?: Array<any>;
   stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
   ratingDistribution?: Record<number, number>;
+  hourlyHealth?: ("operational" | "degraded" | "down")[];
 };
 
 
@@ -83,6 +84,7 @@ export const MOCK_APIS: APIItem[] = [
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
     ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
+    hourlyHealth: Array(24).fill("operational").map((_, i) => i === 12 || i === 13 ? "degraded" : "operational"),
   },
   {
     id: "pay-qr",
@@ -122,6 +124,7 @@ export const MOCK_APIS: APIItem[] = [
         verified: false,
       },
     ],
+    hourlyHealth: Array(24).fill("operational"),
   },
   {
     id: "msg-01",
@@ -153,6 +156,7 @@ export const MOCK_APIS: APIItem[] = [
         verified: true,
       },
     ],
+    hourlyHealth: Array(24).fill("operational").map((_, i) => i > 18 && i < 22 ? "down" : "operational"),
   },
   // minimal demo items
   ...Array.from({ length: 10 }).map((_, i) => {
@@ -190,6 +194,7 @@ const status:  APIItem["status"] =
         avgResponseMs: avgLatencyMs,
         uptimePct: uptimePercent,
       },
+      hourlyHealth: Array(24).fill("operational").map(() => Math.random() > 0.9 ? (Math.random() > 0.5 ? "degraded" : "down") : "operational"),
     };
   }),
 ];
