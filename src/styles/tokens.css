@@ -1,0 +1,9 @@
+/* Status icon semantic tokens — reference these in CallHistoryRow and any
+   component that renders per-call status icons.  They alias the global
+   --success / --danger tokens so both themes are covered automatically.  */
+
+:root {
+  --status-success-icon-color: var(--success);
+  --status-error-icon-color: var(--danger);
+  --status-icon-size: 16px;
+}

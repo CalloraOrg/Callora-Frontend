@@ -4,6 +4,7 @@ import Skeleton, { SkeletonRow } from './components/Skeleton';
 import { formatPrice } from './utils/format';
 import RequestBodyEditor from './components/RequestBodyEditor';
 import type { JsonSchema } from './components/RequestBodyEditor';
+import CallHistoryRow from './components/CallHistoryRow';
 
 type ApiEndpoint = {
   id: string;
@@ -181,14 +182,6 @@ function formatTime(ms: number) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function formatTimestamp(date: Date) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date);
-}
 
 export default function ApiUsage() {
   const { trackFetch } = useFetchTracker();
@@ -627,13 +620,57 @@ export default function ApiUsage() {
         </div>
 
         <div className="call-history-table" aria-busy={isLoading}>
-          <div className="table-header">
-            <span>Timestamp</span>
-            <span>Endpoint</span>
-            <span>Status</span>
-            <span>Response Time</span>
-            <span>Cost</span>
-            <span>Actions</span>
+           <div className="table-header">
+             <span>Timestamp</span>
+             <span>Endpoint</span>
+             <span>Status</span>
+             <span>Response Time</span>
+             <span>Cost</span>
+             <span>Actions</span>
+           </div>
+
+           {isLoading ? (
+             <SkeletonRow rows={5} />
+           ) : filteredCallHistory.length === 0 ? (
+             <EmptyState message="No call records match the selected filter." />
+           ) : (
+             filteredCallHistory.map(call => (
+               <CallHistoryRow
+                 key={call.id}
+                 call={call}
+                 expanded={expandedCall === call.id}
+                 onToggleExpand={id => setExpandedCall(expandedCall === id ? null : id)}
+               />
+             ))
+           )}
+         </div></div>
+      </div>
+
+      {/* Integration Guide */}
+      <div className="surface integration-guide-section">
+        <h2>Integration Guide</h2>
+        
+        <div className="language-tabs">
+          {(['javascript', 'python', 'curl'] as const).map(lang => (
+            <button
+              key={lang}
+              className={`tab-button ${selectedLanguage === lang ? 'active' : ''}`}
+              onClick={() => setSelectedLanguage(lang)}
+            >
+              {lang.charAt(0).toUpperCase() + lang.slice(1)}
+            </button>
+          ))}
+        </div>
+        
+        <div className="code-example">
+          <div className="code-header">
+            <h3>{selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)} Example</h3>
+            <button
+              className="secondary-button"
+              onClick={() => handleCopyCode(CODE_EXAMPLES[selectedLanguage])}
+            >
+              {copied ? 'Copied!' : 'Copy Code'}
+            </button>
           </div>
 
           {isLoading ? (
