@@ -1446,7 +1446,107 @@ code,
   max-width: 1280px;
   margin: 0 auto;
   min-width: 0;
+}.api-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+
+  padding: 2rem;
+  margin-bottom: 2rem;
+
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
 }
+   .api-hero__content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+}
+
+
+.api-hero__identity{
+    display:flex;
+    align-items:center;
+    gap:1rem;
+}
+
+.api-hero__cta {
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.api-version-pill {
+  display: inline-flex;
+  align-items: center;
+
+  padding: 0.25rem 0.75rem;
+
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+
+  background: var(--bg-main);
+  color: var(--text-secondary);
+
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+
+.api-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  padding: 0.25rem 0.75rem;
+
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+
+  color: var(--text-main);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.api-status-dot {
+  width: 8px;
+  height: 8px;
+
+  border-radius: 50%;
+
+  background: var(--accent);
+}
+.api-hero__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  margin-bottom: 0.5rem;
+
+  flex-wrap: wrap;
+}
+
+.api-hero__provider {
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.api-hero__provider a {
+  color: var(--text-main);
+  text-decoration: none;
+}
+
+.api-hero__provider a:hover {
+  text-decoration: underline;
+}
+
+
+.api-hero__cta{
+    display:flex;
+    gap:1rem;
+}
+
 
 .api-detail-shell {
   min-width: 0;
@@ -1469,13 +1569,19 @@ code,
 }
 
 .api-detail-logo {
-  width: 84px;
-  height: 84px;
-  flex: 0 0 auto;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  display: grid;
-  place-items: center;
+  width: 64px;
+  height: 64px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: var(--accent);
+  color: var(--text-main);
+
+  font-size: 1.5rem;
   font-weight: 700;
 }
 
@@ -1504,7 +1610,17 @@ code,
   margin-top: 8px;
   font-size: 1rem;
 }
+.api-status--operational .api-status-dot {
+  background: var(--success);
+}
 
+.api-status--degraded .api-status-dot {
+  background: var(--warning);
+}
+
+.api-status--maintenance .api-status-dot {
+  background: var(--danger);
+}
 .api-detail-price-panel {
   text-align: right;
 }
@@ -2662,9 +2778,47 @@ code,
   color: var(--text);
 }
 
+/* 1024px */
 @media (max-width: 1024px) {
-  .lp-feature-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .api-hero__content {
+    gap: 1.5rem;
+  }
+}
+
+/* 768px */
+@media (max-width: 768px) {
+  .api-hero__content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .api-hero__identity {
+    align-items: flex-start;
+  }
+
+  .api-hero__cta {
+    flex-direction: column;
+  }
+
+  .api-hero__cta button {
+    width: 100%;
+  }
+}
+
+/* 360px */
+@media (max-width: 360px) {
+  .api-hero {
+    padding: 1rem;
+  }
+
+  .api-detail-logo {
+    width: 48px;
+    height: 48px;
+    font-size: 1.1rem;
+  }
+
+  .api-hero__identity {
+    gap: 0.75rem;
   }
 }
 
