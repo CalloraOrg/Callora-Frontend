@@ -6,6 +6,7 @@ import ApiDetailPageSkeleton from "./ApiDetailPage.skeleton";
 import EmbedPreview from "../components/EmbedPreview";
 import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import { useFetchTracker } from "../hooks/useFetchTracker";
 import { findApiById } from "../data/mockApis";
 import type { Review } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
@@ -92,6 +93,7 @@ function deriveEndpointGroupLabel(endpoint: ApiEndpoint): string {
 }
 
 export default function ApiDetailPage({ onBack }: Props) {
+  const { trackFetch } = useFetchTracker();
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
   const [isLoading, setIsLoading] = useState(true);
@@ -178,13 +180,22 @@ export default function ApiDetailPage({ onBack }: Props) {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [documentationEndpoints]);
 
-  // Simulate initial data loading with 1.5s delay (consistent with MarketplacePage)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, LOADING_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
+    const abortController = new AbortController();
+    trackFetch(new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+          resolve();
+        }
+      }, LOADING_DELAY_MS);
+      abortController.signal.addEventListener("abort", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    }));
+    return () => abortController.abort();
+  }, [trackFetch]);
 
   if (isLoading) {
     return <ApiDetailPageSkeleton />;

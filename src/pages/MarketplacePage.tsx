@@ -10,6 +10,7 @@ import EmptyState from "../components/EmptyState";
 import MarketplacePageSkeleton from "./MarketplacePage.skeleton";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
+import { useFetchTracker } from "../hooks/useFetchTracker";
 import { LOADING_DELAY_MS } from "../config/constants";
 import {
   readDensityPreference,
@@ -59,14 +60,21 @@ export default function MarketplacePage(): JSX.Element {
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    // Simulate initial data loading with occasional error for testing
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      // Uncomment below to test error state
-      // setFetchError("Failed to fetch APIs. Please try again.");
-    }, LOADING_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
+    const abortController = new AbortController();
+    trackFetch(new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+          resolve();
+        }
+      }, LOADING_DELAY_MS);
+      abortController.signal.addEventListener("abort", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    }));
+    return () => abortController.abort();
+  }, [trackFetch]);
 
   useEffect(() => {
     persistDensityPreference(density);
@@ -122,8 +130,7 @@ export default function MarketplacePage(): JSX.Element {
   const handleRetryFetch = async () => {
     setFetchError(null);
     setIsLoading(true);
-    // Simulate network request
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await trackFetch(new Promise((resolve) => setTimeout(resolve, 500)));
     setIsLoading(false);
   };
 
