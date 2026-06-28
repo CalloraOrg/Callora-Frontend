@@ -13,6 +13,7 @@ import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import type { APIItem } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
+import { useCompareStore, compareStore } from "../state/compareStore";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -345,6 +346,19 @@ export default function ApiCard({
   const uptimePercent = api.uptimePercent;
   const isCompact = density === "compact";
 
+  const comparedApis = useCompareStore();
+  const isCompared = comparedApis.some(item => item.id === api.id);
+  const canCompare = isCompared || comparedApis.length < 3;
+
+  const handleCompareClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isCompared) {
+      compareStore.removeApi(api.id);
+    } else if (canCompare) {
+      compareStore.addApi(api);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -370,6 +384,32 @@ export default function ApiCard({
     >
       {/* Absolutely-positioned bookmark button in the top-right corner */}
       <BookmarkButton endpointId={api.id} />
+      
+      {/* Compare button - absolutely positioned, top-left */}
+      <button
+        onClick={handleCompareClick}
+        disabled={!canCompare}
+        className="api-card__compare-btn"
+        style={{
+          position: "absolute",
+          top: "8px",
+          left: "8px",
+          zIndex: 10,
+          background: isCompared ? "var(--accent)" : "rgba(0,0,0,0.5)",
+          color: "white",
+          border: "none",
+          borderRadius: "8px",
+          padding: "4px 8px",
+          fontSize: "0.75rem",
+          fontWeight: 600,
+          cursor: canCompare ? "pointer" : "not-allowed",
+          opacity: isCompared ? 1 : 0, // rely on css for hover visibility
+          transition: "opacity 0.2s, background 0.2s"
+        }}
+        aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
+      >
+        {isCompared ? "Compared" : "Compare"}
+      </button>
 
       <div
         className="api-marketplace-card-header"
@@ -427,7 +467,6 @@ export default function ApiCard({
         <div
           className="api-marketplace-card-price"
           style={{ textAlign: "right", paddingRight: 36, flexShrink: 0 }}
-        >
         >
           <div style={{ color: "var(--muted)", fontSize: 12 }}>
             {`$${formatPrice(pricePerCall)}`} / call

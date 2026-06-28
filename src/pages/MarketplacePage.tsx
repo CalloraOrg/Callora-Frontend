@@ -14,6 +14,7 @@ import {
   persistDensityPreference,
   type DensityPreference,
 } from "../utils/density";
+import CompareDrawer from "../components/CompareDrawer";
 
 export default function MarketplacePage(): JSX.Element {
   useDocumentTitle(
@@ -377,6 +378,9 @@ export default function MarketplacePage(): JSX.Element {
         clearFilters={clearFilters}
         triggerRef={filtersTriggerRef}
       />
+
+      {/* Compare Drawer */}
+      <CompareDrawer />
     </div>
   );
 }

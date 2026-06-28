@@ -3714,3 +3714,8 @@ code,
   display: flex;
   gap: 4px;
 }
+
+.api-marketplace-card:hover .api-card__compare-btn,
+.api-marketplace-card:focus-within .api-card__compare-btn {
+  opacity: 1 !important;
+}

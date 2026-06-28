@@ -1,4 +1,4 @@
-import { CSSProperties } from "react";
+import React, { CSSProperties } from "react";
 
 interface SkeletonProps {
   width?: string | number;
@@ -27,7 +27,7 @@ export default function Skeleton({
     />
   );
 }
-}
+
 
 // Row variant for table loading
 export function SkeletonRow({ rows = 5 }: { rows?: number }) {
