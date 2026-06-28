@@ -6,10 +6,12 @@ import FiltersSidebar from "../components/FiltersSidebar";
 import EmptyState, { type EmptyStateProps } from "../components/EmptyState";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
+import { useFetchTracker } from "../hooks/useFetchTracker";
 import { LOADING_DELAY_MS } from "../config/constants";
 
 export default function MarketplacePage(): JSX.Element {
   useDocumentTitle('Marketplace – Callora', 'Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.');
+  const { trackFetch } = useFetchTracker();
   const [search, setSearch] = useState("");
   // Debounce search input to prevent excessive re-renders on large lists
   const debouncedSearch = useDebounce(search, 300);
@@ -26,14 +28,21 @@ export default function MarketplacePage(): JSX.Element {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate initial data loading with occasional error for testing
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      // Uncomment below to test error state
-      // setFetchError("Failed to fetch APIs. Please try again.");
-    }, LOADING_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
+    const abortController = new AbortController();
+    trackFetch(new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+          resolve();
+        }
+      }, LOADING_DELAY_MS);
+      abortController.signal.addEventListener("abort", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    }));
+    return () => abortController.abort();
+  }, [trackFetch]);
 
   const toggleCategory = (c: string) => {
     const copy = new Set(selectedCategories);
@@ -72,8 +81,7 @@ export default function MarketplacePage(): JSX.Element {
   const handleRetryFetch = async () => {
     setFetchError(null);
     setIsLoading(true);
-    // Simulate network request
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await trackFetch(new Promise((resolve) => setTimeout(resolve, 500)));
     setIsLoading(false);
   };
 

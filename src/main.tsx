@@ -3,7 +3,9 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import RouteProgressBar from "./components/RouteProgressBar";
+import TopProgressBar from "./components/TopProgressBar";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
+import { FetchTrackerProvider } from "./hooks/useFetchTracker";
 import "./index.css";
 import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
@@ -22,8 +24,11 @@ async function renderRoute() {
     <React.StrictMode>
       <ThemeProvider>
         <BrowserRouter>
-          <RouteProgressBar />
-          {children}
+          <FetchTrackerProvider>
+            <RouteProgressBar />
+            <TopProgressBar />
+            {children}
+          </FetchTrackerProvider>
         </BrowserRouter>
       </ThemeProvider>
     </React.StrictMode>
@@ -68,8 +73,11 @@ async function renderRoute() {
     <React.StrictMode>
       <BrowserRouter>
       <ThemeProvider>
+      <FetchTrackerProvider>
       <RouteProgressBar />
+      <TopProgressBar />
       <App />
+      </FetchTrackerProvider>
       </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,

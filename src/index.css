@@ -2740,6 +2740,51 @@ code,
   }
 }
 
+/* Top Progress Bar (fetch tracker) */
+.top-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.top-progress-bar--active {
+  opacity: 1;
+}
+
+.top-progress-bar-track {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.top-progress-bar-indicator {
+  width: 33.33%;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .top-progress-bar-indicator {
+    animation: top-progress-indeterminate 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes top-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
 /* Skeleton Loading */
 @keyframes shimmer {
   0% {

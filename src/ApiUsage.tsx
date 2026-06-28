@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import EmptyState from './components/EmptyState';
 import Skeleton from './components/Skeleton';
+import { useFetchTracker } from './hooks/useFetchTracker';
 import { formatPrice } from './utils/format';
 
 type ApiEndpoint = {
@@ -133,6 +134,7 @@ function formatTimestamp(date: Date) {
 }
 
 export default function ApiUsage() {
+  const { trackFetch } = useFetchTracker();
   const [apiKey, setApiKey] = useState('ck_live_4e85ff1ed6a4ff73893a0bf73f2bb');
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -180,55 +182,54 @@ export default function ApiUsage() {
     
     const startTime = Date.now();
     
-    // Simulate API call
-    setTimeout(() => {
-      const endTime = Date.now();
-      const time = endTime - startTime;
-      const cost = Math.random() * 0.005 + 0.001;
-      
-      setResponseTime(time);
-      setCallCost(cost);
-      
-      // Mock response
-      const mockResponse = {
-        success: true,
-        data: {
-          id: 'user_123',
-          name: 'John Doe',
-          email: 'john@example.com',
-          balance: 1250.50,
-          created_at: new Date().toISOString()
-        },
-        timestamp: new Date().toISOString()
-      };
-      
-      setApiResponse(mockResponse);
-      
-      // Add to call history
-      const newCall: CallRecord = {
-        id: Date.now().toString(),
-        timestamp: new Date(),
-        endpoint: selectedEndpoint.path,
-        status: 'success',
-        responseTime: time,
-        cost: cost,
-        request: requestParams,
-        response: mockResponse
-      };
-      
-      setCallHistory(prev => [newCall, ...prev]);
-      
-      // Update stats
-      setUsageStats(prev => ({
-        ...prev,
-        callsToday: prev.callsToday + 1,
-        callsWeek: prev.callsWeek + 1,
-        totalSpent: prev.totalSpent + cost,
-        avgResponseTime: (prev.avgResponseTime * prev.callsToday + time) / (prev.callsToday + 1)
-      }));
-      
-      setIsLoading(false);
-    }, 1000 + Math.random() * 2000);
+    await trackFetch(new Promise<void>((resolve) => {
+      setTimeout(() => {
+        const endTime = Date.now();
+        const time = endTime - startTime;
+        const cost = Math.random() * 0.005 + 0.001;
+        
+        setResponseTime(time);
+        setCallCost(cost);
+        
+        const mockResponse = {
+          success: true,
+          data: {
+            id: 'user_123',
+            name: 'John Doe',
+            email: 'john@example.com',
+            balance: 1250.50,
+            created_at: new Date().toISOString()
+          },
+          timestamp: new Date().toISOString()
+        };
+        
+        setApiResponse(mockResponse);
+        
+        const newCall: CallRecord = {
+          id: Date.now().toString(),
+          timestamp: new Date(),
+          endpoint: selectedEndpoint.path,
+          status: 'success',
+          responseTime: time,
+          cost: cost,
+          request: requestParams,
+          response: mockResponse
+        };
+        
+        setCallHistory(prev => [newCall, ...prev]);
+        
+        setUsageStats(prev => ({
+          ...prev,
+          callsToday: prev.callsToday + 1,
+          callsWeek: prev.callsWeek + 1,
+          totalSpent: prev.totalSpent + cost,
+          avgResponseTime: (prev.avgResponseTime * prev.callsToday + time) / (prev.callsToday + 1)
+        }));
+        
+        setIsLoading(false);
+        resolve();
+      }, 1000 + Math.random() * 2000);
+    }));
   };
 
   const handleCopyCode = async (code: string) => {
