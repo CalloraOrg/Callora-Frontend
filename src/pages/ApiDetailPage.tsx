@@ -5,6 +5,7 @@ import Skeleton from "../components/Skeleton";
 import ApiDetailPageSkeleton from "./ApiDetailPage.skeleton";
 import EmbedPreview from "../components/EmbedPreview";
 import Tabs from "../components/Tabs";
+import { useToast } from "../components/Toast";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import { findApiById } from "../data/mockApis";
@@ -13,7 +14,11 @@ import EmptyState from "../components/EmptyState";
 import { formatPrice } from "../utils/format";
 import { Icons } from "../utils/icons";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
-import { CheckIcon, ClockIcon, BoltIcon } from "../components/icons";
+import {
+  getPostmanImportUrl,
+  getInsomniaImportUrl,
+  copyToClipboard,
+} from "../utils/postman";
 
 /**
  * ApiDetailPage Component
@@ -97,6 +102,7 @@ export default function ApiDetailPage({ onBack }: Props) {
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
   const [isLoading, setIsLoading] = useState(true);
+  const { showToast } = useToast();
 
   // Ordered tab definitions — single source of truth for labels and ids.
   const TAB_ITEMS = [
@@ -685,7 +691,61 @@ print(data)`;
                                 {ep.title}
                               </strong>
                             </div>
-                            <code className="endpoint-url">{ep.url}</code>
+                            <div className="endpoint-header-actions">
+                              <code className="endpoint-url">{ep.url}</code>
+                              <div className="endpoint-client-buttons">
+                                <button
+                                  type="button"
+                                  className="icon-button"
+                                  aria-label="Copy Postman import URL"
+                                  title="Open in Postman"
+                                  onClick={() => {
+                                    const url = getPostmanImportUrl(
+                                      ep.method,
+                                      ep.url,
+                                      ep.title,
+                                      API_BASE_URL,
+                                    );
+                                    copyToClipboard(url).then((ok) => {
+                                      showToast(
+                                        ok
+                                          ? "Postman import URL copied"
+                                          : "Failed to copy",
+                                        ok ? "success" : "error",
+                                      );
+                                    });
+                                  }}
+                                >
+                                  <Icons.ExternalLink size={14} />
+                                  <span>Postman</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="icon-button"
+                                  aria-label="Copy Insomnia import URL"
+                                  title="Open in Insomnia"
+                                  onClick={() => {
+                                    const url = getInsomniaImportUrl(
+                                      ep.method,
+                                      ep.url,
+                                      ep.title,
+                                      API_BASE_URL,
+                                    );
+                                    copyToClipboard(url).then((ok) => {
+                                      showToast(
+                                        ok
+                                          ? "Insomnia import URL copied"
+                                          : "Failed to copy",
+                                        ok ? "success" : "error",
+                                      );
+                                    });
+                                  }}
+                                >
+                                  <Icons.ExternalLink size={14} />
+                                  <span>Insomnia</span>
+                                </button>
+                              </div>
+                            </div>
                           </div>
 
                           <div style={{ padding: 24 }}>
