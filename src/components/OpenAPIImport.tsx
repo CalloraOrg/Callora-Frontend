@@ -1,4 +1,5 @@
 import { useCallback, useId, useRef, useState } from 'react';
+import { Icons } from '../utils/icons';
 import { parseOpenApiSpec } from '../utils/openapi-parse';
 import type { ParsedEndpoint, ParseError } from '../utils/openapi-parse';
 
@@ -297,7 +298,7 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
             id={errorRegionId}
           >
             <div className="oai-error-header">
-              <span className="oai-error-icon" aria-hidden="true">⚠</span>
+              <Icons.Warning size={14} className="oai-error-icon" aria-hidden="true" />
               <h3 className="oai-error-title">
                 Could not parse{state.filename ? ` "${state.filename}"` : ' file'}
               </h3>

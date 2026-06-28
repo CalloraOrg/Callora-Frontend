@@ -1,7 +1,18 @@
+export type Review = {
+  id: string;
+  author: string;
+  rating: number; // 1–5
+  date: string;   // ISO date string
+  body: string;
+  verified: boolean;
+};
+
 export type APIItem = {
   id: string;
   name: string;
-  provider: { name: string; url?: string };
+  provider: { name: string; url?: string; avatar?:string;};
+   version?: string;
+  status?: "operational" | "degraded" | "maintenance";
   description: string;
   pricePerRequest: number;
   pricePerCall?: number;
@@ -16,13 +27,18 @@ export type APIItem = {
   useCases?: string[];
   endpoints?: Array<any>;
   stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
+  ratingDistribution?: Record<number, number>;
+  hourlyHealth?: ("operational" | "degraded" | "down")[];
 };
+
 
 export const MOCK_APIS: APIItem[] = [
   {
     id: "weather-001",
     name: "WeatherSim API",
     provider: { name: "Acme Labs", url: "#" },
+     version: "2.3.1",
+  status: "operational",
     description:
       "WeatherSim provides hyper-local weather forecasts, historical climate data, and simulated conditions for testing your services.",
     pricePerRequest: 0.01,
@@ -67,12 +83,16 @@ export const MOCK_APIS: APIItem[] = [
       },
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
+    ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
+    hourlyHealth: Array(24).fill("operational").map((_, i) => i === 12 || i === 13 ? "degraded" : "operational"),
   },
   {
     id: "pay-qr",
     name: "QuickPay",
     provider: { name: "PayFast", url: "#" },
-    description: "Simple payment processing with card and ACH support.",
+    status: "degraded",
+ version: "1.8.0",
+    description: "Simple payment processing with card and ACH support",
     pricePerRequest: 0.001,
     pricePerCall: 0.001,
     avgLatencyMs: 260,
@@ -86,11 +106,32 @@ export const MOCK_APIS: APIItem[] = [
     useCases: ["Checkout", "Subscriptions"],
     endpoints: [],
     stats: { totalCalls: 880000, avgResponseMs: 260, uptimePct: 99.9 },
+    reviews: [
+      {
+        id: "r1",
+        author: "Naomi L.",
+        rating: 4,
+        date: "2026-06-01",
+        body: "PCI compliance out of the box is a huge time-saver.",
+        verified: true,
+      },
+      {
+        id: "r2",
+        author: "Ben F.",
+        rating: 5,
+        date: "2026-04-20",
+        body: "Handles high-volume checkouts with no issues.",
+        verified: false,
+      },
+    ],
+    hourlyHealth: Array(24).fill("operational"),
   },
   {
     id: "msg-01",
     name: "ChatStream",
     provider: { name: "Comms Inc.", url: "#" },
+     version: "3.0.2",
+  status: "maintenance",
     description: "Scalable messaging and notifications for apps.",
     pricePerRequest: 0.0005,
     pricePerCall: 0.0005,
@@ -105,6 +146,17 @@ export const MOCK_APIS: APIItem[] = [
     useCases: ["Notifications", "Two-factor auth"],
     endpoints: [],
     stats: { totalCalls: 1200000, avgResponseMs: 120, uptimePct: 99.99 },
+    reviews: [
+      {
+        id: "r1",
+        author: "Eva C.",
+        rating: 5,
+        date: "2026-06-15",
+        body: "Delivery webhooks are rock-solid. Brilliant product.",
+        verified: true,
+      },
+    ],
+    hourlyHealth: Array(24).fill("operational").map((_, i) => i > 18 && i < 22 ? "down" : "operational"),
   },
   // minimal demo items
   ...Array.from({ length: 10 }).map((_, i) => {
@@ -112,11 +164,18 @@ export const MOCK_APIS: APIItem[] = [
     const avgLatencyMs = i % 5 === 0 ? undefined : 140 + i * 18;
     const uptimePercent =
       i % 3 === 0 ? undefined : Number((99.2 + i * 0.07).toFixed(2));
-
+const status:  APIItem["status"] =
+  i % 3 === 0
+    ? "operational"
+    : i % 3 === 1
+    ? "degraded"
+    : "maintenance";
     return {
       id: `demo-${i}`,
       name: `Demo API ${i + 1}`,
       provider: { name: i % 2 === 0 ? "OpenTools" : "ThirdParty", url: "#" },
+       version: `1.${i}.0`,
+       status,
       description: `Demo API number ${i + 1} showcasing features and endpoints.`,
       pricePerRequest,
       pricePerCall: i % 4 === 0 ? undefined : pricePerRequest,
@@ -135,6 +194,7 @@ export const MOCK_APIS: APIItem[] = [
         avgResponseMs: avgLatencyMs,
         uptimePct: uptimePercent,
       },
+      hourlyHealth: Array(24).fill("operational").map(() => Math.random() > 0.9 ? (Math.random() > 0.5 ? "degraded" : "down") : "operational"),
     };
   }),
 ];

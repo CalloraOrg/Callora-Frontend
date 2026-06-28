@@ -4,9 +4,12 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import RouteProgressBar from "./components/RouteProgressBar";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
+import { ToastProvider } from "./components/Toast";
 import "./index.css";
 import "./styles/print.css";
+import "./styles/tokens.css";
 import { ThemeProvider } from "./ThemeContext";
+import { CollectionsProvider } from "./state/collectionsStore";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -21,10 +24,12 @@ async function renderRoute() {
   const wrap = (children: React.ReactNode) => (
     <React.StrictMode>
       <ThemeProvider>
-        <BrowserRouter>
-          <RouteProgressBar />
-          {children}
-        </BrowserRouter>
+        <CollectionsProvider>
+          <BrowserRouter>
+            <RouteProgressBar />
+            <ToastProvider>{children}</ToastProvider>
+          </BrowserRouter>
+        </CollectionsProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
@@ -38,6 +43,7 @@ async function renderRoute() {
 
   if (pathname.startsWith("/marketplace")) {
     startRouteLoading();
+    root.render(wrap(<MarketplacePageSkeleton />));
     const mod = await import("./pages/MarketplacePage");
     const MarketplacePage = mod.default;
     root.render(wrap(<MarketplacePage />));
@@ -47,6 +53,7 @@ async function renderRoute() {
 
   if (pathname.startsWith("/details/")) {
     startRouteLoading();
+    root.render(wrap(<ApiDetailPageSkeleton />));
     const mod = await import("./pages/ApiDetailPage");
     const ApiDetailPage = mod.default;
     root.render(
@@ -67,10 +74,14 @@ async function renderRoute() {
   root.render(
     <React.StrictMode>
       <BrowserRouter>
-      <ThemeProvider>
-      <RouteProgressBar />
-      <App />
-      </ThemeProvider>
+        <ThemeProvider>
+          <CollectionsProvider>
+            <RouteProgressBar />
+            <ToastProvider>
+              <App />
+            </ToastProvider>
+          </CollectionsProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,
   );

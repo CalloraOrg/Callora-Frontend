@@ -1,13 +1,25 @@
 import { useMemo, useState, useEffect } from "react";
-import CodeExample from "../components/CodeExample";
+import useDocumentTitle from "../hooks/useDocumentTitle";
 import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
+import ApiDetailPageSkeleton from "./ApiDetailPage.skeleton";
 import EmbedPreview from "../components/EmbedPreview";
+import Tabs from "../components/Tabs";
+import { useToast } from "../components/Toast";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import { useFetchTracker } from "../hooks/useFetchTracker";
 import { findApiById } from "../data/mockApis";
+import type { Review } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 import { formatPrice } from "../utils/format";
+import { Icons } from "../utils/icons";
+import HealthTimeline from "../components/HealthTimeline";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
+import {
+  getPostmanImportUrl,
+  getInsomniaImportUrl,
+  copyToClipboard,
+} from "../utils/postman";
 
 /**
  * ApiDetailPage Component
@@ -22,19 +34,27 @@ import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 type Props = {
   onBack?: () => void;
 };
-
 type TabType =
   | "overview"
   | "documentation"
   | "pricing"
-  | "examples"
-  | "reviews"
-  | "embed";
+  | "reviews";
 
 export default function ApiDetailPage({ onBack }: Props) {
-  const [tab, setTab] = useState<TabType>("overview");
-  const [requests, setRequests] = useState(1000);
+const [, setTab] = useState<TabType>("overview");
+  //const [requests, setRequests] = useState(1000);
   const [isLoading, setIsLoading] = useState(true);
+  const { showToast } = useToast();
+
+  // Ordered tab definitions — single source of truth for labels and ids.
+  const TAB_ITEMS = [
+    { id: "overview",       label: "Overview"       },
+    { id: "documentation",  label: "Documentation"  },
+    { id: "pricing",        label: "Pricing"        },
+    { id: "examples",       label: "Examples"       },
+    { id: "reviews",        label: "Reviews"        },
+    { id: "embed",          label: "Embed"          },
+  ] as const satisfies Array<{ id: TabType; label: string }>;
 
   // Extract ID from URL path: /details/[id]
   const id =
@@ -43,15 +63,91 @@ export default function ApiDetailPage({ onBack }: Props) {
       : undefined;
 
   const api = useMemo(() => findApiById(id), [id]);
-  useDocumentTitle(api?.name ?? 'API Detail – Callora', api?.description);
+  useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
 
-  // Simulate initial data loading with 1.5s delay (consistent with MarketplacePage)
+  const documentationEndpoints = useMemo(
+    () => (api?.endpoints || []) as ApiEndpoint[],
+    [api],
+  );
+
+  const endpointGroups = useMemo<EndpointGroupPreview[]>(() => {
+    const groups = new Map<
+      string,
+      {
+        id: string;
+        label: string;
+        methods: Set<string>;
+        endpoints: EndpointGroupPreview["endpoints"];
+        totalParams: number;
+      }
+    >();
+
+    documentationEndpoints.forEach((endpoint) => {
+      const label = deriveEndpointGroupLabel(endpoint);
+      const id = label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const method = (endpoint.method || "GET").toUpperCase();
+      const paramsCount = endpoint.params?.length ?? 0;
+      const requiredCount =
+        endpoint.params?.filter((param) => param.required).length ?? 0;
+
+      const existingGroup = groups.get(id) ?? {
+        id,
+        label,
+        methods: new Set<string>(),
+        endpoints: [],
+        totalParams: 0,
+      };
+
+      existingGroup.methods.add(method);
+      existingGroup.totalParams += paramsCount;
+      existingGroup.endpoints.push({
+        id: endpoint.id,
+        title: endpoint.title,
+        url: endpoint.url,
+        method,
+        paramsCount,
+        requiredCount,
+      });
+
+      groups.set(id, existingGroup);
+    });
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        id: group.id,
+        label: group.label,
+        methods: Array.from(group.methods).sort(),
+        endpointCount: group.endpoints.length,
+        totalParams: group.totalParams,
+        endpoints: group.endpoints,
+        summary: `${group.endpoints.length} endpoint${group.endpoints.length === 1 ? "" : "s"} and ${group.totalParams} request parameter${group.totalParams === 1 ? "" : "s"}.`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [documentationEndpoints]);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, LOADING_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
+    const abortController = new AbortController();
+    trackFetch(new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+          resolve();
+        }
+      }, LOADING_DELAY_MS);
+      abortController.signal.addEventListener("abort", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    }));
+    return () => abortController.abort();
+  }, [trackFetch]);
+
+  if (isLoading) {
+    return <ApiDetailPageSkeleton />;
+  }
 
   // Show "not found" after loading completes and API is missing
   if (!isLoading && !api) {
@@ -240,62 +336,57 @@ export default function ApiDetailPage({ onBack }: Props) {
     return null; // This should not happen due to the check above, but kept for safety
   }
 
-
-
   // Example Generation Logic
-  const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
-    url: "/v1/data",
-    method: "GET",
-  };
+ // const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
+   // url: "/v1/data",
+    //method: "GET",
+  //};
 
-  const curlExample = `curl -X ${firstEndpoint.method} "${API_BASE_URL}${firstEndpoint.url}?lat=37.78&lon=-122.41" \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
-  -H "Content-Type: application/json"`;
+ // const curlExample = `curl -X ${firstEndpoint.method} "${API_BASE_URL}${firstEndpoint.url}?lat=37.78&lon=-122.41"
+  //-H "Authorization: Bearer YOUR_API_KEY" \\
+  //-H "Content-Type: application/json"`;
 
-  const jsExample = `import fetch from 'node-fetch';
+  //const jsExample = `import fetch from 'node-fetch';
+
 
 const getApiData = async () => {
   const response = await fetch('${API_BASE_URL}${firstEndpoint.url}', {
     method: '${firstEndpoint.method}',
-    headers: { 
+    headers: {
       'Authorization': 'Bearer YOUR_API_KEY',
       'Content-Type': 'application/json'
     }
   });
-  
+
   if (!response.ok) throw new Error('API request failed');
-  
+
   const data = await response.json();
   return data;
 };
 
-getApiData().then(console.log).catch(console.error);`;
+getApiData().then(console.log).catch(console.error);
 
-  const pyExample = `import requests
+   // const pyExample = `import requests`
 
-url = "${API_BASE_URL}${firstEndpoint.url}"
-headers = {
-    "Authorization": "Bearer YOUR_API_KEY",
-    "Content-Type": "application/json"
-}
-params = {
-    "lat": 37.78,
-    "lon": -122.41
-}
+// url = "${API_BASE_URL}${firstEndpoint.url}"
+//headers = {
+  //  "Authorization": "Bearer YOUR_API_KEY",
+  //  "Content-Type": "application/json"
+//}
+//params = {
+  //  "lat": 37.78,
+    //"lon": -122.41
+//}
 
-response = requests.get(url, headers=headers, params=params)
-data = response.json()
+//response = requests.get(url, headers=headers, params=params)
+//data = response.json()
 
-print(data)`;
+//print(data)`;
 
-  const allSnippets = {
-    bash: curlExample,
-    javascript: jsExample,
-    python: pyExample,
-  };
 
-  const estimatedCost = (n: number) =>
-    `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
+
+ // const estimatedCost = (n: number) =>
+   // `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
 
   return (
     <div className="api-detail-page">
@@ -306,146 +397,34 @@ print(data)`;
             { label: api.name, href: "", isCurrent: true },
           ]}
         />
-        <div className="api-detail-shell">
-          <div className="api-detail-hero">
-            <div className="api-detail-heading">
-              <button className="ghost-button" onClick={onBack} type="button">
-                Back
-              </button>
-              <div className="api-detail-brand">
-                <div className="api-detail-logo">W</div>
-                <div className="api-detail-title">
-                  <h1>{api.name}</h1>
-                  <div className="api-detail-meta">
-                    <a href={api.provider?.url}>{api.provider?.name}</a> ·{" "}
-                    <strong style={{ color: "var(--accent-strong)" }}>
-                      {`$${formatPrice(api.pricePerRequest ?? 0)}`}
-                    </strong>{" "}
-                    per request
-                  </div>
-                </div>
-                <div className="api-detail-provider">
-                  Published by{" "}
-                  <a
-                    href={api.provider?.url}
-                    style={{
-                      color: "var(--text-main)",
-                      textDecoration: "none",
-                    }}
-                  >
-                    {api.provider?.name}
-                  </a>
-                </div>
-              </div>
-            </div>
-            <div className="api-detail-price-panel">
-              <div className="api-detail-price">
-                {`$${formatPrice(api.pricePerRequest ?? 0)}`}
-              </div>
-              <div className="api-detail-price-label">
-                per successful request
-              </div>
-              <button className="primary-button">Connect API</button>
-            </div>
-          </div>
+       <div className="api-detail-shell">
 
-          <div className="api-detail-content-grid">
-            <div className="content-left">
-              {/* Tabs Navigation */}
-              <nav className="api-detail-tabs">
-                {(
-                  [
-                    "overview",
-                    "documentation",
-                    "pricing",
-                    "examples",
-                    "reviews",
-                    "embed",
-                  ] as TabType[]
-                ).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTab(t)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      padding: "12px 0",
-                      color: tab === t ? "var(--text-main)" : "var(--muted)",
-                      fontSize: 15,
-                      fontWeight: tab === t ? 600 : 400,
-                      cursor: "pointer",
-                      position: "relative",
-                      transition: "color 0.2s",
-                    }}
-                  >
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                    {tab === t && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          bottom: -1,
-                          left: 0,
-                          right: 0,
-                          height: 2,
-                          background: "var(--accent)",
-                        }}
-                      />
-                    )}
-                  </button>
-                ))}
-              </nav>
+    <button
+      className="ghost-button"
+      onClick={onBack}
+      type="button"
+    >
+    </button>
+<section className="api-hero" aria-labelledby="api-title">
 
-              <div
-                className="tab-content"
-                style={{ animation: "fadeIn 0.3s ease" }}
-              >
-                {/* OVERVIEW TAB */}
-                {tab === "overview" && (
-                  <section>
-                    <div
-                      className="preview-card"
-                      style={{ padding: 24, marginBottom: 32 }}
-                    >
-                      <h3 style={{ marginTop: 0 }}>About this API</h3>
-                      <p
-                        style={{
-                          lineHeight: 1.6,
-                          fontSize: 16,
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        {api.description}
-                      </p>
-                    </div>
+  <div className="api-hero__content">
+    <div className="api-hero__identity">
+      <div className="api-hero__avatar">
+        {api.provider?.avatar ? (
+          <img
+            src={api.provider.avatar}
+            alt={`${api.provider.name} logo`}
+          />
+        ) : (
+          api.provider?.name?.charAt(0).toUpperCase() ?? "A"
+        )}
+      </div>
 
-                    <div className="api-detail-two-column">
-                      <div>
-                        <h2>Key Features</h2>
-                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
-                          {(api.features || []).map((f) => (
-                            <li
-                              key={f}
-                              style={{ color: "var(--text-secondary)" }}
-                            >
-                              {f}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <h2>Primary Use Cases</h2>
-                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
-                          {(api.useCases || []).map((u) => (
-                            <li
-                              key={u}
-                              style={{ color: "var(--text-secondary)" }}
-                            >
-                              {u}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
+      <div className="api-hero__info">
+        <div className="api-hero__meta">
+          <span className="api-version-pill">
+            v{api.version ?? "1.0.0"}
+          </span>
 
                     <h2 style={{ marginTop: 40 }}>Performance Metrics</h2>
                     <div className="api-detail-metrics">
@@ -537,7 +516,12 @@ print(data)`;
 
                 {/* DOCUMENTATION TAB */}
                 {tab === "documentation" && (
-                  <section>
+                  <section
+                    id="panel-documentation"
+                    role="tabpanel"
+                    aria-labelledby="tab-documentation"
+                    tabIndex={0}
+                  >
                     <div className="endpoint-section-header">
                       <h3>Available Endpoints</h3>
                       <span style={{ fontSize: 13, color: "var(--muted)" }}>
@@ -545,8 +529,12 @@ print(data)`;
                       </span>
                     </div>
 
+                    {endpointGroups.length > 0 && (
+                      <EndpointGroupHover groups={endpointGroups} />
+                    )}
+
                     <div style={{ display: "grid", gap: 20, marginTop: 16 }}>
-                      {(api.endpoints || []).map((ep: any) => (
+                      {documentationEndpoints.map((ep: ApiEndpoint) => (
                         <div
                           key={ep.id}
                           className="preview-card"
@@ -555,7 +543,7 @@ print(data)`;
                           <div className="endpoint-card-header">
                             <div className="endpoint-title-row">
                               <span
-                                className={`method-badge method-badge--${(ep.method || 'get').toLowerCase()}`}
+                                className={`method-badge method-badge--${(ep.method || "get").toLowerCase()}`}
                               >
                                 {ep.method}
                               </span>
@@ -646,7 +634,12 @@ print(data)`;
 
                 {/* PRICING TAB */}
                 {tab === "pricing" && (
-                  <section>
+                  <section
+                    id="panel-pricing"
+                    role="tabpanel"
+                    aria-labelledby="tab-pricing"
+                    tabIndex={0}
+                  >
                     <h2>Pricing Plans</h2>
                     <div className="api-detail-pricing-grid">
                       <div
@@ -813,7 +806,12 @@ print(data)`;
 
                 {/* EXAMPLES TAB */}
                 {tab === "examples" && (
-                  <section>
+                  <section
+                    id="panel-examples"
+                    role="tabpanel"
+                    aria-labelledby="tab-examples"
+                    tabIndex={0}
+                  >
                     <h3>Integration Gallery</h3>
                     <p style={{ color: "var(--muted)", marginBottom: 24 }}>
                       Explore these Boilerplate examples to get integrated in
@@ -869,42 +867,261 @@ print(data)`;
 
                 {/* REVIEWS TAB */}
                 {tab === "reviews" && (
-                  <section>
+                  <section
+                    id="panel-reviews"
+                    role="tabpanel"
+                    aria-labelledby="tab-reviews"
+                    tabIndex={0}
+                  >
                     <div className="api-detail-reviews-header">
-                      <h3>Developer Feedback</h3>
+                      <h3 style={{ margin: 0 }}>Developer Feedback</h3>
                       <button className="secondary-button">
                         Write a Review
                       </button>
                     </div>
 
-                    <div
-                      className="preview-card"
-                      style={{
-                        padding: 40,
-                        textAlign: "center",
-                        borderStyle: "dashed",
-                      }}
-                    >
-                      <div style={{ fontSize: 40, marginBottom: 16 }}>💬</div>
-                      <h4>No public reviews yet</h4>
-                      <p
+                    {rawReviews.length === 0 ? (
+                      <div
+                        className="preview-card"
                         style={{
-                          color: "var(--muted)",
-                          maxWidth: 400,
-                          margin: "0 auto",
+                          padding: 40,
+                          textAlign: "center",
+                          borderStyle: "dashed",
+                          marginTop: 16,
                         }}
                       >
-                        Be the first to share your experience with this API.
-                        Your feedback helps other developers make better
-                        choices.
-                      </p>
-                    </div>
+                        <div style={{ fontSize: 40, marginBottom: 16 }}>💬</div>
+                        <h4>No public reviews yet</h4>
+                        <p
+                          style={{
+                            color: "var(--muted)",
+                            maxWidth: 400,
+                            margin: "0 auto",
+                          }}
+                        >
+                          Be the first to share your experience with this API.
+                          Your feedback helps other developers make better
+                          choices.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Rating histogram summary */}
+                        <div style={{ marginTop: 16 }}>
+                          <RatingHistogram
+                            reviews={rawReviews}
+                            averageRating={averageRating}
+                          />
+                        </div>
+
+                        {/* Sort controls */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            marginBottom: 16,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <label
+                            htmlFor="review-sort"
+                            style={{
+                              fontSize: 13,
+                              color: "var(--muted)",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Sort by
+                          </label>
+                          <select
+                            id="review-sort"
+                            value={reviewSort}
+                            onChange={(e) =>
+                              setReviewSort(e.target.value as ReviewSort)
+                            }
+                            style={{
+                              fontSize: 13,
+                              padding: "5px 10px",
+                              borderRadius: 6,
+                              border: "1px solid var(--border-subtle)",
+                              background: "var(--bg-subtle)",
+                              color: "var(--text-main)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <option value="newest">Newest</option>
+                            <option value="highest">Highest rated</option>
+                            <option value="lowest">Lowest rated</option>
+                          </select>
+                        </div>
+
+                        {/* Review list */}
+                        <div style={{ display: "grid", gap: 16 }}>
+                          {sortedReviews.map((review) => (
+                            <div
+                              key={review.id}
+                              className="preview-card"
+                              style={{ padding: 20 }}
+                            >
+                              {/* Review header */}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "flex-start",
+                                  justifyContent: "space-between",
+                                  gap: 8,
+                                  flexWrap: "wrap",
+                                  marginBottom: 10,
+                                }}
+                              >
+                                {/* Author + badge */}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    flexWrap: "wrap",
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontWeight: 600,
+                                      fontSize: 14,
+                                      color: "var(--text-main)",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {review.author}
+                                  </span>
+
+                                  {review.verified && (
+                                    <span
+                                      title="Has called this API in the last 30 days"
+                                      aria-label="Verified Developer – has called this API in the last 30 days"
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                        padding: "2px 8px",
+                                        borderRadius: 999,
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        lineHeight: "18px",
+                                        background:
+                                          "rgba(16, 185, 129, 0.12)",
+                                        color: "#10b981",
+                                        border:
+                                          "1px solid rgba(16, 185, 129, 0.3)",
+                                        cursor: "default",
+                                        whiteSpace: "nowrap",
+                                        flexShrink: 0,
+                                        userSelect: "none",
+                                      }}
+                                    >
+                                      {/* Checkmark icon */}
+                                      <svg
+                                        width="10"
+                                        height="10"
+                                        viewBox="0 0 12 12"
+                                        fill="none"
+                                        aria-hidden="true"
+                                        focusable="false"
+                                      >
+                                        <path
+                                          d="M2 6l3 3 5-5"
+                                          stroke="currentColor"
+                                          strokeWidth="1.8"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                      Verified Developer
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Star rating + date */}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <span
+                                    role="img"
+                                    aria-label={`${review.rating} out of 5 stars`}
+                                    style={{ display: "flex", gap: 1 }}
+                                  >
+                                    {Array.from({ length: 5 }, (_, i) => (
+                                      <svg
+                                        key={i}
+                                        width="13"
+                                        height="13"
+                                        viewBox="0 0 20 20"
+                                        aria-hidden="true"
+                                        focusable="false"
+                                      >
+                                        <path
+                                          d="M10 1.5l2.39 4.84 5.34.78-3.87 3.77.91 5.32L10 13.77l-4.77 2.44.91-5.32L2.27 7.12l5.34-.78L10 1.5z"
+                                          fill={
+                                            i < review.rating
+                                              ? "var(--accent, #f59e0b)"
+                                              : "var(--border-subtle, #374151)"
+                                          }
+                                        />
+                                      </svg>
+                                    ))}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: 12,
+                                      color: "var(--muted)",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {new Date(review.date).toLocaleDateString(
+                                      "en-US",
+                                      {
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                      }
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Review body */}
+                              <p
+                                style={{
+                                  margin: 0,
+                                  fontSize: 14,
+                                  lineHeight: 1.6,
+                                  color: "var(--text-secondary)",
+                                }}
+                              >
+                                {review.body}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </section>
                 )}
 
                 {/* EMBED TAB */}
                 {tab === "embed" && (
-                  <section>
+                  <section
+                    id="panel-embed"
+                    role="tabpanel"
+                    aria-labelledby="tab-embed"
+                    tabIndex={0}
+                  >
                     <div
                       className="preview-card"
                       style={{ padding: 24, marginBottom: 24 }}
@@ -990,6 +1207,7 @@ print(data)`;
                       </span>
                     </div>
                   </div>
+                  <HealthTimeline data={api.hourlyHealth as any} />
                 </div>
 
                 <div
@@ -1064,7 +1282,45 @@ print(data)`;
             </aside>
           </div>
         </div>
+
+        <h1 id="api-title">{api.name}</h1>
+
+        <p className="api-hero__description">
+          {api.description}
+        </p>
+
+        <p className="api-hero__provider">
+          Published by{" "}
+          <a
+            href={api.provider?.url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {api.provider?.name}
+          </a>
+        </p>
       </div>
     </div>
+
+    <div className="api-hero__cta">
+      <button className="primary-button">
+        Try API
+      </button>
+
+      <button
+        className="secondary-button"
+        onClick={() => setTab("pricing")}
+      >
+        View Pricing
+      </button>
+    </div>
+  </div>
+</section>
+
+  <div className="api-detail-content-grid"></div>
+      </div>
+    </div>
+  </div>
   );
 }
+        
