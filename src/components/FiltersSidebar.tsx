@@ -1,4 +1,13 @@
 import { WarningIcon } from "./icons";
+import Dropdown from "./Dropdown";
+
+const POPULARITY_OPTIONS = [
+  { value: "any", label: "Any" },
+  { value: "mostUsed", label: "Most used" },
+  { value: "newest", label: "Newest" },
+] as const;
+
+type PopularityValue = (typeof POPULARITY_OPTIONS)[number]["value"];
 
 export const ALL_CATEGORIES = [
   "Data & Analytics",
@@ -112,15 +121,15 @@ export default function FiltersSidebar({
           <fieldset className="filter-group">
             <legend className="filter-legend">Popularity</legend>
             <div className="filter-popularity" style={{ marginTop: 8 }}>
-              <select
-                className="filter-select"
-                value={popularity}
-                onChange={(e) => setPopularity(e.target.value)}
-              >
-                <option value="any">Any</option>
-                <option value="mostUsed">Most used</option>
-                <option value="newest">Newest</option>
-              </select>
+              <Dropdown<PopularityValue>
+                id="filters-popularity"
+                value={popularity as PopularityValue}
+                options={POPULARITY_OPTIONS as unknown as { value: PopularityValue; label: string }[]}
+                onChange={(v) => setPopularity(v)}
+                label="Filter by popularity"
+                visibleLabel={null}
+                className="filter-dropdown"
+              />
             </div>
           </fieldset>
       </div>
