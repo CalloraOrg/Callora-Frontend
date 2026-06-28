@@ -15,6 +15,7 @@ import {
 export const Icons = {
   Success: CheckCircle,
   Check: Check,
+  Close: X,
   Error: X,
   Warning: AlertTriangle,
   ExternalLink,
