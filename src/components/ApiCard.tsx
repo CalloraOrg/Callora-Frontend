@@ -12,9 +12,7 @@ import TagChip from "./TagChip";
 import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import type { APIItem } from "../data/mockApis";
-import RatingHistogram from "./RatingHistogram";
-
-// ─── Skeleton ────────────────────────────────────────────────────────────────
+import { TagIcon, ClockIcon, BoltIcon } from "./icons";
 
 export function ApiCardSkeleton() {
   return (
@@ -446,13 +444,23 @@ export default function ApiCard({
         className="api-marketplace-card-tags"
         style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
       >
-        {((api.tags as string[]) || []).slice(0, 4).map((tag: string) => (
-          <TagChip
-            key={tag}
-            tag={tag}
-            active={activeTag?.toLowerCase() === tag.toLowerCase()}
-            onClick={onTagClick}
-          />
+        {((api.tags as string[]) || []).slice(0, 4).map((t: string) => (
+          <span
+            key={t}
+            style={{
+              fontSize: 12,
+              color: "var(--muted)",
+              background: "rgba(255,255,255,0.02)",
+              padding: "4px 8px",
+              borderRadius: 8,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <TagIcon size={16} />
+            {t}
+          </span>
         ))}
       </div>
 
@@ -477,14 +485,18 @@ export default function ApiCard({
           </div>
 
           <div className="api-card__stat">
-            <span className="api-card__stat-label">Latency</span>
+            <span className="api-card__stat-label" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <ClockIcon size={16} /> Latency
+            </span>
             {renderStatValue(
               avgLatencyMs !== undefined ? `${avgLatencyMs} ms` : undefined,
             )}
           </div>
 
           <div className="api-card__stat">
-            <span className="api-card__stat-label">Uptime</span>
+            <span className="api-card__stat-label" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <BoltIcon size={16} /> Uptime
+            </span>
             {renderStatValue(
               uptimePercent !== undefined
                 ? `${uptimePercent.toFixed(2)}%`

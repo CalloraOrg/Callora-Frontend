@@ -11,6 +11,7 @@ import EmptyState from "../components/EmptyState";
 import { formatPrice } from "../utils/format";
 import { Icons } from "../utils/icons";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
+import { CheckIcon, ClockIcon, BoltIcon } from "../components/icons";
 
 /**
  * ApiDetailPage Component
@@ -794,14 +795,14 @@ print(data)`;
                             marginTop: 20,
                           }}
                         >
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ Unlimited Throughput
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Unlimited Throughput
                           </li>
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ 99.9% Uptime SLA
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> 99.9% Uptime SLA
                           </li>
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ Community Support
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Community Support
                           </li>
                         </ul>
                       </div>
@@ -829,14 +830,14 @@ print(data)`;
                             marginTop: 20,
                           }}
                         >
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ Dedicated Node
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Dedicated Node
                           </li>
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ 24/7 Phone Support
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> 24/7 Phone Support
                           </li>
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ Custom Rate Limits
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Custom Rate Limits
                           </li>
                         </ul>
                         <button

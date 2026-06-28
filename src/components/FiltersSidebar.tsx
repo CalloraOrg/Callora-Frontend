@@ -1,4 +1,4 @@
-import { Icons } from "../utils/icons";
+import { WarningIcon } from "./icons";
 
 export const ALL_CATEGORIES = [
   "Data & Analytics",
@@ -102,7 +102,7 @@ export default function FiltersSidebar({
                 }}
                 role="alert"
               >
-                <span><Icons.Warning size={14} /></span> Min price cannot exceed max price.
+                <WarningIcon size={16} /> Min price cannot exceed max price.
               </div>
             )}
           </fieldset>
