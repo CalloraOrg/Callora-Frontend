@@ -8,6 +8,7 @@ import { ToastProvider } from "./components/Toast";
 import "./index.css";
 import "./styles/print.css";
 import "./styles/tokens.css";
+import "./styles/patterns.css";
 import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
 

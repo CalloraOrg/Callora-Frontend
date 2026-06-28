@@ -7,3 +7,80 @@
   --status-error-icon-color: var(--danger);
   --status-icon-size: 16px;
 }
+
+/* ── StatusBadge design tokens ─────────────────────────────────────────────
+   Each status variant exposes three properties:
+     --sb-<status>-bg   Background fill (low-opacity tint)
+     --sb-<status>-fg   Text / icon foreground (meets 4.5:1 on the bg above)
+     --sb-<status>-border  Subtle outline
+
+   Patterns (diagonal stripes / crosshatch / dots) are defined in
+   src/styles/patterns.css and referenced via CSS custom property
+   --sb-<status>-pattern so the badge is distinguishable without color alone.
+   ──────────────────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  /* success — solid fill, no pattern (baseline / reference state) */
+  --sb-success-bg: rgba(115, 242, 187, 0.14);
+  --sb-success-fg: #73f2bb;
+  --sb-success-border: rgba(115, 242, 187, 0.35);
+
+  /* error — red tint */
+  --sb-error-bg: rgba(255, 125, 141, 0.14);
+  --sb-error-fg: #ff7d8d;
+  --sb-error-border: rgba(255, 125, 141, 0.35);
+
+  /* warning */
+  --sb-warning-bg: rgba(251, 191, 36, 0.14);
+  --sb-warning-fg: #fbbf24;
+  --sb-warning-border: rgba(251, 191, 36, 0.35);
+
+  /* operational (alias of success) */
+  --sb-operational-bg: var(--sb-success-bg);
+  --sb-operational-fg: var(--sb-success-fg);
+  --sb-operational-border: var(--sb-success-border);
+
+  /* degraded (alias of warning) */
+  --sb-degraded-bg: var(--sb-warning-bg);
+  --sb-degraded-fg: var(--sb-warning-fg);
+  --sb-degraded-border: var(--sb-warning-border);
+
+  /* down (alias of error) */
+  --sb-down-bg: var(--sb-error-bg);
+  --sb-down-fg: var(--sb-error-fg);
+  --sb-down-border: var(--sb-error-border);
+
+  /* pending — neutral blue */
+  --sb-pending-bg: rgba(78, 133, 255, 0.14);
+  --sb-pending-fg: #4e85ff;
+  --sb-pending-border: rgba(78, 133, 255, 0.35);
+}
+
+[data-theme="light"] {
+  --sb-success-bg: rgba(5, 150, 105, 0.1);
+  --sb-success-fg: #065f46;
+  --sb-success-border: rgba(5, 150, 105, 0.3);
+
+  --sb-error-bg: rgba(220, 38, 38, 0.1);
+  --sb-error-fg: #991b1b;
+  --sb-error-border: rgba(220, 38, 38, 0.3);
+
+  --sb-warning-bg: rgba(217, 119, 6, 0.1);
+  --sb-warning-fg: #92400e;
+  --sb-warning-border: rgba(217, 119, 6, 0.3);
+
+  --sb-operational-bg: var(--sb-success-bg);
+  --sb-operational-fg: var(--sb-success-fg);
+  --sb-operational-border: var(--sb-success-border);
+
+  --sb-degraded-bg: var(--sb-warning-bg);
+  --sb-degraded-fg: var(--sb-warning-fg);
+  --sb-degraded-border: var(--sb-warning-border);
+
+  --sb-down-bg: var(--sb-error-bg);
+  --sb-down-fg: var(--sb-error-fg);
+  --sb-down-border: var(--sb-error-border);
+
+  --sb-pending-bg: rgba(37, 99, 235, 0.1);
+  --sb-pending-fg: #1e40af;
+  --sb-pending-border: rgba(37, 99, 235, 0.25);
+}
