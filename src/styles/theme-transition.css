@@ -1,0 +1,31 @@
+/**
+ * theme-transition.css
+ *
+ * Smooth the light <-> dark theme switch by animating the color tokens
+ * (background, text and border colors) instead of swapping them instantly.
+ *
+ * The transition is only active once the ThemeProvider has mounted and added
+ * the `theme-transitions-ready` class to <html>. This prevents the colors from
+ * animating on the very first paint (which would otherwise look like a flash
+ * of the wrong theme fading in).
+ */
+
+html.theme-transitions-ready,
+html.theme-transitions-ready body,
+html.theme-transitions-ready *:not(.no-theme-transition) {
+  transition:
+    background-color var(--transition-speed, 240ms) ease,
+    border-color var(--transition-speed, 240ms) ease,
+    color var(--transition-speed, 240ms) ease,
+    fill var(--transition-speed, 240ms) ease,
+    stroke var(--transition-speed, 240ms) ease;
+}
+
+/* Respect users who prefer reduced motion: switch instantly. */
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transitions-ready,
+  html.theme-transitions-ready body,
+  html.theme-transitions-ready * {
+    transition: none !important;
+  }
+}
