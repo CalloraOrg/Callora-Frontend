@@ -4,7 +4,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import ApiUsage from './ApiUsage';
-import ServerError from './components/ServerError';
+import { ServerError } from './components/ServerError';
 import NotFound from './components/NotFound';
 
 type DepositStage = 'input' | 'approving' | 'pending' | 'confirmed' | 'failed';
