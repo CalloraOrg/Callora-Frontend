@@ -583,6 +583,10 @@ The following utility classes are defined in `src/index.css` and should be used 
 - `.eyebrow` - Small uppercase label
 - `.helper-text` - Secondary/muted text
 
+### Link Classes
+- `.link-body` - Inline body text links. Enforces a 1px default underline (`text-decoration-thickness: 1px`) to prevent dark-mode bleed, and defines a tokenized `:visited` state using the `--visited` design token.
+- `.link-nav` - Structural navigation links (headers, footers, breadcrumbs). Retains hover and focus states without standard text decoration. Includes conditional `:visited` styles targeted at documentation and support destinations.
+
 ### State Classes
 - `.not-found` - 404 page container
 - `.server-error` - Error page container

@@ -258,11 +258,11 @@ function LandingPage({
 
       <footer className="lp-section lp-footer">
         <nav aria-label="Footer links">
-          <a href="#">About</a>
-          <a href="#">Documentation</a>
-          <a href="#">Support</a>
-          <a href="#">Terms</a>
-          <a href="#">Privacy</a>
+          <a href="#" className="link-nav">About</a>
+          <a href="#" className="link-nav">Documentation</a>
+          <a href="#" className="link-nav">Support</a>
+          <a href="#" className="link-nav">Terms</a>
+          <a href="#" className="link-nav">Privacy</a>
         </nav>
         <p>© {new Date().getFullYear()} Callora. All rights reserved.</p>
       </footer>
@@ -546,10 +546,10 @@ function App() {
 
         <div className="topbar-actions">
           <nav className="nav" aria-label="Primary navigation">
-            <NavLink to={APP_ROUTES.dashboard}>Dashboard</NavLink>
-            <NavLink to={APP_ROUTES.marketplace}>Marketplace</NavLink>
-            <NavLink to={APP_ROUTES.billing}>Billing</NavLink>
-            <NavLink to={APP_ROUTES.themePlayground}>Theme Playground</NavLink>
+            <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Dashboard</NavLink>
+            <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Marketplace</NavLink>
+            <NavLink to={APP_ROUTES.billing} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Billing</NavLink>
+            <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Theme Playground</NavLink>
           </nav>
           <ThemeToggle />
         </div>
@@ -742,12 +742,12 @@ function App() {
         </div>
 
         <nav className="footer-nav" aria-label="Footer navigation">
-          <NavLink to={APP_ROUTES.dashboard}>Dashboard</NavLink>
-          <NavLink to={APP_ROUTES.marketplace}>Marketplace</NavLink>
-          <NavLink to={APP_ROUTES.billing}>Billing</NavLink>
-          <NavLink to={APP_ROUTES.themePlayground}>Theme Playground</NavLink>
-          <NavLink to={APP_ROUTES.status}>Status</NavLink>
-          <NavLink to={APP_ROUTES.documentation}>Documentation</NavLink>
+          <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Dashboard</NavLink>
+          <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Marketplace</NavLink>
+          <NavLink to={APP_ROUTES.billing} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Billing</NavLink>
+          <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Theme Playground</NavLink>
+          <NavLink to={APP_ROUTES.status} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Status</NavLink>
+          <NavLink to={APP_ROUTES.documentation} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Documentation</NavLink>
         </nav>
       </footer>
 

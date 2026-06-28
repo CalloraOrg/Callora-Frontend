@@ -77,4 +77,10 @@ describe("Breadcrumb", () => {
     expect(button.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByRole("menu")).toBeNull();
   });
+
+  it("applies the link-nav utility class to breadcrumb links", () => {
+    render(<Breadcrumb items={longBreadcrumb} />);
+    const link = screen.getByRole("link", { name: "Marketplace" });
+    expect(link.classList.contains("link-nav")).toBe(true);
+  });
 });

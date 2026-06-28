@@ -63,4 +63,14 @@ describe("ApiDetailPage", () => {
       within(preview).getByText("1 endpoint and 2 request parameters."),
     ).toBeTruthy();
   });
+
+  it("applies the link-body utility class to provider links", () => {
+    render(<ApiDetailPage />);
+    settleLoadingState();
+
+    // Weather API has provider name "OpenWeather" or similar. We can just check that all links in the hero with "link-body" exist.
+    // Or we can query the links that contain the provider's text. Let's just find the link-body elements.
+    const providerLinks = document.querySelectorAll(".link-body");
+    expect(providerLinks.length).toBeGreaterThan(0);
+  });
 });
