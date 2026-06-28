@@ -9,6 +9,19 @@
     --focus-ring-offset: 0 0 0 5px rgba(78, 133, 255, 0.55);
 }
 
+/* Visually hidden, but available to screen readers (WCAG 2.1 AA). */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 [data-theme="dark"] {
     --page-bg: #0b1020;
     --surface: rgba(14, 20, 39, 0.86);

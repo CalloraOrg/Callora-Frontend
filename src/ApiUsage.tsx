@@ -195,6 +195,7 @@ export default function ApiUsage() {
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
+  const [filterResetMessage, setFilterResetMessage] = useState('');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
 
   const filteredCallHistory = filterCallsByRange(statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter));
@@ -270,6 +271,17 @@ export default function ApiUsage() {
     avgResponseTime: 180,
     successRate: 94.2
   });
+
+  // Whether any call-history filter differs from its default value.
+  const filtersAreActive = statusFilter !== 'all' || selectedRange.preset !== '24h';
+
+  // Reset all call-history filters to their defaults and announce the change
+  // to assistive technology via the aria-live region below.
+  const handleResetFilters = () => {
+    setStatusFilter('all');
+    setSelectedRange({ preset: '24h' });
+    setFilterResetMessage('Filters reset. Showing all calls from the last 24 hours.');
+  };
 
   const handleCopyApiKey = async () => {
     try {
@@ -606,10 +618,19 @@ export default function ApiUsage() {
                 { id: 'error', label: 'Error' },
               ]}
               activeTab={statusFilter}
-              onChange={(id) =>
-                setStatusFilter(id as 'all' | 'success' | 'error')
-              }
+              onChange={(id) => {
+                setStatusFilter(id as 'all' | 'success' | 'error');
+                setFilterResetMessage('');
+              }}
             />
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleResetFilters}
+              disabled={!filtersAreActive}
+            >
+              Reset Filters
+            </button>
             <button className="secondary-button" onClick={() => handleExportHistory('csv')}>
               Export CSV
             </button>
@@ -618,6 +639,11 @@ export default function ApiUsage() {
             </button>
           </div>
         </div>
+
+        {/* Screen-reader announcement for filter reset (WCAG 2.1 AA) */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {filterResetMessage}
+        </p>
 
         <div className="call-history-table" aria-busy={isLoading}>
            <div className="table-header">
