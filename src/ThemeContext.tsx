@@ -16,7 +16,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return (saved as Theme) || 'dark';
   });
 
-  const [actualTheme, setActualTheme] = useState<'light' | 'dark'>('dark');
+  const [actualTheme, setActualTheme] = useState<'light' | 'dark'>(() => {
+    // Initialize from the pre-paint resolved value to prevent flash
+    const resolvedTheme = document.documentElement.getAttribute('data-theme');
+    return (resolvedTheme === 'light' || resolvedTheme === 'dark') ? resolvedTheme : 'dark';
+  });
 
   useEffect(() => {
     localStorage.setItem('callora-theme', theme);

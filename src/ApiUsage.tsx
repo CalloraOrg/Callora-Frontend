@@ -1,4 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import EmptyState from './components/EmptyState';
+import Skeleton, { SkeletonRow } from './components/Skeleton';
+import { formatPrice } from './utils/format';
+import RequestBodyEditor from './components/RequestBodyEditor';
+import type { JsonSchema } from './components/RequestBodyEditor';
 
 type ApiEndpoint = {
   id: string;
@@ -6,6 +11,12 @@ type ApiEndpoint = {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
   description: string;
+  /**
+   * Optional JSON Schema (Draft-07 subset) describing the expected request
+   * body for this endpoint.  When present, RequestBodyEditor validates the
+   * user's JSON input against it in real time.
+   */
+  requestBodySchema?: JsonSchema;
 };
 
 type CallRecord = {
@@ -27,28 +38,78 @@ type UsageStats = {
   successRate: number;
 };
 
+type DateRange = {
+  preset: '24h' | '7d' | '30d' | 'custom';
+  from?: Date;
+  to?: Date;
+};
+
 const MOCK_ENDPOINTS: ApiEndpoint[] = [
   {
     id: '1',
     name: 'Get User Profile',
     method: 'GET',
     path: '/api/v1/user/profile',
-    description: 'Retrieve user profile information'
+    description: 'Retrieve user profile information',
+    // GET endpoints typically have no request body; schema intentionally omitted.
   },
   {
     id: '2',
     name: 'Create Transaction',
     method: 'POST',
     path: '/api/v1/transactions',
-    description: 'Create a new transaction'
+    description: 'Create a new transaction',
+    requestBodySchema: {
+      type: 'object',
+      required: ['amount', 'currency'],
+      properties: {
+        amount: {
+          type: 'number',
+          minimum: 0.01,
+          description: 'Transaction amount (positive, non-zero)',
+        },
+        currency: {
+          type: 'string',
+          enum: ['USD', 'EUR', 'GBP', 'USDC'],
+          description: 'ISO 4217 currency code or USDC',
+        },
+        recipient: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 100,
+          description: 'Optional recipient identifier',
+        },
+        note: {
+          type: 'string',
+          maxLength: 255,
+          description: 'Optional transaction note',
+        },
+      },
+    },
   },
   {
     id: '3',
     name: 'Update Balance',
     method: 'PUT',
     path: '/api/v1/user/balance',
-    description: 'Update user balance'
-  }
+    description: 'Update user balance',
+    requestBodySchema: {
+      type: 'object',
+      required: ['balance'],
+      properties: {
+        balance: {
+          type: 'number',
+          minimum: 0,
+          description: 'New balance value (must be non-negative)',
+        },
+        reason: {
+          type: 'string',
+          maxLength: 200,
+          description: 'Reason for the balance update',
+        },
+      },
+    },
+  },
 ];
 
 const MOCK_CALL_HISTORY: CallRecord[] = [
@@ -113,12 +174,7 @@ curl -X GET "https://api.callora.com/v1/user/profile" \\
   -H "Content-Type: application/json"`
 };
 
-function formatUsdc(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
-  }).format(value);
-}
+
 
 function formatTime(ms: number) {
   if (ms < 1000) return `${ms}ms`;
@@ -144,10 +200,75 @@ export default function ApiUsage() {
   const [apiResponse, setApiResponse] = useState<any>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
+
+  const filteredCallHistory = filterCallsByRange(statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter));
   const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
+  const [selectedRange, setSelectedRange] = useState<DateRange>({ preset: '24h' });
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
+
+  // Filter call history based on selected date range
+  const filterCallsByRange = (calls: CallRecord[]): CallRecord[] => {
+    const now = new Date();
+    let from: Date | undefined;
+    let to: Date | undefined;
+    switch (selectedRange.preset) {
+      case '24h':
+        from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        to = now;
+        break;
+      case '7d':
+        from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        to = now;
+        break;
+      case '30d':
+        from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        to = now;
+        break;
+      case 'custom':
+        from = selectedRange.from;
+        to = selectedRange.to;
+        break;
+    }
+    return calls.filter(call => {
+      const ts = call.timestamp;
+      if (from && ts < from) return false;
+      if (to && ts > to) return false;
+      return true;
+    });
+  };
+
+  // Initialize selected range from URL query on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const preset = params.get('range') as DateRange['preset'] | null;
+    const from = params.get('from');
+    const to = params.get('to');
+    if (preset && ['24h', '7d', '30d', 'custom'].includes(preset)) {
+      setSelectedRange({
+        preset,
+        ...(preset === 'custom' && from && to ? { from: new Date(from), to: new Date(to) } : {}),
+      });
+    }
+  }, []);
+
+  // Sync selected range to URL query whenever it changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (selectedRange.preset !== '24h') {
+      params.set('range', selectedRange.preset);
+      if (selectedRange.preset === 'custom' && selectedRange.from && selectedRange.to) {
+        params.set('from', selectedRange.from.toISOString());
+        params.set('to', selectedRange.to.toISOString());
+      }
+    }
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState(null, '', newUrl);
+  }, [selectedRange]);
   
+  const { usagePercent, isDismissed, dismiss } = useQuota(MOCK_USAGE_PERCENT);
+
   const [usageStats, setUsageStats] = useState<UsageStats>({
     callsToday: 47,
     callsWeek: 312,
@@ -172,6 +293,18 @@ export default function ApiUsage() {
   };
 
   const handleMakeTestCall = async () => {
+    // Guard: do not submit when the request body has a JSON syntax error.
+    // (Schema constraint violations are warnings — we allow submission but
+    //  still show the error to inform the user.)
+    const trimmed = requestParams.trim();
+    if (trimmed !== '' && trimmed !== '{}') {
+      try {
+        JSON.parse(requestParams);
+      } catch {
+        return; // Textarea will already show the syntax error inline.
+      }
+    }
+
     setIsLoading(true);
     setApiResponse(null);
     setResponseTime(null);
@@ -275,6 +408,9 @@ export default function ApiUsage() {
 
   return (
     <div className="api-usage-page">
+      {!isDismissed && (
+        <PlanNudge usagePercent={usagePercent} onDismiss={dismiss} />
+      )}
       {/* Header Section */}
       <div className="api-header">
         <div className="api-header-info">
@@ -341,7 +477,12 @@ export default function ApiUsage() {
               value={selectedEndpoint.id}
               onChange={(e) => {
                 const endpoint = MOCK_ENDPOINTS.find(ep => ep.id === e.target.value);
-                if (endpoint) setSelectedEndpoint(endpoint);
+                if (endpoint) {
+                  setSelectedEndpoint(endpoint);
+                  // Reset the request body when switching endpoints so stale
+                  // JSON from a previous endpoint doesn't fail the new schema.
+                  setRequestParams('{}');
+                }
               }}
               className="endpoint-select"
             >
@@ -354,35 +495,53 @@ export default function ApiUsage() {
           </div>
           
           <div className="form-row">
-            <label>Parameters (JSON)</label>
-            <textarea
+            <RequestBodyEditor
               value={requestParams}
-              onChange={(e) => setRequestParams(e.target.value)}
-              placeholder='{"key": "value"}'
-              className="params-textarea"
-              rows={4}
+              onChange={setRequestParams}
+              schema={selectedEndpoint.requestBodySchema}
+              label="Parameters (JSON)"
+              placeholder={'{\n  "key": "value"\n}'}
+              rows={6}
+              disabled={isLoading}
             />
           </div>
           
           <button
-            className="primary-button"
+            className={`primary-button ${isLoading ? 'button-loading' : ''}`}
             onClick={handleMakeTestCall}
             disabled={isLoading}
           >
+            {isLoading && <span className="button-spinner" aria-hidden="true" />}
             {isLoading ? 'Making Call...' : 'Make Test Call'}
           </button>
         </div>
         
         {(apiResponse || isLoading) && (
-          <div className="response-display">
+          <div 
+            className="response-display"
+            aria-live="polite"
+            aria-busy={isLoading}
+          >
             <h3>Response</h3>
             {isLoading ? (
-              <div className="loading-placeholder">Loading...</div>
+              <div className="response-content">
+                <div className="response-meta">
+                  <Skeleton width="120px" height="18px" borderRadius="4px" />
+                  <Skeleton width="100px" height="18px" borderRadius="4px" />
+                </div>
+                <div className="response-json-skeleton">
+                  <Skeleton width="60%" height="16px" borderRadius="4px" />
+                  <Skeleton width="80%" height="16px" borderRadius="4px" />
+                  <Skeleton width="45%" height="16px" borderRadius="4px" />
+                  <Skeleton width="70%" height="16px" borderRadius="4px" />
+                  <Skeleton width="30%" height="16px" borderRadius="4px" />
+                </div>
+              </div>
             ) : (
               <div className="response-content">
                 <div className="response-meta">
                   <span className="response-time">Response time: {formatTime(responseTime || 0)}</span>
-                  <span className="response-cost">Cost: {formatUsdc(callCost || 0)} USDC</span>
+                  <span className="response-cost">Cost: {formatPrice(callCost || 0)} USDC</span>
                 </div>
                 <pre className="response-json">
                   {JSON.stringify(apiResponse, null, 2)}
@@ -407,7 +566,7 @@ export default function ApiUsage() {
           </div>
           <div className="stat-card">
             <span className="stat-label">Total Spent</span>
-            <strong className="stat-value">{formatUsdc(usageStats.totalSpent)} USDC</strong>
+            <strong className="stat-value">{formatPrice(usageStats.totalSpent)} USDC</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Avg Response Time</span>
@@ -420,8 +579,9 @@ export default function ApiUsage() {
         </div>
         
         <div className="mini-chart">
-          <h4>Calls Over Time</h4>
-          <div className="chart-placeholder">
+          <h3>Calls Over Time</h3>
+          <CallsHeatmap />
+          <div className="chart-placeholder" style={{ marginTop: '24px' }}>
             {/* Simple bar chart visualization */}
             <div className="chart-bars">
               {[65, 59, 80, 81, 56, 55, 47].map((height, i) => (
@@ -446,11 +606,16 @@ export default function ApiUsage() {
         <div className="section-header">
           <h2>Call History</h2>
           <div className="history-actions">
-            <select className="filter-select">
-              <option>All Status</option>
-              <option>Success</option>
-              <option>Error</option>
-            </select>
+            <select
+                className="filter-select"
+                aria-label="Call status filter"
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value as 'all' | 'success' | 'error')}
+              >
+                <option value="all">All Status</option>
+                <option value="success">Success</option>
+                <option value="error">Error</option>
+              </select>
             <button className="secondary-button" onClick={() => handleExportHistory('csv')}>
               Export CSV
             </button>
@@ -460,49 +625,54 @@ export default function ApiUsage() {
           </div>
         </div>
         
-        <div className="call-history-table">
-          <div className="table-header">
-            <span>Timestamp</span>
-            <span>Endpoint</span>
-            <span>Status</span>
-            <span>Response Time</span>
-            <span>Cost</span>
-            <span>Actions</span>
-          </div>
-          
-          {callHistory.map(call => (
-            <div key={call.id} className="table-row">
-              <span>{formatTimestamp(call.timestamp)}</span>
-              <span className="endpoint-cell">{call.endpoint}</span>
-              <span className={`status-cell ${call.status}`}>
-                {call.status === 'success' ? '✓' : '✗'} {call.status}
-              </span>
-              <span>{formatTime(call.responseTime)}</span>
-              <span>{formatUsdc(call.cost)} USDC</span>
-              <span>
-                <button
-                  className="ghost-button"
-                  onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
-                >
-                  {expandedCall === call.id ? 'Hide' : 'View'}
-                </button>
-              </span>
-              
-              {expandedCall === call.id && (
-                <div className="expanded-details">
-                  <div className="detail-section">
-                    <h4>Request</h4>
-                    <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
-                  </div>
-                  <div className="detail-section">
-                    <h4>Response</h4>
-                    <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <div className="call-history-table" aria-busy={isLoading}>
+           <div className="table-header">
+             <span>Timestamp</span>
+             <span>Endpoint</span>
+             <span>Status</span>
+             <span>Response Time</span>
+             <span>Cost</span>
+             <span>Actions</span>
+           </div>
+
+           {isLoading ? (
+             <SkeletonRow rows={5} />
+           ) : filteredCallHistory.length === 0 ? (
+             <EmptyState message="No call records match the selected filter." />
+           ) : (
+             filteredCallHistory.map(call => (
+               <div key={call.id} className="table-row">
+                 <span>{formatTimestamp(call.timestamp)}</span>
+                 <span className="endpoint-cell">{call.endpoint}</span>
+                 <span className={`status-cell ${call.status}`}>
+                   {call.status === 'success' ? '✓' : '✗'} {call.status}
+                 </span>
+                 <span>{formatTime(call.responseTime)}</span>
+                 <span>{formatPrice(call.cost)} USDC</span>
+                 <span>
+                   <button
+                     className="ghost-button"
+                     onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
+                   >
+                     {expandedCall === call.id ? 'Hide' : 'View'}
+                   </button>
+                 </span>
+                 {expandedCall === call.id && (
+                   <div className="expanded-details">
+                     <div className="detail-section">
+                       <h4>Request</h4>
+                       <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
+                     </div>
+                     <div className="detail-section">
+                       <h4>Response</h4>
+                       <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
+                     </div>
+                   </div>
+                 )}
+               </div>
+             ))
+           )}
+         </div></div>
       </div>
 
       {/* Integration Guide */}

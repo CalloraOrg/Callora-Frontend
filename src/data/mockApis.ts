@@ -1,9 +1,21 @@
+export type Review = {
+  id: string;
+  author: string;
+  rating: number; // 1–5
+  date: string;   // ISO date string
+  body: string;
+  verified: boolean;
+};
+
 export type APIItem = {
   id: string;
   name: string;
   provider: { name: string; url?: string };
   description: string;
   pricePerRequest: number;
+  pricePerCall?: number;
+  avgLatencyMs?: number;
+  uptimePercent?: number;
   rating?: number;
   tags?: string[];
   category?: string;
@@ -13,6 +25,7 @@ export type APIItem = {
   useCases?: string[];
   endpoints?: Array<any>;
   stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
+  ratingDistribution?: Record<number, number>;
 };
 
 export const MOCK_APIS: APIItem[] = [
@@ -23,6 +36,9 @@ export const MOCK_APIS: APIItem[] = [
     description:
       "WeatherSim provides hyper-local weather forecasts, historical climate data, and simulated conditions for testing your services.",
     pricePerRequest: 0.01,
+    pricePerCall: 0.01,
+    avgLatencyMs: 180,
+    uptimePercent: 99.97,
     rating: 4.6,
     tags: ["weather", "geo", "forecast"],
     category: "Data & Analytics",
@@ -61,6 +77,7 @@ export const MOCK_APIS: APIItem[] = [
       },
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
+    ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
   },
   {
     id: "pay-qr",
@@ -68,6 +85,9 @@ export const MOCK_APIS: APIItem[] = [
     provider: { name: "PayFast", url: "#" },
     description: "Simple payment processing with card and ACH support.",
     pricePerRequest: 0.001,
+    pricePerCall: 0.001,
+    avgLatencyMs: 260,
+    uptimePercent: 99.9,
     rating: 4.3,
     tags: ["payments", "cards"],
     category: "Payment Processing",
@@ -77,6 +97,24 @@ export const MOCK_APIS: APIItem[] = [
     useCases: ["Checkout", "Subscriptions"],
     endpoints: [],
     stats: { totalCalls: 880000, avgResponseMs: 260, uptimePct: 99.9 },
+    reviews: [
+      {
+        id: "r1",
+        author: "Naomi L.",
+        rating: 4,
+        date: "2026-06-01",
+        body: "PCI compliance out of the box is a huge time-saver.",
+        verified: true,
+      },
+      {
+        id: "r2",
+        author: "Ben F.",
+        rating: 5,
+        date: "2026-04-20",
+        body: "Handles high-volume checkouts with no issues.",
+        verified: false,
+      },
+    ],
   },
   {
     id: "msg-01",
@@ -84,6 +122,9 @@ export const MOCK_APIS: APIItem[] = [
     provider: { name: "Comms Inc.", url: "#" },
     description: "Scalable messaging and notifications for apps.",
     pricePerRequest: 0.0005,
+    pricePerCall: 0.0005,
+    avgLatencyMs: 120,
+    uptimePercent: 99.99,
     rating: 4.1,
     tags: ["sms", "email"],
     category: "Communication",
@@ -93,28 +134,48 @@ export const MOCK_APIS: APIItem[] = [
     useCases: ["Notifications", "Two-factor auth"],
     endpoints: [],
     stats: { totalCalls: 1200000, avgResponseMs: 120, uptimePct: 99.99 },
+    reviews: [
+      {
+        id: "r1",
+        author: "Eva C.",
+        rating: 5,
+        date: "2026-06-15",
+        body: "Delivery webhooks are rock-solid. Brilliant product.",
+        verified: true,
+      },
+    ],
   },
   // minimal demo items
-  ...Array.from({ length: 10 }).map((_, i) => ({
-    id: `demo-${i}`,
-    name: `Demo API ${i + 1}`,
-    provider: { name: i % 2 === 0 ? "OpenTools" : "ThirdParty", url: "#" },
-    description: `Demo API number ${i + 1} showcasing features and endpoints.`,
-    pricePerRequest: Number((Math.random() * 0.02).toFixed(4)),
-    rating: Number((3.5 + Math.random() * 1.5).toFixed(1)),
-    tags: [i % 2 === 0 ? "analytics" : "utility"],
-    category: i % 2 === 0 ? "Data & Analytics" : "Other",
-    createdAt: new Date(Date.now() - i * 86400000).toISOString(),
-    usageCount: Math.floor(Math.random() * 500000),
-    features: [],
-    useCases: [],
-    endpoints: [],
-    stats: {
-      totalCalls: Math.floor(Math.random() * 500000),
-      avgResponseMs: 200,
-      uptimePct: 99.5,
-    },
-  })),
+  ...Array.from({ length: 10 }).map((_, i) => {
+    const pricePerRequest = Number((Math.random() * 0.02).toFixed(4));
+    const avgLatencyMs = i % 5 === 0 ? undefined : 140 + i * 18;
+    const uptimePercent =
+      i % 3 === 0 ? undefined : Number((99.2 + i * 0.07).toFixed(2));
+
+    return {
+      id: `demo-${i}`,
+      name: `Demo API ${i + 1}`,
+      provider: { name: i % 2 === 0 ? "OpenTools" : "ThirdParty", url: "#" },
+      description: `Demo API number ${i + 1} showcasing features and endpoints.`,
+      pricePerRequest,
+      pricePerCall: i % 4 === 0 ? undefined : pricePerRequest,
+      avgLatencyMs,
+      uptimePercent,
+      rating: Number((3.5 + Math.random() * 1.5).toFixed(1)),
+      tags: [i % 2 === 0 ? "analytics" : "utility"],
+      category: i % 2 === 0 ? "Data & Analytics" : "Other",
+      createdAt: new Date(Date.now() - i * 86400000).toISOString(),
+      usageCount: Math.floor(Math.random() * 500000),
+      features: [],
+      useCases: [],
+      endpoints: [],
+      stats: {
+        totalCalls: Math.floor(Math.random() * 500000),
+        avgResponseMs: avgLatencyMs,
+        uptimePct: uptimePercent,
+      },
+    };
+  }),
 ];
 
 export function findApiById(id: string | undefined) {

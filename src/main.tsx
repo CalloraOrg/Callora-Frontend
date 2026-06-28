@@ -2,8 +2,13 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import RouteProgressBar from "./components/RouteProgressBar";
+import CommandPalette from "./components/CommandPalette";
+import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import "./index.css";
+import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
+import { CollectionsProvider } from "./state/collectionsStore";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -18,21 +23,34 @@ async function renderRoute() {
   const wrap = (children: React.ReactNode) => (
     <React.StrictMode>
       <ThemeProvider>
-        <BrowserRouter>
-          {children}
-        </BrowserRouter>
+        <CollectionsProvider>
+          <BrowserRouter>
+            <RouteProgressBar />
+            {children}
+          </BrowserRouter>
+        </CollectionsProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
 
+  if (pathname.startsWith("/publish")) {
+    const mod = await import("./pages/PublishApi");
+    const PublishApi = mod.default;
+    root.render(wrap(<PublishApi />));
+    return;
+  }
+
   if (pathname.startsWith("/marketplace")) {
+    startRouteLoading();
     const mod = await import("./pages/MarketplacePage");
     const MarketplacePage = mod.default;
     root.render(wrap(<MarketplacePage />));
+    stopRouteLoading();
     return;
   }
 
   if (pathname.startsWith("/details/")) {
+    startRouteLoading();
     const mod = await import("./pages/ApiDetailPage");
     const ApiDetailPage = mod.default;
     root.render(
@@ -45,6 +63,7 @@ async function renderRoute() {
         />
       )
     );
+    stopRouteLoading();
     return;
   }
 
@@ -52,9 +71,12 @@ async function renderRoute() {
   root.render(
     <React.StrictMode>
       <BrowserRouter>
-      <ThemeProvider>
-      <App />
-      </ThemeProvider>
+        <ThemeProvider>
+          <CollectionsProvider>
+            <RouteProgressBar />
+            <App />
+          </CollectionsProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,
   );
