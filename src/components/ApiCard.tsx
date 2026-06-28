@@ -15,6 +15,7 @@ import type { APIItem } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import Sparkline from "./Sparkline";
+import WhyApi from "./WhyApi";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -505,6 +506,9 @@ export default function ApiCard({
           </span>
         ))}
       </div>
+
+      {/* "Why this API?" rationale — hidden in compact rows to keep them dense. */}
+      {!isCompact && <WhyApi api={api} />}
 
       <div
   style={{
