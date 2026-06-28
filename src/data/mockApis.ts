@@ -10,7 +10,9 @@ export type Review = {
 export type APIItem = {
   id: string;
   name: string;
-  provider: { name: string; url?: string };
+  provider: { name: string; url?: string; avatar?:string;};
+   version?: string;
+  status?: "operational" | "degraded" | "maintenance";
   description: string;
   pricePerRequest: number;
   pricePerCall?: number;
@@ -28,11 +30,14 @@ export type APIItem = {
   ratingDistribution?: Record<number, number>;
 };
 
+
 export const MOCK_APIS: APIItem[] = [
   {
     id: "weather-001",
     name: "WeatherSim API",
     provider: { name: "Acme Labs", url: "#" },
+     version: "2.3.1",
+  status: "operational",
     description:
       "WeatherSim provides hyper-local weather forecasts, historical climate data, and simulated conditions for testing your services.",
     pricePerRequest: 0.01,
@@ -83,7 +88,9 @@ export const MOCK_APIS: APIItem[] = [
     id: "pay-qr",
     name: "QuickPay",
     provider: { name: "PayFast", url: "#" },
-    description: "Simple payment processing with card and ACH support.",
+    status: "degraded",
+ version: "1.8.0",
+    description: "Simple payment processing with card and ACH support",
     pricePerRequest: 0.001,
     pricePerCall: 0.001,
     avgLatencyMs: 260,
@@ -120,6 +127,8 @@ export const MOCK_APIS: APIItem[] = [
     id: "msg-01",
     name: "ChatStream",
     provider: { name: "Comms Inc.", url: "#" },
+     version: "3.0.2",
+  status: "maintenance",
     description: "Scalable messaging and notifications for apps.",
     pricePerRequest: 0.0005,
     pricePerCall: 0.0005,
@@ -151,11 +160,18 @@ export const MOCK_APIS: APIItem[] = [
     const avgLatencyMs = i % 5 === 0 ? undefined : 140 + i * 18;
     const uptimePercent =
       i % 3 === 0 ? undefined : Number((99.2 + i * 0.07).toFixed(2));
-
+const status:  APIItem["status"] =
+  i % 3 === 0
+    ? "operational"
+    : i % 3 === 1
+    ? "degraded"
+    : "maintenance";
     return {
       id: `demo-${i}`,
       name: `Demo API ${i + 1}`,
       provider: { name: i % 2 === 0 ? "OpenTools" : "ThirdParty", url: "#" },
+       version: `1.${i}.0`,
+       status,
       description: `Demo API number ${i + 1} showcasing features and endpoints.`,
       pricePerRequest,
       pricePerCall: i % 4 === 0 ? undefined : pricePerRequest,

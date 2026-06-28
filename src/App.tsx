@@ -5,6 +5,7 @@ import ApiUsage from './ApiUsage';
 import Dashboard from './components/Dashboard';
 import RouteProgressBar from './components/RouteProgressBar';
 import ServerError from './components/ServerError';
+import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from './components/NotFound';
 import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
 import useDocumentTitle from './hooks/useDocumentTitle';
@@ -56,7 +57,6 @@ const features: Feature[] = [
       "Publish APIs quickly, define per-request pricing, and start earning USDC automatically.",
   },
 ];
-
 const consumerSteps: Step[] = [
   {
     title: "Connect wallet or sign up",
@@ -73,7 +73,7 @@ const consumerSteps: Step[] = [
   {
     title: "Pay automatically per call",
     description:
-      "Billing happens in real time based on actual usage and price-per-request.",
+    "Billing happens in real time based on actual usage and price-per-request.",
   },
 ];
 
@@ -85,17 +85,17 @@ const developerSteps: Step[] = [
   {
     title: "Publish your API",
     description:
-      "Add docs, endpoints, and metadata to make your API easy to adopt.",
+    "Add docs, endpoints, and metadata to make your API easy to adopt.",
   },
   {
     title: "Set pricing per request",
     description:
-      "Choose flexible per-call pricing that reflects the value of your service.",
+    "Choose flexible per-call pricing that reflects the value of your service.",
   },
   {
     title: "Earn USDC automatically",
     description:
-      "Collect revenue from each successful call with transparent settlement.",
+    "Collect revenue from each successful call with transparent settlement.",
   },
 ];
 
@@ -116,33 +116,33 @@ function createMockHash() {
   const seed = `${Date.now().toString(16)}${Math.random()
     .toString(16)
     .slice(2)}`;
-  return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
-}
-
-function buildExplorerLink(hash: string) {
-  return `${EXPLORER_BASE_URL}${hash}`;
-}
-
-function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
-  if (stage === "approving") return "Approve in wallet...";
-  if (stage === "pending") return "Transaction submitted...";
-  if (stage === "confirmed") return "Deposit successful";
-  if (stage === "failed") return "Transaction failed";
-
-  return hasValidAmount
+    return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
+  }
+  
+  function buildExplorerLink(hash: string) {
+    return `${EXPLORER_BASE_URL}${hash}`;
+  }
+  
+  function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
+    if (stage === "approving") return "Approve in wallet...";
+    if (stage === "pending") return "Transaction submitted...";
+    if (stage === "confirmed") return "Deposit successful";
+    if (stage === "failed") return "Transaction failed";
+    
+    return hasValidAmount
     ? "Review transaction preview"
     : "Enter a deposit amount";
-}
-
-function LandingPage({
-  onStartUsingApis,
-  onPublishApi,
-}: {
-  onStartUsingApis: () => void;
-  onPublishApi: () => void;
-}) {
-  return (
-    <div className="lp-shell">
+  }
+  
+  function LandingPage({
+    onStartUsingApis,
+    onPublishApi,
+  }: {
+    onStartUsingApis: () => void;
+    onPublishApi: () => void;
+  }) {
+    return (
+      <div className="lp-shell">
       <header className="lp-section lp-hero" aria-labelledby="hero-title">
         <div>
           <p className="lp-eyebrow">Built for API consumers and publishers</p>
