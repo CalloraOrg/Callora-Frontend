@@ -5,6 +5,7 @@ import App from "./App";
 import RouteProgressBar from "./components/RouteProgressBar";
 import CommandPalette from "./components/CommandPalette";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
+import { ToastProvider } from "./components/Toast";
 import "./index.css";
 import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
@@ -26,7 +27,7 @@ async function renderRoute() {
         <CollectionsProvider>
           <BrowserRouter>
             <RouteProgressBar />
-            {children}
+            <ToastProvider>{children}</ToastProvider>
           </BrowserRouter>
         </CollectionsProvider>
       </ThemeProvider>
@@ -74,7 +75,9 @@ async function renderRoute() {
         <ThemeProvider>
           <CollectionsProvider>
             <RouteProgressBar />
-            <App />
+            <ToastProvider>
+              <App />
+            </ToastProvider>
           </CollectionsProvider>
         </ThemeProvider>
       </BrowserRouter>
