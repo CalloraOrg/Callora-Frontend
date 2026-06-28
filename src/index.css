@@ -3550,6 +3550,13 @@ code,
   );
   background-size: 200% 100%;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-size: 100% 100%;
+  }
+}
 /* Filters Sidebar accessibility styles */
 .filter-group {
   margin-bottom: 1rem;
