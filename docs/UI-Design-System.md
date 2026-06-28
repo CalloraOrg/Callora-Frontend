@@ -107,7 +107,7 @@ All shared components are located in `src/components/`. Use these components ins
 Displays API information in a card format for marketplace listings.
 
 **Props:**
-- `api: any` - API object containing name, description, provider, tags, rating, and footer stats (`pricePerCall`, `avgLatencyMs`, `uptimePercent`)
+- `api: any` - API object containing name, description, provider, tags, rating, ratingDistribution, and footer stats (`pricePerCall`, `avgLatencyMs`, `uptimePercent`)
 - `onViewDetails?: (api: any) => void` - Callback when "View Details" is clicked
 
 **Variants:**
@@ -120,21 +120,23 @@ Displays API information in a card format for marketplace listings.
 - Border: 1px solid with hover state
 - Hover: Lift effect (translateY -4px), enhanced shadow, accent border
 - Background: Uses `--surface-soft` token
-- Tags: Rounded pills (8px radius) with `--muted` text
+- Tags: Reusable clickable chips with pill styling, token-based colors, and active-state highlighting
 - Footer: Three-column micro-stat row with a muted label above a prominent value for price, latency, and uptime
 - Numeric values: Use tabular numerals for easier comparison across marketplace rows
 - Missing stats: Render a muted em dash so card heights remain consistent
 
 **States:**
 - Default: Subtle border, no shadow
-- Hover: Accent border (#4666ff), shadow, lift effect
+- Hover: Accent border (#4666ff), shadow, lift effect. Rating display shows a pop-up distribution histogram on hover or long-press.
 - Focus: Keyboard accessible with tabIndex=0, Enter key triggers onViewDetails
+- Tag active: Matching tag chip uses the accent token and `aria-pressed=true`
 - Loading: Skeleton variant with placeholder elements
 
 **Accessibility:**
 - `tabIndex={0}` for keyboard navigation
 - `onKeyDown` handles Enter key
-- `aria-label` on action buttons
+- Tag chips are real `<button>` elements with `aria-pressed`
+- Tag activation does not trigger card navigation
 - Semantic `<article>` element
 
 **Usage Example:**
@@ -144,6 +146,32 @@ Displays API information in a card format for marketplace listings.
   onViewDetails={(api) => navigate(`/api/${api.id}`)} 
 />
 ```
+
+---
+
+### UsageGauge
+
+Summarizes consumed API budget or request allowance on the dashboard with both a visual progress bar and complete assistive text.
+
+**Props:**
+- `label?: string` - Visible and accessible name for the tracked usage metric
+- `used: number` - Consumed amount; negative and non-finite values are treated as 0
+- `limit: number` - Maximum allowance; values less than or equal to 0 render the “No limit configured” state
+- `unit?: string` - Unit displayed in visible and assistive text, defaults to `USDC`
+- `warningThreshold?: number` - Percentage at which the visible and announced state becomes “Approaching limit”, defaults to 75
+- `criticalThreshold?: number` - Percentage at which the state becomes “Critical usage”, defaults to 90
+
+**Visual Spec:**
+- Container uses `--surface-soft`, `--line`, and `--radius-lg`
+- Fill uses `--accent` to `--accent-strong` gradient for normal usage
+- Warning and critical states use `--accent-strong`; exhausted state uses `--danger`
+- Percentage uses tabular numerals and scales responsively with `clamp()`
+
+**Accessibility:**
+- Uses `role="progressbar"` with `aria-valuemin`, `aria-valuemax`, `aria-valuenow`, and `aria-valuetext`
+- `aria-valuetext` includes the usage state, consumed amount, limit, remaining allowance, and percentage used
+- A visually hidden description mirrors the announced status for screen readers
+- Color is not the only indicator; visible state text is always rendered
 
 ---
 
@@ -258,6 +286,54 @@ Displayed when no results are found (e.g., empty search results).
 
 ---
 
+### TagChip
+
+Reusable chip button for marketplace tag filtering.
+
+**Props:**
+- `tag: string` - Visible tag label and filter value
+- `active?: boolean` - Whether the chip reflects the current active filter
+- `onClick?: (tag: string) => void` - Callback invoked when the chip is selected
+
+**Visual Spec:**
+- Pill shape with full radius (`999px`)
+- Uses `--surface-soft`, `--line`, `--muted`, and `--accent` design tokens
+- Minimum height: 32px for touch accessibility
+- Active state: Accent-filled pill with white text
+
+**Accessibility:**
+- Semantic `<button type="button">`
+- `aria-pressed` communicates toggle state
+- Keyboard activation is supported without bubbling into parent card navigation
+
+---
+
+### EndpointGroupHover
+
+Interactive documentation helper that previews endpoint groups on hover and keyboard focus.
+
+**Props:**
+- `groups: EndpointGroupPreview[]` - Group metadata including label, supported methods, counts, and preview endpoints
+
+**Visual Spec:**
+- Two-column layout on desktop: group triggers on the left, preview card on the right
+- Trigger buttons: 14px radius, token-based border/background, minimum 52px height
+- Preview card: `preview-card` styling with group summary, method badges, and up to three endpoint rows
+- Responsive: collapses to a single column on smaller screens
+
+**States:**
+- Default: Empty helper card prompts the user to hover or focus a group
+- Hover / Focus: Matching group trigger highlights and reveals the preview card
+- Escape: Clears the active preview for keyboard users
+
+**Accessibility:**
+- Uses real `<button type="button">` triggers
+- Keyboard focus reveals the same preview shown on hover
+- `aria-describedby` links the active trigger to its preview card
+- Preview helper text remains available when no group is active
+
+---
+
 ### FiltersSidebar
 
 Sidebar for filtering marketplace results.
@@ -336,6 +412,40 @@ Sidebar for filtering marketplace results.
 **Usage Example:**
 ```tsx
 <NotFound onGoHome={() => navigate("/")} />
+```
+
+---
+
+### RatingHistogram
+
+Displays a tooltip with a 5-star rating distribution breakdown upon hovering or long-pressing the wrapped element.
+
+**Props:**
+- `rating: number` - The aggregate average rating (out of 5).
+- `distribution?: Record<number, number>` - Optional object containing the count of reviews for each star (1-5). If omitted, a mock distribution is dynamically generated based on the rating.
+- `children?: React.ReactNode` - The trigger element (e.g. text or icon) that the user hovers or long-presses.
+
+**Visual Spec:**
+- Layout: Overlay tooltip (`role="tooltip"`) anchored below the trigger element.
+- Header: Large display of the average rating next to "out of 5".
+- Rows: Flex layout for 5 to 1 stars, showing star label, progress bar, and raw count.
+- Progress bar: 8px height, `var(--surface-soft)` background, with a `var(--accent)` filled area based on percentage of total reviews.
+
+**States:**
+- Hidden (Default): Tooltip is not rendered.
+- Hovered (Mouse) / Long-press (Touch): Tooltip becomes visible after a short delay on touch (400ms) or instantly on mouse hover.
+
+**Accessibility:**
+- Tooltip is marked with `role="tooltip"`.
+- Each row uses `aria-label` to announce the star level and number of reviews.
+- Trigger handles both mouse events (`onMouseEnter`, `onMouseLeave`) and touch events (`onTouchStart`, `onTouchEnd`, `onTouchCancel`).
+- Click propagation is stopped within the tooltip to prevent unintended interactions if wrapped inside a button or clickable card.
+
+**Usage Example:**
+```tsx
+<RatingHistogram rating={4.5} distribution={{ 5: 100, 4: 50, 3: 10, 2: 5, 1: 0 }}>
+  <span>⭐ 4.5</span>
+</RatingHistogram>
 ```
 
 ---
@@ -483,10 +593,25 @@ The following utility classes are defined in `src/index.css` and should be used 
 ## Accessibility Guidelines
 
 ### Focus Management
-- All interactive elements must have visible focus states
-- Use the predefined `--focus-ring` token for focus indicators
-- The global CSS suppresses default outlines and restores them via `:focus-visible`
-- Never remove focus styles entirely
+
+All keyboard-focus styling is centralized in a single CSS cascade layer named
+**`focus`**, declared in `src/index.css` as `@layer focus { … }`.
+
+- **One ring everywhere.** Buttons, links, inputs, selects, textareas, checkboxes
+  and the `.input-shell` composite share one indicator: `2px solid var(--accent)`
+  at `outline-offset: 3px`. `var(--accent)` is theme-aware, so the ring meets WCAG
+  2.4.7 / 1.4.11 (≥ 3:1) in both light and dark themes.
+- **Keyboard only.** The ring is restored exclusively via `:focus-visible`, so
+  mouse/pointer clicks never show a ring. Never style bare `:focus` for rings, and
+  never set inline `outline: none` on a control — let the layer handle it.
+- **Overriding intentionally.** Because layered rules rank below unlayered ones
+  regardless of specificity, a component that needs a bespoke focus treatment
+  (e.g. `.api-marketplace-card`, the danger/invalid input state) simply declares an
+  ordinary unlayered `:focus-visible` rule, which wins without specificity hacks.
+- **Never remove focus styles entirely.**
+
+
+
 
 ### Keyboard Navigation
 - All buttons and links must be keyboard accessible

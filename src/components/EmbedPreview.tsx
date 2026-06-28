@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTheme } from '../ThemeContext';
+import { Icons } from '../utils/icons';
 
 type EmbedSize = 'small' | 'medium' | 'large';
 
@@ -351,7 +352,7 @@ export default function EmbedPreview({
           >
             {copied ? (
               <>
-                <span style={{ fontSize: 14 }}>✓</span>
+                <Icons.Check size={14} />
                 Copied!
               </>
             ) : (

@@ -1,3 +1,12 @@
+export type Review = {
+  id: string;
+  author: string;
+  rating: number; // 1–5
+  date: string;   // ISO date string
+  body: string;
+  verified: boolean;
+};
+
 export type APIItem = {
   id: string;
   name: string;
@@ -16,6 +25,7 @@ export type APIItem = {
   useCases?: string[];
   endpoints?: Array<any>;
   stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
+  ratingDistribution?: Record<number, number>;
 };
 
 export const MOCK_APIS: APIItem[] = [
@@ -67,6 +77,7 @@ export const MOCK_APIS: APIItem[] = [
       },
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
+    ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
   },
   {
     id: "pay-qr",
@@ -86,6 +97,24 @@ export const MOCK_APIS: APIItem[] = [
     useCases: ["Checkout", "Subscriptions"],
     endpoints: [],
     stats: { totalCalls: 880000, avgResponseMs: 260, uptimePct: 99.9 },
+    reviews: [
+      {
+        id: "r1",
+        author: "Naomi L.",
+        rating: 4,
+        date: "2026-06-01",
+        body: "PCI compliance out of the box is a huge time-saver.",
+        verified: true,
+      },
+      {
+        id: "r2",
+        author: "Ben F.",
+        rating: 5,
+        date: "2026-04-20",
+        body: "Handles high-volume checkouts with no issues.",
+        verified: false,
+      },
+    ],
   },
   {
     id: "msg-01",
@@ -105,6 +134,16 @@ export const MOCK_APIS: APIItem[] = [
     useCases: ["Notifications", "Two-factor auth"],
     endpoints: [],
     stats: { totalCalls: 1200000, avgResponseMs: 120, uptimePct: 99.99 },
+    reviews: [
+      {
+        id: "r1",
+        author: "Eva C.",
+        rating: 5,
+        date: "2026-06-15",
+        body: "Delivery webhooks are rock-solid. Brilliant product.",
+        verified: true,
+      },
+    ],
   },
   // minimal demo items
   ...Array.from({ length: 10 }).map((_, i) => {
