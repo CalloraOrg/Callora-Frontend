@@ -13,18 +13,29 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 
 - Landing page with product overview
 - Dashboard (usage stats, vault balance)
+- Screen-reader-friendly dashboard usage gauge with visible usage state and remaining allowance
 - Marketplace (browse and compare APIs)
 - Billing (USDC deposit, Stellar settlement, transaction tracking)
 - API Usage analytics view
 - 500 error page with retry flow
 - 404 catch-all page
+- Theme playground for previewing primary/accent/surface tokens live
 - Dev proxy to backend at `http://localhost:3000` for `/api`
+- **Global Command Palette**: Instantly jump to views, search APIs by name, cycle/toggle light & dark themes, or trigger vault deposits. Use `Cmd+K` on macOS or `Ctrl+K` on Windows/Linux to open.
+
+## Keyboard shortcuts
+
+- **Open Command Palette**: `Cmd + K` (macOS) or `Ctrl + K` (Windows/Linux)
+- **Navigate options**: `Up / Down Arrow` keys
+- **Select option**: `Enter`
+- **Close Palette**: `Escape` or backdrop click
 
 ## UI Design System
 
 Callora uses a comprehensive design token system and component library. All contributors must follow the [UI Design System guide](docs/UI-Design-System.md) when building or modifying UI.
 
 Key principles:
+
 - **Use design tokens, not inline hex values** — All colors, spacing, and shadows use CSS custom properties
 - **Reuse shared components** — Use existing components from `src/components/` before creating new ones
 - **Maintain accessibility** — All UI must be keyboard navigable and screen reader friendly
@@ -43,25 +54,30 @@ Key principles:
 
 3. Open [http://localhost:5173](http://localhost:5173).
 
+## Accessibility notes
+
+The dashboard includes an accessible usage gauge that summarizes API spend for the current cycle. It exposes `role="progressbar"`, numeric ARIA values, and a human-readable usage state such as “Within limit”, “Approaching limit”, “Critical usage”, “Limit reached”, or “No limit configured” so screen-reader users receive the same status information as sighted users.
+
 ## Scripts
 
-| Command          | Description                          |
-|------------------|--------------------------------------|
-| `npm run dev`    | Start dev server (port 5173)         |
-| `npm run build`  | TypeScript check + production build  |
-| `npm run preview`| Serve production build locally       |
+| Command           | Description                         |
+| ----------------- | ----------------------------------- |
+| `npm run dev`     | Start dev server (port 5173)        |
+| `npm run build`   | TypeScript check + production build |
+| `npm run preview` | Serve production build locally      |
 
 ## Routes
 
-| Path        | Description                     |
-|-------------|---------------------------------|
-| `/`         | Landing page                    |
-| `/dashboard`| Developer dashboard             |
-| `/marketplace` | API marketplace              |
-| `/billing`  | USDC deposit and settlements    |
-| `/api-usage`| API usage analytics             |
-| `/500`      | Server error page               |
-| `*`         | 404 not found                   |
+| Path                | Description                               |
+| ------------------- | ----------------------------------------- |
+| `/`                 | Landing page                              |
+| `/dashboard`        | Developer dashboard                       |
+| `/marketplace`      | API marketplace                           |
+| `/billing`          | USDC deposit and settlements              |
+| `/api-usage`        | API usage analytics                       |
+| `/theme-playground` | Live theme token playground for designers |
+| `/500`              | Server error page                         |
+| `*`                 | 404 not found                             |
 
 ## Project layout
 
@@ -80,6 +96,10 @@ callora-frontend/
 │   │   ├── ApiCard.tsx
 │   │   ├── Breadcrumb.tsx
 │   │   ├── CodeExample.tsx
+│   │   ├── CommandPalette.css
+│   │   ├── CommandPalette.test.tsx
+│   │   ├── CommandPalette.tsx
+│   │   ├── CommandPalette_MANUAL_TEST_PLAN.md
 │   │   ├── Dashboard.tsx
 │   │   ├── EmptyState.tsx
 │   │   ├── FiltersSidebar.tsx

@@ -3,10 +3,12 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import RouteProgressBar from "./components/RouteProgressBar";
+import CommandPalette from "./components/CommandPalette";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import "./index.css";
 import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
+import { CollectionsProvider } from "./state/collectionsStore";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -21,10 +23,12 @@ async function renderRoute() {
   const wrap = (children: React.ReactNode) => (
     <React.StrictMode>
       <ThemeProvider>
-        <BrowserRouter>
-          <RouteProgressBar />
-          {children}
-        </BrowserRouter>
+        <CollectionsProvider>
+          <BrowserRouter>
+            <RouteProgressBar />
+            {children}
+          </BrowserRouter>
+        </CollectionsProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
@@ -67,10 +71,12 @@ async function renderRoute() {
   root.render(
     <React.StrictMode>
       <BrowserRouter>
-      <ThemeProvider>
-      <RouteProgressBar />
-      <App />
-      </ThemeProvider>
+        <ThemeProvider>
+          <CollectionsProvider>
+            <RouteProgressBar />
+            <App />
+          </CollectionsProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,
   );

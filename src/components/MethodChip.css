@@ -1,5 +1,4 @@
 /* MethodChip.css */
-
 .method-chip {
   position: relative;
   display: inline-flex;
@@ -18,17 +17,16 @@
   color: var(--method-default-fg, #333);
   transition: background-color 0.2s ease, color 0.2s ease;
 }
-
-.method-chip:focus {
-  outline: 2px solid var(--accent, #3b82f6);
-  outline-offset: 2px;
+/* Keyboard-only focus ring, matching the global @layer focus treatment.
+   Using :focus-visible (not :focus) means a mouse click shows no ring. */
+.method-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
-
 .method-icon {
   margin-right: 4px;
   font-size: 0.85rem;
 }
-
 .method-tooltip {
   position: absolute;
   top: 120%;
@@ -44,7 +42,6 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   pointer-events: none;
 }
-
 /* Arrow for tooltip */
 .method-tooltip::after {
   content: '';

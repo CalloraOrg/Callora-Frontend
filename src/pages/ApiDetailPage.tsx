@@ -2,9 +2,15 @@ import { useMemo, useState, useEffect } from "react";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
+import EmbedPreview from "../components/EmbedPreview";
+import Tabs from "../components/Tabs";
+import useDocumentTitle from "../hooks/useDocumentTitle";
 import { findApiById } from "../data/mockApis";
+import type { Review } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
-import {  LOADING_DELAY_MS } from "../config/constants";
+import { formatPrice } from "../utils/format";
+import { Icons } from "../utils/icons";
+import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 
 /**
  * ApiDetailPage Component
@@ -30,6 +36,16 @@ const [, setTab] = useState<TabType>("overview");
   //const [requests, setRequests] = useState(1000);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Ordered tab definitions — single source of truth for labels and ids.
+  const TAB_ITEMS = [
+    { id: "overview",       label: "Overview"       },
+    { id: "documentation",  label: "Documentation"  },
+    { id: "pricing",        label: "Pricing"        },
+    { id: "examples",       label: "Examples"       },
+    { id: "reviews",        label: "Reviews"        },
+    { id: "embed",          label: "Embed"          },
+  ] as const satisfies Array<{ id: TabType; label: string }>;
+
   // Extract ID from URL path: /details/[id]
   const id =
     typeof window !== "undefined"
@@ -37,7 +53,70 @@ const [, setTab] = useState<TabType>("overview");
       : undefined;
 
   const api = useMemo(() => findApiById(id), [id]);
-  useDocumentTitle(api?.name ?? 'API Detail – Callora', api?.description);
+  useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
+
+  const documentationEndpoints = useMemo(
+    () => (api?.endpoints || []) as ApiEndpoint[],
+    [api],
+  );
+
+  const endpointGroups = useMemo<EndpointGroupPreview[]>(() => {
+    const groups = new Map<
+      string,
+      {
+        id: string;
+        label: string;
+        methods: Set<string>;
+        endpoints: EndpointGroupPreview["endpoints"];
+        totalParams: number;
+      }
+    >();
+
+    documentationEndpoints.forEach((endpoint) => {
+      const label = deriveEndpointGroupLabel(endpoint);
+      const id = label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const method = (endpoint.method || "GET").toUpperCase();
+      const paramsCount = endpoint.params?.length ?? 0;
+      const requiredCount =
+        endpoint.params?.filter((param) => param.required).length ?? 0;
+
+      const existingGroup = groups.get(id) ?? {
+        id,
+        label,
+        methods: new Set<string>(),
+        endpoints: [],
+        totalParams: 0,
+      };
+
+      existingGroup.methods.add(method);
+      existingGroup.totalParams += paramsCount;
+      existingGroup.endpoints.push({
+        id: endpoint.id,
+        title: endpoint.title,
+        url: endpoint.url,
+        method,
+        paramsCount,
+        requiredCount,
+      });
+
+      groups.set(id, existingGroup);
+    });
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        id: group.id,
+        label: group.label,
+        methods: Array.from(group.methods).sort(),
+        endpointCount: group.endpoints.length,
+        totalParams: group.totalParams,
+        endpoints: group.endpoints,
+        summary: `${group.endpoints.length} endpoint${group.endpoints.length === 1 ? "" : "s"} and ${group.totalParams} request parameter${group.totalParams === 1 ? "" : "s"}.`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [documentationEndpoints]);
 
   // Simulate initial data loading with 1.5s delay (consistent with MarketplacePage)
   useEffect(() => {
@@ -234,8 +313,6 @@ const [, setTab] = useState<TabType>("overview");
     return null; // This should not happen due to the check above, but kept for safety
   }
 
-
-
   // Example Generation Logic
  // const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
    // url: "/v1/data",
@@ -252,14 +329,14 @@ const [, setTab] = useState<TabType>("overview");
 const getApiData = async () => {
   const response = await fetch('${API_BASE_URL}${firstEndpoint.url}', {
     method: '${firstEndpoint.method}',
-    headers: { 
+    headers: {
       'Authorization': 'Bearer YOUR_API_KEY',
       'Content-Type': 'application/json'
     }
   });
-  
+
   if (!response.ok) throw new Error('API request failed');
-  
+
   const data = await response.json();
   return data;
 };

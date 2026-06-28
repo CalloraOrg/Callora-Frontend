@@ -1,0 +1,19 @@
+{
+  "components": [
+    { "id": "ApiCard", "name": "ApiCard", "status": "audited" },
+    { "id": "Breadcrumb", "name": "Breadcrumb", "status": "needs-work" },
+    { "id": "CodeExample", "name": "CodeExample", "status": "audited" },
+    { "id": "Dashboard", "name": "Dashboard", "status": "n/a" },
+    { "id": "EmbedPreview", "name": "EmbedPreview", "status": "needs-work" },
+    { "id": "EmptyState", "name": "EmptyState", "status": "audited" },
+    { "id": "FiltersSidebar", "name": "FiltersSidebar", "status": "needs-work" },
+    { "id": "MethodChip", "name": "MethodChip", "status": "audited" },
+    { "id": "NotFound", "name": "NotFound", "status": "n/a" },
+    { "id": "OpenAPIImport", "name": "OpenAPIImport", "status": "needs-work" },
+    { "id": "RouteProgressBar", "name": "RouteProgressBar", "status": "audited" },
+    { "id": "SearchBar", "name": "SearchBar", "status": "audited" },
+    { "id": "ServerError", "name": "ServerError", "status": "n/a" },
+    { "id": "ServerErrorDemo", "name": "ServerErrorDemo", "status": "n/a" },
+    { "id": "Skeleton", "name": "Skeleton", "status": "audited" }
+  ]
+}
