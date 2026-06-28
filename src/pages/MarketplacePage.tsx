@@ -7,7 +7,7 @@ import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import FiltersSidebar from "../components/FiltersSidebar";
 import EmptyState from "../components/EmptyState";
-import MarketplacePageSkeleton from "./MarketplacePage.skeleton";
+import { Pagination } from "../components/Pagination";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
 import { useFetchTracker } from "../hooks/useFetchTracker";
@@ -134,6 +134,7 @@ export default function MarketplacePage(): JSX.Element {
     setIsLoading(false);
   };
 
+  // Filter and sort items
   const filtered = useMemo(() => {
     let items = MOCK_APIS.slice();
 
@@ -171,7 +172,6 @@ export default function MarketplacePage(): JSX.Element {
         items = items.filter((a) => a.pricePerRequest <= maxPrice);
     }
 
-    // popularity-based ordering
     if (popularity === "mostUsed") {
       items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
     } else if (popularity === "newest") {
@@ -229,17 +229,77 @@ export default function MarketplacePage(): JSX.Element {
     );
   };
 
-  const displayedItems = filtered.slice(0, shown);
+  // Calculate total pages
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+  // Clamp current page to valid range
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  // Slice items for current page
+  const displayedItems = useMemo(() => {
+    const start = (validCurrentPage - 1) * pageSize;
+    const end = start + pageSize;
+    return filtered.slice(start, end);
+  }, [filtered, validCurrentPage, pageSize]);
+
+  // Handlers
+  const toggleCategory = (c: string) => {
+    const copy = new Set(selectedCategories);
+    if (copy.has(c)) copy.delete(c);
+    else copy.add(c);
+    setSelectedCategories(copy);
+    setSearchParams({ page: "1" });
+  };
+
+  const clearFilters = () => {
+    setSelectedCategories(new Set());
+    setMinPrice(null);
+    setMaxPrice(null);
+    setPopularity("any");
+    setSort("relevance");
+    setSearchParams({ page: "1" });
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setSearchParams({ page: page.toString() });
+    }
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setSearchParams({ page: "1" });
+  };
 
   const handleViewDetails = (api: APIItem) => {
     history.pushState({}, "", `/details/${api.id}`);
-    // inform our small client router that the URL changed
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
-  if (isLoading) {
-    return <MarketplacePageSkeleton />;
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // If page is invalid, update URL
+  useEffect(() => {
+    if (validCurrentPage !== currentPage) {
+      setSearchParams({ page: validCurrentPage.toString() });
+    }
+  }, [validCurrentPage, currentPage, setSearchParams]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    if (!isLoading) {
+      setSearchParams({ page: "1" });
+    }
+  }, [debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sort, setSearchParams, isLoading]);
+
+  const startItem = (validCurrentPage - 1) * pageSize + 1;
+  const endItem = Math.min(validCurrentPage * pageSize, filtered.length);
+
   return (
     <div className="marketplace-page">
       {/* Top row: title + search only */}
@@ -294,8 +354,7 @@ export default function MarketplacePage(): JSX.Element {
                 <>Showing 0 of 0 APIs</>
               ) : (
                 <>
-                  Showing 1-{Math.min(shown, filtered.length)} of{" "}
-                  {filtered.length} APIs
+                  Showing {startItem}-{endItem} of {filtered.length} APIs
                 </>
               )}
               {selectedTag && (
@@ -356,15 +415,15 @@ export default function MarketplacePage(): JSX.Element {
             </div>
           )}
 
-          {filtered.length > shown && (
-            <div style={{ marginTop: 16, textAlign: "center" }}>
-              <button
-                className="primary-button"
-                onClick={() => setShown((s) => s + 12)}
-              >
-                Load more
-              </button>
-            </div>
+          {/* Bottom pagination */}
+          {filtered.length > 0 && (
+            <Pagination
+              currentPage={validCurrentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           )}
         </main>
       </div>
