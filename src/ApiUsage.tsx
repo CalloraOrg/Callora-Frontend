@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import EmptyState from './components/EmptyState';
 import Skeleton, { SkeletonRow } from './components/Skeleton';
 import { formatPrice } from './utils/format';
 import RequestBodyEditor from './components/RequestBodyEditor';
 import type { JsonSchema } from './components/RequestBodyEditor';
 import CallHistoryRow from './components/CallHistoryRow';
+import RequestHistoryPanel from './components/RequestHistoryPanel';
+import { loadHistory, saveEntry, clearHistory } from './state/testCallHistory';
+import type { HistoryEntry } from './state/testCallHistory';
+import { Icons } from './utils/icons';
 
 type ApiEndpoint = {
   id: string;
@@ -196,6 +200,19 @@ export default function ApiUsage() {
   const [callCost, setCallCost] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>(() => loadHistory());
+  const [isHistoryOpen, setIsHistoryOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("callora_history_panel_open") === "true";
+  });
+
+  const toggleHistory = useCallback(() => {
+    setIsHistoryOpen((prev: boolean) => {
+      const next = !prev;
+      localStorage.setItem("callora_history_panel_open", String(next));
+      return next;
+    });
+  }, []);
 
   const filteredCallHistory = filterCallsByRange(statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter));
   const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
@@ -341,7 +358,23 @@ export default function ApiUsage() {
         };
         
         setCallHistory(prev => [newCall, ...prev]);
-        
+
+        const historyEntry: HistoryEntry = {
+          id: newCall.id,
+          timestamp: newCall.timestamp.toISOString(),
+          endpointId: selectedEndpoint.id,
+          endpointName: selectedEndpoint.name,
+          endpointPath: selectedEndpoint.path,
+          method: selectedEndpoint.method,
+          requestParams: requestParams,
+          response: mockResponse,
+          status: "success",
+          responseTime: time,
+          cost: cost,
+        };
+        saveEntry(historyEntry);
+        setHistoryEntries(loadHistory());
+
         setUsageStats(prev => ({
           ...prev,
           callsToday: prev.callsToday + 1,
@@ -355,6 +388,22 @@ export default function ApiUsage() {
       }, 1000 + Math.random() * 2000);
     }));
   };
+
+  const handleHistorySelect = useCallback((entry: HistoryEntry) => {
+    setSelectedEndpoint(
+      MOCK_ENDPOINTS.find((ep) => ep.id === entry.endpointId) ?? MOCK_ENDPOINTS[0],
+    );
+    setRequestParams(entry.requestParams);
+    setApiResponse(entry.response);
+    setResponseTime(entry.responseTime);
+    setCallCost(entry.cost);
+    toggleHistory();
+  }, [toggleHistory]);
+
+  const handleClearHistory = useCallback(() => {
+    clearHistory();
+    setHistoryEntries([]);
+  }, []);
 
   const handleCopyCode = async (code: string) => {
     try {
@@ -418,6 +467,15 @@ export default function ApiUsage() {
         <div className="api-header-actions">
           <button className="secondary-button" onClick={() => window.history.back()}>
             ← Back to API Details
+          </button>
+          <button
+            className="secondary-button"
+            onClick={toggleHistory}
+            aria-label={isHistoryOpen ? "Close request history" : "Open request history"}
+            aria-expanded={isHistoryOpen}
+          >
+            <Icons.History size={16} style={{ marginRight: 6 }} />
+            History
           </button>
           <div className="status-indicator active">
             <span className="status-dot"></span>
@@ -643,13 +701,12 @@ export default function ApiUsage() {
                />
              ))
            )}
-         </div></div>
-      </div>
+          </div></div>
 
       {/* Integration Guide */}
       <div className="surface integration-guide-section">
         <h2>Integration Guide</h2>
-        
+
         <div className="language-tabs">
           {(['javascript', 'python', 'curl'] as const).map(lang => (
             <button
@@ -661,7 +718,7 @@ export default function ApiUsage() {
             </button>
           ))}
         </div>
-        
+
         <div className="code-example">
           <div className="code-header">
             <h3>{selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)} Example</h3>
@@ -672,82 +729,23 @@ export default function ApiUsage() {
               {copied ? 'Copied!' : 'Copy Code'}
             </button>
           </div>
+          <pre className="code-block">
+            <code>{CODE_EXAMPLES[selectedLanguage]}</code>
+          </pre>
+        </div>
 
-          {isLoading ? (
-            <SkeletonRow rows={5} />
-          ) : filteredCallHistory.length === 0 ? (
-            <EmptyState message="No call records match the selected filter." />
-          ) : (
-            filteredCallHistory.map(call => (
-              <div key={call.id} className="table-row">
-                <span>{formatTimestamp(call.timestamp)}</span>
-                <span className="endpoint-cell">{call.endpoint}</span>
-                <span className={`status-cell ${call.status}`}>
-                  {call.status === 'success' ? '✓' : '✗'} {call.status}
-                </span>
-                <span>{formatTime(call.responseTime)}</span>
-                <span>{formatPrice(call.cost)} USDC</span>
-                <span>
-                  <button
-                    className="ghost-button"
-                    onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
-                  >
-                    {expandedCall === call.id ? 'Hide' : 'View'}
-                  </button>
-                </span>
-                {expandedCall === call.id && (
-                  <div className="expanded-details">
-                    <div className="detail-section">
-                      <h4>Request</h4>
-                      <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
-                    </div>
-                    <div className="detail-section">
-                      <h4>Response</h4>
-                      <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div></div>
-    </div>
-
-      {/* Integration Guide */ }
-  <div className="surface integration-guide-section">
-    <h2>Integration Guide</h2>
-
-    <div className="language-tabs">
-      {(['javascript', 'python', 'curl'] as const).map(lang => (
-        <button
-          key={lang}
-          className={`tab-button ${selectedLanguage === lang ? 'active' : ''}`}
-          onClick={() => setSelectedLanguage(lang)}
-        >
-          {lang.charAt(0).toUpperCase() + lang.slice(1)}
-        </button>
-      ))}
-    </div>
-
-    <div className="code-example">
-      <div className="code-header">
-        <h3>{selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)} Example</h3>
-        <button
-          className="secondary-button"
-          onClick={() => handleCopyCode(CODE_EXAMPLES[selectedLanguage])}
-        >
-          {copied ? 'Copied!' : 'Copy Code'}
-        </button>
+        <div className="documentation-link">
+          <a href="#" className="primary-button">View Full Documentation →</a>
+        </div>
       </div>
-      <pre className="code-block">
-        <code>{CODE_EXAMPLES[selectedLanguage]}</code>
-      </pre>
-    </div>
 
-    <div className="documentation-link">
-      <a href="#" className="primary-button">View Full Documentation →</a>
+      <RequestHistoryPanel
+        entries={historyEntries}
+        isOpen={isHistoryOpen}
+        onClose={toggleHistory}
+        onSelect={handleHistorySelect}
+        onClear={handleClearHistory}
+      />
     </div>
-  </div>
-    </div >
   );
 }
