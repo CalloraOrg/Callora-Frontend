@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
+import ApiDetailPageSkeleton from "./ApiDetailPage.skeleton";
 import EmbedPreview from "../components/EmbedPreview";
 import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
@@ -184,6 +185,10 @@ export default function ApiDetailPage({ onBack }: Props) {
     }, LOADING_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
+
+  if (isLoading) {
+    return <ApiDetailPageSkeleton />;
+  }
 
   // Show "not found" after loading completes and API is missing
   if (!isLoading && !api) {

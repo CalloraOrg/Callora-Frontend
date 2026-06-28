@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import ApiCard, { ApiCardSkeleton } from "../components/ApiCard";
+import { useSearchParams } from "react-router-dom";
+import ApiCard from "../components/ApiCard";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import FiltersSidebar from "../components/FiltersSidebar";
 import EmptyState from "../components/EmptyState";
+import MarketplacePageSkeleton from "./MarketplacePage.skeleton";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
 import { LOADING_DELAY_MS } from "../config/constants";
@@ -199,7 +201,7 @@ export default function MarketplacePage(): JSX.Element {
     minPrice,
     maxPrice,
     popularity,
-    sort,
+    sortParam,
   ]);
 
   useEffect(() => {
@@ -211,7 +213,7 @@ export default function MarketplacePage(): JSX.Element {
     minPrice,
     maxPrice,
     popularity,
-    sort,
+    sortParam,
   ]);
 
   const handleTagClick = (tag: string) => {
@@ -228,6 +230,9 @@ export default function MarketplacePage(): JSX.Element {
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
+  if (isLoading) {
+    return <MarketplacePageSkeleton />;
+  }
   return (
     <div className="marketplace-page">
       {/* Top row: title + search only */}
@@ -294,7 +299,7 @@ export default function MarketplacePage(): JSX.Element {
             </div>
 
             <div className="marketplace-actions">
-              <select value={sort} onChange={(e) => setSort(e.target.value)}>
+              <select value={sortParam} onChange={(e) => setSortParam(e.target.value as SortValue)}>
                 <option value="relevance">Relevance</option>
                 <option value="priceAsc">Price: low → high</option>
                 <option value="priceDesc">Price: high → low</option>
@@ -332,19 +337,15 @@ export default function MarketplacePage(): JSX.Element {
             />
           ) : (
             <div className="marketplace-grid">
-              {isLoading
-                ? Array.from({ length: shown }).map((_, i) => (
-                    <ApiCardSkeleton key={i} />
-                  ))
-                : displayedItems.map((a) => (
-                    <ApiCard
-                      key={a.id}
-                      api={a}
-                      onViewDetails={handleViewDetails}
-                      onTagClick={handleTagClick}
-                      activeTag={selectedTag}
-                    />
-                  ))}
+              {displayedItems.map((a) => (
+                <ApiCard
+                  key={a.id}
+                  api={a}
+                  onViewDetails={handleViewDetails}
+                  onTagClick={handleTagClick}
+                  activeTag={selectedTag}
+                />
+              ))}
             </div>
           )}
 

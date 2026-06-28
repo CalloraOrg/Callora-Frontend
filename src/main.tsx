@@ -3,8 +3,9 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import RouteProgressBar from "./components/RouteProgressBar";
-import CommandPalette from "./components/CommandPalette";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
+import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
+import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
 import "./index.css";
 import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
@@ -42,6 +43,7 @@ async function renderRoute() {
 
   if (pathname.startsWith("/marketplace")) {
     startRouteLoading();
+    root.render(wrap(<MarketplacePageSkeleton />));
     const mod = await import("./pages/MarketplacePage");
     const MarketplacePage = mod.default;
     root.render(wrap(<MarketplacePage />));
@@ -51,6 +53,7 @@ async function renderRoute() {
 
   if (pathname.startsWith("/details/")) {
     startRouteLoading();
+    root.render(wrap(<ApiDetailPageSkeleton />));
     const mod = await import("./pages/ApiDetailPage");
     const ApiDetailPage = mod.default;
     root.render(

@@ -1,4 +1,4 @@
-import { CSSProperties } from "react";
+import { Fragment, CSSProperties } from "react";
 
 interface SkeletonProps {
   width?: string | number;
@@ -18,6 +18,8 @@ export default function Skeleton({
   return (
     <div
       className={`skeleton ${className}`}
+      aria-hidden="true"
+      role="presentation"
       style={{
         width,
         height,
@@ -26,7 +28,6 @@ export default function Skeleton({
       }}
     />
   );
-}
 }
 
 // Row variant for table loading
@@ -41,5 +42,11 @@ export function SkeletonRow({ rows = 5 }: { rows?: number }) {
       <Skeleton width="40px" height="16px" className="skeleton-cell" />
     </div>
   );
-  return <>{Array.from({ length: rows }).map((_, i) => <React.Fragment key={i}>{rowSkeleton}</React.Fragment>)}</>;
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <Fragment key={i}>{rowSkeleton}</Fragment>
+      ))}
+    </>
+  );
 }
