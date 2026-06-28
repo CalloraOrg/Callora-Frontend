@@ -8,6 +8,8 @@ import ServerError from './components/ServerError';
 import NotFound from './components/NotFound';
 import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
 import { formatUsdc, formatUsdShortcut } from './utils/format';
+import useDocumentTitle from './hooks/useDocumentTitle';
+import DepositPreview from './components/DepositPreview';
 import {
   EXPLORER_BASE_URL,
   MIN_DEPOSIT,
@@ -272,6 +274,7 @@ function LandingPage({
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: 'Marketplace – Callora',
     [APP_ROUTES.dashboard]: 'Dashboard – Callora',
@@ -332,7 +335,6 @@ function App() {
 
   const hasValidAmount = validationMessage.length === 0;
   const stageLabel = getStageLabel(depositStage, hasValidAmount);
-  const balanceDelta = formatUsdc(activeAmount || 0);
   const pendingHashLabel = txHash
     ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}`
     : null;
@@ -851,7 +853,6 @@ function App() {
               hasAmount={hasAmount || submittedAmount !== null}
               ariaLabel="Deposit transaction preview"
             />
-          </div>
 
                 {(depositStage === "pending" ||
                   depositStage === "confirmed" ||

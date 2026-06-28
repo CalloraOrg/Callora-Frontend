@@ -3,6 +3,7 @@ import EmptyState from './components/EmptyState';
 import Skeleton, { SkeletonRow } from './components/Skeleton';
 import { formatPrice } from './utils/format';
 import DateRangePicker from './components/DateRangePicker';
+import { LOADING_DELAY_MS } from './config/constants';
 
 type ApiEndpoint = {
   id: string;
@@ -151,10 +152,17 @@ export default function ApiUsage() {
   const [callCost, setCallCost] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
+  const [isTableLoading, setIsTableLoading] = useState(true);
 
-  const filteredCallHistory = filterCallsByRange(statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter));
-  const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsTableLoading(false);
+    }, LOADING_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [selectedRange, setSelectedRange] = useState<DateRange>({ preset: '24h' });
+  const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
 
   // Filter call history based on selected date range
@@ -187,6 +195,8 @@ export default function ApiUsage() {
       return true;
     });
   };
+
+  const filteredCallHistory = filterCallsByRange(statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter));
 
   // Initialize selected range from URL query on mount
   useEffect(() => {
@@ -531,6 +541,7 @@ export default function ApiUsage() {
         <div className="section-header">
           <h2>Call History</h2>
           <div className="history-actions">
+            <DateRangePicker selectedRange={selectedRange} onChange={setSelectedRange} />
             <select
                 className="filter-select"
                 aria-label="Call status filter"
@@ -550,7 +561,7 @@ export default function ApiUsage() {
           </div>
         </div>
         
-        <div className="call-history-table" aria-busy={isLoading}>
+        <div className="call-history-table" aria-busy={isTableLoading || isLoading}>
            <div className="table-header">
              <span>Timestamp</span>
              <span>Endpoint</span>
@@ -560,7 +571,7 @@ export default function ApiUsage() {
              <span>Actions</span>
            </div>
 
-           {isLoading ? (
+           {isTableLoading ? (
              <SkeletonRow rows={5} />
            ) : filteredCallHistory.length === 0 ? (
              <EmptyState message="No call records match the selected filter." />
@@ -597,7 +608,7 @@ export default function ApiUsage() {
                </div>
              ))
            )}
-         </div></div>
+         </div>
       </div>
 
       {/* Integration Guide */}
