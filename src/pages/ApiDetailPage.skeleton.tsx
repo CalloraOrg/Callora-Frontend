@@ -52,7 +52,7 @@ export default function ApiDetailPageSkeleton() {
 
           <div className="api-detail-content-grid">
             <div className="content-left">
-              <nav className="api-detail-tabs" aria-hidden="true" style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+              <nav className="api-detail-tabs no-print" aria-hidden="true" style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
                 {Array.from({ length: 5 }).map((_, index) => (
                   <Skeleton key={index} width={88} height={20} />
                 ))}
@@ -68,7 +68,7 @@ export default function ApiDetailPageSkeleton() {
               </div>
             </div>
 
-            <aside className="api-detail-sidebar" aria-hidden="true">
+            <aside className="api-detail-sidebar no-print" aria-hidden="true">
               <div className="api-detail-sidebar-inner" style={{ display: "grid", gap: 20 }}>
                 <SidebarCardSkeleton />
                 <SidebarCardSkeleton />

@@ -132,6 +132,7 @@ export default function CodeExample({
     >
       {/* Header Section: Contains Language Tabs and Copy Button */}
       <div
+        className="no-print"
         style={{
           display: "flex",
           justifyContent: "space-between",

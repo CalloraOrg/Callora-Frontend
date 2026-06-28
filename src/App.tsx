@@ -538,7 +538,7 @@ function App() {
       <div className="ambient ambient-a" aria-hidden="true" />
       <div className="ambient ambient-b" aria-hidden="true" />
 
-      <header className="topbar" role="banner">
+      <header className="topbar no-print" role="banner">
         <div>
           <p className="eyebrow">Callora Vault</p>
           <p className="brand">Secure USDC funding for premium API usage</p>
@@ -600,7 +600,7 @@ function App() {
                       <p className="eyebrow">Deposit USDC to Vault</p>
                       <h1>Review every number before you approve.</h1>
                     </div>
-                    <button className="primary-button" onClick={openDeposit}>
+                    <button className="primary-button no-print" onClick={openDeposit}>
                       Open deposit modal
                     </button>
                   </div>
@@ -733,7 +733,7 @@ function App() {
         </Routes>
       </main>
 
-      <footer className="surface app-footer" role="contentinfo">
+      <footer className="surface app-footer no-print" role="contentinfo">
         <div>
           <p className="eyebrow">Callora</p>
           <p className="footer-copy">
