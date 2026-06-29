@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import SubscribeButton from "../components/SubscribeButton";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
@@ -1313,6 +1314,12 @@ getApiData().then(console.log).catch(console.error);
       >
         View Pricing
       </button>
+
+      {/* Accessible subscribe flow with inline confirmation (issue #287) */}
+      <SubscribeButton
+        apiName={api.name}
+        onSubscribe={() => showToast(`Subscribed to ${api.name}!`, "success")}
+      />
     </div>
   </div>
 </section>
