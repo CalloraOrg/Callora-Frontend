@@ -18,6 +18,7 @@ import {
   type DensityPreference,
 } from "../utils/density";
 import CompareDrawer from "../components/CompareDrawer";
+import RecentlyActiveRail from "../components/RecentlyActiveRail";
 
 export default function MarketplacePage(): JSX.Element {
   useDocumentTitle(
@@ -331,6 +332,9 @@ export default function MarketplacePage(): JSX.Element {
         </div>
         <SortDropdown value={sortParam} onChange={setSortParam} />
       </div>
+
+      {/* Rail of APIs with the most recent usage */}
+      <RecentlyActiveRail apis={MOCK_APIS} onSelect={handleViewDetails} />
 
       {/* Bottom: filters left, content right */}
       <div className="marketplace-layout">
