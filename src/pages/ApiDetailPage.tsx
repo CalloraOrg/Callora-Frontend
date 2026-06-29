@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import Breadcrumb from "../components/Breadcrumb";
+import TestInBrowser from "../components/TestInBrowser";
 import Skeleton from "../components/Skeleton";
 import ApiDetailPageSkeleton from "./ApiDetailPage.skeleton";
 import EmbedPreview from "../components/EmbedPreview";
@@ -624,6 +625,17 @@ getApiData().then(console.log).catch(console.error);
                             <CodeExample
                               snippets={allSnippets}
                               defaultLanguage="bash"
+                            />
+
+                            {/* One-click inline test runner (issue #290) */}
+                            <TestInBrowser
+                              endpointUrl={`${API_BASE_URL}${ep.url}`}
+                              method={ep.method || "GET"}
+                              params={(ep.params || []).map((p: any) => ({
+                                name: p.name,
+                                type: p.type ?? "string",
+                                required: Boolean(p.required),
+                              }))}
                             />
                           </div>
                         </div>
