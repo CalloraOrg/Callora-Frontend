@@ -6,6 +6,10 @@ export interface EmptyStateProps {
   message?: string;
   onClearFilters?: () => void;
   onRetry?: () => void | Promise<void>;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 /**
@@ -23,6 +27,7 @@ export default function EmptyState({
   message,
   onClearFilters,
   onRetry,
+  action,
 }: EmptyStateProps) {
   // Default copy based on variant
   const defaults = {
@@ -153,6 +158,20 @@ export default function EmptyState({
       </p>
 
       {/* Primary action */}
+      {action && (
+        <button
+          className="primary-button"
+          onClick={action.onClick}
+          style={{
+            minHeight: "44px",
+            minWidth: "160px",
+          }}
+          type="button"
+        >
+          {action.label}
+        </button>
+      )}
+
       {variant === "filtered" && onClearFilters && (
         <button
           className="primary-button"
