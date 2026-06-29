@@ -35,13 +35,67 @@ export default function MarketplacePage(): JSX.Element {
   );
   // Debounce search input to prevent excessive re-renders on large lists
   const debouncedSearch = useDebounce(search, 300);
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
-    new Set(),
+  // ── Filter persistence in URL ──────────────────────────────────────────────
+  // Categories are serialised as comma-separated ?categories= param.
+  // Tag, minPrice, maxPrice, popularity are individual params.
+  const [selectedCategories, setSelectedCategoriesRaw] = useState<Set<string>>(
+    () => {
+      const raw = searchParams.get("categories");
+      return raw ? new Set(raw.split(",").filter(Boolean)) : new Set();
+    },
   );
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [minPrice, setMinPrice] = useState<number | null>(null);
-  const [maxPrice, setMaxPrice] = useState<number | null>(null);
-  const [popularity, setPopularity] = useState<string>("any");
+  const setSelectedCategories = (next: Set<string>) => {
+    setSelectedCategoriesRaw(next);
+    setSearchParams((prev) => {
+      if (next.size > 0) prev.set("categories", [...next].join(","));
+      else prev.delete("categories");
+      return prev;
+    }, { replace: true });
+  };
+
+  const [selectedTag, setSelectedTagRaw] = useState<string | null>(
+    () => searchParams.get("tag"),
+  );
+  const setSelectedTag = (tag: string | null) => {
+    setSelectedTagRaw(tag);
+    setSearchParams((prev) => {
+      if (tag) prev.set("tag", tag); else prev.delete("tag");
+      return prev;
+    }, { replace: true });
+  };
+
+  const [minPrice, setMinPriceRaw] = useState<number | null>(
+    () => { const v = searchParams.get("minPrice"); return v ? Number(v) : null; },
+  );
+  const setMinPrice = (v: number | null) => {
+    setMinPriceRaw(v);
+    setSearchParams((prev) => {
+      if (v !== null) prev.set("minPrice", String(v)); else prev.delete("minPrice");
+      return prev;
+    }, { replace: true });
+  };
+
+  const [maxPrice, setMaxPriceRaw] = useState<number | null>(
+    () => { const v = searchParams.get("maxPrice"); return v ? Number(v) : null; },
+  );
+  const setMaxPrice = (v: number | null) => {
+    setMaxPriceRaw(v);
+    setSearchParams((prev) => {
+      if (v !== null) prev.set("maxPrice", String(v)); else prev.delete("maxPrice");
+      return prev;
+    }, { replace: true });
+  };
+
+  const [popularity, setPopularityRaw] = useState<string>(
+    () => searchParams.get("popularity") ?? "any",
+  );
+  const setPopularity = (v: string) => {
+    setPopularityRaw(v);
+    setSearchParams((prev) => {
+      if (v !== "any") prev.set("popularity", v); else prev.delete("popularity");
+      return prev;
+    }, { replace: true });
+  };
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   /**
