@@ -29,6 +29,7 @@ export type APIItem = {
   stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
   ratingDistribution?: Record<number, number>;
   hourlyHealth?: ("operational" | "degraded" | "down")[];
+  reviews?: Review[];
 };
 
 

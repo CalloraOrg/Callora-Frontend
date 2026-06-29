@@ -1,13 +1,10 @@
 import { useMemo, useState, useEffect } from "react";
-import useDocumentTitle from "../hooks/useDocumentTitle";
+import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
-import ApiDetailPageSkeleton from "./ApiDetailPage.skeleton";
 import EmbedPreview from "../components/EmbedPreview";
 import Tabs from "../components/Tabs";
-import { useToast } from "../components/Toast";
 import useDocumentTitle from "../hooks/useDocumentTitle";
-import { useFetchTracker } from "../hooks/useFetchTracker";
 import { findApiById } from "../data/mockApis";
 import type { Review } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
@@ -15,11 +12,8 @@ import { formatPrice } from "../utils/format";
 import { Icons } from "../utils/icons";
 import HealthTimeline from "../components/HealthTimeline";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
-import {
-  getPostmanImportUrl,
-  getInsomniaImportUrl,
-  copyToClipboard,
-} from "../utils/postman";
+import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
+import RatingHistogram from "../components/RatingHistogram";
 
 /**
  * ApiDetailPage Component
@@ -34,17 +28,77 @@ import {
 type Props = {
   onBack?: () => void;
 };
+
 type TabType =
-  | "overview"
-  | "documentation"
-  | "pricing"
-  | "reviews";
+  "overview" | "documentation" | "pricing" | "examples" | "reviews" | "embed";
+
+type ReviewSort = "newest" | "highest" | "lowest";
+
+type EndpointParameter = {
+  name: string;
+  type: string;
+  required?: boolean;
+};
+
+type ApiEndpoint = {
+  id: string;
+  title: string;
+  url: string;
+  method: string;
+  params: EndpointParameter[];
+  response?: string;
+  group?: string;
+};
+
+const GENERIC_ENDPOINT_VERBS = new Set([
+  "get",
+  "list",
+  "create",
+  "update",
+  "delete",
+  "remove",
+  "fetch",
+]);
+
+function toTitleCase(value: string) {
+  return value.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function deriveEndpointGroupLabel(endpoint: ApiEndpoint): string {
+  if (endpoint.group?.trim()) {
+    return endpoint.group.trim();
+  }
+
+  if (endpoint.title?.trim()) {
+    const words = endpoint.title.trim().split(/\s+/);
+
+    if (
+      words.length > 1 &&
+      GENERIC_ENDPOINT_VERBS.has(words[0].toLowerCase())
+    ) {
+      return words.slice(1).join(" ");
+    }
+
+    return endpoint.title.trim();
+  }
+
+  const firstMeaningfulSegment = endpoint.url
+    .split("/")
+    .filter(Boolean)
+    .find((segment) => !/^v\d+$/i.test(segment) && !segment.startsWith("{"));
+
+  if (!firstMeaningfulSegment) {
+    return "General";
+  }
+
+  return toTitleCase(firstMeaningfulSegment.replace(/[-_]+/g, " "));
+}
 
 export default function ApiDetailPage({ onBack }: Props) {
-const [, setTab] = useState<TabType>("overview");
-  //const [requests, setRequests] = useState(1000);
+  const [tab, setTab] = useState<TabType>("overview");
+  const [requests, setRequests] = useState(1000);
   const [isLoading, setIsLoading] = useState(true);
-  const { showToast } = useToast();
+  const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
 
   // Ordered tab definitions — single source of truth for labels and ids.
   const TAB_ITEMS = [
@@ -64,6 +118,16 @@ const [, setTab] = useState<TabType>("overview");
 
   const api = useMemo(() => findApiById(id), [id]);
   useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
+
+  const rawReviews = api?.reviews || [];
+  const averageRating = api?.rating ?? 0;
+  const sortedReviews = useMemo(() => {
+    return [...rawReviews].sort((a, b) => {
+      if (reviewSort === "highest") return b.rating - a.rating;
+      if (reviewSort === "lowest") return a.rating - b.rating;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+  }, [rawReviews, reviewSort]);
 
   const documentationEndpoints = useMemo(
     () => (api?.endpoints || []) as ApiEndpoint[],
@@ -128,26 +192,13 @@ const [, setTab] = useState<TabType>("overview");
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [documentationEndpoints]);
 
+  // Simulate initial data loading with 1.5s delay (consistent with MarketplacePage)
   useEffect(() => {
-    const abortController = new AbortController();
-    trackFetch(new Promise<void>((resolve) => {
-      const timer = setTimeout(() => {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-          resolve();
-        }
-      }, LOADING_DELAY_MS);
-      abortController.signal.addEventListener("abort", () => {
-        clearTimeout(timer);
-        resolve();
-      });
-    }));
-    return () => abortController.abort();
-  }, [trackFetch]);
-
-  if (isLoading) {
-    return <ApiDetailPageSkeleton />;
-  }
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, LOADING_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Show "not found" after loading completes and API is missing
   if (!isLoading && !api) {
@@ -337,17 +388,16 @@ const [, setTab] = useState<TabType>("overview");
   }
 
   // Example Generation Logic
- // const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
-   // url: "/v1/data",
-    //method: "GET",
-  //};
+  const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
+    url: "/v1/data",
+    method: "GET",
+  };
 
- // const curlExample = `curl -X ${firstEndpoint.method} "${API_BASE_URL}${firstEndpoint.url}?lat=37.78&lon=-122.41"
-  //-H "Authorization: Bearer YOUR_API_KEY" \\
-  //-H "Content-Type: application/json"`;
+  const curlExample = `curl -X ${firstEndpoint.method} "${API_BASE_URL}${firstEndpoint.url}?lat=37.78&lon=-122.41" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json"`;
 
-  //const jsExample = `import fetch from 'node-fetch';
-
+  const jsExample = `import fetch from 'node-fetch';
 
 const getApiData = async () => {
   const response = await fetch('${API_BASE_URL}${firstEndpoint.url}', {
@@ -364,29 +414,33 @@ const getApiData = async () => {
   return data;
 };
 
-getApiData().then(console.log).catch(console.error);
+getApiData().then(console.log).catch(console.error);`;
 
-   // const pyExample = `import requests`
+  const pyExample = `import requests
 
-// url = "${API_BASE_URL}${firstEndpoint.url}"
-//headers = {
-  //  "Authorization": "Bearer YOUR_API_KEY",
-  //  "Content-Type": "application/json"
-//}
-//params = {
-  //  "lat": 37.78,
-    //"lon": -122.41
-//}
+url = "${API_BASE_URL}${firstEndpoint.url}"
+headers = {
+    "Authorization": "Bearer YOUR_API_KEY",
+    "Content-Type": "application/json"
+}
+params = {
+    "lat": 37.78,
+    "lon": -122.41
+}
 
-//response = requests.get(url, headers=headers, params=params)
-//data = response.json()
+response = requests.get(url, headers=headers, params=params)
+data = response.json()
 
-//print(data)`;
+print(data)`;
 
+  const allSnippets = {
+    bash: curlExample,
+    javascript: jsExample,
+    python: pyExample,
+  };
 
-
- // const estimatedCost = (n: number) =>
-   // `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
+  const estimatedCost = (n: number) =>
+    `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
 
   return (
     <div className="api-detail-page">
@@ -397,34 +451,116 @@ getApiData().then(console.log).catch(console.error);
             { label: api.name, href: "", isCurrent: true },
           ]}
         />
-       <div className="api-detail-shell">
+        <div className="api-detail-shell">
+          <div className="api-detail-hero">
+            <div className="api-detail-heading">
+              <button className="ghost-button" onClick={onBack} type="button">
+                Back
+              </button>
+              <div className="api-detail-brand">
+                <div className="api-detail-logo">W</div>
+                <div className="api-detail-title">
+                  <h1>{api.name}</h1>
+                  <div className="api-detail-meta">
+                    <a href={api.provider?.url}>{api.provider?.name}</a> ·{" "}
+                    <strong style={{ color: "var(--accent-strong)" }}>
+                      {`$${formatPrice(api.pricePerRequest ?? 0)}`}
+                    </strong>{" "}
+                    per request
+                  </div>
+                </div>
+                <div className="api-detail-provider">
+                  Published by{" "}
+                  <a
+                    href={api.provider?.url}
+                    style={{
+                      color: "var(--text-main)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    {api.provider?.name}
+                  </a>
+                </div>
+              </div>
+            </div>
+            <div className="api-detail-price-panel">
+              <div className="api-detail-price">
+                {`$${formatPrice(api.pricePerRequest ?? 0)}`}
+              </div>
+              <div className="api-detail-price-label">
+                per successful request
+              </div>
+              <button className="primary-button">Connect API</button>
+            </div>
+          </div>
 
-    <button
-      className="ghost-button"
-      onClick={onBack}
-      type="button"
-    >
-    </button>
-<section className="api-hero" aria-labelledby="api-title">
+          <div className="api-detail-content-grid">
+            <div className="content-left">
+              {/* Animated tab strip — accessible + smooth sliding indicator */}
+              <Tabs
+                tabs={TAB_ITEMS}
+                activeTab={tab}
+                onChange={(id) => setTab(id as TabType)}
+                tabPanelId={(id) => `panel-${id}`}
+                className="api-detail-tabs"
+              />
 
-  <div className="api-hero__content">
-    <div className="api-hero__identity">
-      <div className="api-hero__avatar">
-        {api.provider?.avatar ? (
-          <img
-            src={api.provider.avatar}
-            alt={`${api.provider.name} logo`}
-          />
-        ) : (
-          api.provider?.name?.charAt(0).toUpperCase() ?? "A"
-        )}
-      </div>
+              <div
+                className="tab-content"
+                style={{ animation: "fadeIn 0.3s ease" }}
+              >
+                {/* OVERVIEW TAB */}
+                {tab === "overview" && (
+                  <section
+                    id="panel-overview"
+                    role="tabpanel"
+                    aria-labelledby="tab-overview"
+                    tabIndex={0}
+                  >
+                    <div
+                      className="preview-card"
+                      style={{ padding: 24, marginBottom: 32 }}
+                    >
+                      <h3 style={{ marginTop: 0 }}>About this API</h3>
+                      <p
+                        style={{
+                          lineHeight: 1.6,
+                          fontSize: 16,
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        {api.description}
+                      </p>
+                    </div>
 
-      <div className="api-hero__info">
-        <div className="api-hero__meta">
-          <span className="api-version-pill">
-            v{api.version ?? "1.0.0"}
-          </span>
+                    <div className="api-detail-two-column">
+                      <div>
+                        <h2>Key Features</h2>
+                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                          {(api.features || []).map((f) => (
+                            <li
+                              key={f}
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {f}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <h2>Primary Use Cases</h2>
+                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                          {(api.useCases || []).map((u) => (
+                            <li
+                              key={u}
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {u}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
 
                     <h2 style={{ marginTop: 40 }}>Performance Metrics</h2>
                     <div className="api-detail-metrics">
@@ -1282,45 +1418,7 @@ getApiData().then(console.log).catch(console.error);
             </aside>
           </div>
         </div>
-
-        <h1 id="api-title">{api.name}</h1>
-
-        <p className="api-hero__description">
-          {api.description}
-        </p>
-
-        <p className="api-hero__provider">
-          Published by{" "}
-          <a
-            href={api.provider?.url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {api.provider?.name}
-          </a>
-        </p>
       </div>
     </div>
-
-    <div className="api-hero__cta">
-      <button className="primary-button">
-        Try API
-      </button>
-
-      <button
-        className="secondary-button"
-        onClick={() => setTab("pricing")}
-      >
-        View Pricing
-      </button>
-    </div>
-  </div>
-</section>
-
-  <div className="api-detail-content-grid"></div>
-      </div>
-    </div>
-  </div>
   );
 }
-        

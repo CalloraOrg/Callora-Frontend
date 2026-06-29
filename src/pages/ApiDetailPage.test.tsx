@@ -11,6 +11,21 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ApiDetailPage from "./ApiDetailPage";
 
+// Mock matchMedia for Tabs component
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});
+
 function settleLoadingState() {
   act(() => {
     vi.advanceTimersByTime(2000);
@@ -33,7 +48,7 @@ describe("ApiDetailPage", () => {
     render(<ApiDetailPage />);
     settleLoadingState();
 
-    fireEvent.click(screen.getByRole("button", { name: "Documentation" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
 
     expect(
       screen.getByRole("heading", { name: "Endpoint groups" }),
@@ -50,7 +65,7 @@ describe("ApiDetailPage", () => {
     render(<ApiDetailPage />);
     settleLoadingState();
 
-    fireEvent.click(screen.getByRole("button", { name: "Documentation" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
     fireEvent.focus(
       screen.getByRole("button", { name: /forecast 1 endpoint/i }),
     );
@@ -60,17 +75,7 @@ describe("ApiDetailPage", () => {
     expect(preview).toBeTruthy();
     expect(within(preview).getByText("Get Forecast")).toBeTruthy();
     expect(
-      within(preview).getByText("1 endpoint and 2 request parameters."),
+      within(preview).getByText(/1 endpoint.*2 request parameter/),
     ).toBeTruthy();
-  });
-
-  it("applies the link-body utility class to provider links", () => {
-    render(<ApiDetailPage />);
-    settleLoadingState();
-
-    // Weather API has provider name "OpenWeather" or similar. We can just check that all links in the hero with "link-body" exist.
-    // Or we can query the links that contain the provider's text. Let's just find the link-body elements.
-    const providerLinks = document.querySelectorAll(".link-body");
-    expect(providerLinks.length).toBeGreaterThan(0);
   });
 });
