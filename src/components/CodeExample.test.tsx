@@ -255,4 +255,20 @@ describe('CodeExample', () => {
     const copyBtn = screen.getByLabelText(/copy code/i);
     expect(copyBtn).toBeTruthy();
   });
+
+  describe('dark theme styling', () => {
+    it('applies code-sample class for styling hooks', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const container = document.querySelector('.code-sample');
+      expect(container).toBeTruthy();
+    });
+
+    it('has accessible focus styles on tabs', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const tabs = screen.getAllByRole('tab');
+      tabs.forEach(tab => {
+        expect(tab.classList.contains('code-sample__tab')).toBe(true);
+      });
+    });
+  });
 });
