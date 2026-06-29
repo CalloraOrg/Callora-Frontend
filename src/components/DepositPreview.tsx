@@ -2,7 +2,6 @@
 // Uses semantic HTML and ARIA labels for accessibility.
 // No external dependencies are added; it relies on existing utils for formatting.
 
-import React from 'react';
 import { formatUsdc } from '../utils/format';
 
 interface DepositPreviewProps {

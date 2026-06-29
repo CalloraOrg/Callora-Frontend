@@ -197,10 +197,17 @@ export default function ApiUsage() {
   const [callCost, setCallCost] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
+  const [isTableLoading, setIsTableLoading] = useState(true);
 
-  const filteredCallHistory = filterCallsByRange(statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter));
-  const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsTableLoading(false);
+    }, LOADING_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [selectedRange, setSelectedRange] = useState<DateRange>({ preset: '24h' });
+  const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
 
   // Filter call history based on selected date range
@@ -233,6 +240,8 @@ export default function ApiUsage() {
       return true;
     });
   };
+
+  const filteredCallHistory = filterCallsByRange(statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter));
 
   // Initialize selected range from URL query on mount
   useEffect(() => {
@@ -640,7 +649,7 @@ export default function ApiUsage() {
              <span>Actions</span>
            </div>
 
-           {isLoading ? (
+           {isTableLoading ? (
              <SkeletonRow rows={5} />
            ) : filteredCallHistory.length === 0 ? (
              <EmptyState message="No call records match the selected filter." />
@@ -654,7 +663,7 @@ export default function ApiUsage() {
                />
              ))
            )}
-         </div></div>
+         </div>
       </div>
 
       {/* Integration Guide */}

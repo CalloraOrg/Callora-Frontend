@@ -35,12 +35,12 @@ export default function Skeleton({
 export function SkeletonRow({ rows = 5 }: { rows?: number }) {
   const rowSkeleton = (
     <div className="table-row">
-      <Skeleton width="120px" height="16px" className="skeleton-cell" />
-      <Skeleton width="200px" height="16px" className="skeleton-cell" />
-      <Skeleton width="80px" height="16px" className="skeleton-cell" />
-      <Skeleton width="80px" height="16px" className="skeleton-cell" />
-      <Skeleton width="60px" height="16px" className="skeleton-cell" />
-      <Skeleton width="40px" height="16px" className="skeleton-cell" />
+      <Skeleton width="60%" height="16px" className="skeleton-cell" />
+      <Skeleton width="85%" height="16px" className="skeleton-cell" />
+      <Skeleton width="50%" height="16px" className="skeleton-cell" />
+      <Skeleton width="45%" height="16px" className="skeleton-cell" />
+      <Skeleton width="35%" height="16px" className="skeleton-cell" />
+      <Skeleton width="50%" height="16px" className="skeleton-cell" />
     </div>
   );
   return (
@@ -51,3 +51,4 @@ export function SkeletonRow({ rows = 5 }: { rows?: number }) {
     </>
   );
 }
+

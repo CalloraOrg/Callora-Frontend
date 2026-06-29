@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 /**
  * Props for the DateRangePicker component.
  */
 interface DateRange {
-  preset: string; // '24h' | '7d' | '30d' | 'custom'
+  preset: '24h' | '7d' | '30d' | 'custom';
   from?: Date;
   to?: Date;
 }
@@ -29,7 +29,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ selectedRange, onChan
   ];
 
   const handlePresetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const preset = e.target.value;
+    const preset = e.target.value as '24h' | '7d' | '30d' | 'custom';
     if (preset !== 'custom') {
       onChange({ preset });
     } else {
