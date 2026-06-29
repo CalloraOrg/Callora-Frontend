@@ -183,6 +183,15 @@ function formatTime(ms: number) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+function formatTimestamp(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 
 export default function ApiUsage() {
   const { trackFetch } = useFetchTracker();
