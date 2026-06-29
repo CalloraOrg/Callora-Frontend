@@ -3,12 +3,12 @@ import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-d
 import { ThemeToggle } from './ThemeToggle';
 import ApiUsage from './ApiUsage';
 import Dashboard from './components/Dashboard';
+import MyApis from './pages/MyApis';
 import RouteProgressBar from './components/RouteProgressBar';
 import ServerError from './components/ServerError';
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from './components/NotFound';
 import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
-import useDocumentTitle from './hooks/useDocumentTitle';
 import { formatUsdc, formatUsdShortcut } from './utils/format';
 import {
   EXPLORER_BASE_URL,
@@ -104,6 +104,7 @@ const APP_ROUTES = {
   dashboard: "/dashboard",
   marketplace: "/marketplace",
   publish: "/publish",
+  myApis: "/apis/my-apis",
   apiUsage: "/api-usage",
   billing: "/billing",
   documentation: "/documentation",
@@ -273,10 +274,10 @@ function createMockHash() {
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const navigate = useNavigate();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
+    [APP_ROUTES.myApis]: "My APIs – Callora",
     [APP_ROUTES.billing]: "Billing – Callora",
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
@@ -305,6 +306,16 @@ function App() {
 
   // Handle global shortcuts
   const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
+    // Navigation to My APIs (e.g. g then a)
+    if (event.key === 'g') {
+      const handleNextKey = (e: KeyboardEvent) => {
+        if (e.key === 'a') {
+          navigate(APP_ROUTES.myApis);
+        }
+      };
+      window.addEventListener('keydown', handleNextKey, { once: true });
+    }
+
     // Open shortcuts modal with ?
     if (event.key === '?' || (event.shiftKey && event.key === '/')) {
       event.preventDefault();
@@ -548,6 +559,7 @@ function App() {
           <nav className="nav" aria-label="Primary navigation">
             <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Dashboard</NavLink>
             <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Marketplace</NavLink>
+            <NavLink to={APP_ROUTES.myApis} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>My APIs</NavLink>
             <NavLink to={APP_ROUTES.billing} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Billing</NavLink>
             <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Theme Playground</NavLink>
           </nav>
@@ -568,6 +580,11 @@ function App() {
                 }}
               />
             }
+          />
+
+          <Route
+            path={APP_ROUTES.myApis}
+            element={<MyApis />}
           />
 
           <Route
@@ -744,6 +761,7 @@ function App() {
         <nav className="footer-nav" aria-label="Footer navigation">
           <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Dashboard</NavLink>
           <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Marketplace</NavLink>
+          <NavLink to={APP_ROUTES.myApis} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>My APIs</NavLink>
           <NavLink to={APP_ROUTES.billing} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Billing</NavLink>
           <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Theme Playground</NavLink>
           <NavLink to={APP_ROUTES.status} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Status</NavLink>

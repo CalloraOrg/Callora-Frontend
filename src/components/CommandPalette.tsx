@@ -48,6 +48,13 @@ export default function CommandPalette() {
       icon: '🛍️'
     },
     {
+      id: 'my-apis',
+      name: 'Go to My APIs',
+      category: 'Navigation',
+      action: () => navigateTo('/apis/my-apis'),
+      icon: '🔌'
+    },
+    {
       id: 'billing',
       name: 'Go to Billing',
       category: 'Navigation',
