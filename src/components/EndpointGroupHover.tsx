@@ -75,7 +75,7 @@ export default function EndpointGroupHover({
         onBlurCapture={handleBlurCapture}
       >
         <div
-          className="endpoint-group-hover__triggers"
+          className="endpoint-group-hover__triggers no-print"
           role="list"
           aria-label="Endpoint groups"
         >

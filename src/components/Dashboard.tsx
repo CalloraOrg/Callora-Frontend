@@ -63,7 +63,7 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
 
       {/* Quick actions */}
       <div className="dashboard-actions">
-        <button className="primary-button" onClick={openDeposit}>Deposit</button>
+        <button className="primary-button no-print" onClick={openDeposit}>Deposit</button>
         <button className="secondary-button" onClick={() => navigate('/marketplace')}>Browse APIs</button>
         <button className="secondary-button" onClick={() => navigate('/api-usage')}>View Usage</button>
       </div>

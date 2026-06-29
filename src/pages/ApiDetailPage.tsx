@@ -192,7 +192,7 @@ const [, setTab] = useState<TabType>("overview");
             {/* Hero Skeleton */}
             <div className="api-detail-hero">
               <div className="api-detail-heading">
-                <button className="ghost-button" onClick={onBack} type="button">
+                <button className="ghost-button no-print" onClick={onBack} type="button">
                   Back
                 </button>
                 <div className="api-detail-brand">
@@ -224,7 +224,7 @@ const [, setTab] = useState<TabType>("overview");
             <div className="api-detail-content-grid">
               <div className="content-left">
                 {/* Tabs Navigation Skeleton */}
-                <nav className="api-detail-tabs">
+                <nav className="api-detail-tabs no-print">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <Skeleton
                       key={i}
@@ -255,7 +255,7 @@ const [, setTab] = useState<TabType>("overview");
               </div>
 
               {/* Sidebar Skeleton */}
-              <aside className="api-detail-sidebar">
+              <aside className="api-detail-sidebar no-print">
                 <div className="api-detail-sidebar-inner">
                   {/* API Health Card Skeleton */}
                   <div
@@ -400,7 +400,7 @@ getApiData().then(console.log).catch(console.error);
        <div className="api-detail-shell">
 
     <button
-      className="ghost-button"
+      className="ghost-button no-print"
       onClick={onBack}
       type="button"
     >
@@ -1155,7 +1155,7 @@ getApiData().then(console.log).catch(console.error);
             </div>
 
             {/* Sidebar Sticky Column */}
-            <aside className="api-detail-sidebar">
+            <aside className="api-detail-sidebar no-print">
               <div className="api-detail-sidebar-inner">
                 <div
                   className="stat-card"
@@ -1302,7 +1302,7 @@ getApiData().then(console.log).catch(console.error);
       </div>
     </div>
 
-    <div className="api-hero__cta">
+    <div className="api-hero__cta no-print">
       <button className="primary-button">
         Try API
       </button>

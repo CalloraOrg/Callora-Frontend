@@ -61,3 +61,20 @@
 ## Accessibility checks
 - [ ] Route shell sets `aria-busy="true"` while the destination is pending
 - [ ] Reduced motion removes shimmer from skeleton surfaces
+
+# ApiDetailPage Print Preview Manual Test Plan
+
+## Setup
+- [ ] Open `/details/weather-001` in Chrome
+- [ ] Open the same page in Firefox
+
+## Print preview checks
+- [ ] Global nav, footer, deposit CTA, in-page tabs, and sidebar are hidden
+- [ ] Background is white and body text is black/dark gray
+- [ ] Provider and other inline links show the full URL in parentheses after the link text
+- [ ] Long code snippets wrap without horizontal scrollbar or clipped content
+- [ ] Endpoint cards, parameter tables, and documentation content remain visible
+
+## Regression checks
+- [ ] Screen layout is unchanged when not printing
+- [ ] Interactive controls still work normally on screen after print stylesheet changes
