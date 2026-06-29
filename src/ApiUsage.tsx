@@ -5,6 +5,7 @@ import { formatPrice } from './utils/format';
 import RequestBodyEditor from './components/RequestBodyEditor';
 import type { JsonSchema } from './components/RequestBodyEditor';
 import CallHistoryRow from './components/CallHistoryRow';
+import Breadcrumb from './components/Breadcrumb';
 
 type ApiEndpoint = {
   id: string;
@@ -401,6 +402,16 @@ export default function ApiUsage() {
 
   return (
     <div className="api-usage-page">
+      <Breadcrumb
+        items={[
+          { label: 'Marketplace', href: '/marketplace' },
+          {
+            label: 'User Profile API usage',
+            href: '/api-usage',
+            isCurrent: true,
+          },
+        ]}
+      />
       {!isDismissed && (
         <PlanNudge usagePercent={usagePercent} onDismiss={dismiss} />
       )}

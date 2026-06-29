@@ -78,6 +78,50 @@ describe("Breadcrumb", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
+  it("moves focus into collapsed crumbs and supports arrow key navigation", () => {
+    const { container } = render(<Breadcrumb items={longBreadcrumb} />);
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+
+    if (!button) throw new Error("Expected breadcrumb ellipsis button");
+
+    fireEvent.click(button);
+
+    const menuItems = screen.getAllByRole("menuitem");
+    expect(document.activeElement).toBe(menuItems[0]);
+
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowDown" });
+    expect(document.activeElement).toBe(menuItems[1]);
+
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowDown" });
+    expect(document.activeElement).toBe(menuItems[0]);
+
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "End" });
+    expect(document.activeElement).toBe(menuItems[1]);
+
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Home" });
+    expect(document.activeElement).toBe(menuItems[0]);
+  });
+
+  it("returns focus to the ellipsis button when closing the popover with Escape", () => {
+    const { container } = render(<Breadcrumb items={longBreadcrumb} />);
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+
+    if (!button) throw new Error("Expected breadcrumb ellipsis button");
+
+    fireEvent.click(button);
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(button);
+  });
+
   it("applies the link-nav utility class to breadcrumb links", () => {
     render(<Breadcrumb items={longBreadcrumb} />);
     const link = screen.getByRole("link", { name: "Marketplace" });

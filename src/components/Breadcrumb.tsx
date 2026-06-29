@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 
 type BreadcrumbItem = {
   label: string;
@@ -40,6 +41,8 @@ function BreadcrumbSeparator() {
 
 export default function Breadcrumb({ items }: BreadcrumbProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const ellipsisButtonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const popoverId = useId();
   const middleItems = useMemo(() => items.slice(1, -1), [items]);
   const shouldCollapseMiddle = middleItems.length > 0;
@@ -50,6 +53,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsPopoverOpen(false);
+        ellipsisButtonRef.current?.focus();
       }
     };
 
@@ -59,6 +63,56 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isPopoverOpen]);
+
+  useEffect(() => {
+    if (!isPopoverOpen) return;
+
+    popoverRef.current
+      ?.querySelector<HTMLAnchorElement>('[role="menuitem"]')
+      ?.focus();
+  }, [isPopoverOpen]);
+
+  const handlePopoverKeyDown = (
+    event: ReactKeyboardEvent<HTMLDivElement>,
+  ) => {
+    const menuItems = Array.from(
+      event.currentTarget.querySelectorAll<HTMLAnchorElement>(
+        '[role="menuitem"]',
+      ),
+    );
+
+    if (menuItems.length === 0) return;
+
+    const currentIndex = menuItems.indexOf(
+      document.activeElement as HTMLAnchorElement,
+    );
+    const focusMenuItem = (index: number) => {
+      event.preventDefault();
+      menuItems[index]?.focus();
+    };
+
+    switch (event.key) {
+      case "ArrowDown":
+        focusMenuItem((currentIndex + 1) % menuItems.length);
+        break;
+      case "ArrowUp":
+        focusMenuItem(
+          (currentIndex - 1 + menuItems.length) % menuItems.length,
+        );
+        break;
+      case "Home":
+        focusMenuItem(0);
+        break;
+      case "End":
+        focusMenuItem(menuItems.length - 1);
+        break;
+      case "Escape":
+        event.preventDefault();
+        setIsPopoverOpen(false);
+        ellipsisButtonRef.current?.focus();
+        break;
+    }
+  };
 
   return (
     <nav aria-label="breadcrumb" className="breadcrumb-nav">
@@ -225,6 +279,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                 <span className="breadcrumb-collapsed">
                   <BreadcrumbSeparator />
                   <button
+                    ref={ellipsisButtonRef}
                     type="button"
                     className="breadcrumb-ellipsis"
                     aria-label="Show collapsed breadcrumb items"
@@ -236,9 +291,11 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                   </button>
                   {isPopoverOpen && (
                     <div
+                      ref={popoverRef}
                       className="breadcrumb-popover"
                       id={popoverId}
                       role="menu"
+                      onKeyDown={handlePopoverKeyDown}
                     >
                       <ol className="breadcrumb-popover-list">
                         {middleItems.map((middleItem) => (
