@@ -15,6 +15,7 @@ import type { APIItem } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import Sparkline from "./Sparkline";
+import { TagIcon, ClockIcon, BoltIcon } from "./icons";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -474,7 +475,11 @@ export default function ApiCard({
           </div>
           {api.rating !== undefined && (
             <div style={{ color: "var(--muted)", marginTop: 6 }}>
-              <RatingHistogram rating={api.rating} distribution={api.ratingDistribution}>
+              <RatingHistogram
+                rating={api.rating}
+                distribution={api.ratingDistribution}
+                placement="top-end"
+              >
                 ⭐ {api.rating}
               </RatingHistogram>
             </div>
@@ -543,6 +548,7 @@ export default function ApiCard({
   width={90}
   height={28}
 />
+      </div>
 
       <div
         className="api-marketplace-card-footer"
@@ -602,7 +608,11 @@ export default function ApiCard({
           </span>
           <div style={{ color: "var(--muted)", fontSize: 12 }}>
             {api.rating ? (
-              <RatingHistogram rating={api.rating} distribution={api.ratingDistribution}>
+              <RatingHistogram
+                rating={api.rating}
+                distribution={api.ratingDistribution}
+                placement="top-end"
+              >
                 {api.rating} ★
               </RatingHistogram>
             ) : (
