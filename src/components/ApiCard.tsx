@@ -543,6 +543,7 @@ export default function ApiCard({
   width={90}
   height={28}
 />
+      </div>
 
       <div
         className="api-marketplace-card-footer"

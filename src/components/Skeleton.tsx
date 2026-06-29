@@ -1,4 +1,4 @@
-import React, { CSSProperties } from "react";
+import React, { CSSProperties, Fragment } from "react";
 
 interface SkeletonProps {
   width?: string | number;
