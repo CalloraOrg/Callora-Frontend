@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import useDocumentTitle from "../hooks/useDocumentTitle";
+import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import Skeleton from "../components/Skeleton";
 import ApiDetailPageSkeleton from "./ApiDetailPage.skeleton";
@@ -13,8 +13,7 @@ import type { Review } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 import { formatPrice } from "../utils/format";
 import { Icons } from "../utils/icons";
-import PricingTierTable, { type PricingTier } from "../components/PricingTierTable";
-import HealthTimeline from "../components/HealthTimeline";
+import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 import {
   getPostmanImportUrl,
@@ -35,17 +34,77 @@ import {
 type Props = {
   onBack?: () => void;
 };
+
 type TabType =
-  | "overview"
-  | "documentation"
-  | "pricing"
-  | "reviews";
+  "overview" | "documentation" | "pricing" | "examples" | "reviews" | "embed";
+
+type EndpointParameter = {
+  name: string;
+  type: string;
+  required?: boolean;
+};
+
+type ApiEndpoint = {
+  id: string;
+  title: string;
+  url: string;
+  method: string;
+  params: EndpointParameter[];
+  response?: string;
+  group?: string;
+};
+
+const GENERIC_ENDPOINT_VERBS = new Set([
+  "get",
+  "list",
+  "create",
+  "update",
+  "delete",
+  "remove",
+  "fetch",
+]);
+
+function toTitleCase(value: string) {
+  return value.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function deriveEndpointGroupLabel(endpoint: ApiEndpoint): string {
+  if (endpoint.group?.trim()) {
+    return endpoint.group.trim();
+  }
+
+  if (endpoint.title?.trim()) {
+    const words = endpoint.title.trim().split(/\s+/);
+
+    if (
+      words.length > 1 &&
+      GENERIC_ENDPOINT_VERBS.has(words[0].toLowerCase())
+    ) {
+      return words.slice(1).join(" ");
+    }
+
+    return endpoint.title.trim();
+  }
+
+  const firstMeaningfulSegment = endpoint.url
+    .split("/")
+    .filter(Boolean)
+    .find((segment) => !/^v\d+$/i.test(segment) && !segment.startsWith("{"));
+
+  if (!firstMeaningfulSegment) {
+    return "General";
+  }
+
+  return toTitleCase(firstMeaningfulSegment.replace(/[-_]+/g, " "));
+}
 
 export default function ApiDetailPage({ onBack }: Props) {
+  const { trackFetch } = useFetchTracker();
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useToast();
+  const { recordView } = useRecentlyViewed();
 
   // Ordered tab definitions — single source of truth for labels and ids.
   const TAB_ITEMS = [
@@ -65,6 +124,12 @@ export default function ApiDetailPage({ onBack }: Props) {
 
   const api = useMemo(() => findApiById(id), [id]);
   useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
+
+  useEffect(() => {
+    if (api?.id) {
+      recordView(api.id);
+    }
+  }, [api?.id, recordView]);
 
   const documentationEndpoints = useMemo(
     () => (api?.endpoints || []) as ApiEndpoint[],
@@ -338,17 +403,16 @@ export default function ApiDetailPage({ onBack }: Props) {
   }
 
   // Example Generation Logic
- // const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
-   // url: "/v1/data",
-    //method: "GET",
-  //};
+  const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
+    url: "/v1/data",
+    method: "GET",
+  };
 
- // const curlExample = `curl -X ${firstEndpoint.method} "${API_BASE_URL}${firstEndpoint.url}?lat=37.78&lon=-122.41"
-  //-H "Authorization: Bearer YOUR_API_KEY" \\
-  //-H "Content-Type: application/json"`;
+  const curlExample = `curl -X ${firstEndpoint.method} "${API_BASE_URL}${firstEndpoint.url}?lat=37.78&lon=-122.41" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json"`;
 
-  //const jsExample = `import fetch from 'node-fetch';
-
+  const jsExample = `import fetch from 'node-fetch';
 
 const getApiData = async () => {
   const response = await fetch('${API_BASE_URL}${firstEndpoint.url}', {
@@ -365,30 +429,33 @@ const getApiData = async () => {
   return data;
 };
 
-getApiData().then(console.log).catch(console.error);
+getApiData().then(console.log).catch(console.error);`;
 
-   // const pyExample = `import requests`
+  const pyExample = `import requests
 
-// url = "${API_BASE_URL}${firstEndpoint.url}"
-//headers = {
-  //  "Authorization": "Bearer YOUR_API_KEY",
-  //  "Content-Type": "application/json"
-//}
-//params = {
-  //  "lat": 37.78,
-    //"lon": -122.41
-//}
+url = "${API_BASE_URL}${firstEndpoint.url}"
+headers = {
+    "Authorization": "Bearer YOUR_API_KEY",
+    "Content-Type": "application/json"
+}
+params = {
+    "lat": 37.78,
+    "lon": -122.41
+}
 
-//response = requests.get(url, headers=headers, params=params)
-//data = response.json()
+response = requests.get(url, headers=headers, params=params)
+data = response.json()
 
-//print(data)`;
+print(data)`;
 
-
+  const allSnippets = {
+    bash: curlExample,
+    javascript: jsExample,
+    python: pyExample,
+  };
 
   const estimatedCost = (n: number) =>
     `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
-
 
   return (
     <div className="api-detail-page">
@@ -399,34 +466,113 @@ getApiData().then(console.log).catch(console.error);
             { label: api.name, href: "", isCurrent: true },
           ]}
         />
-       <div className="api-detail-shell">
+        <div className="api-detail-shell">
+          <div className="api-detail-hero">
+            <div className="api-detail-heading">
+              <button className="ghost-button" onClick={onBack} type="button">
+                Back
+              </button>
+              <div className="api-detail-brand">
+                <div className="api-detail-logo">W</div>
+                <div className="api-detail-title">
+                  <h1>{api.name}</h1>
+                  <div className="api-detail-meta">
+                    <a href={api.provider?.url} className="link-body">{api.provider?.name}</a> ·{" "}
+                    <strong style={{ color: "var(--accent-strong)" }}>
+                      {`$${formatPrice(api.pricePerRequest ?? 0)}`}
+                    </strong>{" "}
+                    per request
+                  </div>
+                </div>
+                <div className="api-detail-provider">
+                  Published by{" "}
+                  <a
+                    href={api.provider?.url}
+                    className="link-body"
+                  >
+                    {api.provider?.name}
+                  </a>
+                </div>
+              </div>
+            </div>
+            <div className="api-detail-price-panel">
+              <div className="api-detail-price">
+                {`$${formatPrice(api.pricePerRequest ?? 0)}`}
+              </div>
+              <div className="api-detail-price-label">
+                per successful request
+              </div>
+              <button className="primary-button">Connect API</button>
+            </div>
+          </div>
 
-    <button
-      className="ghost-button"
-      onClick={onBack}
-      type="button"
-    >
-    </button>
-<section className="api-hero" aria-labelledby="api-title">
+          <div className="api-detail-content-grid">
+            <div className="content-left">
+              {/* Animated tab strip — accessible + smooth sliding indicator */}
+              <Tabs
+                tabs={TAB_ITEMS}
+                activeTab={tab}
+                onChange={(id) => setTab(id as TabType)}
+                tabPanelId={(id) => `panel-${id}`}
+                className="api-detail-tabs"
+              />
 
-  <div className="api-hero__content">
-    <div className="api-hero__identity">
-      <div className="api-hero__avatar">
-        {api.provider?.avatar ? (
-          <img
-            src={api.provider.avatar}
-            alt={`${api.provider.name} logo`}
-          />
-        ) : (
-          api.provider?.name?.charAt(0).toUpperCase() ?? "A"
-        )}
-      </div>
+              <div
+                className="tab-content"
+                style={{ animation: "fadeIn 0.3s ease" }}
+              >
+                {/* OVERVIEW TAB */}
+                {tab === "overview" && (
+                  <section
+                    id="panel-overview"
+                    role="tabpanel"
+                    aria-labelledby="tab-overview"
+                    tabIndex={0}
+                  >
+                    <div
+                      className="preview-card"
+                      style={{ padding: 24, marginBottom: 32 }}
+                    >
+                      <h3 style={{ marginTop: 0 }}>About this API</h3>
+                      <p
+                        style={{
+                          lineHeight: 1.6,
+                          fontSize: 16,
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        {api.description}
+                      </p>
+                    </div>
 
-      <div className="api-hero__info">
-        <div className="api-hero__meta">
-          <span className="api-version-pill">
-            v{api.version ?? "1.0.0"}
-          </span>
+                    <div className="api-detail-two-column">
+                      <div>
+                        <h2>Key Features</h2>
+                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                          {(api.features || []).map((f) => (
+                            <li
+                              key={f}
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {f}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <h2>Primary Use Cases</h2>
+                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                          {(api.useCases || []).map((u) => (
+                            <li
+                              key={u}
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {u}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
 
                     <h2 style={{ marginTop: 40 }}>Performance Metrics</h2>
                     <div className="api-detail-metrics">
@@ -553,7 +699,61 @@ getApiData().then(console.log).catch(console.error);
                                 {ep.title}
                               </strong>
                             </div>
-                            <code className="endpoint-url">{ep.url}</code>
+                            <div className="endpoint-header-actions">
+                              <code className="endpoint-url">{ep.url}</code>
+                              <div className="endpoint-client-buttons">
+                                <button
+                                  type="button"
+                                  className="icon-button"
+                                  aria-label="Copy Postman import URL"
+                                  title="Open in Postman"
+                                  onClick={() => {
+                                    const url = getPostmanImportUrl(
+                                      ep.method,
+                                      ep.url,
+                                      ep.title,
+                                      API_BASE_URL,
+                                    );
+                                    copyToClipboard(url).then((ok) => {
+                                      showToast(
+                                        ok
+                                          ? "Postman import URL copied"
+                                          : "Failed to copy",
+                                        ok ? "success" : "error",
+                                      );
+                                    });
+                                  }}
+                                >
+                                  <Icons.ExternalLink size={14} />
+                                  <span>Postman</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="icon-button"
+                                  aria-label="Copy Insomnia import URL"
+                                  title="Open in Insomnia"
+                                  onClick={() => {
+                                    const url = getInsomniaImportUrl(
+                                      ep.method,
+                                      ep.url,
+                                      ep.title,
+                                      API_BASE_URL,
+                                    );
+                                    copyToClipboard(url).then((ok) => {
+                                      showToast(
+                                        ok
+                                          ? "Insomnia import URL copied"
+                                          : "Failed to copy",
+                                        ok ? "success" : "error",
+                                      );
+                                    });
+                                  }}
+                                >
+                                  <Icons.ExternalLink size={14} />
+                                  <span>Insomnia</span>
+                                </button>
+                              </div>
+                            </div>
                           </div>
 
                           <div style={{ padding: 24 }}>
@@ -643,46 +843,98 @@ getApiData().then(console.log).catch(console.error);
                     tabIndex={0}
                   >
                     <h2>Pricing Plans</h2>
-                    <PricingTierTable
-                      tiers={[
-                        {
-                          name: "Free",
-                          price: "$0",
-                          description: "Perfect for experimentation and testing.",
-                          features: api.features?.map((f) => ({ label: f, included: true })) || [
-                            { label: "Standard Support", included: false },
-                            { label: "High Rate Limits", included: false },
-                          ],
-                          ctaLabel: "Get Started",
-                        },
-                        {
-                          name: "Pro",
-                          price: `$${formatPrice(api.pricePerRequest ?? 0)}`,
-                          description: "Ideal for production-grade applications.",
-                          features: api.features?.map((f) => ({ label: f, included: true })) || [
-                            { label: "Standard Support", included: true },
-                            { label: "High Rate Limits", included: true },
-                          ],
-                          ctaLabel: "Upgrade Now",
-                          isRecommended: true,
-                        },
-                        {
-                          name: "Enterprise",
-                          price: "Custom",
-                          description: "Tailored for large-scale, high-volume needs.",
-                          features: [
-                            ...(api.features?.map((f) => ({ label: f, included: true })) || []),
-                            { label: "Dedicated Support", included: true },
-                            { label: "Custom SLA", included: true },
-                            { label: "Dedicated Infrastructure", included: true },
-                          ],
-                          ctaLabel: "Contact Sales",
-                        },
-                      ]}
-                    />
+                    <div className="api-detail-pricing-grid">
+                      <div
+                        className="preview-card"
+                        style={{
+                          padding: 24,
+                          border: "2px solid var(--accent)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            color: "var(--accent)",
+                            fontWeight: 700,
+                            fontSize: 12,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Standard
+                        </div>
+                        <div className="api-detail-plan-price">
+                          {`$${formatPrice(api.pricePerRequest ?? 0)}`}{" "}
+                          <span style={{ fontSize: 14, color: "var(--muted)" }}>
+                            / call
+                          </span>
+                        </div>
+                        <p style={{ fontSize: 14, color: "var(--muted)" }}>
+                          Perfect for startups and scaling applications. Pay
+                          only for what you use.
+                        </p>
+                        <ul
+                          style={{
+                            padding: 0,
+                            listStyle: "none",
+                            fontSize: 14,
+                            marginTop: 20,
+                          }}
+                        >
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Unlimited Throughput
+                          </li>
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> 99.9% Uptime SLA
+                          </li>
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Community Support
+                          </li>
+                        </ul>
+                      </div>
+                      <div className="preview-card" style={{ padding: 24 }}>
+                        <div
+                          style={{
+                            color: "var(--muted)",
+                            fontWeight: 700,
+                            fontSize: 12,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Enterprise
+                        </div>
+                        <div className="api-detail-plan-price">Custom</div>
+                        <p style={{ fontSize: 14, color: "var(--muted)" }}>
+                          For high-volume needs requiring dedicated
+                          infrastructure and support.
+                        </p>
+                        <ul
+                          style={{
+                            padding: 0,
+                            listStyle: "none",
+                            fontSize: 14,
+                            marginTop: 20,
+                          }}
+                        >
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Dedicated Node
+                          </li>
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> 24/7 Phone Support
+                          </li>
+                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Custom Rate Limits
+                          </li>
+                        </ul>
+                        <button
+                          className="secondary-button"
+                          style={{ width: "100%", marginTop: 10 }}
+                        >
+                          Contact Sales
+                        </button>
+                      </div>
+                    </div>
 
-                    <div className="preview-card" style={{ marginTop: 32, padding: 32 }}>
-                      <h4>Cost Calculator</h4>
+                    <div className="preview-card" style={{ padding: 32 }}>
+                      <h4 style={{ marginTop: 0 }}>Cost Calculator</h4>
                       <p style={{ color: "var(--muted)" }}>
                         Estimate your monthly billing based on projected request
                         volume.
@@ -1157,7 +1409,6 @@ getApiData().then(console.log).catch(console.error);
                       </span>
                     </div>
                   </div>
-                  <HealthTimeline data={api.hourlyHealth as any} />
                 </div>
 
                 <div
@@ -1232,45 +1483,7 @@ getApiData().then(console.log).catch(console.error);
             </aside>
           </div>
         </div>
-
-        <h1 id="api-title">{api.name}</h1>
-
-        <p className="api-hero__description">
-          {api.description}
-        </p>
-
-        <p className="api-hero__provider">
-          Published by{" "}
-          <a
-            href={api.provider?.url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {api.provider?.name}
-          </a>
-        </p>
       </div>
     </div>
-
-    <div className="api-hero__cta">
-      <button className="primary-button">
-        Try API
-      </button>
-
-      <button
-        className="secondary-button"
-        onClick={() => setTab("pricing")}
-      >
-        View Pricing
-      </button>
-    </div>
-  </div>
-</section>
-
-  <div className="api-detail-content-grid"></div>
-      </div>
-    </div>
-  </div>
   );
 }
-        
