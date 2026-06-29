@@ -11,6 +11,7 @@ import type { Review } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 import { formatPrice } from "../utils/format";
 import { Icons } from "../utils/icons";
+import PricingTierTable, { type PricingTier } from "../components/PricingTierTable";
 import HealthTimeline from "../components/HealthTimeline";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
@@ -786,98 +787,46 @@ print(data)`;
                     tabIndex={0}
                   >
                     <h2>Pricing Plans</h2>
-                    <div className="api-detail-pricing-grid">
-                      <div
-                        className="preview-card"
-                        style={{
-                          padding: 24,
-                          border: "2px solid var(--accent)",
-                        }}
-                      >
-                        <div
-                          style={{
-                            color: "var(--accent)",
-                            fontWeight: 700,
-                            fontSize: 12,
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          Standard
-                        </div>
-                        <div className="api-detail-plan-price">
-                          {`$${formatPrice(api.pricePerRequest ?? 0)}`}{" "}
-                          <span style={{ fontSize: 14, color: "var(--muted)" }}>
-                            / call
-                          </span>
-                        </div>
-                        <p style={{ fontSize: 14, color: "var(--muted)" }}>
-                          Perfect for startups and scaling applications. Pay
-                          only for what you use.
-                        </p>
-                        <ul
-                          style={{
-                            padding: 0,
-                            listStyle: "none",
-                            fontSize: 14,
-                            marginTop: 20,
-                          }}
-                        >
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ Unlimited Throughput
-                          </li>
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ 99.9% Uptime SLA
-                          </li>
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ Community Support
-                          </li>
-                        </ul>
-                      </div>
-                      <div className="preview-card" style={{ padding: 24 }}>
-                        <div
-                          style={{
-                            color: "var(--muted)",
-                            fontWeight: 700,
-                            fontSize: 12,
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          Enterprise
-                        </div>
-                        <div className="api-detail-plan-price">Custom</div>
-                        <p style={{ fontSize: 14, color: "var(--muted)" }}>
-                          For high-volume needs requiring dedicated
-                          infrastructure and support.
-                        </p>
-                        <ul
-                          style={{
-                            padding: 0,
-                            listStyle: "none",
-                            fontSize: 14,
-                            marginTop: 20,
-                          }}
-                        >
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ Dedicated Node
-                          </li>
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ 24/7 Phone Support
-                          </li>
-                          <li style={{ marginBottom: 10 }}>
-                            ✅ Custom Rate Limits
-                          </li>
-                        </ul>
-                        <button
-                          className="secondary-button"
-                          style={{ width: "100%", marginTop: 10 }}
-                        >
-                          Contact Sales
-                        </button>
-                      </div>
-                    </div>
+                    <PricingTierTable
+                      tiers={[
+                        {
+                          name: "Free",
+                          price: "$0",
+                          description: "Perfect for experimentation and testing.",
+                          features: api.features?.map((f) => ({ label: f, included: true })) || [
+                            { label: "Standard Support", included: false },
+                            { label: "High Rate Limits", included: false },
+                          ],
+                          ctaLabel: "Get Started",
+                        },
+                        {
+                          name: "Pro",
+                          price: `$${formatPrice(api.pricePerRequest ?? 0)}`,
+                          description: "Ideal for production-grade applications.",
+                          features: api.features?.map((f) => ({ label: f, included: true })) || [
+                            { label: "Standard Support", included: true },
+                            { label: "High Rate Limits", included: true },
+                          ],
+                          ctaLabel: "Upgrade Now",
+                          isRecommended: true,
+                        },
+                        {
+                          name: "Enterprise",
+                          price: "Custom",
+                          description: "Tailored for large-scale, high-volume needs.",
+                          features: [
+                            ...(api.features?.map((f) => ({ label: f, included: true })) || []),
+                            { label: "Dedicated Support", included: true },
+                            { label: "Custom SLA", included: true },
+                            { label: "Dedicated Infrastructure", included: true },
+                          ],
+                          ctaLabel: "Contact Sales",
+                        },
+                      ]}
+                    />
 
-                    <div className="preview-card" style={{ padding: 32 }}>
-                      <h4 style={{ marginTop: 0 }}>Cost Calculator</h4>
+                    <div className="preview-card" style={{ marginTop: 32, padding: 32 }}>
+                      <h4>Cost Calculator</h4>
                       <p style={{ color: "var(--muted)" }}>
                         Estimate your monthly billing based on projected request
                         volume.
