@@ -1,0 +1,106 @@
+/* Code Example Design Tokens — Light and Dark Theme Variants */
+
+/* Light theme defaults */
+.code-sample {
+  --bg-subtle: #f9f9f9;
+  --bg-highlight: #ffffff;
+  --border-subtle: #e2e8f0;
+  --text-main: #1a2332;
+  --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] .code-sample {
+  --bg-subtle: rgba(255, 255, 255, 0.03);
+  --bg-highlight: var(--surface-strong, rgba(17, 24, 46, 0.96));
+  --border-subtle: var(--line, rgba(169, 184, 255, 0.16));
+  --text-main: var(--text, #f3f5fb);
+}
+
+/* Code sample container */
+.code-sample {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.code-sample__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.code-sample__tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.code-sample__tab {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted, #64748b);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 180ms ease;
+}
+
+.code-sample__tab--active {
+  font-weight: 600;
+  color: var(--text-main);
+  background: var(--bg-highlight);
+  border-color: var(--border-subtle);
+}
+
+.code-sample__tab:focus-visible {
+  outline: 2px solid var(--accent, #4e85ff);
+  outline-offset: 2px;
+}
+
+.code-sample__copy {
+  padding: 5px 12px;
+  font-size: 11px;
+  min-width: 75px;
+}
+
+.code-sample__copy--success {
+  color: var(--success, #10b981);
+}
+
+.code-sample__panel {
+  padding: 16px 12px;
+  margin: 0;
+}
+
+.code-sample__pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-main);
+}
+
+/* Screen reader only text */
+.sr-only {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .code-sample__tab {
+    transition: none;
+  }
+}

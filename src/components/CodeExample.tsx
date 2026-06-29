@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Icons } from "../utils/icons";
+import { usePersistedState } from "../hooks/usePersistedState";
+import "../styles/code.css";
 
 /**
- * UPDATED COMPONENT FOR ISSUE #188:
- * - Features tabbed navigation for multiple code snippets with roving tabindex.
- * - Language persistence with usePersistedState hook.
- * - Enhanced copy-to-clipboard with visual feedback and tooltip affordance.
- * - Full WCAG 2.1 AA accessibility with keyboard navigation.
- * - Minimalist design that respects CSS variables and focus states.
+ * CodeExample component with tabbed navigation for multiple code snippets.
+ * 
+ * Features:
+ * - Tabbed navigation for multiple languages with roving tabindex
+ * - Language persistence via usePersistedState hook
+ * - Copy-to-clipboard with visual feedback
+ * - Full WCAG 2.1 AA accessibility
+ * - Dark mode support via CSS custom properties
  */
 
 type CodeExampleProps = {
@@ -122,29 +126,13 @@ export default function CodeExample({
   };
 
   return (
-    <div 
-      className="preview-card" 
-      style={{ 
-        padding: 0, 
-        overflow: "hidden", 
-        border: "1px solid var(--border-subtle)" 
-      }}
-    >
+    <div className="code-sample">
       {/* Header Section: Contains Language Tabs and Copy Button */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 12px",
-          background: "var(--bg-subtle, #f9f9f9)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
+      <div className="code-sample__header">
         {/* Navigation Tabs List with Roving Tabindex */}
         <div 
           ref={tablistRef}
-          style={{ display: "flex", gap: "4px" }} 
+          className="code-sample__tabs" 
           role="tablist"
           aria-label="Code language"
         >
@@ -156,29 +144,9 @@ export default function CodeExample({
               aria-selected={resolvedLanguage === lang}
               aria-controls={`tabpanel-${lang}`}
               tabIndex={resolvedLanguage === lang ? 0 : -1}
+              className={`code-sample__tab ${resolvedLanguage === lang ? 'code-sample__tab--active' : ''}`}
               onClick={() => setActiveLanguage(lang)}
               onKeyDown={(e) => handleTabKeyDown(e, index)}
-              style={{
-                padding: "4px 10px",
-                fontSize: "11px",
-                fontWeight: resolvedLanguage === lang ? 600 : 400,
-                color: resolvedLanguage === lang ? "var(--text-main)" : "var(--muted)",
-                background: resolvedLanguage === lang ? "var(--bg-highlight, #fff)" : "transparent",
-                border: "1px solid",
-                borderColor: resolvedLanguage === lang ? "var(--border-subtle)" : "transparent",
-                borderRadius: "4px",
-                cursor: "pointer",
-                textTransform: "uppercase",
-                transition: "all 0.2s ease",
-                outline: "none",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.outline = "2px solid var(--accent, #4e85ff)";
-                e.currentTarget.style.outlineOffset = "2px";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.outline = "none";
-              }}
             >
               {lang}
             </button>
@@ -187,25 +155,12 @@ export default function CodeExample({
 
         {/* Action: Copy to Clipboard */}
         <button
-          className="ghost-button"
+          className={`ghost-button code-sample__copy ${copied ? 'code-sample__copy--success' : ''}`}
           onClick={handleCopy}
           aria-label="Copy code snippet to clipboard"
-          style={{
-            padding: "5px 12px",
-            fontSize: "11px",
-            minWidth: "75px",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
         >
           {copied ? (
-            <span style={{ 
-              color: "var(--success, #10b981)", 
-              display: "flex", 
-              alignItems: "center", 
-              gap: "4px" 
-            }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <Icons.Check size={14} /> Copied
             </span>
           ) : (
@@ -220,19 +175,9 @@ export default function CodeExample({
         id={`tabpanel-${resolvedLanguage}`}
         aria-labelledby={`tab-${resolvedLanguage}`}
         tabIndex={0}
-        style={{ padding: "16px 12px" }}
+        className="code-sample__panel"
       >
-        <pre
-          style={{
-            margin: 0,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            fontSize: "13px",
-            fontFamily: "var(--font-mono, monospace)",
-            lineHeight: 1.5,
-            color: "var(--text-main)"
-          }}
-        >
+        <pre className="code-sample__pre">
           <code>{activeCode}</code>
         </pre>
       </div>
@@ -241,28 +186,10 @@ export default function CodeExample({
       <span
         aria-live="polite"
         aria-atomic="true"
-        style={{
-          position: "absolute",
-          left: "-10000px",
-          width: "1px",
-          height: "1px",
-          overflow: "hidden",
-        }}
+        className="sr-only"
       >
         {copied ? "Code copied to clipboard" : ""}
       </span>
-
-      <style>{`
-        .code-example-tab:focus-visible {
-          outline: 2px solid var(--accent, #4e85ff);
-          outline-offset: 2px;
-        }
-
-        .code-example-copy:focus-visible {
-          outline: 2px solid var(--accent, #4e85ff);
-          outline-offset: 2px;
-        }
-      `}</style>
     </div>
   );
 }
