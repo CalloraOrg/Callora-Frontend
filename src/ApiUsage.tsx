@@ -5,6 +5,8 @@ import { formatPrice } from './utils/format';
 import RequestBodyEditor from './components/RequestBodyEditor';
 import type { JsonSchema } from './components/RequestBodyEditor';
 import CallHistoryRow from './components/CallHistoryRow';
+import { generateSnapshotUrl, parseSnapshotUrl, copySnapshotUrl } from './utils/snapshotUrl';
+import { LinkIcon } from './components/icons';
 
 type ApiEndpoint = {
   id: string;
@@ -201,6 +203,38 @@ export default function ApiUsage() {
   const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
   const [selectedRange, setSelectedRange] = useState<DateRange>({ preset: '24h' });
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
+  const [snapshotted, setSnapshotted] = useState(false);
+
+  // Restore endpoint params from snapshot URL on mount
+  useEffect(() => {
+    const snapshot = parseSnapshotUrl(window.location.search);
+    if (snapshot?.endpointId) {
+      const endpoint = MOCK_ENDPOINTS.find(ep => ep.id === snapshot.endpointId);
+      if (endpoint) {
+        setSelectedEndpoint(endpoint);
+        if (snapshot.params) {
+          setRequestParams(JSON.stringify(snapshot.params, null, 2));
+        }
+      }
+    }
+  }, []);
+
+  const handleShareSnapshot = async () => {
+    let parsedParams: Record<string, unknown> | null = null;
+    try {
+      parsedParams = JSON.parse(requestParams);
+    } catch {
+      // Invalid JSON, use null
+    }
+    const success = await copySnapshotUrl(window.location.pathname, {
+      endpointId: selectedEndpoint.id,
+      params: parsedParams,
+    });
+    if (success) {
+      setSnapshotted(true);
+      setTimeout(() => setSnapshotted(false), 2000);
+    }
+  };
 
   // Filter call history based on selected date range
   const filterCallsByRange = (calls: CallRecord[]): CallRecord[] => {
@@ -506,6 +540,16 @@ export default function ApiUsage() {
           >
             {isLoading && <span className="button-spinner" aria-hidden="true" />}
             {isLoading ? 'Making Call...' : 'Make Test Call'}
+          </button>
+
+          <button
+            className="secondary-button share-snapshot-button"
+            onClick={handleShareSnapshot}
+            disabled={isLoading}
+            aria-label="Share snapshot URL"
+          >
+            <LinkIcon size={16} />
+            {snapshotted ? 'Copied!' : 'Share Snapshot'}
           </button>
         </div>
 
