@@ -273,7 +273,6 @@ function createMockHash() {
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const navigate = useNavigate();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",

@@ -182,6 +182,15 @@ function formatTime(ms: number) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+function formatTimestamp(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 
 export default function ApiUsage() {
   const { trackFetch } = useFetchTracker();
@@ -713,41 +722,5 @@ export default function ApiUsage() {
         </div></div>
     </div>
 
-      {/* Integration Guide */ }
-  <div className="surface integration-guide-section">
-    <h2>Integration Guide</h2>
-
-    <div className="language-tabs">
-      {(['javascript', 'python', 'curl'] as const).map(lang => (
-        <button
-          key={lang}
-          className={`tab-button ${selectedLanguage === lang ? 'active' : ''}`}
-          onClick={() => setSelectedLanguage(lang)}
-        >
-          {lang.charAt(0).toUpperCase() + lang.slice(1)}
-        </button>
-      ))}
-    </div>
-
-    <div className="code-example">
-      <div className="code-header">
-        <h3>{selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)} Example</h3>
-        <button
-          className="secondary-button"
-          onClick={() => handleCopyCode(CODE_EXAMPLES[selectedLanguage])}
-        >
-          {copied ? 'Copied!' : 'Copy Code'}
-        </button>
-      </div>
-      <pre className="code-block">
-        <code>{CODE_EXAMPLES[selectedLanguage]}</code>
-      </pre>
-    </div>
-
-    <div className="documentation-link">
-      <a href="#" className="primary-button">View Full Documentation →</a>
-    </div>
-  </div>
-    </div >
   );
 }
