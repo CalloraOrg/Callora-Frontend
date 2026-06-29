@@ -4593,3 +4593,11 @@ code,
     color: #444;
   }
 }
+
+/* Share Snapshot Button */
+.share-snapshot-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
