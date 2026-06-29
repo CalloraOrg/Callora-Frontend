@@ -511,6 +511,9 @@ export default function ApiCard({
         ))}
       </div>
 
+      {/* "Why this API?" rationale — hidden in compact rows to keep them dense. */}
+      {!isCompact && <WhyApi api={api} />}
+
       <div
   style={{
     marginTop: 10,
