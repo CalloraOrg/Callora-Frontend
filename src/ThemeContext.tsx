@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import './styles/theme-transition.css';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -21,6 +22,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const resolvedTheme = document.documentElement.getAttribute('data-theme');
     return (resolvedTheme === 'light' || resolvedTheme === 'dark') ? resolvedTheme : 'dark';
   });
+
+  // Enable color-token transitions only after the first paint, so the initial
+  // theme is applied instantly (no flash) while subsequent switches animate.
+  useEffect(() => {
+    const root = window.document.documentElement;
+    const id = window.requestAnimationFrame(() => {
+      root.classList.add('theme-transitions-ready');
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('callora-theme', theme);
