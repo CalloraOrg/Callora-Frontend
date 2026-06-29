@@ -22,6 +22,9 @@ import CompareDrawer from "../components/CompareDrawer";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
 
 export default function MarketplacePage(): JSX.Element {
+  const { apis } = useCompareStore();
+  const isTrayVisible = apis.length > 0;
+
   useDocumentTitle(
     "Marketplace – Callora",
     "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
@@ -350,8 +353,12 @@ export default function MarketplacePage(): JSX.Element {
           />
         </aside>
 
-        <main className="marketplace-results">
-          <div className="marketplace-toolbar">
+          <main 
+            className="marketplace-results"
+            style={isTrayVisible ? { paddingBottom: '80px' } : {}}
+          >
+            <div className="marketplace-toolbar">
+
             <div className="marketplace-count">
               {filtered.length === 0 ? (
                 <>Showing 0 of 0 APIs</>
@@ -435,27 +442,23 @@ export default function MarketplacePage(): JSX.Element {
 
        {/* Mobile bottom-sheet — only rendered when open */}
        <FiltersBottomSheet
-         open={showFiltersMobile}
-         onClose={() => setShowFiltersMobile(false)}
-         resultCount={filtered.length}
-         selectedCategories={selectedCategories}
-         toggleCategory={toggleCategory}
-         minPrice={minPrice}
-         maxPrice={maxPrice}
-         setMinPrice={setMinPrice}
-         setMaxPrice={setMaxPrice}
-         popularity={popularity}
-         setPopularity={setPopularity}
-         clearFilters={clearFilters}
-         favoritesOnly={favoritesOnly}
-         toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
-         triggerRef={filtersTriggerRef}
-       />
-
-
-
-      {/* Compare Drawer */}
-      <CompareDrawer />
-    </div>
-  );
+          open={showFiltersMobile}
+          onClose={() => setShowFiltersMobile(false)}
+          resultCount={filtered.length}
+          selectedCategories={selectedCategories}
+          toggleCategory={toggleCategory}
+          minPrice={minPrice}
+          maxPrice={maxPrice}
+          setMinPrice={setMinPrice}
+          setMaxPrice={setMaxPrice}
+          popularity={popularity}
+          setPopularity={setPopularity}
+          clearFilters={clearFilters}
+          favoritesOnly={favoritesOnly}
+          toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+          triggerRef={filtersTriggerRef}
+        />
+     </div>
+   );
 }
+

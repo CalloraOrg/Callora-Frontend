@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 import ApiUsage from './ApiUsage';
@@ -18,6 +18,8 @@ import {
   NETWORK_FEE,
   PRESET_AMOUNTS,
 } from "./config/constants";
+import CompareDrawer from './components/CompareDrawer';
+import CompareTray from './components/CompareTray';
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -761,10 +763,17 @@ function App() {
         </nav>
       </footer>
 
-      <ShortcutsModal
-        isOpen={isShortcutsModalOpen}
-        onClose={() => setIsShortcutsModalOpen(false)}
-      />
+       <ShortcutsModal
+         isOpen={isShortcutsModalOpen}
+         onClose={() => setIsShortcutsModalOpen(false)}
+       />
+
+       <CompareTray />
+       <CompareDrawer />
+     </div>
+   );
+}
+
 
       {isDepositOpen && (
         <div

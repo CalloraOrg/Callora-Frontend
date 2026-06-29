@@ -1,27 +1,29 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import { formatPrice } from "../utils/format";
 import RatingHistogram from "./RatingHistogram";
 import "./CompareDrawer.css";
 
 export default function CompareDrawer() {
-  const comparedApis = useCompareStore();
-  const [isOpen, setIsOpen] = useState(false);
+  const { apis, isOpen } = useCompareStore();
   const [announcement, setAnnouncement] = useState("");
+  const drawerRef = useRef<HTMLDivElement>(null);
 
-  // Sync drawer visibility with items
+  // Handle ESC to close
   useEffect(() => {
-    if (comparedApis.length > 0) {
-      setIsOpen(true);
-    } else {
-      setIsOpen(false);
-    }
-  }, [comparedApis.length]);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        compareStore.setOpen(false);
+        drawerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [isOpen]);
 
   const handleRemove = (id: string, name: string) => {
     compareStore.removeApi(id);
     setAnnouncement(`Removed ${name} from comparison.`);
-    // Clear announcement after a moment to allow re-announcing
     setTimeout(() => setAnnouncement(""), 3000);
   };
 
@@ -31,29 +33,44 @@ export default function CompareDrawer() {
     setTimeout(() => setAnnouncement(""), 3000);
   };
 
+  if (!isOpen) return null;
+
   return (
     <>
       <div aria-live="polite" className="skip-link">
         {announcement}
       </div>
 
-      <div className={`compare-drawer-overlay ${isOpen ? "open" : ""}`}>
-        <div className={`compare-drawer ${isOpen ? "open" : ""}`}>
+      <div className="compare-drawer-overlay open" onClick={() => compareStore.setOpen(false)}>
+        <div
+          ref={drawerRef}
+          className="compare-drawer open"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="compare-drawer-title"
+          onClick={(e) => e.stopPropagation()}
+          tabIndex={-1}
+        >
           <div className="compare-drawer-header">
-            <h2 className="compare-drawer-title">Compare APIs</h2>
-            <button className="ghost-button" onClick={handleClear} aria-label="Clear all comparisons">
-              Clear
-            </button>
+            <h2 id="compare-drawer-title" className="compare-drawer-title">Compare APIs</h2>
+            <div className="compare-drawer-actions">
+               <button className="ghost-button" onClick={handleClear} aria-label="Clear all comparisons">
+                Clear
+              </button>
+              <button className="close-button" onClick={() => compareStore.setOpen(false)} aria-label="Close drawer">
+                ✕
+              </button>
+            </div>
           </div>
 
           <div className="compare-drawer-content">
-            {comparedApis.length === 0 ? (
+            {apis.length === 0 ? (
               <div className="compare-drawer-empty">
                 Select APIs to compare them.
               </div>
             ) : (
               <div className="compare-grid">
-                {comparedApis.map((api) => (
+                {apis.map((api) => (
                   <div key={api.id} className="compare-column">
                     <button
                       className="compare-column-remove"

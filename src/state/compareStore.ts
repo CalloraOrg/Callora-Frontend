@@ -1,11 +1,17 @@
 import { useSyncExternalStore } from "react";
 import type { APIItem } from "../data/mockApis";
 
-type CompareState = APIItem[];
+type CompareState = {
+  apis: APIItem[];
+  isOpen: boolean;
+};
 
 const STORAGE_KEY = "callora_compare_state";
 
-let state: CompareState = [];
+let state: CompareState = {
+  apis: [],
+  isOpen: false,
+};
 
 try {
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -26,20 +32,37 @@ function emitChange() {
 
 export const compareStore = {
   addApi(api: APIItem) {
-    if (state.length >= 3) return;
-    if (state.some((item) => item.id === api.id)) return;
+    if (state.apis.length >= 3) return;
+    if (state.apis.some((item) => item.id === api.id)) return;
 
-    state = [...state, api];
+    state = {
+      ...state,
+      apis: [...state.apis, api],
+    };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     emitChange();
   },
   removeApi(apiId: string) {
-    state = state.filter((item) => item.id !== apiId);
+    state = {
+      ...state,
+      apis: state.apis.filter((item) => item.id !== apiId),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    emitChange();
+  },
+  setOpen(open: boolean) {
+    state = {
+      ...state,
+      isOpen: open,
+    };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     emitChange();
   },
   clear() {
-    state = [];
+    state = {
+      apis: [],
+      isOpen: false,
+    };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     emitChange();
   },

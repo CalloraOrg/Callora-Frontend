@@ -405,7 +405,7 @@ export default function ApiCard({
   const isCompact = density === "compact";
 
   const { isFavorite, toggleFavorite } = useFavorites();
-  const comparedApis = useCompareStore();
+  const { apis: comparedApis } = useCompareStore();
   const isCompared = comparedApis.some(item => item.id === api.id);
   const canCompare = isCompared || comparedApis.length < 3;
 
@@ -500,31 +500,33 @@ export default function ApiCard({
         onToggle={toggleFavorite}
       />
 
-      {/* Compare button - absolutely positioned, top-left */}
-      <button
-        onClick={handleCompareClick}
-        disabled={!canCompare}
-        className="api-card__compare-btn"
-        style={{
-          position: "absolute",
-          top: "8px",
-          left: "48px",
-          zIndex: 10,
-          background: isCompared ? "var(--accent)" : "rgba(0,0,0,0.5)",
-          color: "white",
-          border: "none",
-          borderRadius: "8px",
-          padding: "4px 8px",
-          fontSize: "0.75rem",
-          fontWeight: 600,
-          cursor: canCompare ? "pointer" : "not-allowed",
-          opacity: isCompared ? 1 : 0, // rely on css for hover visibility
-          transition: "opacity 0.2s, background 0.2s"
-        }}
-        aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
-      >
-        {isCompared ? "Compared" : "Compare"}
-      </button>
+       {/* Pin button - absolutely positioned, top-left */}
+       <button
+         onClick={handleCompareClick}
+         disabled={!canCompare}
+         className="api-card__compare-btn"
+         style={{
+           position: "absolute",
+           top: "8px",
+           left: "48px",
+           zIndex: 10,
+           background: isCompared ? "var(--accent)" : "rgba(0,0,0,0.5)",
+           color: "white",
+           border: "none",
+           borderRadius: "8px",
+           padding: "4px 8px",
+           fontSize: "0.75rem",
+           fontWeight: 600,
+           cursor: canCompare ? "pointer" : "not-allowed",
+           opacity: isCompared ? 1 : 0.6,
+           transition: "opacity 0.2s, background 0.2s"
+         }}
+         aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
+         aria-pressed={isCompared}
+       >
+         {isCompared ? "Pinned" : "Pin"}
+       </button>
+
 
       <div
         className="api-marketplace-card-header"
