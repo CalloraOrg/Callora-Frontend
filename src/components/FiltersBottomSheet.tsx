@@ -44,6 +44,8 @@ interface FiltersBottomSheetProps {
   popularity: string;
   setPopularity: (p: string) => void;
   clearFilters: () => void;
+  favoritesOnly: boolean;
+  toggleFavoritesOnly: () => void;
   /** Ref to the trigger button so focus is restored on close */
   triggerRef: React.RefObject<HTMLButtonElement>;
 }
@@ -61,6 +63,8 @@ export default function FiltersBottomSheet({
   popularity,
   setPopularity,
   clearFilters,
+  favoritesOnly,
+  toggleFavoritesOnly,
   triggerRef,
 }: FiltersBottomSheetProps) {
   const [snap, setSnap] = useState<Snap>("half");
@@ -222,6 +226,8 @@ export default function FiltersBottomSheet({
             popularity={popularity}
             setPopularity={setPopularity}
             clearFilters={clearFilters}
+            favoritesOnly={favoritesOnly}
+            toggleFavoritesOnly={toggleFavoritesOnly}
           />
         </div>
 
