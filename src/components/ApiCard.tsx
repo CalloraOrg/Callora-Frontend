@@ -6,7 +6,8 @@
  * allowing users to add/remove the endpoint from collections.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ContextMenu } from './ContextMenu';
 import Skeleton from "./Skeleton";
 import TagChip from "./TagChip";
 import { formatPrice } from "../utils/format";
@@ -368,6 +369,45 @@ export default function ApiCard({
     }
   };
 
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const handleOpenMenu = (
+    e: React.MouseEvent | React.TouchEvent,
+    clientX: number,
+    clientY: number,
+  ) => {
+    e.preventDefault();
+    setMenuPos({ x: clientX, y: clientY });
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // Prevent menu from opening on interactive elements
+    if ((e.target as HTMLElement).closest('button, a')) return;
+    handleOpenMenu(e, e.clientX, e.clientY);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest('button, a')) return;
+    const touch = e.touches[0];
+    longPressTimer.current = setTimeout(() => {
+      handleOpenMenu(e, touch.clientX, touch.clientY);
+    }, 600); // 600ms long press threshold
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+
+  const contextActions = [
+    { label: 'View Details', action: () => onViewDetails?.(api) },
+    {
+      label: 'Copy Endpoint URL',
+      action: () => navigator.clipboard.writeText(api.endpoint),
+    },
+    { label: 'Add to Comparison', action: () => compareStore.addApi(api), isCritical: false },
+  ];
+
   return (
     <article
       className={`preview-card api-marketplace-card${isCompact ? " api-card--compact" : ""}`}
@@ -376,6 +416,9 @@ export default function ApiCard({
       aria-label={`View details for ${api.name}`}
       onClick={() => onViewDetails?.(api)}
       onKeyDown={handleKeyDown}
+      onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       style={{
         padding: isCompact ? 10 : 12,
         display: "flex",
@@ -384,6 +427,14 @@ export default function ApiCard({
         gap: isCompact ? 6 : 8,
       }}
     >
+      {menuPos && (
+        <ContextMenu
+          x={menuPos.x}
+          y={menuPos.y}
+          onClose={() => setMenuPos(null)}
+          actions={contextActions}
+        />
+      )}
       {/* Absolutely-positioned bookmark button in the top-right corner */}
       <BookmarkButton endpointId={api.id} />
       
