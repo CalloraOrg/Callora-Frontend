@@ -1429,6 +1429,12 @@ print(data)`;
       >
         View Pricing
       </button>
+
+      {/* Accessible subscribe flow with inline confirmation (issue #287) */}
+      <SubscribeButton
+        apiName={api.name}
+        onSubscribe={() => showToast(`Subscribed to ${api.name}!`, "success")}
+      />
     </div>
   </div>
 </section>
