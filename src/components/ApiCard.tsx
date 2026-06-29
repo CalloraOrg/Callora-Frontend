@@ -16,6 +16,7 @@ import { useFavorites } from "../hooks/useFavorites";
 import type { APIItem } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
+import { usePinnedApis, pinnedApisStore } from "../state/pinnedApis";
 import Sparkline from "./Sparkline";
 import { TagIcon, ClockIcon, BoltIcon } from "./icons";
 
@@ -372,6 +373,57 @@ function BookmarkButton({ endpointId }: BookmarkButtonProps) {
   );
 }
 
+// ─── Pin button ───────────────────────────────────────────────────────────────
+
+/** Quick-menu button that pins/unpins an API to the dashboard. */
+function PinButton({ apiId }: { apiId: string }) {
+  const pinned = usePinnedApis();
+  const isPinned = pinned.has(apiId);
+
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); pinnedApisStore.toggle(apiId); }}
+      style={{
+        position: "absolute",
+        top: "48px",
+        right: "8px",
+        background: isPinned ? "var(--accent, rgba(78,133,255,0.9))" : "rgba(0,0,0,0.5)",
+        border: "none",
+        borderRadius: "50%",
+        width: "32px",
+        height: "32px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        zIndex: 10,
+        transition: "background 160ms ease, transform 160ms ease",
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)")}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
+      aria-label={isPinned ? `Unpin ${apiId} from dashboard` : `Pin ${apiId} to dashboard`}
+      aria-pressed={isPinned}
+    >
+      {/* Pin icon */}
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill={isPinned ? "white" : "none"}
+        stroke="white"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <line x1="12" y1="17" x2="12" y2="22" />
+        <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+      </svg>
+    </button>
+  );
+}
+
 // ─── ApiCard ─────────────────────────────────────────────────────────────────
 
 const EM_DASH = "—";
@@ -493,6 +545,9 @@ export default function ApiCard({
       )}
       {/* Absolutely-positioned bookmark button in the top-right corner */}
       <BookmarkButton endpointId={api.id} />
+
+      {/* Pin/unpin button — below bookmark, top-right */}
+      <PinButton apiId={api.id} />
       
       <FavoriteButton
         endpointId={api.id}
