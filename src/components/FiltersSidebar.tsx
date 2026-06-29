@@ -18,6 +18,8 @@ export default function FiltersSidebar({
   popularity,
   setPopularity,
   clearFilters,
+  favoritesOnly,
+  toggleFavoritesOnly,
 }: {
   selectedCategories: Set<string>;
   toggleCategory: (c: string) => void;
@@ -28,6 +30,8 @@ export default function FiltersSidebar({
   popularity: string;
   setPopularity: (p: string) => void;
   clearFilters: () => void;
+  favoritesOnly: boolean;
+  toggleFavoritesOnly: () => void;
 }) {
   return (
     <aside className="filters-sidebar">
@@ -121,6 +125,24 @@ export default function FiltersSidebar({
                 <option value="mostUsed">Most used</option>
                 <option value="newest">Newest</option>
               </select>
+            </div>
+          </fieldset>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+          <fieldset className="filter-group">
+            <legend className="filter-legend">Favorites</legend>
+            <div className="filter-option" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+              <input
+                id="favorites-only-checkbox"
+                type="checkbox"
+                className="filter-checkbox"
+                checked={favoritesOnly}
+                onChange={toggleFavoritesOnly}
+              />
+              <label htmlFor="favorites-only-checkbox" className="filter-label" style={{ color: "var(--text)" }}>
+                Favorites only
+              </label>
             </div>
           </fieldset>
       </div>

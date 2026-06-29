@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import ApiCard from "../components/ApiCard";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import { useFavorites } from "../hooks/useFavorites";
 import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
@@ -37,6 +38,8 @@ export default function MarketplacePage(): JSX.Element {
   const [minPrice, setMinPrice] = useState<number | null>(null);
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const [popularity, setPopularity] = useState<string>("any");
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   /**
    * Sort state persisted via URL query parameter ?sort=
    * Default is "popularity" to match existing behaviour.
@@ -81,24 +84,6 @@ export default function MarketplacePage(): JSX.Element {
     persistDensityPreference(density);
   }, [density]);
 
-  const toggleCategory = (c: string) => {
-    const copy = new Set(selectedCategories);
-    if (copy.has(c)) copy.delete(c);
-    else copy.add(c);
-    setSelectedCategories(copy);
-  };
-
-  const clearFilters = () => {
-    setSelectedCategories(new Set());
-    setSelectedTag(null);
-    setMinPrice(null);
-    setMaxPrice(null);
-    setPopularity("any");
-    setSortParam("popularity");
-    setSearch("");
-    setShown(12);
-  };
-
   /**
    * Determine if any filters are currently active.
    * Used to distinguish between "no APIs exist" vs "filters too narrow" empty states.
@@ -110,7 +95,8 @@ export default function MarketplacePage(): JSX.Element {
       selectedTag !== null ||
       minPrice !== null ||
       maxPrice !== null ||
-      popularity !== "any"
+      popularity !== "any" ||
+      favoritesOnly
     );
   };
 
@@ -122,7 +108,8 @@ export default function MarketplacePage(): JSX.Element {
     selectedCategories.size +
     (minPrice !== null ? 1 : 0) +
     (maxPrice !== null ? 1 : 0) +
-    (popularity !== "any" ? 1 : 0);
+    (popularity !== "any" ? 1 : 0) +
+    (favoritesOnly ? 1 : 0);
 
   /**
    * Handle retry for fetch errors.
@@ -153,6 +140,10 @@ export default function MarketplacePage(): JSX.Element {
 
     if (selectedCategories.size > 0) {
       items = items.filter((a) => selectedCategories.has(a.category ?? ""));
+    }
+
+    if (favoritesOnly) {
+      items = items.filter((a) => favorites.includes(a.id));
     }
 
     if (selectedTag) {
@@ -209,6 +200,7 @@ export default function MarketplacePage(): JSX.Element {
     minPrice,
     maxPrice,
     popularity,
+    favoritesOnly,
     sortParam,
   ]);
 
@@ -254,11 +246,14 @@ export default function MarketplacePage(): JSX.Element {
 
   const clearFilters = () => {
     setSelectedCategories(new Set());
+    setSelectedTag(null);
     setMinPrice(null);
     setMaxPrice(null);
     setPopularity("any");
-    setSort("relevance");
-    setSearchParams({ page: "1" });
+    setFavoritesOnly(false);
+    setSortParam("popularity");
+    setSearch("");
+    setShown(12);
   };
 
   const handlePageChange = (page: number) => {
@@ -296,7 +291,8 @@ export default function MarketplacePage(): JSX.Element {
     if (!isLoading) {
       setSearchParams({ page: "1" });
     }
-  }, [debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sort, setSearchParams, isLoading]);
+  }, [debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sortParam, setSearchParams, isLoading]);
+
 
   const startItem = (validCurrentPage - 1) * pageSize + 1;
   const endItem = Math.min(validCurrentPage * pageSize, filtered.length);
@@ -345,6 +341,8 @@ export default function MarketplacePage(): JSX.Element {
             popularity={popularity}
             setPopularity={setPopularity}
             clearFilters={clearFilters}
+            favoritesOnly={favoritesOnly}
+            toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
           />
         </aside>
 
@@ -400,6 +398,8 @@ export default function MarketplacePage(): JSX.Element {
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}
+              title={favoritesOnly ? "No favorites yet" : undefined}
+              message={favoritesOnly ? "Try starring some APIs to see them here!" : undefined}
               onClearFilters={hasActiveFilters() ? clearFilters : undefined}
             />
           ) : (
@@ -429,22 +429,26 @@ export default function MarketplacePage(): JSX.Element {
         </main>
       </div>
 
-      {/* Mobile bottom-sheet — only rendered when open */}
-      <FiltersBottomSheet
-        open={showFiltersMobile}
-        onClose={() => setShowFiltersMobile(false)}
-        resultCount={filtered.length}
-        selectedCategories={selectedCategories}
-        toggleCategory={toggleCategory}
-        minPrice={minPrice}
-        maxPrice={maxPrice}
-        setMinPrice={setMinPrice}
-        setMaxPrice={setMaxPrice}
-        popularity={popularity}
-        setPopularity={setPopularity}
-        clearFilters={clearFilters}
-        triggerRef={filtersTriggerRef}
-      />
+       {/* Mobile bottom-sheet — only rendered when open */}
+       <FiltersBottomSheet
+         open={showFiltersMobile}
+         onClose={() => setShowFiltersMobile(false)}
+         resultCount={filtered.length}
+         selectedCategories={selectedCategories}
+         toggleCategory={toggleCategory}
+         minPrice={minPrice}
+         maxPrice={maxPrice}
+         setMinPrice={setMinPrice}
+         setMaxPrice={setMaxPrice}
+         popularity={popularity}
+         setPopularity={setPopularity}
+         clearFilters={clearFilters}
+         favoritesOnly={favoritesOnly}
+         toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+         triggerRef={filtersTriggerRef}
+       />
+
+
 
       {/* Compare Drawer */}
       <CompareDrawer />

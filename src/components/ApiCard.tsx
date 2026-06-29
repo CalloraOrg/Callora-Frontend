@@ -11,6 +11,7 @@ import Skeleton from "./Skeleton";
 import TagChip from "./TagChip";
 import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
+import { useFavorites } from "../hooks/useFavorites";
 import type { APIItem } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
@@ -103,6 +104,60 @@ export function ApiCardSkeleton() {
 }
 
 // ─── Save-to-collection popover ───────────────────────────────────────────────
+
+// ─── Favorite button ─────────────────────────────────────────────────────────
+
+interface FavoriteButtonProps {
+  endpointId: string;
+  isFavorite: boolean;
+  onToggle: (id: string) => void;
+}
+
+function FavoriteButton({ endpointId, isFavorite, onToggle }: FavoriteButtonProps) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <button
+      ref={btnRef}
+      onClick={(e) => { e.stopPropagation(); onToggle(endpointId); }}
+      style={{
+        position: "absolute",
+        top: "8px",
+        left: "8px",
+        zIndex: 10,
+        background: isFavorite ? "var(--accent, rgba(78,133,255,0.9))" : "rgba(0,0,0,0.5)",
+        border: "none",
+        borderRadius: "50%",
+        width: "32px",
+        height: "32px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        transition: "background 160ms ease, transform 160ms ease",
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)")}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
+      aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+      aria-pressed={isFavorite}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill={isFavorite ? "white" : "none"}
+        stroke="white"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+      </svg>
+    </button>
+  );
+}
 
 // ─── Bookmark button ─────────────────────────────────────────────────────────
 
@@ -347,6 +402,7 @@ export default function ApiCard({
   const uptimePercent = api.uptimePercent;
   const isCompact = density === "compact";
 
+  const { isFavorite, toggleFavorite } = useFavorites();
   const comparedApis = useCompareStore();
   const isCompared = comparedApis.some(item => item.id === api.id);
   const canCompare = isCompared || comparedApis.length < 3;
@@ -386,6 +442,12 @@ export default function ApiCard({
       {/* Absolutely-positioned bookmark button in the top-right corner */}
       <BookmarkButton endpointId={api.id} />
       
+      <FavoriteButton
+        endpointId={api.id}
+        isFavorite={isFavorite(api.id)}
+        onToggle={toggleFavorite}
+      />
+
       {/* Compare button - absolutely positioned, top-left */}
       <button
         onClick={handleCompareClick}
@@ -394,7 +456,7 @@ export default function ApiCard({
         style={{
           position: "absolute",
           top: "8px",
-          left: "8px",
+          left: "48px",
           zIndex: 10,
           background: isCompared ? "var(--accent)" : "rgba(0,0,0,0.5)",
           color: "white",
