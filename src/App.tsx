@@ -5,10 +5,10 @@ import ApiUsage from './ApiUsage';
 import Dashboard from './components/Dashboard';
 import RouteProgressBar from './components/RouteProgressBar';
 import ServerError from './components/ServerError';
-import useDocumentTitle from "./hooks/useDocumentTitle";
-import NotFound from './components/NotFound';
-import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
 import useDocumentTitle from './hooks/useDocumentTitle';
+import NotFound from './components/NotFound';
+import PublishApi from './pages/PublishApi';
+import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
 import { formatUsdc, formatUsdShortcut } from './utils/format';
 import {
   EXPLORER_BASE_URL,
@@ -562,12 +562,14 @@ function App() {
             element={
               <LandingPage
                 onStartUsingApis={() => navigate(APP_ROUTES.marketplace)}
-                onPublishApi={() => {
-                  window.history.pushState({}, "", APP_ROUTES.publish);
-                  window.dispatchEvent(new PopStateEvent("popstate"));
-                }}
+                onPublishApi={() => navigate(APP_ROUTES.publish)}
               />
             }
+          />
+
+          <Route
+            path={APP_ROUTES.publish}
+            element={<PublishApi />}
           />
 
           <Route
