@@ -7,6 +7,7 @@ import RouteProgressBar from './components/RouteProgressBar';
 import ServerError from './components/ServerError';
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from './components/NotFound';
+import DesignSystemDocs from './pages/DesignSystemDocs';
 import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
 import useDocumentTitle from './hooks/useDocumentTitle';
 import { formatUsdc, formatUsdShortcut } from './utils/format';
@@ -109,6 +110,7 @@ const APP_ROUTES = {
   documentation: "/documentation",
   status: "/status",
   themePlayground: "/theme-playground",
+  designSystem: "/design-system/docs",
   serverError: "/500",
 } as const;
 
@@ -550,6 +552,7 @@ function App() {
             <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Marketplace</NavLink>
             <NavLink to={APP_ROUTES.billing} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Billing</NavLink>
             <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Theme Playground</NavLink>
+            <NavLink to={APP_ROUTES.designSystem} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Design System</NavLink>
           </nav>
           <ThemeToggle />
         </div>
@@ -708,6 +711,11 @@ function App() {
           />
 
           <Route path="/api-usage" element={<ApiUsage />} />
+
+          <Route
+            path={APP_ROUTES.designSystem}
+            element={<DesignSystemDocs />}
+          />
 
           <Route
             path={APP_ROUTES.serverError}
