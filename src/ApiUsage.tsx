@@ -6,6 +6,7 @@ import RequestBodyEditor from './components/RequestBodyEditor';
 import type { JsonSchema } from './components/RequestBodyEditor';
 import CallHistoryRow from './components/CallHistoryRow';
 import Breadcrumb from './components/Breadcrumb';
+import { JsonViewer } from './components/JsonViewer';
 
 type ApiEndpoint = {
   id: string;
