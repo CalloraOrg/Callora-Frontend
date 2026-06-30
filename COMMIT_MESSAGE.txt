@@ -1,5 +1,6 @@
 feat(ui): redesign ServerError component with calm UX and accessibility
 
+
 BREAKING CHANGE: ServerError API simplified - onGoHome prop removed
 
 This is a complete UX/UI redesign of the ServerError component following
