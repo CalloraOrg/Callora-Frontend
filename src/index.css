@@ -4601,3 +4601,53 @@ code,
   gap: 6px;
   margin-left: 8px;
 }
+
+/* ─── Category Pills ──────────────────────────────────────────────────────── */
+.pill-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  scrollbar-width: thin;
+}
+
+.pill-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
+.pill-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pill-bar::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+
+.pill-bar__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  padding: 0 16px;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+}
+
+.pill-bar__item:hover,
+.pill-bar__item:focus-visible {
+  background: var(--line);
+}
+
+.pill-bar__item--active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  border-color: var(--accent);
+}
