@@ -310,6 +310,11 @@ function App() {
   const [amountInput, setAmountInput] = useState("50");
   const [selectedPreset, setSelectedPreset] = useState<number | "custom">(50);
 
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  useEffect(() => {
+    setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  }, []);
+
   // Handle global shortcuts
   const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
     // Navigation to My APIs (e.g. g then a)
@@ -774,13 +779,24 @@ function App() {
           <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Theme Playground</NavLink>
           <NavLink to={APP_ROUTES.status} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Status</NavLink>
           <NavLink to={APP_ROUTES.documentation} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Documentation</NavLink>
+          {!isTouchDevice && (
+            <button 
+              className="link-nav" 
+              onClick={() => setIsShortcutsModalOpen(true)}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', color: 'inherit', padding: 0 }}
+            >
+              Keyboard Shortcuts (?)
+            </button>
+          )}
         </nav>
       </footer>
 
-       <ShortcutsModal
-         isOpen={isShortcutsModalOpen}
-         onClose={() => setIsShortcutsModalOpen(false)}
-       />
+        {!isTouchDevice && (
+          <ShortcutsModal
+            isOpen={isShortcutsModalOpen}
+            onClose={() => setIsShortcutsModalOpen(false)}
+          />
+        )}
 
        <CompareTray />
        <CompareDrawer />
