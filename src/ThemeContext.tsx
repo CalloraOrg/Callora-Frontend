@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import './styles/theme-transition.css';
-
-type Theme = 'light' | 'dark' | 'system';
+import { getPref, setPref, type Theme } from './utils/userPrefs';
 
 interface ThemeContextType {
   theme: Theme;
@@ -13,8 +12,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('callora-theme');
-    return (saved as Theme) || 'dark';
+    return getPref('theme');
   });
 
   const [actualTheme, setActualTheme] = useState<'light' | 'dark'>(() => {
@@ -34,7 +32,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('callora-theme', theme);
+    setPref('theme', theme);
     
     const root = window.document.documentElement;
     
