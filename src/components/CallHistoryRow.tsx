@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { formatPrice } from '../utils/format';
+import { buildJsonDiff } from '../utils/diff';
 
 export type CallRecord = {
   id: string;
@@ -11,6 +11,7 @@ export type CallRecord = {
   cost: number;
   request?: unknown;
   response?: unknown;
+  compareResponse?: unknown;
 };
 
 type Props = {
@@ -52,6 +53,34 @@ function StatusIcon({ status }: { status: 'success' | 'error' }) {
       color="var(--status-error-icon-color)"
       data-testid="icon-error"
     />
+  );
+}
+
+function ResponseDiff({ before, after }: { before: unknown; after: unknown }) {
+  const lines = buildJsonDiff(before, after);
+
+  return (
+    <div className="detail-section" aria-label="Response diff">
+      <h4>Response diff</h4>
+      <pre>
+        {lines.map((line, index) => {
+          const prefix =
+            line.type === 'added' ? '+ ' : line.type === 'removed' ? '- ' : '  ';
+
+          return (
+            <span
+              key={`${line.type}-${index}-${line.text}`}
+              className={`diff-line ${line.type}`}
+              data-testid={`diff-line-${line.type}`}
+            >
+              {prefix}
+              {line.text}
+              {'\n'}
+            </span>
+          );
+        })}
+      </pre>
+    </div>
   );
 }
 
@@ -97,6 +126,9 @@ export default function CallHistoryRow({ call, expanded, onToggleExpand }: Props
             <h4>Response</h4>
             <pre>{JSON.stringify(call.response ?? {}, null, 2)}</pre>
           </div>
+          {call.compareResponse !== undefined && (
+            <ResponseDiff before={call.compareResponse} after={call.response ?? {}} />
+          )}
         </div>
       )}
     </>
