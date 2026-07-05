@@ -121,7 +121,16 @@ const MOCK_CALL_HISTORY: CallRecord[] = [
     endpoint: '/api/v1/user/profile',
     status: 'success',
     responseTime: 120,
-    cost: 0.001
+    cost: 0.001,
+    response: {
+      success: true,
+      data: {
+        id: 'user_123',
+        name: 'John Doe',
+        balance: 1250.5,
+        plan: 'pro',
+      },
+    },
   },
   {
     id: '2',
@@ -129,7 +138,15 @@ const MOCK_CALL_HISTORY: CallRecord[] = [
     endpoint: '/api/v1/transactions',
     status: 'success',
     responseTime: 250,
-    cost: 0.003
+    cost: 0.003,
+    response: {
+      success: true,
+      data: {
+        id: 'user_123',
+        name: 'John Doe',
+        balance: 1180,
+      },
+    },
   },
   {
     id: '3',
@@ -137,7 +154,14 @@ const MOCK_CALL_HISTORY: CallRecord[] = [
     endpoint: '/api/v1/user/balance',
     status: 'error',
     responseTime: 5000,
-    cost: 0.001
+    cost: 0.001,
+    response: {
+      success: false,
+      error: {
+        code: 'BALANCE_TIMEOUT',
+        message: 'Balance service timed out',
+      },
+    },
   }
 ];
 
@@ -772,10 +796,11 @@ export default function ApiUsage() {
            ) : filteredCallHistory.length === 0 ? (
              <EmptyState message="No call records match the selected filter." />
            ) : (
-             filteredCallHistory.map(call => (
+             filteredCallHistory.map((call, index) => (
                <CallHistoryRow
                  key={call.id}
                  call={call}
+                 compareCall={filteredCallHistory[index + 1]}
                  expanded={expandedCall === call.id}
                  onToggleExpand={id => setExpandedCall(expandedCall === id ? null : id)}
                />

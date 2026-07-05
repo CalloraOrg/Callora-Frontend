@@ -1,6 +1,7 @@
-import { useState } from 'react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { formatPrice } from '../utils/format';
+import { diffValues } from '../utils/diff';
+import type { DiffEntry } from '../utils/diff';
 
 export type CallRecord = {
   id: string;
@@ -15,6 +16,7 @@ export type CallRecord = {
 
 type Props = {
   call: CallRecord;
+  compareCall?: CallRecord;
   expanded: boolean;
   onToggleExpand: (id: string) => void;
 };
@@ -31,6 +33,47 @@ function formatTimestamp(date: Date) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+}
+
+function formatDiffValue(value: unknown) {
+  if (typeof value === 'string') return value;
+  if (value === undefined) return 'undefined';
+  const json = JSON.stringify(value);
+  return json ?? String(value);
+}
+
+function DiffValue({ label, value }: { label: string; value: unknown }) {
+  return (
+    <span className="response-diff__value">
+      <span className="response-diff__value-label">{label}</span>
+      <code>{formatDiffValue(value)}</code>
+    </span>
+  );
+}
+
+function ResponseDiff({ entries }: { entries: DiffEntry[] }) {
+  return (
+    <div className="response-diff" aria-label="Response diff against previous call">
+      <h4>Response diff</h4>
+      {entries.length === 0 ? (
+        <p className="response-diff__empty">No response changes detected.</p>
+      ) : (
+        <ul className="response-diff__list">
+          {entries.map(entry => (
+            <li
+              key={`${entry.kind}:${entry.path}`}
+              className={`response-diff__row response-diff__row--${entry.kind}`}
+            >
+              <span className="response-diff__kind">{entry.kind}</span>
+              <code className="response-diff__path">{entry.path}</code>
+              {entry.kind !== 'added' && <DiffValue label="Before" value={entry.before} />}
+              {entry.kind !== 'removed' && <DiffValue label="After" value={entry.after} />}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /** Status icon using design tokens — no hardcoded hex values. */
@@ -55,7 +98,9 @@ function StatusIcon({ status }: { status: 'success' | 'error' }) {
   );
 }
 
-export default function CallHistoryRow({ call, expanded, onToggleExpand }: Props) {
+export default function CallHistoryRow({ call, compareCall, expanded, onToggleExpand }: Props) {
+  const responseDiff = compareCall ? diffValues(compareCall.response, call.response) : null;
+
   return (
     <>
       <div className="table-row">
@@ -96,6 +141,7 @@ export default function CallHistoryRow({ call, expanded, onToggleExpand }: Props
           <div className="detail-section">
             <h4>Response</h4>
             <pre>{JSON.stringify(call.response ?? {}, null, 2)}</pre>
+            {responseDiff && <ResponseDiff entries={responseDiff} />}
           </div>
         </div>
       )}

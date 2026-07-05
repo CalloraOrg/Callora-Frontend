@@ -16,6 +16,32 @@ const successCall: CallRecord = {
   response: { name: 'Alice' },
 };
 
+const previousCall: CallRecord = {
+  ...successCall,
+  id: 'c0',
+  timestamp: new Date('2024-01-15T10:00:00'),
+  response: {
+    name: 'Alice',
+    balance: 100,
+    status: 'active',
+    metadata: {
+      tier: 'basic',
+    },
+  },
+};
+
+const changedCall: CallRecord = {
+  ...successCall,
+  response: {
+    name: 'Alice',
+    balance: 150,
+    metadata: {
+      tier: 'pro',
+    },
+    plan: 'team',
+  },
+};
+
 const errorCall: CallRecord = {
   id: 'c2',
   timestamp: new Date('2024-01-15T11:00:00'),
@@ -112,6 +138,36 @@ describe('CallHistoryRow', () => {
   it('does not render expanded details when expanded=false', () => {
     renderRow({ call: successCall, expanded: false, onToggleExpand: () => {} });
     expect(screen.queryByRole('region', { name: 'Call details' })).toBeNull();
+  });
+
+  it('renders response diff entries against a previous call', () => {
+    renderRow({
+      call: changedCall,
+      compareCall: previousCall,
+      expanded: true,
+      onToggleExpand: () => {},
+    });
+
+    expect(screen.getByLabelText('Response diff against previous call')).toBeTruthy();
+    expect(screen.getByText('Response diff')).toBeTruthy();
+    expect(screen.getByText('balance')).toBeTruthy();
+    expect(screen.getByText('metadata.tier')).toBeTruthy();
+    expect(screen.getByText('plan')).toBeTruthy();
+    expect(screen.getByText('status')).toBeTruthy();
+    expect(screen.getAllByText('changed').length).toBe(2);
+    expect(screen.getByText('added')).toBeTruthy();
+    expect(screen.getByText('removed')).toBeTruthy();
+  });
+
+  it('renders an empty response diff message when responses match', () => {
+    renderRow({
+      call: successCall,
+      compareCall: { ...previousCall, response: successCall.response },
+      expanded: true,
+      onToggleExpand: () => {},
+    });
+
+    expect(screen.getByText('No response changes detected.')).toBeTruthy();
   });
 
   // ── Data rendering ───────────────────────────────────────────────────────
