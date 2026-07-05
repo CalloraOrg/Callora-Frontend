@@ -78,4 +78,35 @@ describe("ApiDetailPage", () => {
       within(preview).getByText(/1 endpoint.*2 request parameter/),
     ).toBeTruthy();
   });
+
+  it("filters documentation endpoints from the search combobox", () => {
+    render(<ApiDetailPage />);
+    settleLoadingState();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Search endpoints" }), {
+      target: { value: "historical" },
+    });
+
+    expect(screen.getByRole("status").textContent).toBe("Showing 1 of 2 endpoints");
+    expect(screen.getAllByText("Historical Weather").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Get Forecast")).toBeNull();
+  });
+
+  it("shows a resettable empty state when endpoint search has no matches", () => {
+    render(<ApiDetailPage />);
+    settleLoadingState();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Search endpoints" }), {
+      target: { value: "billing" },
+    });
+
+    expect(screen.getByRole("heading", { name: "No endpoints match your search" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear all filters" }));
+
+    expect(screen.getByRole("status").textContent).toBe("2 endpoints available");
+    expect(screen.getByText("Get Forecast")).toBeTruthy();
+    expect(screen.getAllByText("Historical Weather").length).toBeGreaterThan(0);
+  });
 });

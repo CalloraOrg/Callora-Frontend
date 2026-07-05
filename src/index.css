@@ -2023,6 +2023,74 @@ code,
     background: var(--surface-soft);
 }
 
+.endpoint-search {
+    display: grid;
+    gap: 8px;
+    margin-top: 16px;
+    margin-bottom: 16px;
+}
+
+.endpoint-search__label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.endpoint-search__control {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.endpoint-search__icon {
+    position: absolute;
+    left: 14px;
+    color: var(--muted);
+    pointer-events: none;
+}
+
+.endpoint-search__input {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 44px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+}
+
+.endpoint-search__input::placeholder {
+    color: var(--muted);
+}
+
+.endpoint-search__clear {
+    position: absolute;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.endpoint-search__clear:hover,
+.endpoint-search__clear:focus-visible {
+    color: var(--text);
+    background: var(--surface-soft);
+}
+
+.endpoint-search__status {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.8125rem;
+}
+
 .endpoint-title-row {
     display: flex;
     align-items: center;

@@ -9,6 +9,7 @@ import useDocumentTitle from "../hooks/useDocumentTitle";
 import { findApiById } from "../data/mockApis";
 import type { Review } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
+import EndpointSearch from "../components/EndpointSearch";
 import { formatPrice } from "../utils/format";
 import { Icons } from "../utils/icons";
 import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
@@ -96,11 +97,11 @@ function deriveEndpointGroupLabel(endpoint: ApiEndpoint): string {
 }
 
 export default function ApiDetailPage({ onBack }: Props) {
-  const { trackFetch } = useFetchTracker();
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
   const [isLoading, setIsLoading] = useState(true);
   const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
+  const [endpointSearch, setEndpointSearch] = useState("");
 
   // Ordered tab definitions — single source of truth for labels and ids.
   const TAB_ITEMS = [
@@ -136,6 +137,30 @@ export default function ApiDetailPage({ onBack }: Props) {
     [api],
   );
 
+  const filteredDocumentationEndpoints = useMemo(() => {
+    const query = endpointSearch.trim().toLowerCase();
+    if (!query) return documentationEndpoints;
+
+    return documentationEndpoints.filter((endpoint) => {
+      const searchable = [
+        endpoint.title,
+        endpoint.url,
+        endpoint.method,
+        endpoint.group,
+        ...((endpoint.params || []).flatMap((param) => [
+          param.name,
+          param.type,
+          param.required ? "required" : "optional",
+        ])),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchable.includes(query);
+    });
+  }, [documentationEndpoints, endpointSearch]);
+
   const endpointGroups = useMemo<EndpointGroupPreview[]>(() => {
     const groups = new Map<
       string,
@@ -148,7 +173,7 @@ export default function ApiDetailPage({ onBack }: Props) {
       }
     >();
 
-    documentationEndpoints.forEach((endpoint) => {
+    filteredDocumentationEndpoints.forEach((endpoint) => {
       const label = deriveEndpointGroupLabel(endpoint);
       const id = label
         .toLowerCase()
@@ -192,7 +217,7 @@ export default function ApiDetailPage({ onBack }: Props) {
         summary: `${group.endpoints.length} endpoint${group.endpoints.length === 1 ? "" : "s"} and ${group.totalParams} request parameter${group.totalParams === 1 ? "" : "s"}.`,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [documentationEndpoints]);
+  }, [filteredDocumentationEndpoints]);
 
   // Simulate initial data loading with 1.5s delay (consistent with MarketplacePage)
   useEffect(() => {
@@ -496,13 +521,14 @@ print(data)`;
             </div>
           </div>
 
-    <button
-      className="ghost-button no-print"
-      onClick={onBack}
-      type="button"
-    >
-    </button>
-<section className="api-hero" aria-labelledby="api-title">
+          <div className="api-detail-content-grid">
+            <div className="content-left">
+              <Tabs
+                tabs={TAB_ITEMS}
+                activeTab={tab}
+                onChange={(nextTab) => setTab(nextTab as TabType)}
+                className="api-detail-tabs no-print"
+              />
 
               <div
                 className="tab-content"
@@ -668,13 +694,32 @@ print(data)`;
                       <EndpointGroupHover groups={endpointGroups} />
                     )}
 
-                    <div style={{ display: "grid", gap: 20, marginTop: 16 }}>
-                      {documentationEndpoints.map((ep: ApiEndpoint) => (
-                        <div
-                          key={ep.id}
-                          className="preview-card"
-                          style={{ padding: 0, overflow: "hidden" }}
-                        >
+                    <EndpointSearch
+                      value={endpointSearch}
+                      onChange={setEndpointSearch}
+                      resultCount={filteredDocumentationEndpoints.length}
+                      totalCount={documentationEndpoints.length}
+                      resultsId="endpoint-results"
+                    />
+
+                    {filteredDocumentationEndpoints.length === 0 ? (
+                      <EmptyState
+                        variant="filtered"
+                        title="No endpoints match your search"
+                        message="Try a method, path segment, endpoint title, or parameter name."
+                        onClearFilters={() => setEndpointSearch("")}
+                      />
+                    ) : (
+                      <div
+                        id="endpoint-results"
+                        style={{ display: "grid", gap: 20, marginTop: 16 }}
+                      >
+                        {filteredDocumentationEndpoints.map((ep: ApiEndpoint) => (
+                          <div
+                            key={ep.id}
+                            className="preview-card"
+                            style={{ padding: 0, overflow: "hidden" }}
+                          >
                           <div className="endpoint-card-header">
                             <div className="endpoint-title-row">
                               <span
@@ -826,9 +871,10 @@ print(data)`;
                               }))}
                             />
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </section>
                 )}
 
@@ -1484,30 +1530,5 @@ print(data)`;
       </div>
     </div>
 
-    <div className="api-hero__cta no-print">
-      <button className="primary-button">
-        Try API
-      </button>
-
-      <button
-        className="secondary-button"
-        onClick={() => setTab("pricing")}
-      >
-        View Pricing
-      </button>
-
-      {/* Accessible subscribe flow with inline confirmation (issue #287) */}
-      <SubscribeButton
-        apiName={api.name}
-        onSubscribe={() => showToast(`Subscribed to ${api.name}!`, "success")}
-      />
-    </div>
-  </div>
-</section>
-
-  <div className="api-detail-content-grid"></div>
-      </div>
-    </div>
-  </div>
   );
 }
