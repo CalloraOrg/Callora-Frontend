@@ -114,6 +114,25 @@ describe('CallHistoryRow', () => {
     expect(screen.queryByRole('region', { name: 'Call details' })).toBeNull();
   });
 
+  it('renders response diff lines when a comparison response is available', () => {
+    const callWithDiff: CallRecord = {
+      ...successCall,
+      compareResponse: { name: 'Alice', plan: 'Free' },
+      response: { name: 'Alice', plan: 'Pro' },
+    };
+
+    renderRow({ call: callWithDiff, expanded: true, onToggleExpand: () => {} });
+
+    expect(screen.getByLabelText('Response diff')).toBeTruthy();
+    expect(screen.getByText(/-.*"plan": "Free"/)).toBeTruthy();
+    expect(screen.getByText(/\+.*"plan": "Pro"/)).toBeTruthy();
+  });
+
+  it('does not render response diff when no comparison response is available', () => {
+    renderRow({ call: successCall, expanded: true, onToggleExpand: () => {} });
+    expect(screen.queryByLabelText('Response diff')).toBeNull();
+  });
+
   // ── Data rendering ───────────────────────────────────────────────────────
 
   it('displays the endpoint path', () => {
