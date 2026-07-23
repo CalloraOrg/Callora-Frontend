@@ -44,4 +44,20 @@ describe("toCurl", () => {
     });
     expect(out).toContain(`--data 'it'\\''s fine'`);
   });
+
+  it("handles empty headers object without emitting -H flags", () => {
+    const out = toCurl({
+      url: "https://api.example.com/v1/ping",
+      headers: {},
+    });
+    expect(out).not.toContain("-H");
+  });
+
+  it("escapes single quotes in header values safely", () => {
+    const out = toCurl({
+      url: "https://api.example.com/v1/data",
+      headers: { "X-Note": "don't fail" },
+    });
+    expect(out).toContain(`-H 'X-Note: don'\\''t fail'`);
+  });
 });

@@ -15,6 +15,7 @@ import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
 import RatingHistogram from "../components/RatingHistogram";
+import CopyCurlButton from "../components/CopyCurlButton";
 
 /**
  * ApiDetailPage Component
@@ -739,6 +740,13 @@ print(data)`;
                                   <Icons.ExternalLink size={14} />
                                   <span>Insomnia</span>
                                 </button>
+                                <CopyCurlButton
+                                  className="icon-button"
+                                  request={{
+                                    method: ep.method || "GET",
+                                    url: `${API_BASE_URL}${ep.url}`,
+                                  }}
+                                />
                               </div>
                             </div>
                           </div>
