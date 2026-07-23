@@ -120,7 +120,11 @@ function validateNode(
 
   // ── null shortcut ──────────────────────────────────────────────────────
   if (value === null) {
-    if (!nullable && schema.type !== undefined && schema.type !== 'null') {
+    const typeAllowsNull =
+      nullable === true ||
+      schema.type === 'null' ||
+      (Array.isArray(schema.type) && schema.type.includes('null'));
+    if (!typeAllowsNull && schema.type !== undefined) {
       errors.push(`${path}: must not be null`);
     }
     // null passes all other constraints

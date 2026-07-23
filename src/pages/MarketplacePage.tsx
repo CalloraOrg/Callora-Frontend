@@ -19,11 +19,15 @@ import {
   type DensityPreference,
 } from "../utils/density";
 import CompareDrawer from "../components/CompareDrawer";
+import FiltersBottomSheet from "../components/FiltersBottomSheet";
+import { useCompareStore } from "../state/compareStore";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
 
 export default function MarketplacePage(): JSX.Element {
   const { apis } = useCompareStore();
   const isTrayVisible = apis.length > 0;
+  const { trackFetch } = useFetchTracker();
+  const [pageSize, setPageSize] = useState(12);
 
   useDocumentTitle(
     "Marketplace – Callora",
@@ -35,6 +39,12 @@ export default function MarketplacePage(): JSX.Element {
   );
   // Debounce search input to prevent excessive re-renders on large lists
   const debouncedSearch = useDebounce(search, 300);
+  /**
+   * Sort state persisted via URL query parameter ?sort=
+   * Default is "popularity" to match existing behaviour.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentPage = Number(searchParams.get("page") ?? "1");
   // ── Filter persistence in URL ──────────────────────────────────────────────
   // Categories are serialised as comma-separated ?categories= param.
   // Tag, minPrice, maxPrice, popularity are individual params.
@@ -98,11 +108,6 @@ export default function MarketplacePage(): JSX.Element {
   };
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  /**
-   * Sort state persisted via URL query parameter ?sort=
-   * Default is "popularity" to match existing behaviour.
-   */
-  const [searchParams, setSearchParams] = useSearchParams();
   const sortParam = (searchParams.get("sort") ?? "popularity") as SortValue;
   const setSortParam = (value: SortValue) => {
     setSearchParams(
@@ -275,8 +280,8 @@ export default function MarketplacePage(): JSX.Element {
   ]);
 
   const handleTagClick = (tag: string) => {
-    setSelectedTag((currentTag) =>
-      currentTag?.toLowerCase() === tag.toLowerCase() ? null : tag,
+    setSelectedTag(
+      selectedTag?.toLowerCase() === tag.toLowerCase() ? null : tag,
     );
   };
 

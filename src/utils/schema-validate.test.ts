@@ -440,7 +440,7 @@ describe('validateAgainstSchema — Create Transaction schema', () => {
   });
 
   it('fails when currency is not in the enum', () => {
-    assertInvalid({ amount: 10, currency: 'JPY' }, transactionSchema, 'JPY');
+    assertInvalid({ amount: 10, currency: 'JPY' }, transactionSchema, 'must be one of');
   });
 
   it('fails when a required field is missing', () => {

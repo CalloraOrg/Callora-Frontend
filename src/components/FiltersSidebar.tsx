@@ -1,4 +1,5 @@
-import { WarningIcon } from "./icons";
+import { WarningIcon, ChevronIcon } from "./icons";
+import { usePersistedState } from "../hooks/usePersistedState";
 import Dropdown from "./Dropdown";
 
 const POPULARITY_OPTIONS = [
@@ -72,8 +73,8 @@ export default function FiltersSidebar({
   popularity,
   setPopularity,
   clearFilters,
-  favoritesOnly,
-  toggleFavoritesOnly,
+  favoritesOnly = false,
+  toggleFavoritesOnly = () => {},
 }: {
   selectedCategories: Set<string>;
   toggleCategory: (c: string) => void;
@@ -84,9 +85,12 @@ export default function FiltersSidebar({
   popularity: string;
   setPopularity: (p: string) => void;
   clearFilters: () => void;
-  favoritesOnly: boolean;
-  toggleFavoritesOnly: () => void;
+  favoritesOnly?: boolean;
+  toggleFavoritesOnly?: () => void;
 }) {
+  const priceError =
+    minPrice !== null && maxPrice !== null && minPrice > maxPrice;
+
   return (
     <aside className="filters-sidebar">
       <FilterGroup title="Categories" storageKey="categories">
@@ -109,39 +113,100 @@ export default function FiltersSidebar({
         </div>
       </FilterGroup>
 
-      <div style={{ marginBottom: 12 }}>
-          <fieldset className="filter-group">
-            <legend className="filter-legend">Popularity</legend>
-            <div className="filter-popularity" style={{ marginTop: 8 }}>
-              <Dropdown<PopularityValue>
-                id="filters-popularity"
-                value={popularity as PopularityValue}
-                options={POPULARITY_OPTIONS as unknown as { value: PopularityValue; label: string }[]}
-                onChange={(v) => setPopularity(v)}
-                label="Filter by popularity"
-                visibleLabel={null}
-                className="filter-dropdown"
-              />
+      <FilterGroup title="Price range" storageKey="price">
+        <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              id="filter-min-price"
+              type="number"
+              min="0"
+              placeholder="Min"
+              className="filter-input"
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.6rem",
+                border: "1px solid var(--line)",
+                borderRadius: "8px",
+                background: "var(--surface)",
+                color: "var(--text)",
+              }}
+              value={minPrice ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                setMinPrice(v === "" ? null : Number(v));
+              }}
+              aria-label="Minimum price"
+            />
+            <span style={{ color: "var(--muted)" }}>–</span>
+            <input
+              id="filter-max-price"
+              type="number"
+              min="0"
+              placeholder="Max"
+              className="filter-input"
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.6rem",
+                border: "1px solid var(--line)",
+                borderRadius: "8px",
+                background: "var(--surface)",
+                color: "var(--text)",
+              }}
+              value={maxPrice ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                setMaxPrice(v === "" ? null : Number(v));
+              }}
+              aria-label="Maximum price"
+            />
+          </div>
+          {priceError && (
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                alignItems: "center",
+                color: "var(--danger)",
+                fontSize: "0.8rem",
+              }}
+            >
+              <WarningIcon size={16} />
+              <span>Min price cannot exceed max price</span>
             </div>
-          </fieldset>
-      </div>
+          )}
+        </div>
+      </FilterGroup>
+
+      <FilterGroup title="Popularity" storageKey="popularity">
+        <div style={{ marginTop: 0 }}>
+          <Dropdown<PopularityValue>
+            id="filters-popularity"
+            value={popularity as PopularityValue}
+            options={POPULARITY_OPTIONS as unknown as { value: PopularityValue; label: string }[]}
+            onChange={(v) => setPopularity(v)}
+            label="Filter by popularity"
+            visibleLabel={null}
+            className="filter-dropdown"
+          />
+        </div>
+      </FilterGroup>
 
       <div style={{ marginBottom: 12 }}>
-          <fieldset className="filter-group">
-            <legend className="filter-legend">Favorites</legend>
-            <div className="filter-option" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-              <input
-                id="favorites-only-checkbox"
-                type="checkbox"
-                className="filter-checkbox"
-                checked={favoritesOnly}
-                onChange={toggleFavoritesOnly}
-              />
-              <label htmlFor="favorites-only-checkbox" className="filter-label" style={{ color: "var(--text)" }}>
-                Favorites only
-              </label>
-            </div>
-          </fieldset>
+        <fieldset className="filter-group">
+          <legend className="filter-legend">Favorites</legend>
+          <div className="filter-option" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+            <input
+              id="favorites-only-checkbox"
+              type="checkbox"
+              className="filter-checkbox"
+              checked={favoritesOnly}
+              onChange={toggleFavoritesOnly}
+            />
+            <label htmlFor="favorites-only-checkbox" className="filter-label" style={{ color: "var(--text)" }}>
+              Favorites only
+            </label>
+          </div>
+        </fieldset>
       </div>
 
       <div style={{ marginTop: 8 }}>

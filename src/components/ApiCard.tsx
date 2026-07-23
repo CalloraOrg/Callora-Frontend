@@ -18,6 +18,7 @@ import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import { usePinnedApis, pinnedApisStore } from "../state/pinnedApis";
 import Sparkline from "./Sparkline";
+import WhyApi from "./WhyApi";
 import { TagIcon, ClockIcon, BoltIcon } from "./icons";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
