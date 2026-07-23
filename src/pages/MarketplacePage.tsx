@@ -20,6 +20,7 @@ import {
 } from "../utils/density";
 import CompareDrawer from "../components/CompareDrawer";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
+import FiltersBottomSheet from "../components/FiltersBottomSheet";
 
 export default function MarketplacePage(): JSX.Element {
   const { apis } = useCompareStore();

@@ -14,6 +14,8 @@ const baseProps = {
   popularity: "any",
   setPopularity: vi.fn(),
   clearFilters: vi.fn(),
+  favoritesOnly: false,
+  toggleFavoritesOnly: vi.fn(),
 };
 
 describe("FiltersSidebar", () => {

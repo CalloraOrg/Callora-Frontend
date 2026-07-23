@@ -1,5 +1,6 @@
-import { WarningIcon } from "./icons";
+import { WarningIcon, ChevronIcon } from "./icons";
 import Dropdown from "./Dropdown";
+import { usePersistedState } from "../hooks/usePersistedState";
 
 const POPULARITY_OPTIONS = [
   { value: "any", label: "Any" },
@@ -87,14 +88,23 @@ export default function FiltersSidebar({
   favoritesOnly: boolean;
   toggleFavoritesOnly: () => void;
 }) {
+  // Inverted price range — show a warning without silently discarding filters.
+  const hasPriceRangeError =
+    minPrice !== null && maxPrice !== null && minPrice > maxPrice;
+
   return (
     <aside className="filters-sidebar">
+      {/* ── Categories ──────────────────────────────────────────────────── */}
       <FilterGroup title="Categories" storageKey="categories">
         <div className="filter-options" style={{ display: "grid", gap: 8 }}>
           {ALL_CATEGORIES.map((c) => {
-            const id = `category-${c.replace(/\s+/g, '-').toLowerCase()}`;
+            const id = `category-${c.replace(/\s+/g, "-").toLowerCase()}`;
             return (
-              <div key={c} className="filter-option" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div
+                key={c}
+                className="filter-option"
+                style={{ display: "flex", gap: 8, alignItems: "center" }}
+              >
                 <input
                   id={id}
                   type="checkbox"
@@ -102,48 +112,117 @@ export default function FiltersSidebar({
                   checked={selectedCategories.has(c)}
                   onChange={() => toggleCategory(c)}
                 />
-                <label htmlFor={id} className="filter-label" style={{ color: "var(--text)" }}>{c}</label>
+                <label
+                  htmlFor={id}
+                  className="filter-label"
+                  style={{ color: "var(--text)" }}
+                >
+                  {c}
+                </label>
               </div>
             );
           })}
         </div>
       </FilterGroup>
 
+      {/* ── Price range ─────────────────────────────────────────────────── */}
+      <FilterGroup title="Price range" storageKey="price">
+        <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label htmlFor="filter-min-price" className="filter-label" style={{ minWidth: 28 }}>
+              Min
+            </label>
+            <input
+              id="filter-min-price"
+              type="number"
+              className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""}`}
+              value={minPrice ?? ""}
+              min={0}
+              placeholder="0"
+              onChange={(e) =>
+                setMinPrice(e.target.value === "" ? null : Number(e.target.value))
+              }
+              aria-label="Minimum price"
+              aria-invalid={hasPriceRangeError}
+              style={{ flex: 1, minWidth: 0 }}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label htmlFor="filter-max-price" className="filter-label" style={{ minWidth: 28 }}>
+              Max
+            </label>
+            <input
+              id="filter-max-price"
+              type="number"
+              className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""}`}
+              value={maxPrice ?? ""}
+              min={0}
+              placeholder="∞"
+              onChange={(e) =>
+                setMaxPrice(e.target.value === "" ? null : Number(e.target.value))
+              }
+              aria-label="Maximum price"
+              aria-invalid={hasPriceRangeError}
+              style={{ flex: 1, minWidth: 0 }}
+            />
+          </div>
+          {hasPriceRangeError && (
+            <p
+              className="error-text"
+              role="alert"
+              style={{ display: "flex", gap: 6, alignItems: "center", margin: 0 }}
+            >
+              <WarningIcon size={16} aria-hidden="true" />
+              Min price cannot exceed max price
+            </p>
+          )}
+        </div>
+      </FilterGroup>
+
+      {/* ── Popularity ──────────────────────────────────────────────────── */}
+      <FilterGroup title="Popularity" storageKey="popularity">
+        <div className="filter-popularity" style={{ marginTop: 4 }}>
+          <Dropdown<PopularityValue>
+            id="filters-popularity"
+            value={popularity as PopularityValue}
+            options={
+              POPULARITY_OPTIONS as unknown as { value: PopularityValue; label: string }[]
+            }
+            onChange={(v) => setPopularity(v)}
+            label="Filter by popularity"
+            visibleLabel={null}
+            className="filter-dropdown"
+          />
+        </div>
+      </FilterGroup>
+
+      {/* ── Favorites ───────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 12 }}>
-          <fieldset className="filter-group">
-            <legend className="filter-legend">Popularity</legend>
-            <div className="filter-popularity" style={{ marginTop: 8 }}>
-              <Dropdown<PopularityValue>
-                id="filters-popularity"
-                value={popularity as PopularityValue}
-                options={POPULARITY_OPTIONS as unknown as { value: PopularityValue; label: string }[]}
-                onChange={(v) => setPopularity(v)}
-                label="Filter by popularity"
-                visibleLabel={null}
-                className="filter-dropdown"
-              />
-            </div>
-          </fieldset>
+        <fieldset className="filter-group">
+          <legend className="filter-legend">Favorites</legend>
+          <div
+            className="filter-option"
+            style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}
+          >
+            <input
+              id="favorites-only-checkbox"
+              type="checkbox"
+              className="filter-checkbox"
+              checked={favoritesOnly}
+              onChange={toggleFavoritesOnly}
+            />
+            <label
+              htmlFor="favorites-only-checkbox"
+              className="filter-label"
+              style={{ color: "var(--text)" }}
+            >
+              Favorites only
+            </label>
+          </div>
+        </fieldset>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-          <fieldset className="filter-group">
-            <legend className="filter-legend">Favorites</legend>
-            <div className="filter-option" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-              <input
-                id="favorites-only-checkbox"
-                type="checkbox"
-                className="filter-checkbox"
-                checked={favoritesOnly}
-                onChange={toggleFavoritesOnly}
-              />
-              <label htmlFor="favorites-only-checkbox" className="filter-label" style={{ color: "var(--text)" }}>
-                Favorites only
-              </label>
-            </div>
-          </fieldset>
-      </div>
-
+      {/* ── Clear ───────────────────────────────────────────────────────── */}
       <div style={{ marginTop: 8 }}>
         <button className="ghost-button" onClick={clearFilters}>
           Clear filters
