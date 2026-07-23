@@ -21,7 +21,7 @@ describe("ApiCard Accessibility and Context Layouts", () => {
     name: "Stellar Metering API",
     endpoint: "/api/v1/meter",
     description: "A mock API for testing.",
-    tags: ["mock"],
+    tags: ["weather", "forecast", "geo"],
     pricePerRequest: 0.01,
   };
 
@@ -35,5 +35,56 @@ describe("ApiCard Accessibility and Context Layouts", () => {
 
     expect(screen.getByRole("menu")).toBeDefined();
     expect(screen.getByText("Copy Endpoint URL")).toBeDefined();
+  });
+
+  it("renders tag chips with correct ARIA labels", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const weatherChip = screen.getByLabelText("Filter marketplace by tag weather");
+    const forecastChip = screen.getByLabelText("Filter marketplace by tag forecast");
+    const geoChip = screen.getByLabelText("Filter marketplace by tag geo");
+
+    expect(weatherChip).toBeDefined();
+    expect(forecastChip).toBeDefined();
+    expect(geoChip).toBeDefined();
+  });
+
+  it("calls onTagClick when a tag chip is clicked", () => {
+    const handleTagClick = vi.fn();
+    render(<ApiCard api={mockApi} onTagClick={handleTagClick} />);
+
+    const weatherChip = screen.getByLabelText("Filter marketplace by tag weather");
+    fireEvent.click(weatherChip);
+
+    expect(handleTagClick).toHaveBeenCalledTimes(1);
+    expect(handleTagClick).toHaveBeenCalledWith("weather");
+  });
+
+  it("marks the active tag chip as pressed", () => {
+    render(<ApiCard api={mockApi} activeTag="weather" />);
+
+    const weatherChip = screen.getByLabelText("Filter marketplace by tag weather");
+    expect(weatherChip.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("does not mark non-active tag chips as pressed", () => {
+    render(<ApiCard api={mockApi} activeTag="weather" />);
+
+    const forecastChip = screen.getByLabelText("Filter marketplace by tag forecast");
+    expect(forecastChip.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("handles case-insensitive active tag matching", () => {
+    render(<ApiCard api={mockApi} activeTag="WEATHER" />);
+
+    const weatherChip = screen.getByLabelText("Filter marketplace by tag weather");
+    expect(weatherChip.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("renders tag chips even when no activeTag is set", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const chips = screen.getAllByRole("button", { name: /Filter marketplace by tag/ });
+    expect(chips.length).toBe(3);
   });
 });
