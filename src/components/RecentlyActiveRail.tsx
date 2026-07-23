@@ -43,15 +43,18 @@ export default function RecentlyActiveRail({
 }: RecentlyActiveRailProps): JSX.Element | null {
   // Rank by most recent creation/usage, then by raw usage volume as a tiebreak.
   const items = useMemo(() => {
-    return apis
-      .slice()
+    const withTimestamps = apis.map(api => ({
+      api,
+      ts: Date.parse(api.createdAt ?? "1970-01-01")
+    }));
+
+    return withTimestamps
       .sort((a, b) => {
-        const da = Date.parse(a.createdAt ?? "1970-01-01");
-        const db = Date.parse(b.createdAt ?? "1970-01-01");
-        if (db !== da) return db - da;
-        return (b.usageCount ?? 0) - (a.usageCount ?? 0);
+        if (b.ts !== a.ts) return b.ts - a.ts;
+        return (b.api.usageCount ?? 0) - (a.api.usageCount ?? 0);
       })
-      .slice(0, Math.max(0, limit));
+      .slice(0, Math.max(0, limit))
+      .map(item => item.api);
   }, [apis, limit]);
 
   if (items.length === 0) return null;
