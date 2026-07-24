@@ -899,6 +899,72 @@ The following utility classes are defined in `src/index.css` and should be used 
 
 ---
 
+---
+
+## Theme Transition System
+
+Callora's light/dark switch is polished with a smooth color transition so the
+switch feels intentional rather than jarring.
+
+### How it works
+
+1. **`src/styles/theme-transition.css`** — Applies `transition: background-color,
+   border-color, color, fill, stroke, outline-color` to every semantic HTML element
+   and SVG shape.  The transition is guarded by the `.theme-transitions-ready` class
+   on `<html>`, which `ThemeProvider` adds via `requestAnimationFrame` after the
+   very first paint.  This prevents the initial page load from animating into the
+   user's saved theme (which would look like a flash).
+
+2. **`ThemeProvider`** (`src/ThemeContext.tsx`) — Sets `.theme-transitions-ready`
+   after the first paint and exposes two helpers to consumers:
+   - `THEME_TRANSITION_MS` (number, `240`) — matches the `--transition-speed` CSS
+     token.  Import it when you need to delay or coordinate JS-side changes with
+     the CSS animation.
+   - `isTransitioning` (boolean) — `true` from the moment `data-theme` changes
+     until `THEME_TRANSITION_MS` has elapsed.  Useful for suppressing or
+     coordinating secondary UI updates during the switch.
+
+3. **`ThemeToggle`** (`src/ThemeToggle.tsx`) — Adds
+   `.theme-toggle-icon--swapping` to the icon `<span>` for the first half of the
+   transition (`THEME_TRANSITION_MS / 2` ms), hiding the outgoing SVG with an
+   opacity fade so the icon swap feels deliberate (fade-out → swap → fade-in).
+
+### Opting out
+
+Any element (or its subtree) that must not participate in the theme transition —
+for example, elements controlled by `animation` keyframes — should use the
+`.no-theme-transition` class:
+
+```html
+<!-- Toast wrapper: opacity/transform are already animated by keyframes -->
+<div class="toast-queue no-theme-transition">…</div>
+```
+
+The stylesheet also automatically excludes the following known animated
+components so you do not need to add the class to them manually:
+`.toast-queue`, `.skeleton`, `.button-spinner`, `.status-dot`,
+`.route-progress-bar`, `.bottom-sheet`, `.history-panel`,
+`.history-bottom-sheet`.
+
+### Reduced motion
+
+All color transitions are disabled when `prefers-reduced-motion: reduce` is set.
+The `@media (prefers-reduced-motion: reduce)` block in `theme-transition.css`
+overrides every transition with `none !important`, so users who prefer instant
+switches always get them.
+
+### Adding new UI
+
+- Color-bearing elements receive the transition automatically — no opt-in needed.
+- If you add a component with its own `animation` keyframes that animate
+  `background-color`, `color`, or `border-color`, add `.no-theme-transition` to
+  that component's root element or add its class to the exclusion list in
+  `theme-transition.css`.
+- Never hardcode the 240 ms duration in JS.  Use the exported
+  `THEME_TRANSITION_MS` constant from `ThemeContext` instead.
+
+---
+
 ## Accessibility Guidelines
 
 ### Focus Management
