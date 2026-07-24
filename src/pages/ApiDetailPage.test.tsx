@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ApiDetailPage from "./ApiDetailPage";
 import { ToastProvider } from "../components/Toast";
+import { CollectionsProvider } from "../state/collectionsStore";
 
 // Mock matchMedia (required by the Tabs component)
 Object.defineProperty(window, "matchMedia", {
@@ -22,7 +23,11 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 function renderWithProviders(ui: React.ReactElement) {
-  return render(<ToastProvider>{ui}</ToastProvider>);
+  return render(
+    <CollectionsProvider>
+      <ToastProvider>{ui}</ToastProvider>
+    </CollectionsProvider>
+  );
 }
 
 // Mock IntersectionObserver (required by ApiDetailStickyTOC)
@@ -173,5 +178,34 @@ describe("ApiDetailPage", () => {
     expect(document.getElementById("toc-endpoints")).toBeTruthy();
     expect(document.getElementById("toc-parameters")).toBeTruthy();
     expect(document.getElementById("toc-implementation")).toBeTruthy();
+  });
+
+  it("lets the user save an endpoint into a new collection from the save panel", () => {
+    renderWithProviders(<ApiDetailPage />);
+    settleLoadingState();
+    fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+    const saveButtons = screen.getAllByRole("button", {
+      name: /Save endpoint to collection/i,
+    });
+    fireEvent.click(saveButtons[0]);
+
+    const dialog = screen.getByRole("dialog", {
+      name: /Save endpoint to collection/i,
+    });
+    expect(within(dialog).getByText(/no collections yet/i)).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /new collection/i }));
+    const input = within(dialog).getByRole("textbox", {
+      name: /new collection name/i,
+    });
+    fireEvent.change(input, { target: { value: "Weather collection" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Save/i }));
+
+    const collectionCheckbox = within(dialog).getByRole("checkbox", {
+      name: /Remove from collection "Weather collection"/i,
+    }) as HTMLInputElement;
+    expect(collectionCheckbox.checked).toBe(true);
+    expect(screen.getByRole("button", { name: /Saved endpoint/i })).toBeTruthy();
   });
 });

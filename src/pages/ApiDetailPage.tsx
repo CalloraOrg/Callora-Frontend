@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import TestInBrowser from "../components/TestInBrowser";
@@ -18,6 +18,7 @@ import { CheckIcon } from "../components/icons";
 import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
 import SubscribeButton from "../components/SubscribeButton";
 import { useToast } from "../components/Toast";
+import { useCollections } from "../state/collectionsStore";
 
 /**
  * ApiDetailPage
@@ -100,6 +101,232 @@ const TAB_ITEMS = [
   { id: "reviews", label: "Reviews" },
   { id: "embed", label: "Embed" },
 ] as const satisfies Array<{ id: TabType; label: string }>;
+
+// ── Endpoint save controls ───────────────────────────────────────────────────
+
+function EndpointSaveButton({ endpointId }: { endpointId: string }) {
+  const {
+    collections,
+    isEndpointSaved,
+    collectionIdsForEndpoint,
+    addEndpointToCollection,
+    removeEndpointFromCollection,
+    createCollectionWithEndpoint,
+  } = useCollections();
+
+  const [open, setOpen] = useState(false);
+  const [showNewInput, setShowNewInput] = useState(false);
+  const [newName, setNewName] = useState("");
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const savedIn = collectionIdsForEndpoint(endpointId);
+  const isSaved = isEndpointSaved(endpointId);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        panelRef.current &&
+        !panelRef.current.contains(e.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [open]);
+
+  const handleCreateCollection = useCallback(() => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    createCollectionWithEndpoint(trimmed, endpointId);
+    setNewName("");
+    setShowNewInput(false);
+    setOpen(true);
+  }, [createCollectionWithEndpoint, endpointId, newName]);
+
+  const handleNewKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleCreateCollection();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setShowNewInput(false);
+      setNewName("");
+    }
+  };
+
+  const handleToggleCollection = (collectionId: string) => {
+    if (savedIn.has(collectionId)) {
+      removeEndpointFromCollection(collectionId, endpointId);
+    } else {
+      addEndpointToCollection(collectionId, endpointId);
+    }
+  };
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        ref={buttonRef}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((prev) => !prev);
+        }}
+        className="icon-button"
+        aria-label={isSaved ? "Saved endpoint" : "Save endpoint to collection"}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <Icons.Link size={14} />
+        <span>{isSaved ? "Saved" : "Save"}</span>
+      </button>
+
+      {open && (
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Save endpoint to collection"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            top: "38px",
+            right: 0,
+            zIndex: 120,
+            width: 260,
+            background: "var(--surface-strong, rgba(17,24,46,0.98))",
+            border: "1px solid var(--line-strong, rgba(169,184,255,0.28))",
+            borderRadius: 12,
+            boxShadow: "var(--shadow, 0 24px 80px rgba(3,8,22,0.45))",
+            padding: "12px",
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Save to collection
+          </p>
+
+          {collections.length === 0 && !showNewInput && (
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+              <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.85rem" }}>
+                No collections yet.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowNewInput(true)}
+                className="icon-button"
+                style={{ width: "100%" }}
+              >
+                <span>＋ New collection</span>
+              </button>
+            </div>
+          )}
+
+          {collections.length > 0 && (
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto" }}>
+              {collections.map((collection) => (
+                <label
+                  key={collection.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "6px 4px",
+                    borderRadius: 8,
+                    background: savedIn.has(collection.id)
+                      ? "rgba(78,133,255,0.12)"
+                      : "transparent",
+                    cursor: "pointer",
+                    color: "var(--text)",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={savedIn.has(collection.id)}
+                    onChange={() => handleToggleCollection(collection.id)}
+                    aria-label={`${savedIn.has(collection.id) ? "Remove from" : "Add to"} collection \"${collection.name}\"`}
+                    style={{ accentColor: "var(--accent)", width: 16, height: 16 }}
+                  />
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {collection.name}
+                  </span>
+                  <span style={{ color: "var(--muted)", fontSize: 11 }}>
+                    {collection.endpointIds.length}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {showNewInput ? (
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={handleNewKeyDown}
+                placeholder="Collection name"
+                aria-label="New collection name"
+                style={{
+                  flex: 1,
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid var(--line)",
+                  borderRadius: 8,
+                  color: "var(--text)",
+                  padding: "8px 10px",
+                  fontSize: "0.85rem",
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleCreateCollection}
+                disabled={!newName.trim()}
+                className="icon-button"
+                style={{ minWidth: 56, justifyContent: "center" }}
+              >
+                Save
+              </button>
+            </div>
+          ) : collections.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowNewInput(true)}
+              className="icon-button"
+              style={{ width: "100%", marginTop: 10 }}
+            >
+              <span>＋ New collection</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -532,6 +759,7 @@ print(response.json())`;
                                     <Icons.ExternalLink size={14} />
                                     <span>Insomnia</span>
                                   </button>
+                                  <EndpointSaveButton endpointId={ep.id} />
                                 </div>
                               </div>
                             </div>
