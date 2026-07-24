@@ -471,10 +471,30 @@ export default function ApiCard({
     }
   };
 
+  /**
+   * Handle keyboard interactions on the card.
+   * - Enter/Space: View API details
+   * - 'c': Add/remove card from comparison (only when card is focused, not in form controls)
+   *
+   * The 'c' shortcut enables quick comparison without using the mouse.
+   * Respects the same 3-item limit as the click-based compare button.
+   */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       onViewDetails?.(api);
+    }
+
+    // Handle 'c' key for add-to-compare shortcut (lowercase only, no modifiers)
+    if (e.key.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      // Don't fire if focus is in a form field
+      if ((e.target as HTMLElement).closest('input, textarea, [contenteditable]')) {
+        return;
+      }
+
+      e.preventDefault();
+      // Reuse exact same logic as the compare button click
+      handleCompareClick(e as unknown as React.MouseEvent);
     }
   };
 
@@ -523,6 +543,7 @@ export default function ApiCard({
       role="button"
       tabIndex={0}
       aria-label={`View details for ${api.name}`}
+      aria-keyshortcuts="c"
       onClick={() => onViewDetails?.(api)}
       onKeyDown={handleKeyDown}
       onContextMenu={handleContextMenu}

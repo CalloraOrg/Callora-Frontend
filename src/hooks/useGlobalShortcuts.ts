@@ -18,6 +18,7 @@ export const SHORTCUTS: Shortcut[] = [
   
   // Marketplace
   { key: '/', description: 'Focus search bar', category: 'Marketplace' },
+  { key: 'c', description: 'Add/remove focused API card to comparison', category: 'Marketplace' },
   
   // ApiDetailPage
   { key: 'Esc', description: 'Go back to Marketplace', category: 'ApiDetailPage' },

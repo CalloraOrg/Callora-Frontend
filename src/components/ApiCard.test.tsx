@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import ApiCard from "./ApiCard";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import type { APIItem } from "../data/mockApis";
 import { pinnedApisStore } from "../state/pinnedApis";
@@ -16,6 +16,24 @@ vi.mock("../state/collectionsStore", () => ({
   }),
 }));
 
+vi.mock("../state/compareStore", () => {
+  const mockCompareStore = {
+    apis: [],
+    addApi: vi.fn(),
+    removeApi: vi.fn(),
+    setOpen: vi.fn(),
+    subscribe: vi.fn((listener) => {
+      return () => {};
+    }),
+    getSnapshot: vi.fn(() => ({ apis: [], isOpen: false })),
+  };
+
+  return {
+    compareStore: mockCompareStore,
+    useCompareStore: () => ({ apis: [], isOpen: false }),
+  };
+});
+
 describe("ApiCard Accessibility and Context Layouts", () => {
   const mockApi: APIItem = {
     id: "api-1",
@@ -25,6 +43,10 @@ describe("ApiCard Accessibility and Context Layouts", () => {
     tags: ["weather", "forecast", "geo"],
     pricePerRequest: 0.01,
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it("opens context menu correctly on right click invocation", () => {
     render(

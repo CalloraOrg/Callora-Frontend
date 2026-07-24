@@ -1,4 +1,5 @@
 import React from "react";
+import ExternalLink from "./ExternalLink";
 
 export interface EmptyStateProps {
   variant?: "empty" | "filtered" | "error";
@@ -201,10 +202,9 @@ export default function EmptyState({
           >
             {isRetrying ? "Retrying…" : "Retry"}
           </button>
-          <a
+          <ExternalLink
             href="https://status.callora.io"
-            target="_blank"
-            rel="noopener noreferrer"
+            ariaLabel="Check system status"
             style={{
               fontSize: "0.875rem",
               color: "var(--accent)",
@@ -219,7 +219,7 @@ export default function EmptyState({
             }}
           >
             Check system status
-          </a>
+          </ExternalLink>
         </div>
       )}
     </div>
