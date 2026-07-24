@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icons } from "../utils/icons";
-import { usePersistedState } from "../hooks/usePersistedState";
+import { getDefaultCodeLanguage, setDefaultCodeLanguage } from "../state/userPrefs";
 
 /**
  * CodeExample component with tabbed navigation for multiple code snippets.
- * 
+ *
  * Features:
  * - Tabbed navigation for multiple languages with roving tabindex
- * - Language persistence via usePersistedState hook
+ * - Default language pinned via userPrefs, shared across all CodeExample instances
  * - Copy-to-clipboard with visual feedback
  * - Full WCAG 2.1 AA accessibility
  * - Dark mode support via CSS custom properties
@@ -21,22 +21,29 @@ type CodeExampleProps = {
   defaultLanguage?: string;
 };
 
-const STORAGE_KEY = "callora:codeExample:language";
-
 export default function CodeExample({
   snippets,
   defaultLanguage,
 }: CodeExampleProps) {
   // Extract available languages from the snippets keys
   const languages = Object.keys(snippets);
-  
-  // Use persisted state for language selection
-  const [activeLanguage, setActiveLanguage] = usePersistedState<string>(
-    STORAGE_KEY,
-    defaultLanguage && defaultLanguage in snippets
+
+  // Pin the user's preferred language (if set and available here), otherwise
+  // fall back to this example's own defaultLanguage prop, then the first language.
+  const [activeLanguage, setActiveLanguageState] = useState<string>(() => {
+    const pinned = getDefaultCodeLanguage();
+    if (pinned && pinned in snippets) {
+      return pinned;
+    }
+    return defaultLanguage && defaultLanguage in snippets
       ? defaultLanguage
-      : languages[0] || ""
-  );
+      : languages[0] || "";
+  });
+
+  const setActiveLanguage = useCallback((language: string) => {
+    setActiveLanguageState(language);
+    setDefaultCodeLanguage(language);
+  }, []);
 
   // Validate persisted language is still in current languages list
   const resolvedLanguage = languages.includes(activeLanguage)
