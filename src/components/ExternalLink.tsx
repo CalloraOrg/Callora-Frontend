@@ -1,12 +1,43 @@
 import React from "react";
+import { ExternalLink as ExternalLinkIcon } from "lucide-react";
 
+/**
+ * ExternalLink component
+ *
+ * A wrapper around <a> that automatically detects external links and applies
+ * security attributes (target="_blank", rel="noopener noreferrer"), visual
+ * affordance (external link icon), and accessible labeling for screen readers.
+ *
+ * For same-origin relative links (/, #, ./), no external styling is applied.
+ *
+ * @example
+ * <ExternalLink href="https://example.com">Learn more</ExternalLink>
+ * // Renders: <a href="..." target="_blank" rel="noopener noreferrer">
+ * //            Learn more <ExternalLinkIcon />
+ * //          </a>
+ *
+ * @param href - Link URL (required)
+ * @param children - Link text/content (required)
+ * @param hideIcon - Opt out of icon display (default: false). Use only if your
+ *                   link already has sufficient affordance (rare).
+ * @param ariaLabel - Override the default aria-label for external links
+ * @param ...rest - Standard anchor props (className, id, onClick, etc.)
+ */
 type ExternalLinkProps = React.ComponentPropsWithoutRef<"a"> & {
   children: React.ReactNode;
+  hideIcon?: boolean;
+  ariaLabel?: string;
 };
 
 function isExternal(href?: string): boolean {
   if (!href) return false;
-  if (href.startsWith("#") || href.startsWith("/") || href.startsWith("?") || href.startsWith("./") || href.startsWith("../")) {
+  if (
+    href.startsWith("#") ||
+    href.startsWith("/") ||
+    href.startsWith("?") ||
+    href.startsWith("./") ||
+    href.startsWith("../")
+  ) {
     return false;
   }
   try {
@@ -18,22 +49,39 @@ function isExternal(href?: string): boolean {
   }
 }
 
+/**
+ * Composes aria-label for external links: includes user-provided label
+ * plus "opens in new tab" suffix for screen reader clarity.
+ */
+function composeAriaLabel(
+  isExternal: boolean,
+  providedLabel: string | undefined
+): string | undefined {
+  if (!isExternal) return providedLabel;
+  const suffix = "opens in new tab";
+  if (!providedLabel) return suffix;
+  return `${providedLabel}, ${suffix}`;
+}
+
 export default function ExternalLink({
   href,
   children,
+  hideIcon = false,
+  ariaLabel: customAriaLabel,
   ...rest
 }: ExternalLinkProps) {
   const external = isExternal(href);
-  const baseAriaLabel = (rest as Record<string, unknown>)["aria-label"] as string | undefined;
-  const ariaLabel = external
-    ? `${baseAriaLabel ?? ""}${baseAriaLabel ? ", " : ""}opens in new tab`
-    : baseAriaLabel;
+  const computedAriaLabel = composeAriaLabel(external, customAriaLabel);
 
   const anchorProps: React.AnchorHTMLAttributes<HTMLAnchorElement> = {
     ...rest,
     href,
-    "aria-label": ariaLabel,
   };
+
+  // Only set aria-label if we have one; undefined is cleaner than null
+  if (computedAriaLabel) {
+    anchorProps["aria-label"] = computedAriaLabel;
+  }
 
   if (external) {
     anchorProps.target = "_blank";
@@ -43,42 +91,28 @@ export default function ExternalLink({
   return (
     <a {...anchorProps}>
       {children}
-      {external && (
+      {external && !hideIcon && (
         <span
           aria-hidden="true"
           style={{
             display: "inline-flex",
             alignItems: "center",
-            marginLeft: 4,
-            verticalAlign: "middle",
-            color: "var(--muted)",
+            marginLeft: "0.25em",
+            marginRight: "0",
+            verticalAlign: "0.125em",
             lineHeight: 1,
           }}
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-            <polyline points="15 3 21 3 21 9" />
-            <line x1="10" y1="14" x2="21" y2="3" />
-          </svg>
+          <ExternalLinkIcon
+            size={14}
+            strokeWidth={2.5}
+            style={{
+              color: "var(--muted)",
+              flexShrink: 0,
+            }}
+          />
         </span>
       )}
-      <style>{`
-        a:focus-visible {
-          outline: 2px solid var(--accent);
-          outline-offset: 2px;
-          box-shadow: var(--focus-ring);
-          border-radius: 4px;
-        }
-      `}</style>
     </a>
   );
 }
