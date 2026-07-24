@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import './Dashboard.css';
+import LowBalanceBanner from './LowBalanceBanner';
 import { useNavigate } from 'react-router-dom';
 import Skeleton from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
@@ -42,8 +43,10 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
   const totalUsage = activity?.reduce((sum, item) => (item.type === 'usage' ? sum + item.amount : sum), 0) ?? 0;
 
   return (
-    <section className="dashboard-grid surface">
-      {/* Balance Overview */}
+    <>
+      <LowBalanceBanner balance={vaultBalance} openDeposit={openDeposit} />
+      <section className="dashboard-grid surface">
+        {/* Balance Overview */}
       <div className="dashboard-card">
         <h3 className="eyebrow">Vault balance</h3>
         <strong>{formatUsdc(vaultBalance)} USDC</strong>
@@ -94,5 +97,6 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
         )}
       </div>
     </section>
+    </>
   );
 }

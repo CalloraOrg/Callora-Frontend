@@ -16,6 +16,9 @@ export const API_BASE_URL = "https://api.callora.com";
 /** Minimum USDC deposit amount accepted by the vault. */
 export const MIN_DEPOSIT = 10;
 
+/** Low balance warning threshold in USDC. */
+export const LOW_BALANCE_USD = 15;
+
 /** Human-readable network fee shown in the deposit preview. */
 export const NETWORK_FEE = "0.00001 XLM";
 
