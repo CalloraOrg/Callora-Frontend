@@ -3,6 +3,7 @@ import ApiCard from "./ApiCard";
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import type { APIItem } from "../data/mockApis";
+import { pinnedApisStore } from "../state/pinnedApis";
 
 vi.mock("../state/collectionsStore", () => ({
   useCollections: () => ({
@@ -86,5 +87,19 @@ describe("ApiCard Accessibility and Context Layouts", () => {
 
     const chips = screen.getAllByRole("button", { name: /Filter marketplace by tag/ });
     expect(chips.length).toBe(3);
+  });
+
+  it("toggles pin state when the pin button is clicked", () => {
+    pinnedApisStore._reset();
+    render(<ApiCard api={mockApi} />);
+
+    const pinButton = screen.getByRole("button", { name: /Pin api-1 to dashboard/i });
+    expect(pinButton).toBeTruthy();
+    expect(pinButton.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(pinButton);
+
+    expect(pinButton.getAttribute("aria-pressed")).toBe("true");
+    expect(pinButton.getAttribute("aria-label")).toBe("Unpin api-1 from dashboard");
   });
 });
