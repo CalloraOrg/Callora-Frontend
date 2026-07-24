@@ -101,4 +101,12 @@ describe('StatusBadge', () => {
     const dot = badge.querySelector('span[aria-hidden="true"]');
     expect(dot).not.toBeNull();
   });
+
+  it('exposes the pattern semantics for non-color status cues', () => {
+    render(<StatusBadge status="error" />);
+    const badge = screen.getByRole('img', { name: 'Error' }) as HTMLElement;
+    expect(badge.getAttribute('data-status')).toBe('error');
+    expect(badge.getAttribute('data-pattern')).toBe('stripes');
+    expect(badge.getAttribute('aria-description')).toContain('diagonal stripes');
+  });
 });
