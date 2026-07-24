@@ -29,6 +29,19 @@ describe('ApiUsage - Filter Reset', () => {
       },
       writable: true,
     });
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
     vi.clearAllMocks();
   });
 
@@ -36,22 +49,35 @@ describe('ApiUsage - Filter Reset', () => {
     render(<ApiUsage />);
     
     const resetButton = screen.getByRole('button', { name: /Reset Filters/i });
-    expect(resetButton).toBeDisabled();
+    expect((resetButton as HTMLButtonElement).disabled).toBe(true);
 
     // Change a filter to activate the reset button
-    const successTab = screen.getByRole('button', { name: /Success/i });
+    const successTab = screen.getByRole('tab', { name: /Success/i });
     fireEvent.click(successTab);
 
-    expect(resetButton).not.toBeDisabled();
+    expect((resetButton as HTMLButtonElement).disabled).toBe(false);
 
     // Reset filters
     fireEvent.click(resetButton);
 
     // Verify filters are reset
-    expect(resetButton).toBeDisabled();
+    expect((resetButton as HTMLButtonElement).disabled).toBe(true);
     
     // Verify screen reader announcement
     const srAnnouncement = screen.getByRole('status');
     expect(srAnnouncement.textContent).toBe('Filters reset. Showing all calls from the last 24 hours.');
+  });
+
+  it('renders an accessible breadcrumb with the current page announced', () => {
+    render(<ApiUsage />);
+
+    const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i });
+    expect(breadcrumb).toBeTruthy();
+
+    const marketplaceLink = screen.getByRole('link', { name: 'Marketplace' });
+    expect(marketplaceLink.getAttribute('href')).toBe('/marketplace');
+
+    const currentCrumb = screen.getByText('User Profile API usage');
+    expect(currentCrumb.getAttribute('aria-current')).toBe('page');
   });
 });

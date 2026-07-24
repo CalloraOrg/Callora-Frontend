@@ -5,24 +5,25 @@ import { formatPrice } from './utils/format';
 import type { JsonSchema } from './components/RequestBodyEditor';
 import CallHistoryRow from './components/CallHistoryRow';
 import Breadcrumb from './components/Breadcrumb';
+import RequestHistoryPanel from './components/RequestHistoryPanel';
 import ParamsBuilder from './components/ParamsBuilder';
 import { useFetchTracker } from './hooks/useFetchTracker';
 import { useQuota } from './hooks/useQuota';
 import PlanNudge from './components/PlanNudge';
 import CallsHeatmap from './components/CallsHeatmap';
 import Tabs from './components/Tabs';
+import { Icons } from './utils/icons';
+import { LinkIcon } from './components/icons';
+import {
+  clearHistory,
+  loadHistory,
+  saveEntry,
+  type HistoryEntry,
+} from './state/testCallHistory';
+import { copySnapshotUrl, parseSnapshotUrl } from './utils/snapshotUrl';
 
 const MOCK_USAGE_PERCENT = 80;
 const LOADING_DELAY_MS = 500;
-const Icons = { History: () => null };
-const LinkIcon = () => null;
-type HistoryEntry = any;
-const saveEntry = (entry: any) => {};
-const loadHistory = () => [];
-const clearHistory = () => {};
-const parseSnapshotUrl = (url: string) => ({} as any);
-const copySnapshotUrl = async (path: string, params: any) => true;
-
 
 type ApiEndpoint = {
   id: string;

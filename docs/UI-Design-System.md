@@ -233,7 +233,7 @@ Navigation breadcrumb showing page hierarchy.
 
 - `aria-label="breadcrumb"` on nav
 - `aria-current="page"` on current item
-- Collapsed middle crumbs open from a real button with `aria-expanded` and `aria-controls`
+- Collapsed middle crumbs open from a real button with `aria-haspopup="menu"`, `aria-expanded`, and `aria-controls`
 - Keyboard navigation supports Enter/Space on links and buttons, Arrow Up/Down, Home, End, and Escape in the collapsed crumbs menu
 - Focus moves into the collapsed menu when opened and returns to the trigger when closed with Escape
 
