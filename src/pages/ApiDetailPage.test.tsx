@@ -123,6 +123,17 @@ describe("ApiDetailPage", () => {
     expect(screen.getByText("Integration Gallery")).toBeTruthy();
   });
 
+  it("shows the available page shortcuts next to the tab navigation", () => {
+    renderWithProviders(<ApiDetailPage />);
+    settleLoadingState();
+
+    const hint = screen.getByLabelText("Keyboard shortcuts");
+    expect(within(hint).getByText("Esc")).toBeTruthy();
+    expect(within(hint).getByText("Go back to Marketplace")).toBeTruthy();
+    expect(within(hint).getByText("1-5")).toBeTruthy();
+    expect(within(hint).getByText(/Switch tabs/)).toBeTruthy();
+  });
+
   // ── ApiDetailStickyTOC integration ────────────────────────────────────────
 
   it("renders the TOC nav when the documentation tab is active", () => {

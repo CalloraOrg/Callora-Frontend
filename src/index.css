@@ -1965,6 +1965,34 @@ code,
   background: var(--page-bg);
 }
 
+.kbd-hint {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 8px 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.kbd-hint__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kbd-hint__key {
+  min-width: 24px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
 /* The .api-detail-tabs button rule is now handled by .tabs-tab inside Tabs.tsx */
 
 .api-detail-two-column,
@@ -3108,6 +3136,17 @@ code,
 
   .api-detail-tabs {
     margin-bottom: 22px;
+  }
+
+  .kbd-hint {
+    justify-content: flex-start;
+    gap: 12px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .kbd-hint__item {
+    flex: 0 0 auto;
   }
 
   /* Tighten tab button spacing on narrow viewports */
@@ -4930,4 +4969,3 @@ code,
     font-size: 0.6875rem; /* 11 px */
   }
 }
-
