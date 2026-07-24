@@ -1290,7 +1290,7 @@ code,
   background: var(--surface-soft);
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1024px) {
   .topbar,
   .section-heading,
   .hero-grid,
@@ -2934,7 +2934,7 @@ code,
 }
 
 /* Responsive Design */
-@media (max-width: 980px) {
+@media (max-width: 1024px) {
   .marketplace-layout {
     grid-template-columns: 1fr;
     gap: 16px;
@@ -3027,13 +3027,14 @@ code,
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .marketplace-page,
   .api-detail-page {
     padding: 14px;
   }
 
   .marketplace-header,
+  .marketplace-search-row,
   .marketplace-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -3258,7 +3259,7 @@ code,
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .app-shell {
     padding: 20px 14px 32px;
   }
