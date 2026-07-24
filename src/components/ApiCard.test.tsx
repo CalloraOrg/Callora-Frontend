@@ -12,14 +12,7 @@ vi.mock("../state/collectionsStore", () => ({
     addEndpointToCollection: vi.fn(),
     removeEndpointFromCollection: vi.fn(),
     collectionIdsForEndpoint: () => new Set(),
-    createCollection: vi.fn(),
-  }),
-}));
-
-vi.mock("../state/compareStore", () => {
-  const mockCompareStore = {
-    apis: [],
-    addApi: vi.fn(),
+      createCollectionWithEndpoint: vi.fn(),
     removeApi: vi.fn(),
     setOpen: vi.fn(),
     subscribe: vi.fn((listener) => {
