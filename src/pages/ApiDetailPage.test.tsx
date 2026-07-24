@@ -208,4 +208,63 @@ describe("ApiDetailPage", () => {
     expect(collectionCheckbox.checked).toBe(true);
     expect(screen.getByRole("button", { name: /Saved endpoint/i })).toBeTruthy();
   });
+
+  describe("prefers-reduced-motion", () => {
+    let originalMatchMedia: typeof window.matchMedia;
+
+    beforeEach(() => {
+      originalMatchMedia = window.matchMedia;
+    });
+
+    afterEach(() => {
+      window.matchMedia = originalMatchMedia;
+    });
+
+    it("bypasses loading skeleton delay and resolves immediately when prefers-reduced-motion is active", () => {
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query === "(prefers-reduced-motion: reduce)" || query.includes("reduce"),
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }));
+
+      renderWithProviders(<ApiDetailPage />);
+      
+      // Without advancing timers, loading should resolve immediately since delay is 0ms
+      act(() => {
+        vi.advanceTimersByTime(0);
+      });
+
+      // The mock API weather-001 should be rendered
+      expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
+    });
+
+    it("sets tab content animation style to 'none' when prefers-reduced-motion is active", () => {
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query === "(prefers-reduced-motion: reduce)" || query.includes("reduce"),
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }));
+
+      renderWithProviders(<ApiDetailPage />);
+      
+      act(() => {
+        vi.advanceTimersByTime(0);
+      });
+
+      // Find the tab content container. It has class 'tab-content'
+      const tabContent = document.querySelector(".tab-content");
+      expect(tabContent).toBeTruthy();
+      expect(tabContent?.getAttribute("style")).toContain("animation: none");
+    });
+  });
 });
