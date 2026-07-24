@@ -19,6 +19,8 @@ import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../u
 import SubscribeButton from "../components/SubscribeButton";
 import { useToast } from "../components/Toast";
 import { useCollections } from "../state/collectionsStore";
+import RelatedApisRail from "../components/RelatedApisRail";
+import MOCK_APIS from "../data/mockApis";
 
 /**
  * ApiDetailPage
@@ -1091,6 +1093,15 @@ print(response.json())`;
                     Contact Publisher
                   </button>
                 </div>
+
+                {/* ── Related APIs rail ───────────────────────────────── */}
+                <RelatedApisRail
+                  currentApi={api}
+                  allApis={MOCK_APIS}
+                  onSelect={(related) => {
+                    window.location.href = `/details/${related.id}`;
+                  }}
+                />
               </div>
             </aside>
           </div>
