@@ -176,7 +176,7 @@ function BookmarkButton({ endpointId }: BookmarkButtonProps) {
     addEndpointToCollection,
     removeEndpointFromCollection,
     collectionIdsForEndpoint,
-    createCollection,
+    createCollectionWithEndpoint,
   } = useCollections();
 
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -232,10 +232,10 @@ function BookmarkButton({ endpointId }: BookmarkButtonProps) {
   const handleCreateAndAdd = useCallback(() => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    createCollection(trimmed);
+    createCollectionWithEndpoint(trimmed, endpointId);
     setNewName("");
     setShowNew(false);
-  }, [newName, createCollection]);
+  }, [newName, createCollectionWithEndpoint, endpointId]);
 
   const handleNewKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") { e.preventDefault(); handleCreateAndAdd(); }
