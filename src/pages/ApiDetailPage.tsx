@@ -339,6 +339,12 @@ export default function ApiDetailPage({ onBack }: Props) {
   const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
   const { showToast } = useToast();
 
+  const prefersReducedMotion = useMemo(() => {
+    return typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
+
   // Extract ID from URL path: /details/[id]
   const id = typeof window !== "undefined" ? window.location.pathname.split("/").filter(Boolean).pop() : undefined;
 
@@ -428,9 +434,10 @@ export default function ApiDetailPage({ onBack }: Props) {
 
   // Simulate 1.5 s initial data load (consistent with MarketplacePage)
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), LOADING_DELAY_MS);
+    const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
+    const timer = setTimeout(() => setIsLoading(false), delay);
     return () => clearTimeout(timer);
-  }, []);
+  }, [prefersReducedMotion]);
 
   // ── Not found (post-load) ─────────────────────────────────────────────────
 
@@ -644,7 +651,7 @@ print(response.json())`;
               </div>
 
               {/* Tab panels */}
-              <div className="tab-content" style={{ animation: "fadeIn 0.3s ease" }}>
+              <div className="tab-content" style={{ animation: prefersReducedMotion ? "none" : "fadeIn 0.3s ease" }}>
                 {/* ── OVERVIEW ────────────────────────────────────────────── */}
                 {tab === "overview" && (
                   <section id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" tabIndex={0}>
