@@ -21,7 +21,8 @@ import { useToast } from "../components/Toast";
 import { useCollections } from "../state/collectionsStore";
 import RelatedApisRail from "../components/RelatedApisRail";
 import MOCK_APIS from "../data/mockApis";
-import PlanBadge from "../components/PlanBadge";
+import KbdHint from "../components/KbdHint";
+import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 
 /**
  * ApiDetailPage
@@ -104,6 +105,10 @@ const TAB_ITEMS = [
   { id: "reviews", label: "Reviews" },
   { id: "embed", label: "Embed" },
 ] as const satisfies Array<{ id: TabType; label: string }>;
+
+const API_DETAIL_SHORTCUTS = SHORTCUTS.filter(
+  (shortcut) => shortcut.category === "ApiDetailPage",
+);
 
 // ── Endpoint save controls ───────────────────────────────────────────────────
 
@@ -648,6 +653,7 @@ print(response.json())`;
             <div className="content-left">
               {/* Tab navigation */}
               <div className="api-detail-tabs no-print">
+                <KbdHint shortcuts={API_DETAIL_SHORTCUTS} />
                 <Tabs tabs={TAB_ITEMS} activeTab={tab} onChange={(id) => setTab(id as TabType)} />
               </div>
 
