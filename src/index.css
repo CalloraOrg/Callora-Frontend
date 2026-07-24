@@ -3564,8 +3564,13 @@ code,
 }
 
 @keyframes route-progress-glow-pulse {
-    0%, 100% { opacity: 0.6; }
-    50%      { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .route-progress-bar {
@@ -4283,7 +4288,9 @@ code,
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: background 180ms ease, border-color 180ms ease;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease;
 }
 
 .filter-group__header:hover,
@@ -4862,13 +4869,14 @@ code,
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 0.75rem;        /* 12 px */
+  font-size: 0.75rem; /* 12 px */
   font-weight: 600;
   color: var(--accent);
   line-height: 1;
   /* Smooth colour transition on hover/focus so the change isn't jarring. */
-  transition: color var(--transition-speed, 240ms) ease,
-              opacity var(--transition-speed, 240ms) ease;
+  transition:
+    color var(--transition-speed, 240ms) ease,
+    opacity var(--transition-speed, 240ms) ease;
 }
 
 .why-api__toggle:hover {
@@ -4936,7 +4944,7 @@ code,
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  font-size: 0.75rem;   /* 12 px */
+  font-size: 0.75rem; /* 12 px */
   line-height: 1.5;
   color: var(--muted);
 }
@@ -4969,4 +4977,43 @@ code,
   .why-api__item {
     font-size: 0.6875rem; /* 11 px */
   }
+}
+
+/* ── ContextMenu ────────────────────────────────────────────────────────────
+   Token-based styles for the ApiCard right-click / long-press menu.
+   The animation is suppressed for users who prefer reduced motion.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@keyframes contextmenu-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes contextmenu-appear {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+.context-menu__item:hover,
+.context-menu__item:focus-visible {
+  background: var(--surface-soft);
+  outline: none;
+}
+
+/* Restore the global focus ring for keyboard users inside the menu. */
+.context-menu__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
