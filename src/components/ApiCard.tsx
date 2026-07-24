@@ -18,7 +18,8 @@ import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import { usePinnedApis, pinnedApisStore } from "../state/pinnedApis";
 import Sparkline from "./Sparkline";
-import { TagIcon, ClockIcon, BoltIcon } from "./icons";
+import WhyApi from "./WhyApi";
+import { ClockIcon, BoltIcon } from "./icons";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -662,22 +663,12 @@ export default function ApiCard({
         style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
       >
         {((api.tags as string[]) || []).slice(0, 4).map((t: string) => (
-          <span
+          <TagChip
             key={t}
-            style={{
-              fontSize: 12,
-              color: "var(--muted)",
-              background: "rgba(255,255,255,0.02)",
-              padding: "4px 8px",
-              borderRadius: 8,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-            }}
-          >
-            <TagIcon size={16} />
-            {t}
-          </span>
+            tag={t}
+            active={activeTag?.toLowerCase() === t.toLowerCase()}
+            onClick={onTagClick}
+          />
         ))}
       </div>
 
