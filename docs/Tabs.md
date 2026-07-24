@@ -2,6 +2,10 @@
 
 ## Overview
 
+
+
+
+
 The `Tabs` component replaces the inline tab navigation in `ApiDetailPage` with a reusable, fully accessible tab strip featuring a **smooth sliding ink-bar indicator** that animates between tabs using CSS `transition` driven by DOM geometry measurements. No animation libraries required.
 
 ---
