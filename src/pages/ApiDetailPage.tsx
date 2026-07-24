@@ -21,6 +21,7 @@ import { useToast } from "../components/Toast";
 import { useCollections } from "../state/collectionsStore";
 import RelatedApisRail from "../components/RelatedApisRail";
 import MOCK_APIS from "../data/mockApis";
+import PlanBadge from "../components/PlanBadge";
 
 /**
  * ApiDetailPage
@@ -828,7 +829,7 @@ print(response.json())`;
                     <div className="api-detail-pricing-grid">
                       {/* Standard plan */}
                       <div className="preview-card" style={{ padding: 24, border: "2px solid var(--accent)" }}>
-                        <div style={{ color: "var(--accent)", fontWeight: 700, fontSize: 12, textTransform: "uppercase" }}>Standard</div>
+                        <PlanBadge tier="pro" />
                         <div className="api-detail-plan-price">
                           {`$${formatPrice(api.pricePerRequest ?? 0)}`} <span style={{ fontSize: 14, color: "var(--muted)" }}>/ call</span>
                         </div>
@@ -844,7 +845,7 @@ print(response.json())`;
 
                       {/* Enterprise plan */}
                       <div className="preview-card" style={{ padding: 24 }}>
-                        <div style={{ color: "var(--muted)", fontWeight: 700, fontSize: 12, textTransform: "uppercase" }}>Enterprise</div>
+                        <PlanBadge tier="enterprise" />
                         <div className="api-detail-plan-price">Custom</div>
                         <p style={{ fontSize: 14, color: "var(--muted)" }}>For high-volume needs requiring dedicated infrastructure and support.</p>
                         <ul style={{ padding: 0, listStyle: "none", fontSize: 14, marginTop: 20 }}>
