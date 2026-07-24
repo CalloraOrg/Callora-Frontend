@@ -116,6 +116,22 @@ describe("ApiDetailPage", () => {
     expect(screen.getByText("Pricing Plans")).toBeTruthy();
   });
 
+  it("shows plan badges with tooltips on the pricing tab", () => {
+    renderWithProviders(<ApiDetailPage />);
+    settleLoadingState();
+    fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+    const proBadge = screen.getByText("Pro");
+    const enterpriseBadge = screen.getByText("Enterprise");
+    expect(proBadge).toBeTruthy();
+    expect(enterpriseBadge).toBeTruthy();
+
+    fireEvent.focus(enterpriseBadge);
+    const tip = screen.getByRole("tooltip");
+    expect(tip.textContent).toContain("Enterprise plan");
+    expect(tip.textContent).toContain("Custom / unmetered");
+  });
+
   it("switches to the examples tab", () => {
     renderWithProviders(<ApiDetailPage />);
     settleLoadingState();
