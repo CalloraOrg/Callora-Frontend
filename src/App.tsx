@@ -21,6 +21,7 @@ import {
 } from "./config/constants";
 import CompareDrawer from './components/CompareDrawer';
 import CompareTray from './components/CompareTray';
+import ExternalLink from './components/ExternalLink';
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -1013,13 +1014,12 @@ function App() {
                         </div>
 
                         <div className="hash-actions">
-                          <a
+                          <ExternalLink
                             href={buildExplorerLink(txHash)}
-                            target="_blank"
-                            rel="noreferrer"
+                            ariaLabel="View transaction on Stellar Explorer"
                           >
                             View on Stellar Explorer
-                          </a>
+                          </ExternalLink>
                           <button onClick={handleCopyHash}>
                             {copied ? "Copied" : "Copy hash"}
                           </button>
