@@ -39,6 +39,26 @@ const DEFAULT_LABELS: Record<StatusVariant, string> = {
   pending: 'Pending',
 };
 
+const PATTERN_DESCRIPTIONS: Record<StatusVariant, string> = {
+  success: 'solid baseline',
+  operational: 'solid baseline',
+  error: 'diagonal stripes',
+  down: 'diagonal stripes',
+  warning: 'opposite diagonal stripes',
+  degraded: 'opposite diagonal stripes',
+  pending: 'dot pattern',
+};
+
+const PATTERN_KEYS: Record<StatusVariant, string> = {
+  success: 'baseline',
+  operational: 'baseline',
+  error: 'stripes',
+  down: 'stripes',
+  warning: 'opposite-stripes',
+  degraded: 'opposite-stripes',
+  pending: 'dots',
+};
+
 /** Small circle indicator rendered before the text label. */
 function Dot({ status }: { status: StatusVariant }) {
   return (
@@ -65,11 +85,15 @@ type Props = {
 
 export function StatusBadge({ status, label, className }: Props) {
   const visibleLabel = label ?? DEFAULT_LABELS[status];
+  const patternDescription = PATTERN_DESCRIPTIONS[status];
+  const patternKey = PATTERN_KEYS[status];
 
   return (
     <span
       // Pattern class from patterns.css provides the texture overlay
       className={[`sb-pattern-${status}`, className].filter(Boolean).join(' ')}
+      data-status={status}
+      data-pattern={patternKey}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -91,6 +115,7 @@ export function StatusBadge({ status, label, className }: Props) {
       // role="status" would be too assertive for a static badge.
       role="img"
       aria-label={visibleLabel}
+      aria-description={`Pattern-based status badge: ${visibleLabel} with ${patternDescription}`}
     >
       <Dot status={status} />
       {visibleLabel}
