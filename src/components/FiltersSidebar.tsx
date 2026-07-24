@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
 import { WarningIcon, ChevronIcon } from "./icons";
+import { usePersistedState } from "../hooks/usePersistedState";
 import Dropdown from "./Dropdown";
 import { usePersistedState } from "../hooks/usePersistedState";
 
@@ -74,8 +74,8 @@ export default function FiltersSidebar({
   popularity,
   setPopularity,
   clearFilters,
-  favoritesOnly,
-  toggleFavoritesOnly,
+  favoritesOnly = false,
+  toggleFavoritesOnly = () => {},
 }: {
   selectedCategories: Set<string>;
   toggleCategory: (c: string) => void;
@@ -86,9 +86,12 @@ export default function FiltersSidebar({
   popularity: string;
   setPopularity: (p: string) => void;
   clearFilters: () => void;
-  favoritesOnly: boolean;
-  toggleFavoritesOnly: () => void;
+  favoritesOnly?: boolean;
+  toggleFavoritesOnly?: () => void;
 }) {
+  const priceError =
+    minPrice !== null && maxPrice !== null && minPrice > maxPrice;
+
   return (
     <aside className="filters-sidebar">
       <FilterGroup title="Categories" storageKey="categories">
@@ -112,58 +115,71 @@ export default function FiltersSidebar({
       </FilterGroup>
 
       <FilterGroup title="Price range" storageKey="price">
-        <div className="filter-price" style={{ display: "flex", gap: 8 }}>
-          <input
-            id="min-price-input"
-            type="number"
-            min="0"
-            className={`filter-input ${minPrice !== null && maxPrice !== null && minPrice > maxPrice ? 'filter-input--invalid' : ''}`}
-            placeholder="min"
-            value={minPrice ?? ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : Math.max(0, Number(e.target.value));
-              setMinPrice(val);
-            }}
-            aria-invalid={minPrice !== null && maxPrice !== null && minPrice > maxPrice}
-            aria-describedby={minPrice !== null && maxPrice !== null && minPrice > maxPrice ? "price-range-error" : undefined}
-            style={{ width: "100%" }}
-          />
-          <input
-            id="max-price-input"
-            type="number"
-            min="0"
-            className={`filter-input ${minPrice !== null && maxPrice !== null && minPrice > maxPrice ? 'filter-input--invalid' : ''}`}
-            placeholder="max"
-            value={maxPrice ?? ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : Math.max(0, Number(e.target.value));
-              setMaxPrice(val);
-            }}
-            aria-invalid={minPrice !== null && maxPrice !== null && minPrice > maxPrice}
-            aria-describedby={minPrice !== null && maxPrice !== null && minPrice > maxPrice ? "price-range-error" : undefined}
-            style={{ width: "100%" }}
-          />
-        </div>
-        {minPrice !== null && maxPrice !== null && minPrice > maxPrice && (
-          <div
-            id="price-range-error"
-            style={{
-              color: "var(--danger)",
-              fontSize: "0.8rem",
-              marginTop: 6,
-              display: "flex",
-              alignItems: "center",
-              gap: 4
-            }}
-            role="alert"
-          >
-            <WarningIcon size={16} /> Min price cannot exceed max price.
+        <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              id="filter-min-price"
+              type="number"
+              min="0"
+              placeholder="Min"
+              className="filter-input"
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.6rem",
+                border: "1px solid var(--line)",
+                borderRadius: "8px",
+                background: "var(--surface)",
+                color: "var(--text)",
+              }}
+              value={minPrice ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                setMinPrice(v === "" ? null : Number(v));
+              }}
+              aria-label="Minimum price"
+            />
+            <span style={{ color: "var(--muted)" }}>–</span>
+            <input
+              id="filter-max-price"
+              type="number"
+              min="0"
+              placeholder="Max"
+              className="filter-input"
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.6rem",
+                border: "1px solid var(--line)",
+                borderRadius: "8px",
+                background: "var(--surface)",
+                color: "var(--text)",
+              }}
+              value={maxPrice ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                setMaxPrice(v === "" ? null : Number(v));
+              }}
+              aria-label="Maximum price"
+            />
           </div>
-        )}
+          {priceError && (
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                alignItems: "center",
+                color: "var(--danger)",
+                fontSize: "0.8rem",
+              }}
+            >
+              <WarningIcon size={16} />
+              <span>Min price cannot exceed max price</span>
+            </div>
+          )}
+        </div>
       </FilterGroup>
 
       <FilterGroup title="Popularity" storageKey="popularity">
-        <div className="filter-popularity">
+        <div style={{ marginTop: 0 }}>
           <Dropdown<PopularityValue>
             id="filters-popularity"
             value={popularity as PopularityValue}
@@ -177,21 +193,21 @@ export default function FiltersSidebar({
       </FilterGroup>
 
       <div style={{ marginBottom: 12 }}>
-          <fieldset className="filter-group">
-            <legend className="filter-legend">Favorites</legend>
-            <div className="filter-option" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-              <input
-                id="favorites-only-checkbox"
-                type="checkbox"
-                className="filter-checkbox"
-                checked={favoritesOnly}
-                onChange={toggleFavoritesOnly}
-              />
-              <label htmlFor="favorites-only-checkbox" className="filter-label" style={{ color: "var(--text)" }}>
-                Favorites only
-              </label>
-            </div>
-          </fieldset>
+        <fieldset className="filter-group">
+          <legend className="filter-legend">Favorites</legend>
+          <div className="filter-option" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+            <input
+              id="favorites-only-checkbox"
+              type="checkbox"
+              className="filter-checkbox"
+              checked={favoritesOnly}
+              onChange={toggleFavoritesOnly}
+            />
+            <label htmlFor="favorites-only-checkbox" className="filter-label" style={{ color: "var(--text)" }}>
+              Favorites only
+            </label>
+          </div>
+        </fieldset>
       </div>
 
       <div style={{ marginTop: 8 }}>

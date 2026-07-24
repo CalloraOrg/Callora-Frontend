@@ -3521,9 +3521,12 @@ code,
 }
 
 /* ─── Route Progress Bar ────────────────────────────────────────────────────
-   Fixed thin bar at the top of the viewport. Uses var(--accent) to stay
-   theme-aware in both light and dark mode. The indeterminate animation only
-   runs when the user has not requested reduced motion.
+   Fixed bar at the top of the viewport with a visible height (4px) and a
+   subtle glow that improves visibility during transitions. Uses var(--accent)
+   and var(--accent-strong) to stay theme-aware in both light and dark mode.
+   The indeterminate animation only runs when the user has not requested
+   reduced motion.  Prints and pointer-events are suppressed so the bar never
+   blocks interaction or clutters printed pages.
    ─────────────────────────────────────────────────────────────────────────── */
 
 @keyframes route-progress-indeterminate {
@@ -3535,12 +3538,17 @@ code,
     }
 }
 
+@keyframes route-progress-glow-pulse {
+    0%, 100% { opacity: 0.6; }
+    50%      { opacity: 1; }
+}
+
 .route-progress-bar {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    height: 3px;
+    height: 4px;
     z-index: 99999;
     pointer-events: none;
     opacity: 0;
@@ -3560,13 +3568,40 @@ code,
 .route-progress-bar-indicator {
     width: 33.33%;
     height: 100%;
-    background: var(--accent);
+    background: linear-gradient(
+        90deg,
+        var(--accent),
+        var(--accent-strong),
+        var(--accent)
+    );
     border-radius: 2px;
+    box-shadow:
+        0 0 8px color-mix(in srgb, var(--accent) 50%, transparent),
+        0 0 16px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Subtle glow layer beneath the main indicator for extra visibility */
+.route-progress-bar-glow {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+    background:
+        linear-gradient(
+            90deg,
+            transparent 0%,
+            color-mix(in srgb, var(--accent) 18%, transparent) 30%,
+            color-mix(in srgb, var(--accent) 18%, transparent) 70%,
+            transparent 100%
+        );
 }
 
 @media (prefers-reduced-motion: no-preference) {
     .route-progress-bar-indicator {
         animation: route-progress-indeterminate 1.4s ease-in-out infinite;
+    }
+
+    .route-progress-bar-glow {
+        animation: route-progress-glow-pulse 1.8s ease-in-out infinite;
     }
 }
 

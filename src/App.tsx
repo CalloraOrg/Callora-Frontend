@@ -800,10 +800,6 @@ function App() {
 
        <CompareTray />
        <CompareDrawer />
-     </div>
-   );
-}
-
 
       {isDepositOpen && (
         <div

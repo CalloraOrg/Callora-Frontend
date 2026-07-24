@@ -15,7 +15,15 @@ import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
 import RatingHistogram from "../components/RatingHistogram";
-import CopyCurlButton from "../components/CopyCurlButton";
+import { useFetchTracker } from "../hooks/useFetchTracker";
+import { CheckIcon } from "./icons";
+import SubscribeButton from "../components/SubscribeButton";
+import { getPostmanImportUrl, getInsomniaImportUrl, copyToClipboard } from "../utils/postman";
+
+/** Local toast helper until a shared toast system is wired in. */
+function showToast(_message: string, _type?: string): void {
+  // Stub - no-op for now; avoids breaking Postman/Insomnia copy buttons.
+}
 
 /**
  * ApiDetailPage Component
@@ -497,13 +505,19 @@ print(data)`;
             </div>
           </div>
 
-    <button
-      className="ghost-button no-print"
-      onClick={onBack}
-      type="button"
-    >
-    </button>
-<section className="api-hero" aria-labelledby="api-title">
+          <div className="api-detail-content-grid">
+            <div className="content-left">
+              <nav className="api-detail-tabs no-print">
+                <Tabs
+                  items={TAB_ITEMS.map((t) => ({
+                    id: t.id,
+                    label: t.label,
+                  }))}
+                  activeTab={tab}
+                  onTabChange={(id) => setTab(id as TabType)}
+                  aria-label="API detail sections"
+                />
+              </nav>
 
               <div
                 className="tab-content"
@@ -1491,31 +1505,5 @@ print(data)`;
         </div>
       </div>
     </div>
-
-    <div className="api-hero__cta no-print">
-      <button className="primary-button">
-        Try API
-      </button>
-
-      <button
-        className="secondary-button"
-        onClick={() => setTab("pricing")}
-      >
-        View Pricing
-      </button>
-
-      {/* Accessible subscribe flow with inline confirmation (issue #287) */}
-      <SubscribeButton
-        apiName={api.name}
-        onSubscribe={() => showToast(`Subscribed to ${api.name}!`, "success")}
-      />
-    </div>
-  </div>
-</section>
-
-  <div className="api-detail-content-grid"></div>
-      </div>
-    </div>
-  </div>
   );
 }
