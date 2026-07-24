@@ -4786,3 +4786,148 @@ code,
   color: var(--accent);
   border-color: var(--accent);
 }
+
+/* ============================================================
+   WhyApi — "Why this API?" disclosure widget
+   BEM block: .why-api
+   Placed inside the marketplace ApiCard (non-compact variant).
+   Design tokens: --accent, --accent-strong, --muted,
+                  --surface-soft, --border-subtle, --transition-speed
+   WCAG 2.1 AA: focus-visible ring, colour-contrast safe colours.
+   ============================================================ */
+
+/**
+ * Container block.
+ * Provides top margin to separate it from the card body content above,
+ * and sets the stacking context for the animated list.
+ */
+.why-api {
+  margin-top: 4px;
+  /* Establish a local stacking context so z-index on children is contained. */
+  position: relative;
+}
+
+/**
+ * Toggle button element.
+ * Stripped of native button chrome and styled as a small accent link-like
+ * affordance. The focus-visible ring uses the global token so it's
+ * consistent with every other interactive element in the app.
+ */
+.why-api__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;        /* 12 px */
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+  /* Smooth colour transition on hover/focus so the change isn't jarring. */
+  transition: color var(--transition-speed, 240ms) ease,
+              opacity var(--transition-speed, 240ms) ease;
+}
+
+.why-api__toggle:hover {
+  /* Slightly brighten on hover to signal interactivity. */
+  opacity: 0.8;
+}
+
+/* Keyboard-focus ring — 2px solid accent at 3 px offset (matches app-wide
+   focus style defined in the :focus-visible section above). */
+.why-api__toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/** Open-state modifier — rotate chevron handled via content swap in JSX,
+    but the class can be used for additional styling if needed. */
+.why-api__toggle--open {
+  /* Slightly muted colour in the open state so "close" feels natural. */
+  color: var(--accent-strong, var(--accent));
+}
+
+/**
+ * Decorative chevron icon (aria-hidden in JSX).
+ * `user-select: none` prevents the symbol being included in copy-paste.
+ */
+.why-api__chevron {
+  user-select: none;
+  font-size: 0.625rem; /* 10 px — smaller than the label */
+  line-height: 1;
+}
+
+/**
+ * Reasons list element.
+ * Uses flex-column with a gap instead of list padding so spacing is
+ * predictable across all breakpoints.
+ */
+.why-api__reasons {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Subtle fade-in for the list appearance. */
+  animation: why-api-appear 180ms ease forwards;
+}
+
+@keyframes why-api-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/**
+ * Individual reason list item.
+ * Flex row so the check icon and text align on the same baseline.
+ */
+.why-api__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.75rem;   /* 12 px */
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/**
+ * Decorative check mark (aria-hidden in JSX).
+ * Uses --accent-strong for a distinct but on-theme green tick.
+ */
+.why-api__check {
+  flex-shrink: 0;
+  color: var(--accent-strong, var(--accent));
+  user-select: none;
+  margin-top: 1px; /* optical alignment with the first line of text */
+}
+
+/**
+ * Readable reason text.
+ * `min-width: 0` allows long strings to wrap correctly inside the flex row.
+ */
+.why-api__text {
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ── Responsive adjustments ─────────────────────────────────────────────── */
+
+/* On narrow screens (< 400 px) reduce font slightly to stay within card. */
+@media (max-width: 400px) {
+  .why-api__toggle,
+  .why-api__item {
+    font-size: 0.6875rem; /* 11 px */
+  }
+}
+
