@@ -1,4 +1,4 @@
-import React, { CSSProperties, Fragment } from "react";
+import React, { CSSProperties } from "react";
 
 interface SkeletonProps {
   width?: string | number;
@@ -31,24 +31,30 @@ export default function Skeleton({
 }
 
 
-// Row variant for table loading
-export function SkeletonRow({ rows = 5 }: { rows?: number }) {
-  const rowSkeleton = (
-    <div className="table-row">
-      <Skeleton width="60%" height="16px" className="skeleton-cell" />
-      <Skeleton width="85%" height="16px" className="skeleton-cell" />
-      <Skeleton width="50%" height="16px" className="skeleton-cell" />
-      <Skeleton width="45%" height="16px" className="skeleton-cell" />
-      <Skeleton width="35%" height="16px" className="skeleton-cell" />
-      <Skeleton width="50%" height="16px" className="skeleton-cell" />
-    </div>
-  );
+const TABLE_CELL_VARIANTS = [
+  "timestamp",
+  "endpoint",
+  "status",
+  "response-time",
+  "cost",
+  "action",
+] as const;
+
+// Mirrors the six cells and responsive span wrappers in CallHistoryRow.
+export function SkeletonRow({ rows = 3 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <Fragment key={i}>{rowSkeleton}</Fragment>
+        <div className="table-row" aria-hidden="true" key={i}>
+          {TABLE_CELL_VARIANTS.map((variant) => (
+            <span className="skeleton-cell-slot" key={variant}>
+              <Skeleton
+                className={`skeleton-cell skeleton-cell--${variant}`}
+              />
+            </span>
+          ))}
+        </div>
       ))}
     </>
   );
 }
-

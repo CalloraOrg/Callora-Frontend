@@ -192,6 +192,64 @@ function formatTimestamp(date: Date) {
   }).format(date);
 }
 
+type CallHistoryTableProps = {
+  calls: CallRecord[];
+  expandedCall: string | null;
+  isLoading: boolean;
+  onToggleExpand: (id: string) => void;
+};
+
+export function ApiUsageCallHistory({
+  calls,
+  expandedCall,
+  isLoading,
+  onToggleExpand,
+}: CallHistoryTableProps) {
+  return (
+    <>
+      {isLoading && (
+        <p
+          id="call-history-loading"
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+        >
+          Loading call history.
+        </p>
+      )}
+      <div
+        className="call-history-table"
+        aria-busy={isLoading}
+        aria-describedby={isLoading ? 'call-history-loading' : undefined}
+      >
+        <div className="table-header">
+          <span>Timestamp</span>
+          <span>Endpoint</span>
+          <span>Status</span>
+          <span>Response Time</span>
+          <span>Cost</span>
+          <span>Actions</span>
+        </div>
+
+        {isLoading ? (
+          <SkeletonRow rows={calls.length} />
+        ) : calls.length === 0 ? (
+          <EmptyState message="No call records match the selected filter." />
+        ) : (
+          calls.map(call => (
+            <CallHistoryRow
+              key={call.id}
+              call={call}
+              expanded={expandedCall === call.id}
+              onToggleExpand={onToggleExpand}
+            />
+          ))
+        )}
+      </div>
+    </>
+  );
+}
+
 
 export default function ApiUsage() {
   const { trackFetch } = useFetchTracker();
@@ -754,31 +812,12 @@ export default function ApiUsage() {
           {filterResetMessage}
         </p>
 
-        <div className="call-history-table" aria-busy={isLoading}>
-           <div className="table-header">
-             <span>Timestamp</span>
-             <span>Endpoint</span>
-             <span>Status</span>
-             <span>Response Time</span>
-             <span>Cost</span>
-             <span>Actions</span>
-           </div>
-
-           {isTableLoading ? (
-             <SkeletonRow rows={5} />
-           ) : filteredCallHistory.length === 0 ? (
-             <EmptyState message="No call records match the selected filter." />
-           ) : (
-             filteredCallHistory.map(call => (
-               <CallHistoryRow
-                 key={call.id}
-                 call={call}
-                 expanded={expandedCall === call.id}
-                 onToggleExpand={id => setExpandedCall(expandedCall === id ? null : id)}
-               />
-             ))
-           )}
-         </div>
+        <ApiUsageCallHistory
+          calls={filteredCallHistory}
+          expandedCall={expandedCall}
+          isLoading={isTableLoading}
+          onToggleExpand={id => setExpandedCall(expandedCall === id ? null : id)}
+        />
       </div>
 
       {/* Integration Guide */}

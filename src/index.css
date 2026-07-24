@@ -2769,6 +2769,42 @@ code,
     border-bottom: none;
 }
 
+.skeleton-cell-slot {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.skeleton-cell {
+    height: 16px;
+}
+
+.skeleton-cell--timestamp {
+    width: 60%;
+}
+
+.skeleton-cell--endpoint {
+    width: 85%;
+}
+
+.skeleton-cell--status {
+    width: 50%;
+}
+
+.skeleton-cell--response-time {
+    width: 45%;
+}
+
+.skeleton-cell--cost {
+    width: 35%;
+}
+
+.skeleton-cell--action {
+    width: 56px;
+    height: 48px;
+    border-radius: 6px;
+}
+
 .endpoint-cell {
     font-family: "Courier New", monospace;
     font-size: 0.875rem;
