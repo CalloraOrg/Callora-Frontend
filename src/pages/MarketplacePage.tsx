@@ -7,6 +7,7 @@ import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import FiltersSidebar from "../components/FiltersSidebar";
+import ActiveFilterChips from "../components/ActiveFilterChips";
 import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
@@ -458,6 +459,20 @@ export default function MarketplacePage(): JSX.Element {
               </button>
             </div>
           </div>
+
+          <ActiveFilterChips
+            categories={selectedCategories}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            popularity={popularity}
+            favoritesOnly={favoritesOnly}
+            onRemoveCategory={(c) => toggleCategory(c)}
+            onRemoveMinPrice={() => setMinPrice(null)}
+            onRemoveMaxPrice={() => setMaxPrice(null)}
+            onRemovePopularity={() => setPopularity("any")}
+            onRemoveFavoritesOnly={() => setFavoritesOnly(false)}
+            onClearAll={clearFilters}
+          />
 
           {fetchError ? (
             <EmptyState variant="error" onRetry={handleRetryFetch} />
