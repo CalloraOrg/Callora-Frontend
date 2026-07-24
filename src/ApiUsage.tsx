@@ -2,11 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import EmptyState from './components/EmptyState';
 import Skeleton, { SkeletonRow } from './components/Skeleton';
 import { formatPrice } from './utils/format';
-import RequestBodyEditor from './components/RequestBodyEditor';
 import type { JsonSchema } from './components/RequestBodyEditor';
 import CallHistoryRow from './components/CallHistoryRow';
 import Breadcrumb from './components/Breadcrumb';
-import { JsonViewer } from './components/JsonViewer';
+import ParamsBuilder from './components/ParamsBuilder';
 
 type ApiEndpoint = {
   id: string;
@@ -603,14 +602,11 @@ export default function ApiUsage() {
           </div>
 
           <div className="form-row">
-            <RequestBodyEditor
+            <ParamsBuilder
               value={requestParams}
               onChange={setRequestParams}
-              schema={selectedEndpoint.requestBodySchema}
-              label="Parameters (JSON)"
-              placeholder={'{\n  "key": "value"\n}'}
-              rows={6}
               disabled={isLoading}
+              label="Parameters"
             />
           </div>
 
