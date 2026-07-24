@@ -23,7 +23,7 @@ import CompareDrawer from "../components/CompareDrawer";
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
 import { useCompareStore } from "../state/compareStore";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
-import { useCompareStore } from "../state/compareStore";
+import FiltersBottomSheet from "../components/FiltersBottomSheet";
 
 export default function MarketplacePage(): JSX.Element {
   const { apis } = useCompareStore();

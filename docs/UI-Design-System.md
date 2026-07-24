@@ -387,7 +387,7 @@ Interactive documentation helper that previews endpoint groups on hover and keyb
 
 ### FiltersSidebar
 
-Sidebar for filtering marketplace results.
+Sidebar for filtering marketplace results. Rendered inside the desktop layout and also embedded inside the `FiltersBottomSheet` on mobile.
 
 **Props:**
 
@@ -397,29 +397,32 @@ Sidebar for filtering marketplace results.
 - `maxPrice: number | null` - Maximum price filter
 - `setMinPrice: (v: number | null) => void` - Set minimum price
 - `setMaxPrice: (v: number | null) => void` - Set maximum price
-- `popularity: string` - Popularity sort option
+- `popularity: string` - Popularity sort option (`"any"` | `"mostUsed"` | `"newest"`)
 - `setPopularity: (p: string) => void` - Set popularity sort
 - `clearFilters: () => void` - Reset all filters
+- `favoritesOnly: boolean` - Whether the Favorites Only filter is active
+- `toggleFavoritesOnly: () => void` - Toggle favorites-only filter
 
 **Visual Spec:**
-
-- Layout: Vertical sections with 12px margin
-- Categories: Checkbox list, 8px gap
-- Price range: Two number inputs side-by-side
-- Popularity: Select dropdown
+- Layout: Three collapsible `FilterGroup` sections (Categories, Price range, Popularity) plus a Favorites fieldset and a Clear button
+- Each `FilterGroup` persists its collapsed state to `localStorage` via `usePersistedState`
+- Price range: Two `<input type="number">` fields with a `WarningIcon` + error message when min > max
+- Popularity: Accessible `Dropdown` component
 - Clear button: Ghost button style
 
 **States:**
-
-- Default: All filters visible
-- Checked: Checkbox shows selected state
-- Focused: Standard focus ring on inputs
+- Default: All filter sections expanded
+- Collapsed: Section header shows rotated chevron; panel is `hidden`
+- Price error: Both price inputs gain `filter-input--invalid` class; alert paragraph appears with `role="alert"`
+- Focused: Standard focus ring on all inputs and buttons
 
 **Accessibility:**
 
 - Semantic `<aside>` element
-- Labels for all form controls
-- Keyboard navigation through checkboxes
+- All form controls have associated `<label>` elements
+- `FilterGroup` uses `aria-expanded` and `aria-controls` on the toggle button
+- Price validation error uses `role="alert"` and `aria-invalid` on the affected inputs
+- Keyboard navigation through checkboxes and inputs
 
 **Usage Example:**
 
@@ -434,6 +437,74 @@ Sidebar for filtering marketplace results.
   popularity={popularity}
   setPopularity={setPopularity}
   clearFilters={clearFilters}
+  favoritesOnly={favoritesOnly}
+  toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+/>
+```
+
+---
+
+### FiltersBottomSheet
+
+Mobile-only bottom-sheet that wraps `FiltersSidebar`. Shown when the user taps the "Filters" trigger button on viewports ≤ 980 px. Rendered by `MarketplacePage` and controlled via `showFiltersMobile` state.
+
+**Props:**
+- `open: boolean` - Whether the sheet is visible
+- `onClose: () => void` - Callback to close the sheet
+- `resultCount: number` - Live count displayed in the footer CTA ("Show N results")
+- `selectedCategories: Set<string>` — Passed through to `FiltersSidebar`
+- `toggleCategory: (c: string) => void` — Passed through
+- `minPrice / maxPrice / setMinPrice / setMaxPrice` — Passed through
+- `popularity / setPopularity` — Passed through
+- `clearFilters: () => void` — Passed through
+- `favoritesOnly: boolean` — Passed through
+- `toggleFavoritesOnly: () => void` — Passed through
+- `triggerRef: React.RefObject<HTMLButtonElement>` - Ref to the trigger button; focus is restored to it when the sheet closes
+
+**Snap points:**
+- `"half"` (default on open) → `50vh`
+- `"full"` → `92vh`
+- Drag the handle area down > 60 px from `"full"` → snaps to `"half"`; drag down from `"half"` → dismisses
+- Drag up > 60 px → snaps to `"full"`
+- Spring transition: `280ms cubic-bezier(0.32, 0.72, 0, 1)`; disabled when `prefers-reduced-motion: reduce`
+
+**CSS classes (index.css):**
+- `.bottom-sheet__backdrop` — fixed overlay; click to close
+- `.bottom-sheet` — the sheet panel; height driven by snap state
+- `.bottom-sheet--half` / `.bottom-sheet--full` — semantic modifier classes
+- `.bottom-sheet__handle-area` — 44 px-tall touch target for dragging
+- `.bottom-sheet__handle` — visible pill indicator
+- `.bottom-sheet__header` — title row with close button
+- `.bottom-sheet__body` — scrollable filter content area
+- `.bottom-sheet__footer` — sticky footer with the "Show N results" CTA
+- `@keyframes bottom-sheet-in` — slide-up entry animation (no-preference motion only)
+
+**Accessibility:**
+- `role="dialog"` with `aria-modal="true"` and `aria-label="Filters"`
+- Focus trap: Tab/Shift+Tab cycle is contained inside the sheet while open
+- ESC key closes the sheet
+- Focus is automatically moved into the sheet on open and restored to `triggerRef` on close
+- `document.body.overflow` is locked while open to prevent background scroll
+- Handle area is `aria-hidden`; close button has `aria-label="Close filters"`
+
+**Usage Example:**
+```tsx
+<FiltersBottomSheet
+  open={showFiltersMobile}
+  onClose={() => setShowFiltersMobile(false)}
+  resultCount={filtered.length}
+  selectedCategories={selectedCategories}
+  toggleCategory={toggleCategory}
+  minPrice={minPrice}
+  maxPrice={maxPrice}
+  setMinPrice={setMinPrice}
+  setMaxPrice={setMaxPrice}
+  popularity={popularity}
+  setPopularity={setPopularity}
+  clearFilters={clearFilters}
+  favoritesOnly={favoritesOnly}
+  toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+  triggerRef={filtersTriggerRef}
 />
 ```
 

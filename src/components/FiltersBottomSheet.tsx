@@ -72,8 +72,10 @@ export default function FiltersBottomSheet({
   const dragStartY = useRef<number | null>(null);
 
   // Detect reduced-motion preference once; stable for the component lifetime.
+  // Guard against environments (jsdom, SSR) where matchMedia may be absent.
   const prefersReducedMotion =
     typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Reset to half-snap whenever the sheet opens.
