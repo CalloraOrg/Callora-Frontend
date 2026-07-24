@@ -89,15 +89,10 @@ export default function FiltersSidebar({
   favoritesOnly?: boolean;
   toggleFavoritesOnly?: () => void;
 }) {
-<<<<<<< HEAD
   // Inverted price range — show a warning without silently discarding filters.
   const hasPriceRangeError =
     minPrice !== null && maxPrice !== null && minPrice > maxPrice;
 
-  return (
-    <aside className="filters-sidebar">
-      {/* ── Categories ──────────────────────────────────────────────────── */}
-=======
   const [sheetOpen, setSheetOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -108,29 +103,15 @@ export default function FiltersSidebar({
       const onKey = (e: KeyboardEvent) => {
         if (e.key === "Escape") setSheetOpen(false);
       };
-        // Inverted price range — show a warning without silently discarding filters.
-        const hasPriceRangeError = minPrice !== null && maxPrice !== null && minPrice > maxPrice;
+      document.addEventListener("keydown", onKey);
+      return () => document.removeEventListener("keydown", onKey);
+    }
+  }, [sheetOpen]);
 
-        const [sheetOpen, setSheetOpen] = useState(false);
-        const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-
-        useEffect(() => {
-          if (sheetOpen) {
-            // set focus to close button for basic accessibility
-            closeButtonRef.current?.focus();
-            const onKey = (e: KeyboardEvent) => {
-              if (e.key === "Escape") setSheetOpen(false);
-            };
-            document.addEventListener("keydown", onKey);
-            return () => document.removeEventListener("keydown", onKey);
-          }
-        }, [sheetOpen]);
-
-        // For responsive styling, `.mobile-filters-toggle` is hidden by desktop CSS
-        const content = (
-          <>
-            {/* ── Categories */}
-      >>>>>>> 0a57646 (feat: FiltersSidebar bottom-sheet)
+  // For responsive styling, `.mobile-filters-toggle` is hidden by desktop CSS
+  const content = (
+    <>
+      {/* ── Categories ────────────────────────────────────────────────── */}
       <FilterGroup title="Categories" storageKey="categories">
         <div className="filter-options" style={{ display: "grid", gap: 8 }}>
           {ALL_CATEGORIES.map((c) => {
@@ -161,8 +142,7 @@ export default function FiltersSidebar({
         </div>
       </FilterGroup>
 
-<<<<<<< HEAD
-      {/* ── Price range ─────────────────────────────────────────────────── */}
+      {/* ── Price range ────────────────────────────────────────────────── */}
       <FilterGroup title="Price range" storageKey="price">
         <div style={{ display: "grid", gap: 8 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -202,91 +182,38 @@ export default function FiltersSidebar({
               aria-invalid={hasPriceRangeError}
               style={{ flex: 1, minWidth: 0 }}
             />
-          </FilterGroup>
+          </div>
+          {hasPriceRangeError && (
+            <p
+              className="error-text"
+              role="alert"
+              style={{ display: "flex", gap: 6, alignItems: "center", margin: 0 }}
+            >
+              <WarningIcon size={16} aria-hidden="true" />
+              Min price cannot exceed max price
+            </p>
+          )}
+        </div>
+      </FilterGroup>
 
-          {/* ── Price range */}
-          <FilterGroup title="Price range" storageKey="price">
-            <div style={{ display: "grid", gap: 8 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <label htmlFor="filter-min-price" className="filter-label" style={{ minWidth: 28 }}>
-                  Min
-                </label>
-                <input
-                  id="filter-min-price"
-                  type="number"
-                  className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""}`}
-                  value={minPrice ?? ""}
-                  min={0}
-                  placeholder="0"
-                  onChange={(e) =>
-                    setMinPrice(e.target.value === "" ? null : Number(e.target.value))
-                  }
-                  aria-label="Minimum price"
-                  aria-invalid={hasPriceRangeError}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <label htmlFor="filter-max-price" className="filter-label" style={{ minWidth: 28 }}>
-                  Max
-                </label>
-                <input
-                  id="filter-max-price"
-                  type="number"
-                  className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""}`}
-                  value={maxPrice ?? ""}
-                  min={0}
-                  placeholder="∞"
-                  onChange={(e) =>
-                    setMaxPrice(e.target.value === "" ? null : Number(e.target.value))
-                  }
-                  aria-label="Maximum price"
-                  aria-invalid={hasPriceRangeError}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-              </div>
-              {hasPriceRangeError && (
-                <p
-                  className="error-text"
-                  role="alert"
-                  style={{ display: "flex", gap: 6, alignItems: "center", margin: 0 }}
-                >
-                  <WarningIcon size={16} aria-hidden="true" />
-                  Min price cannot exceed max price
-                </p>
-              )}
-            </div>
-          </FilterGroup>
+      {/* ── Popularity ─────────────────────────────────────────────────── */}
+      <FilterGroup title="Popularity" storageKey="popularity">
+        <div className="filter-popularity" style={{ marginTop: 8 }}>
+          <Dropdown<PopularityValue>
+            id="filters-popularity"
+            value={popularity as PopularityValue}
+            options={POPULARITY_OPTIONS as unknown as { value: PopularityValue; label: string }[]}
+            onChange={(v) => setPopularity(v)}
+            label="Filter by popularity"
+            visibleLabel={null}
+            className="filter-dropdown"
+          />
+        </div>
+      </FilterGroup>
 
-          {/* ── Popularity */}
-          <FilterGroup title="Popularity" storageKey="popularity">
-            <div className="filter-popularity" style={{ marginTop: 8 }}>
-              <Dropdown<PopularityValue>
-                id="filters-popularity"
-                value={popularity as PopularityValue}
-                options={POPULARITY_OPTIONS as unknown as { value: PopularityValue; label: string }[]}
-                onChange={(v) => setPopularity(v)}
-                label="Filter by popularity"
-                visibleLabel={null}
-                className="filter-dropdown"
-              />
-            </div>
-          </FilterGroup>
-
-          <FilterGroup title="Favorites" storageKey="favorites">
-            <div className="filter-option" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-              <input
-                id="favorites-only-checkbox"
-                type="checkbox"
-                className="filter-checkbox"
-                checked={favoritesOnly}
-                onChange={toggleFavoritesOnly}
-              />
-              <label htmlFor="favorites-only-checkbox" className="filter-label" style={{ color: "var(--text)" }}>
-                Favorites only
-              </label>
-            </div>
-          </FilterGroup>
+      {/* ── Favorites ──────────────────────────────────────────────────── */}
+      <FilterGroup title="Favorites" storageKey="favorites">
+        <div className="filter-option" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
           <input
             id="favorites-only-checkbox"
             type="checkbox"
@@ -299,9 +226,8 @@ export default function FiltersSidebar({
           </label>
         </div>
       </FilterGroup>
->>>>>>> 0a57646 (feat: FiltersSidebar bottom-sheet)
 
-      {/* ── Clear ───────────────────────────────────────────────────────── */}
+      {/* ── Clear ──────────────────────────────────────────────────────── */}
       <div style={{ marginTop: 8 }}>
         <button className="ghost-button" onClick={clearFilters}>
           Clear filters
