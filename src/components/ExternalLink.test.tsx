@@ -44,9 +44,9 @@ describe("ExternalLink", () => {
     );
 
     const link = container.querySelector("a");
-    const svg = link?.querySelector("svg");
-    expect(svg).toBeTruthy();
-    expect(svg?.getAttribute("aria-hidden")).toBe("true");
+    const iconSpan = link?.querySelector("span[aria-hidden]");
+    expect(iconSpan).toBeTruthy();
+    expect(iconSpan?.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("does not add external attributes for internal relative links", () => {
@@ -72,9 +72,9 @@ describe("ExternalLink", () => {
       writable: true,
     });
 
-    render(<ExternalLink href="https://callora.io/docs"> docs</ExternalLink>);
+    render(<ExternalLink href="https://callora.io/docs">docs</ExternalLink>);
 
-    const link = screen.getByText(" docs");
+    const link = screen.getByText("docs");
     expect(link.getAttribute("target")).toBeNull();
     expect(link.getAttribute("rel")).toBeNull();
 

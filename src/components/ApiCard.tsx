@@ -19,7 +19,7 @@ import { useCompareStore, compareStore } from "../state/compareStore";
 import { usePinnedApis, pinnedApisStore } from "../state/pinnedApis";
 import Sparkline from "./Sparkline";
 import WhyApi from "./WhyApi";
-import { ClockIcon, BoltIcon } from "./icons";
+import { TagIcon, ClockIcon, BoltIcon } from "./icons";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
