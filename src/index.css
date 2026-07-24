@@ -1959,6 +1959,9 @@ code,
   position: sticky;
   top: 0;
   z-index: 20;
+  /* Small bottom padding prevents the first line of content below from
+     being obscured by the sticky bar at top:0. */
+  padding-bottom: 4px;
   /* The Tabs component (.tabs-nav) provides border-bottom, overflow-x,
      display:flex, and background. We only need to ensure the sticky
      background matches the page background here. */
@@ -4139,6 +4142,73 @@ code,
 .lp-footer a:hover,
 .lp-footer a:focus-visible {
   color: var(--text);
+}
+
+/* ── ApiDetailPage CTA row (below hero, above tabs) ────────────────────────
+   The .api-hero__cta--detail modifier is scoped to the detail-page CTA row
+   so the same base class can be reused in other contexts without side-effects.
+   Uses only design tokens — no hardcoded hex values.
+   ─────────────────────────────────────────────────────────────────────────── */
+.api-hero__cta--detail {
+  /* Row layout with a bottom gutter matching the token-based spacing used
+     elsewhere on the page (same 16px as the old inline padding-bottom). */
+  display: flex;
+  gap: 0.75rem;
+  padding-bottom: 16px;
+  flex-wrap: wrap; /* buttons can wrap before stacking on mid-range widths */
+  align-items: center;
+}
+
+/* Stack CTA buttons vertically on narrow screens (≤ 640 px). */
+@media (max-width: 640px) {
+  .api-hero__cta--detail {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Ensure every button in the row spans the full available width. */
+  .api-hero__cta--detail > * {
+    width: 100%;
+  }
+}
+
+/* ── api-detail-metrics: 2-column at 640 px before collapsing to 1 ─────────
+   The existing rule in the ≤720px breakpoint collapses .api-detail-metrics
+   all the way to 1 column. This intermediate 640px rule gives a 2-column
+   layout in the 641px–720px range so cards aren't over-large on those sizes.
+   Below 481px the 1-column rule from the ≤720px breakpoint applies.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 720px) and (min-width: 481px) {
+  .api-detail-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── api-detail-two-column: auto-wrap at mid range (721px–980px) ────────────
+   Between 720px and 980px, the main content column is full-width (sidebar has
+   moved below). The two-column grid still tries to put two items side by side
+   in a potentially narrow container. Switch to auto-fill so the columns wrap
+   naturally when each item would be narrower than 260px.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 980px) and (min-width: 721px) {
+  .api-detail-two-column {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+/* ── api-detail-hero mid-range: align brand row on 768px ───────────────────
+   Between 720px and 980px the hero is 1-column (collapses above). At 768px
+   the brand row (logo + title) needs breathing room so the heading doesn't
+   crowd the logo, and the heading font clamp is tighter on these widths.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) and (min-width: 721px) {
+  .api-detail-brand {
+    gap: 14px;
+  }
+
+  .api-detail-title h1 {
+    font-size: 1.55rem;
+  }
 }
 
 /* 1024px */
