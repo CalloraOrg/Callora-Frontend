@@ -1,5 +1,7 @@
-import { WarningIcon } from "./icons";
+import type { ReactNode } from "react";
+import { WarningIcon, ChevronIcon } from "./icons";
 import Dropdown from "./Dropdown";
+import { usePersistedState } from "../hooks/usePersistedState";
 
 const POPULARITY_OPTIONS = [
   { value: "any", label: "Any" },
@@ -20,7 +22,7 @@ export const ALL_CATEGORIES = [
 interface FilterGroupProps {
   title: string;
   storageKey: "categories" | "price" | "popularity";
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 function FilterGroup({ title, storageKey, children }: FilterGroupProps) {
@@ -109,22 +111,70 @@ export default function FiltersSidebar({
         </div>
       </FilterGroup>
 
-      <div style={{ marginBottom: 12 }}>
-          <fieldset className="filter-group">
-            <legend className="filter-legend">Popularity</legend>
-            <div className="filter-popularity" style={{ marginTop: 8 }}>
-              <Dropdown<PopularityValue>
-                id="filters-popularity"
-                value={popularity as PopularityValue}
-                options={POPULARITY_OPTIONS as unknown as { value: PopularityValue; label: string }[]}
-                onChange={(v) => setPopularity(v)}
-                label="Filter by popularity"
-                visibleLabel={null}
-                className="filter-dropdown"
-              />
-            </div>
-          </fieldset>
-      </div>
+      <FilterGroup title="Price range" storageKey="price">
+        <div className="filter-price" style={{ display: "flex", gap: 8 }}>
+          <input
+            id="min-price-input"
+            type="number"
+            min="0"
+            className={`filter-input ${minPrice !== null && maxPrice !== null && minPrice > maxPrice ? 'filter-input--invalid' : ''}`}
+            placeholder="min"
+            value={minPrice ?? ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : Math.max(0, Number(e.target.value));
+              setMinPrice(val);
+            }}
+            aria-invalid={minPrice !== null && maxPrice !== null && minPrice > maxPrice}
+            aria-describedby={minPrice !== null && maxPrice !== null && minPrice > maxPrice ? "price-range-error" : undefined}
+            style={{ width: "100%" }}
+          />
+          <input
+            id="max-price-input"
+            type="number"
+            min="0"
+            className={`filter-input ${minPrice !== null && maxPrice !== null && minPrice > maxPrice ? 'filter-input--invalid' : ''}`}
+            placeholder="max"
+            value={maxPrice ?? ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : Math.max(0, Number(e.target.value));
+              setMaxPrice(val);
+            }}
+            aria-invalid={minPrice !== null && maxPrice !== null && minPrice > maxPrice}
+            aria-describedby={minPrice !== null && maxPrice !== null && minPrice > maxPrice ? "price-range-error" : undefined}
+            style={{ width: "100%" }}
+          />
+        </div>
+        {minPrice !== null && maxPrice !== null && minPrice > maxPrice && (
+          <div
+            id="price-range-error"
+            style={{
+              color: "var(--danger)",
+              fontSize: "0.8rem",
+              marginTop: 6,
+              display: "flex",
+              alignItems: "center",
+              gap: 4
+            }}
+            role="alert"
+          >
+            <WarningIcon size={16} /> Min price cannot exceed max price.
+          </div>
+        )}
+      </FilterGroup>
+
+      <FilterGroup title="Popularity" storageKey="popularity">
+        <div className="filter-popularity">
+          <Dropdown<PopularityValue>
+            id="filters-popularity"
+            value={popularity as PopularityValue}
+            options={POPULARITY_OPTIONS as unknown as { value: PopularityValue; label: string }[]}
+            onChange={(v) => setPopularity(v)}
+            label="Filter by popularity"
+            visibleLabel={null}
+            className="filter-dropdown"
+          />
+        </div>
+      </FilterGroup>
 
       <div style={{ marginBottom: 12 }}>
           <fieldset className="filter-group">
