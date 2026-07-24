@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import FiltersSidebar from "./FiltersSidebar";
 
@@ -14,6 +14,8 @@ const baseProps = {
   popularity: "any",
   setPopularity: vi.fn(),
   clearFilters: vi.fn(),
+  favoritesOnly: false,
+  toggleFavoritesOnly: vi.fn(),
 };
 
 describe("FiltersSidebar", () => {
@@ -163,6 +165,36 @@ describe("FiltersSidebar", () => {
     it("does not show error when both prices are null", () => {
       render(<FiltersSidebar {...baseProps} />);
       expect(screen.queryByText(/Min price cannot exceed max price/i)).toBeNull();
+    });
+  });
+
+  describe("mobile sheet behavior", () => {
+    it("opens and closes via toggle and Escape", () => {
+      render(<FiltersSidebar {...baseProps} />);
+
+      const toggle = screen.getByRole('button', { name: 'Filters' }, { hidden: true });
+      toggle.style.display = 'inline-block';
+      fireEvent.click(toggle);
+
+      expect(screen.getByRole('dialog', { name: /Filters/i })).toBeTruthy();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('dialog', { name: /Filters/i })).toBeNull();
+    });
+
+    it('calls clearFilters from within the sheet', () => {
+      const clearFilters = vi.fn();
+      render(<FiltersSidebar {...baseProps} clearFilters={clearFilters} />);
+
+      const toggle = screen.getByRole('button', { name: 'Filters' }, { hidden: true });
+      toggle.style.display = 'inline-block';
+      fireEvent.click(toggle);
+
+      const dialog = screen.getByRole('dialog', { name: /Filters/i });
+      const clearBtn = within(dialog).getByText('Clear filters');
+      fireEvent.click(clearBtn);
+
+      expect(clearFilters).toHaveBeenCalled();
     });
   });
 });

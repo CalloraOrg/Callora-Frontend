@@ -1,27 +1,27 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { ThemeToggle } from './ThemeToggle';
-import ApiUsage from './ApiUsage';
-import Dashboard from './components/Dashboard';
-import MyApis from './pages/MyApis';
-import RouteProgressBar from './components/RouteProgressBar';
-import ServerError from './components/ServerError';
-import useDocumentTitle from './hooks/useDocumentTitle';
-import NotFound from './components/NotFound';
-import PublishApi from './pages/PublishApi';
-import { startRouteLoading, stopRouteLoading } from './hooks/useRouteLoading';
-import { formatUsdc, formatUsdShortcut } from './utils/format';
-import useDocumentTitle from './hooks/useDocumentTitle';
-import DepositPreview from './components/DepositPreview';
-import {
-  EXPLORER_BASE_URL,
-  MIN_DEPOSIT,
-  NETWORK_FEE,
-  PRESET_AMOUNTS,
-} from "./config/constants";
-import CompareDrawer from './components/CompareDrawer';
-import CompareTray from './components/CompareTray';
-import ExternalLink from './components/ExternalLink';
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { ThemeToggle } from "./ThemeToggle";
+import ApiUsage from "./ApiUsage";
+import Dashboard from "./components/Dashboard";
+import MyApis from "./pages/MyApis";
+import RouteProgressBar from "./components/RouteProgressBar";
+import ServerError from "./components/ServerError";
+import useDocumentTitle from "./hooks/useDocumentTitle";
+import NotFound from "./components/NotFound";
+import PublishApi from "./pages/PublishApi";
+import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
+import { formatUsdc, formatUsdShortcut } from "./utils/format";
+import DepositPreview from "./components/DepositPreview";
+import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS } from "./config/constants";
+import CompareDrawer from "./components/CompareDrawer";
+import CompareTray from "./components/CompareTray";
+import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import MarketplacePage from "./pages/MarketplacePage";
+import ThemePlayground from "./pages/ThemePlayground";
+import DesignSystemDocs from "./pages/DesignSystemDocs";
+import A11yAudit from "./pages/A11yAudit";
+import { ShortcutsModal } from "./components/ShortcutsModal";
+import { ToastProvider } from "./components/Toast";
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -41,26 +41,22 @@ const features: Feature[] = [
   {
     icon: "💸",
     title: "Pay-per-call billing",
-    description:
-      "Micro-payments in USDC mean every API request is billed precisely and transparently.",
+    description: "Micro-payments in USDC mean every API request is billed precisely and transparently.",
   },
   {
     icon: "⛓️",
     title: "On-chain settlement",
-    description:
-      "Every transaction settles on-chain with verifiable records and near real-time visibility.",
+    description: "Every transaction settles on-chain with verifiable records and near real-time visibility.",
   },
   {
     icon: "🧾",
     title: "No subscriptions",
-    description:
-      "Skip fixed plans and commitments. Pay only for the API calls your product actually makes.",
+    description: "Skip fixed plans and commitments. Pay only for the API calls your product actually makes.",
   },
   {
     icon: "🧑‍💻",
     title: "Developer-friendly",
-    description:
-      "Publish APIs quickly, define per-request pricing, and start earning USDC automatically.",
+    description: "Publish APIs quickly, define per-request pricing, and start earning USDC automatically.",
   },
 ];
 const consumerSteps: Step[] = [
@@ -78,8 +74,7 @@ const consumerSteps: Step[] = [
   },
   {
     title: "Pay automatically per call",
-    description:
-    "Billing happens in real time based on actual usage and price-per-request.",
+    description: "Billing happens in real time based on actual usage and price-per-request.",
   },
 ];
 
@@ -90,18 +85,15 @@ const developerSteps: Step[] = [
   },
   {
     title: "Publish your API",
-    description:
-    "Add docs, endpoints, and metadata to make your API easy to adopt.",
+    description: "Add docs, endpoints, and metadata to make your API easy to adopt.",
   },
   {
     title: "Set pricing per request",
-    description:
-    "Choose flexible per-call pricing that reflects the value of your service.",
+    description: "Choose flexible per-call pricing that reflects the value of your service.",
   },
   {
     title: "Earn USDC automatically",
-    description:
-    "Collect revenue from each successful call with transparent settlement.",
+    description: "Collect revenue from each successful call with transparent settlement.",
   },
 ];
 
@@ -121,51 +113,37 @@ const APP_ROUTES = {
 } as const;
 
 function createMockHash() {
-  const seed = `${Date.now().toString(16)}${Math.random()
-    .toString(16)
-    .slice(2)}`;
-    return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
-  }
-  
-  function buildExplorerLink(hash: string) {
-    return `${EXPLORER_BASE_URL}${hash}`;
-  }
-  
-  function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
-    if (stage === "approving") return "Approve in wallet...";
-    if (stage === "pending") return "Transaction submitted...";
-    if (stage === "confirmed") return "Deposit successful";
-    if (stage === "failed") return "Transaction failed";
-    
-    return hasValidAmount
-    ? "Review transaction preview"
-    : "Enter a deposit amount";
-  }
-  
-  function LandingPage({
-    onStartUsingApis,
-    onPublishApi,
-  }: {
-    onStartUsingApis: () => void;
-    onPublishApi: () => void;
-  }) {
-    return (
-      <div className="lp-shell">
+  const seed = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+  return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
+}
+
+function buildExplorerLink(hash: string) {
+  return `${EXPLORER_BASE_URL}${hash}`;
+}
+
+function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
+  if (stage === "approving") return "Approve in wallet...";
+  if (stage === "pending") return "Transaction submitted...";
+  if (stage === "confirmed") return "Deposit successful";
+  if (stage === "failed") return "Transaction failed";
+
+  return hasValidAmount ? "Review transaction preview" : "Enter a deposit amount";
+}
+
+function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () => void; onPublishApi: () => void }) {
+  return (
+    <div className="lp-shell">
       <header className="lp-section lp-hero" aria-labelledby="hero-title">
         <div>
           <p className="lp-eyebrow">Built for API consumers and publishers</p>
           <h1 id="hero-title">Callora - Programmable API Access</h1>
           <p className="lp-subhead">
-            Access and monetize APIs with usage-based billing. Callora combines
-            programmable API access with pay-per-call settlement in USDC so
-            teams can build faster and charge fairly.
+            Access and monetize APIs with usage-based billing. Callora combines programmable API access with pay-per-call settlement in USDC so teams can build faster and
+            charge fairly.
           </p>
 
           <div className="lp-cta-row">
-            <button
-              className="lp-btn lp-btn-primary"
-              onClick={onStartUsingApis}
-            >
+            <button className="lp-btn lp-btn-primary" onClick={onStartUsingApis}>
               Start Using APIs
             </button>
             <button className="lp-btn lp-btn-secondary" onClick={onPublishApi}>
@@ -234,30 +212,20 @@ function createMockHash() {
           <article className="lp-card">
             <h3>Where Callora shines</h3>
             <ul>
-              <li>
-                AI workflows that need utility APIs without subscription
-                overhead.
-              </li>
-              <li>
-                Data providers monetizing endpoint access with frictionless
-                micro-billing.
-              </li>
-              <li>
-                Fintech and web3 apps requiring transparent usage-based costs.
-              </li>
+              <li>AI workflows that need utility APIs without subscription overhead.</li>
+              <li>Data providers monetizing endpoint access with frictionless micro-billing.</li>
+              <li>Fintech and web3 apps requiring transparent usage-based costs.</li>
             </ul>
           </article>
 
           <article className="lp-card">
             <h3>Testimonials</h3>
             <p>
-              “Callora helped us launch usage-based API monetization in days,
-              not months.”
+              “Callora helped us launch usage-based API monetization in days, not months.”
               <span> — Case study placeholder</span>
             </p>
             <p>
-              “Our teams can scale integration costs exactly with demand, no
-              wasted subscription spend.”
+              “Our teams can scale integration costs exactly with demand, no wasted subscription spend.”
               <span> — Customer quote placeholder</span>
             </p>
           </article>
@@ -266,11 +234,21 @@ function createMockHash() {
 
       <footer className="lp-section lp-footer">
         <nav aria-label="Footer links">
-          <a href="#" className="link-nav">About</a>
-          <a href="#" className="link-nav">Documentation</a>
-          <a href="#" className="link-nav">Support</a>
-          <a href="#" className="link-nav">Terms</a>
-          <a href="#" className="link-nav">Privacy</a>
+          <a href="#" className="link-nav">
+            About
+          </a>
+          <a href="#" className="link-nav">
+            Documentation
+          </a>
+          <a href="#" className="link-nav">
+            Support
+          </a>
+          <a href="#" className="link-nav">
+            Terms
+          </a>
+          <a href="#" className="link-nav">
+            Privacy
+          </a>
         </nav>
         <p>© {new Date().getFullYear()} Callora. All rights reserved.</p>
       </footer>
@@ -290,15 +268,11 @@ function App() {
     [APP_ROUTES.landing]: "Callora",
   };
   const routeDescriptionMap: Record<string, string> = {
-    [APP_ROUTES.marketplace]:
-      "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
-    [APP_ROUTES.dashboard]:
-      "Your Callora dashboard showing balances, recent activity and quick actions.",
-    [APP_ROUTES.billing]:
-      "Manage your USDC vault, deposit funds, and view transaction status.",
+    [APP_ROUTES.marketplace]: "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
+    [APP_ROUTES.dashboard]: "Your Callora dashboard showing balances, recent activity and quick actions.",
+    [APP_ROUTES.billing]: "Manage your USDC vault, deposit funds, and view transaction status.",
     "/api-usage": "Monitor API usage, request stats, and view call history.",
-    [APP_ROUTES.landing]:
-      "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
+    [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
   };
   const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
@@ -317,63 +291,62 @@ function App() {
   }, []);
 
   // Handle global shortcuts
-  const handleGlobalKeyDown = useCallback((event: KeyboardEvent) => {
-    // Navigation to My APIs (e.g. g then a)
-    if (event.key === 'g') {
-      const handleNextKey = (e: KeyboardEvent) => {
-        if (e.key === 'a') {
-          navigate(APP_ROUTES.myApis);
-        }
-      };
-      window.addEventListener('keydown', handleNextKey, { once: true });
-    }
+  const handleGlobalKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      // Navigation to My APIs (e.g. g then a)
+      if (event.key === "g") {
+        const handleNextKey = (e: KeyboardEvent) => {
+          if (e.key === "a") {
+            navigate(APP_ROUTES.myApis);
+          }
+        };
+        window.addEventListener("keydown", handleNextKey, { once: true });
+      }
 
-    // Open shortcuts modal with ?
-    if (event.key === '?' || (event.shiftKey && event.key === '/')) {
-      event.preventDefault();
-      setIsShortcutsModalOpen(true);
-      return;
-    }
+      // Open shortcuts modal with ?
+      if (event.key === "?" || (event.shiftKey && event.key === "/")) {
+        event.preventDefault();
+        setIsShortcutsModalOpen(true);
+        return;
+      }
 
-    // Navigation shortcuts (g followed by another key)
-    if (event.key === 'g') {
-      // We'll handle the next key in a separate listener for sequence
-      const handleNextKey = (e: KeyboardEvent) => {
-        if (e.key === 'h') {
-          navigate(APP_ROUTES.dashboard);
-        } else if (e.key === 'm') {
-          navigate(APP_ROUTES.marketplace);
-        } else if (e.key === 'b') {
-          navigate(APP_ROUTES.billing);
-        }
-        window.removeEventListener('keydown', handleNextKey);
-      };
-      window.addEventListener('keydown', handleNextKey, { once: true });
-    }
-  }, [navigate]);
+      // Navigation shortcuts (g followed by another key)
+      if (event.key === "g") {
+        // We'll handle the next key in a separate listener for sequence
+        const handleNextKey = (e: KeyboardEvent) => {
+          if (e.key === "h") {
+            navigate(APP_ROUTES.dashboard);
+          } else if (e.key === "m") {
+            navigate(APP_ROUTES.marketplace);
+          } else if (e.key === "b") {
+            navigate(APP_ROUTES.billing);
+          }
+          window.removeEventListener("keydown", handleNextKey);
+        };
+        window.addEventListener("keydown", handleNextKey, { once: true });
+      }
+    },
+    [navigate],
+  );
 
   useGlobalShortcuts(handleGlobalKeyDown);
   const [depositStage, setDepositStage] = useState<DepositStage>("input");
   const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
   const [txHash, setTxHash] = useState("");
   const [copied, setCopied] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(
-    "Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.",
-  );
+  const [statusMessage, setStatusMessage] = useState("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   const [submittedAmount, setSubmittedAmount] = useState<number | null>(null);
-  const [submittedStartingBalance, setSubmittedStartingBalance] = useState<
-    number | null
-  >(null);
+  const [submittedStartingBalance, setSubmittedStartingBalance] = useState<number | null>(null);
 
   const timersRef = useRef<number[]>([]);
 
   const parsedAmount = Number(amountInput);
-  const hasAmount =
-    amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
+  const hasAmount = amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
   const activeAmount = submittedAmount ?? (hasAmount ? parsedAmount : 0);
   const previewCurrentBalance = submittedStartingBalance ?? vaultBalance;
   const projectedBalance = previewCurrentBalance + activeAmount;
   const isBusy = depositStage === "approving" || depositStage === "pending";
+  const balanceDelta = formatUsdc(submittedAmount ?? (hasAmount ? parsedAmount : 0));
 
   let validationMessage = "";
 
@@ -389,9 +362,7 @@ function App() {
 
   const hasValidAmount = validationMessage.length === 0;
   const stageLabel = getStageLabel(depositStage, hasValidAmount);
-  const pendingHashLabel = txHash
-    ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}`
-    : null;
+  const pendingHashLabel = txHash ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : null;
 
   useEffect(() => {
     return () => {
@@ -425,9 +396,7 @@ function App() {
     setCopied(false);
     setSubmittedAmount(null);
     setSubmittedStartingBalance(null);
-    setStatusMessage(
-      "Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.",
-    );
+    setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
   const openDeposit = () => {
@@ -438,7 +407,7 @@ function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (location.pathname === APP_ROUTES.billing && params.get('deposit') === 'true') {
+    if (location.pathname === APP_ROUTES.billing && params.get("deposit") === "true") {
       if (!isDepositOpen) {
         openDeposit();
       }
@@ -448,19 +417,16 @@ function App() {
   const closeDeposit = () => {
     if (isBusy) return;
     setIsDepositOpen(false);
-    
+
     // Clean up url parameter if it exists
     const url = new URL(window.location.href);
-    if (url.searchParams.has('deposit')) {
-      url.searchParams.delete('deposit');
-      window.history.replaceState({}, '', url.pathname + url.search);
+    if (url.searchParams.has("deposit")) {
+      url.searchParams.delete("deposit");
+      window.history.replaceState({}, "", url.pathname + url.search);
     }
   };
 
-  const handleAmountChange = (
-    value: string,
-    preset: number | "custom" = "custom",
-  ) => {
+  const handleAmountChange = (value: string, preset: number | "custom" = "custom") => {
     if (isBusy) return;
 
     const sanitized = value.replace(/[^\d.]/g, "");
@@ -505,9 +471,7 @@ function App() {
     timersRef.current.push(
       window.setTimeout(() => {
         setDepositStage("pending");
-        setStatusMessage(
-          "Transaction submitted to Stellar. Waiting for confirmation.",
-        );
+        setStatusMessage("Transaction submitted to Stellar. Waiting for confirmation.");
       }, 1400),
     );
 
@@ -515,19 +479,11 @@ function App() {
       window.setTimeout(() => {
         if (demoOutcome === "confirmed") {
           setDepositStage("confirmed");
-          setVaultBalance(
-            Number((startingBalance + approvedAmount).toFixed(2)),
-          );
-          setStatusMessage(
-            `${formatUsdShortcut(
-              approvedAmount,
-            )} reached the vault. Your balance is updated and ready for API usage.`,
-          );
+          setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
+          setStatusMessage(`${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`);
         } else {
           setDepositStage("failed");
-          setStatusMessage(
-            "The deposit was not confirmed. Review the details, then retry when your wallet is ready.",
-          );
+          setStatusMessage("The deposit was not confirmed. Review the details, then retry when your wallet is ready.");
         }
       }, 3600),
     );
@@ -552,461 +508,327 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
-      <RouteProgressBar />
-      <a href="#main-content" className="skip-link">
-        Skip to main content
-      </a>
-      <div className="ambient ambient-a" aria-hidden="true" />
-      <div className="ambient ambient-b" aria-hidden="true" />
+    <ToastProvider>
+      <div className="app-shell">
+        <RouteProgressBar />
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+        <div className="ambient ambient-a" aria-hidden="true" />
+        <div className="ambient ambient-b" aria-hidden="true" />
 
-      <header className="topbar no-print" role="banner">
-        <div>
-          <p className="eyebrow">Callora Vault</p>
-          <p className="brand">Secure USDC funding for premium API usage</p>
-        </div>
+        <header className="topbar no-print" role="banner">
+          <div>
+            <p className="eyebrow">Callora Vault</p>
+            <p className="brand">Secure USDC funding for premium API usage</p>
+          </div>
 
-        <div className="topbar-actions">
-          <nav className="nav" aria-label="Primary navigation">
-            <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Dashboard</NavLink>
-            <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Marketplace</NavLink>
-            <NavLink to={APP_ROUTES.myApis} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>My APIs</NavLink>
-            <NavLink to={APP_ROUTES.billing} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Billing</NavLink>
-            <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Theme Playground</NavLink>
-            <NavLink to={APP_ROUTES.designSystem} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Design System</NavLink>
-          </nav>
-          <ThemeToggle />
-        </div>
-      </header>
+          <div className="topbar-actions">
+            <nav className="nav" aria-label="Primary navigation">
+              <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+                Dashboard
+              </NavLink>
+              <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+                Marketplace
+              </NavLink>
+              <NavLink to={APP_ROUTES.myApis} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+                My APIs
+              </NavLink>
+              <NavLink to={APP_ROUTES.billing} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+                Billing
+              </NavLink>
+              <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+                Theme Playground
+              </NavLink>
+              <NavLink to={APP_ROUTES.designSystem} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+                Design System
+              </NavLink>
+            </nav>
+            <ThemeToggle />
+          </div>
+        </header>
 
-      <main id="main-content" role="main" className="page">
-        <Routes>
-          <Route
-            path={APP_ROUTES.landing}
-            element={
-              <LandingPage
-                onStartUsingApis={() => navigate(APP_ROUTES.marketplace)}
-                onPublishApi={() => navigate(APP_ROUTES.publish)}
-              />
-            }
-          />
+        <main id="main-content" role="main" className="page">
+          <Routes>
+            <Route
+              path={APP_ROUTES.landing}
+              element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} />}
+            />
 
-          <Route
-            path={APP_ROUTES.publish}
-            element={<PublishApi />}
-          />
+            <Route path={APP_ROUTES.publish} element={<PublishApi />} />
 
-          <Route
-            path={APP_ROUTES.dashboard}
-            element={
-              <Dashboard
-                vaultBalance={vaultBalance}
-                walletBalance={walletBalance}
-                openDeposit={openDeposit}
-              />
-            }
-          />
-          <Route
-            path={APP_ROUTES.marketplace}
-            element={<MarketplacePage />}
-          />
+            <Route path={APP_ROUTES.dashboard} element={<Dashboard vaultBalance={vaultBalance} walletBalance={walletBalance} openDeposit={openDeposit} />} />
+            <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
 
-          <Route
-            path={APP_ROUTES.themePlayground}
-            element={<ThemePlayground />}
-          />
+            <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
 
-          <Route
-            path={APP_ROUTES.billing}
-            element={
-              <section className="billing-layout">
-                <div className="surface billing-panel">
-                  <div className="section-heading">
-                    <div>
-                      <p className="eyebrow">Deposit USDC to Vault</p>
-                      <h1>Review every number before you approve.</h1>
-                    </div>
-                    <button className="primary-button no-print" onClick={openDeposit}>
-                      Open deposit modal
-                    </button>
-                  </div>
-
-                  <div className="vault-grid">
-                    <article className="vault-balance-card">
-                      <span>Current vault balance</span>
-                      <strong>{formatUsdc(vaultBalance)} USDC</strong>
-                      <p>
-                        Funds are used for call routing, model execution, and
-                        premium features.
-                      </p>
-                    </article>
-
-                    <article className="vault-balance-card secondary">
-                      <span>Wallet available</span>
-                      <strong>{formatUsdc(walletBalance)} USDC</strong>
-                      <p>
-                        Deposits settle on Stellar. Network fee is shown before
-                        wallet approval.
-                      </p>
-                    </article>
-                  </div>
-
-                  <div className="info-row">
-                    <div className="info-card">
-                      <h2>Preset funding options</h2>
-                      <p>
-                        $10, $50, $100, $500, or any custom amount above the
-                        minimum.
-                      </p>
-                    </div>
-                    <div className="info-card">
-                      <h2>Status tracking</h2>
-                      <p>
-                        Approving, pending, confirmed, and failed states are all
-                        shown in-context.
-                      </p>
-                    </div>
-                    <div className="info-card">
-                      <h2>Explorer visibility</h2>
-                      <p>
-                        Once submitted, the transaction hash is linkable and
-                        copyable from the UI.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <aside className="surface prototype-panel">
-                  <p className="eyebrow">Prototype state preview</p>
-                  <h2>Review both success and failure flows.</h2>
-                  <div className="outcome-toggle">
-                    <button
-                      className={demoOutcome === "confirmed" ? "active" : ""}
-                      onClick={() => setDemoOutcome("confirmed")}
-                    >
-                      Confirmed path
-                    </button>
-                    <button
-                      className={demoOutcome === "failed" ? "active" : ""}
-                      onClick={() => setDemoOutcome("failed")}
-                    >
-                      Failed path
-                    </button>
-                  </div>
-                  <p className="helper-text">
-                    The modal follows the real sequence. Use this toggle to
-                    preview the end-state a reviewer should see after wallet
-                    approval.
-                  </p>
-                </aside>
-              </section>
-            }
-          />
-
-          <Route
-            path={APP_ROUTES.documentation}
-            element={
-              <section className="surface placeholder-card">
-                <p className="eyebrow">Documentation</p>
-                <h1>Everything you need to ship with the Callora vault.</h1>
-                <p>
-                  Implementation guides, transaction lifecycle notes, and
-                  troubleshooting references live here so teams can move from
-                  prototype to production quickly.
-                </p>
-              </section>
-            }
-          />
-
-          <Route
-            path={APP_ROUTES.status}
-            element={
-              <section className="surface placeholder-card">
-                <p className="eyebrow">Status</p>
-                <h1>System status updates in one place.</h1>
-                <p>
-                  All core services are operational. If you are still seeing
-                  issues, please contact support and include what action you
-                  were trying to complete.
-                </p>
-              </section>
-            }
-          />
-
-          <Route path="/api-usage" element={<ApiUsage />} />
-
-          <Route
-            path={APP_ROUTES.designSystem}
-            element={<DesignSystemDocs />}
-          />
-
-          <Route
-            path={APP_ROUTES.serverError}
-            element={
-              <ServerError
-                onRetry={handleServerRetry}
-                onGoHome={() => navigate(APP_ROUTES.dashboard)}
-              />
-            }
-          />
-
-          <Route
-            path="/a11y-audit"
-            element={<A11yAudit />}
-          />
-
-          <Route
-            path="*"
-            element={
-              <NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />
-            }
-          />
-        </Routes>
-      </main>
-
-      <footer className="surface app-footer no-print" role="contentinfo">
-        <div>
-          <p className="eyebrow">Callora</p>
-          <p className="footer-copy">
-            Reliable USDC funding and API operations for modern product teams.
-          </p>
-        </div>
-
-        <nav className="footer-nav" aria-label="Footer navigation">
-          <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Dashboard</NavLink>
-          <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Marketplace</NavLink>
-          <NavLink to={APP_ROUTES.myApis} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>My APIs</NavLink>
-          <NavLink to={APP_ROUTES.billing} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Billing</NavLink>
-          <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Theme Playground</NavLink>
-          <NavLink to={APP_ROUTES.status} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Status</NavLink>
-          <NavLink to={APP_ROUTES.documentation} className={({ isActive }) => isActive ? "link-nav active" : "link-nav"}>Documentation</NavLink>
-          {!isTouchDevice && (
-            <button 
-              className="link-nav" 
-              onClick={() => setIsShortcutsModalOpen(true)}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', color: 'inherit', padding: 0 }}
-            >
-              Keyboard Shortcuts (?)
-            </button>
-          )}
-        </nav>
-      </footer>
-
-        {!isTouchDevice && (
-          <ShortcutsModal
-            isOpen={isShortcutsModalOpen}
-            onClose={() => setIsShortcutsModalOpen(false)}
-          />
-        )}
-
-       <CompareTray />
-       <CompareDrawer />
-     </div>
-   );
-}
-
-
-      {isDepositOpen && (
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onClick={closeDeposit}
-        >
-          <section
-            className="deposit-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="deposit-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="modal-header">
-              <div>
-                <p className="eyebrow">Secure vault funding</p>
-                <h2 id="deposit-title">Deposit USDC to Vault</h2>
-              </div>
-
-              <button
-                className="close-button"
-                onClick={closeDeposit}
-                disabled={isBusy}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="stage-strip" aria-label="Transaction flow status">
-                {[
-                  "input",
-                  "approving",
-                  "pending",
-                  demoOutcome === "confirmed" ? "confirmed" : "failed",
-                ].map((item) => {
-                  const isActive =
-                    item === depositStage ||
-                    (item === "input" &&
-                      depositStage === "input" &&
-                      hasValidAmount);
-
-                  return (
-                    <span
-                      key={item}
-                      className={`stage-pill ${isActive ? "active" : ""}`}
-                    >
-                      {item}
-                    </span>
-                  );
-                })}
-              </div>
-
-              <div className="status-banner">
-                <div>
-                  <strong>{stageLabel}</strong>
-                  <p>{statusMessage}</p>
-                </div>
-                <span className={`status-chip ${depositStage}`}>
-                  {depositStage}
-                </span>
-              </div>
-
-              <div className="modal-grid">
-                <div className="form-panel">
-                  <div className="balance-row">
-                    <article className="balance-tile">
-                      <span>Vault balance</span>
-                      <strong>{formatUsdc(vaultBalance)} USDC</strong>
-                    </article>
-                    <article className="balance-tile">
-                      <span>Wallet available</span>
-                      <strong>{formatUsdc(walletBalance)} USDC</strong>
-                    </article>
-                  </div>
-
-                  <label className="field-label" htmlFor="deposit-amount">
-                    Amount
-                  </label>
-
-                  <div
-                    className={`input-shell ${
-                      validationMessage && depositStage === "input"
-                        ? "invalid"
-                        : ""
-                    }`}
-                  >
-                    <input
-                      id="deposit-amount"
-                      type="text"
-                      inputMode="decimal"
-                      value={amountInput}
-                      onChange={(event) =>
-                        handleAmountChange(event.target.value)
-                      }
-                      disabled={isBusy}
-                      placeholder="0.00"
-                      aria-describedby="deposit-help"
-                    />
-                    <span>USDC</span>
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={handleMax}
-                      disabled={isBusy}
-                    >
-                      Max
-                    </button>
-                  </div>
-
-                  <p id="deposit-help" className="helper-text">
-                    Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom
-                    deposits settle into your vault after wallet approval.
-                  </p>
-
-                  {validationMessage && depositStage === "input" && (
-                    <p className="error-text">{validationMessage}</p>
-                  )}
-
-                  <div className="preset-row">
-                    {PRESET_AMOUNTS.map((preset) => (
-                      <button
-                        key={preset}
-                        className={selectedPreset === preset ? "active" : ""}
-                        onClick={() => handlePresetClick(preset)}
-                        disabled={isBusy}
-                      >
-                        ${preset}
-                      </button>
-                    ))}
-                    <button
-                      className={selectedPreset === "custom" ? "active" : ""}
-                      onClick={() => setSelectedPreset("custom")}
-                      disabled={isBusy}
-                    >
-                      Custom
-                    </button>
-                  </div>
-
-                  <div className="security-note">
-                    <strong>What you are approving</strong>
-                    <p>
-                      Your wallet signs a USDC deposit into the Callora vault.
-                      The preview shows the exact vault credit, network fee, and
-                      post-deposit balance before submission.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="preview-panel">
-                  <article className="preview-card">
-                    <div className="preview-header">
+            <Route
+              path={APP_ROUTES.billing}
+              element={
+                <section className="billing-layout">
+                  <div className="surface billing-panel">
+                    <div className="section-heading">
                       <div>
-                        <span className="eyebrow">Transaction preview</span>
-                        <h3>Review before wallet approval</h3>
+                        <p className="eyebrow">Deposit USDC to Vault</p>
+                        <h1>Review every number before you approve.</h1>
                       </div>
-                      <span className="preview-highlight">Secure preview</span>
+                      <button className="primary-button no-print" onClick={openDeposit}>
+                        Open deposit modal
+                      </button>
                     </div>
 
-                    <div className="preview-row">
-                      <span>Deposit amount</span>
-                      <strong>
-                        {hasAmount || submittedAmount
-                          ? `${balanceDelta} USDC`
-                          : "--"}
-                      </strong>
+                    <div className="vault-grid">
+                      <article className="vault-balance-card">
+                        <span>Current vault balance</span>
+                        <strong>{formatUsdc(vaultBalance)} USDC</strong>
+                        <p>Funds are used for call routing, model execution, and premium features.</p>
+                      </article>
+
+                      <article className="vault-balance-card secondary">
+                        <span>Wallet available</span>
+                        <strong>{formatUsdc(walletBalance)} USDC</strong>
+                        <p>Deposits settle on Stellar. Network fee is shown before wallet approval.</p>
+                      </article>
                     </div>
 
-                    <div className="preview-row">
-                      <span>Current balance</span>
-                      <strong>{formatUsdc(previewCurrentBalance)} USDC</strong>
+                    <div className="info-row">
+                      <div className="info-card">
+                        <h2>Preset funding options</h2>
+                        <p>$10, $50, $100, $500, or any custom amount above the minimum.</p>
+                      </div>
+                      <div className="info-card">
+                        <h2>Status tracking</h2>
+                        <p>Approving, pending, confirmed, and failed states are all shown in-context.</p>
+                      </div>
+                      <div className="info-card">
+                        <h2>Explorer visibility</h2>
+                        <p>Once submitted, the transaction hash is linkable and copyable from the UI.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <aside className="surface prototype-panel">
+                    <p className="eyebrow">Prototype state preview</p>
+                    <h2>Review both success and failure flows.</h2>
+                    <div className="outcome-toggle">
+                      <button className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
+                        Confirmed path
+                      </button>
+                      <button className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
+                        Failed path
+                      </button>
+                    </div>
+                    <p className="helper-text">
+                      The modal follows the real sequence. Use this toggle to preview the end-state a reviewer should see after wallet approval.
+                    </p>
+                  </aside>
+                </section>
+              }
+            />
+
+            <Route
+              path={APP_ROUTES.documentation}
+              element={
+                <section className="surface placeholder-card">
+                  <p className="eyebrow">Documentation</p>
+                  <h1>Everything you need to ship with the Callora vault.</h1>
+                  <p>
+                    Implementation guides, transaction lifecycle notes, and troubleshooting references live here so teams can move from prototype to production quickly.
+                  </p>
+                </section>
+              }
+            />
+
+            <Route
+              path={APP_ROUTES.status}
+              element={
+                <section className="surface placeholder-card">
+                  <p className="eyebrow">Status</p>
+                  <h1>System status updates in one place.</h1>
+                  <p>All core services are operational. If you are still seeing issues, please contact support and include what action you were trying to complete.</p>
+                </section>
+              }
+            />
+
+            <Route path="/api-usage" element={<ApiUsage />} />
+
+            <Route path={APP_ROUTES.designSystem} element={<DesignSystemDocs />} />
+
+            <Route path={APP_ROUTES.serverError} element={<ServerError onRetry={handleServerRetry} onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
+
+            <Route path="/a11y-audit" element={<A11yAudit />} />
+
+            <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
+          </Routes>
+        </main>
+
+        <footer className="surface app-footer no-print" role="contentinfo">
+          <div>
+            <p className="eyebrow">Callora</p>
+            <p className="footer-copy">Reliable USDC funding and API operations for modern product teams.</p>
+          </div>
+
+          <nav className="footer-nav" aria-label="Footer navigation">
+            <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              Dashboard
+            </NavLink>
+            <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              Marketplace
+            </NavLink>
+            <NavLink to={APP_ROUTES.myApis} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              My APIs
+            </NavLink>
+            <NavLink to={APP_ROUTES.billing} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              Billing
+            </NavLink>
+            <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              Theme Playground
+            </NavLink>
+            <NavLink to={APP_ROUTES.status} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              Status
+            </NavLink>
+            <NavLink to={APP_ROUTES.documentation} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              Documentation
+            </NavLink>
+          </nav>
+        </footer>
+
+        <ShortcutsModal isOpen={isShortcutsModalOpen} onClose={() => setIsShortcutsModalOpen(false)} />
+
+        <CompareTray />
+        <CompareDrawer />
+        {isDepositOpen && (
+          <div className="modal-backdrop" role="presentation" onClick={closeDeposit}>
+            <section className="deposit-modal" role="dialog" aria-modal="true" aria-labelledby="deposit-title" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-header">
+                <div>
+                  <p className="eyebrow">Secure vault funding</p>
+                  <h2 id="deposit-title">Deposit USDC to Vault</h2>
+                </div>
+
+                <button className="close-button" onClick={closeDeposit} disabled={isBusy}>
+                  Close
+                </button>
+              </div>
+
+              <div className="modal-body">
+                <div className="stage-strip" aria-label="Transaction flow status">
+                  {["input", "approving", "pending", demoOutcome === "confirmed" ? "confirmed" : "failed"].map((item) => {
+                    const isActive = item === depositStage || (item === "input" && depositStage === "input" && hasValidAmount);
+
+                    return (
+                      <span key={item} className={`stage-pill ${isActive ? "active" : ""}`}>
+                        {item}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <div className="status-banner">
+                  <div>
+                    <strong>{stageLabel}</strong>
+                    <p>{statusMessage}</p>
+                  </div>
+                  <span className={`status-chip ${depositStage}`}>{depositStage}</span>
+                </div>
+
+                <div className="modal-grid">
+                  <div className="form-panel">
+                    <div className="balance-row">
+                      <article className="balance-tile">
+                        <span>Vault balance</span>
+                        <strong>{formatUsdc(vaultBalance)} USDC</strong>
+                      </article>
+                      <article className="balance-tile">
+                        <span>Wallet available</span>
+                        <strong>{formatUsdc(walletBalance)} USDC</strong>
+                      </article>
                     </div>
 
-                    <div className="preview-row emphasis">
-                      <span>New balance</span>
-                      <strong>
-                        {hasAmount || submittedAmount
-                          ? `${formatUsdc(projectedBalance)} USDC`
-                          : "--"}
-                      </strong>
+                    <label className="field-label" htmlFor="deposit-amount">
+                      Amount
+                    </label>
+
+                    <div className={`input-shell ${validationMessage && depositStage === "input" ? "invalid" : ""}`}>
+                      <input
+                        id="deposit-amount"
+                        type="text"
+                        inputMode="decimal"
+                        value={amountInput}
+                        onChange={(event) => handleAmountChange(event.target.value)}
+                        disabled={isBusy}
+                        placeholder="0.00"
+                        aria-describedby="deposit-help"
+                      />
+                      <span>USDC</span>
+                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy}>
+                        Max
+                      </button>
                     </div>
 
-                    <div className="preview-row">
-                      <span>Network fee</span>
-                      <strong>{NETWORK_FEE}</strong>
+                    <p id="deposit-help" className="helper-text">
+                      Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom deposits settle into your vault after wallet approval.
+                    </p>
+
+                    {validationMessage && depositStage === "input" && <p className="error-text">{validationMessage}</p>}
+
+                    <div className="preset-row">
+                      {PRESET_AMOUNTS.map((preset) => (
+                        <button key={preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
+                          ${preset}
+                        </button>
+                      ))}
+                      <button className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy}>
+                        Custom
+                      </button>
                     </div>
 
-                    <div className="preview-row total">
-                      <span>Total cost</span>
-                      <strong>
-                        {hasAmount || submittedAmount
-                          ? `${balanceDelta} USDC + ${NETWORK_FEE}`
-                          : `0.00 USDC + ${NETWORK_FEE}`}
-                      </strong>
+                    <div className="security-note">
+                      <strong>What you are approving</strong>
+                      <p>
+                        Your wallet signs a USDC deposit into the Callora vault. The preview shows the exact vault credit, network fee, and post-deposit balance before
+                        submission.
+                      </p>
                     </div>
-                  </article>
+                  </div>
 
-                  {(depositStage === "pending" ||
-                    depositStage === "confirmed" ||
-                    depositStage === "failed") &&
-                    txHash && (
+                  <div className="preview-panel">
+                    <article className="preview-card">
+                      <div className="preview-header">
+                        <div>
+                          <span className="eyebrow">Transaction preview</span>
+                          <h3>Review before wallet approval</h3>
+                        </div>
+                        <span className="preview-highlight">Secure preview</span>
+                      </div>
+
+                      <div className="preview-row">
+                        <span>Deposit amount</span>
+                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC` : "--"}</strong>
+                      </div>
+
+                      <div className="preview-row">
+                        <span>Current balance</span>
+                        <strong>{formatUsdc(previewCurrentBalance)} USDC</strong>
+                      </div>
+
+                      <div className="preview-row emphasis">
+                        <span>New balance</span>
+                        <strong>{hasAmount || submittedAmount ? `${formatUsdc(projectedBalance)} USDC` : "--"}</strong>
+                      </div>
+
+                      <div className="preview-row">
+                        <span>Network fee</span>
+                        <strong>{NETWORK_FEE}</strong>
+                      </div>
+
+                      <div className="preview-row total">
+                        <span>Total cost</span>
+                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${NETWORK_FEE}` : `0.00 USDC + ${NETWORK_FEE}`}</strong>
+                      </div>
+                    </article>
+
+                    {(depositStage === "pending" || depositStage === "confirmed" || depositStage === "failed") && txHash && (
                       <article className="hash-card">
                         <div>
                           <span className="eyebrow">Transaction hash</span>
@@ -1014,80 +836,55 @@ function App() {
                         </div>
 
                         <div className="hash-actions">
-                          <ExternalLink
-                            href={buildExplorerLink(txHash)}
-                            ariaLabel="View transaction on Stellar Explorer"
-                          >
+                          <a href={buildExplorerLink(txHash)} target="_blank" rel="noreferrer">
                             View on Stellar Explorer
-                          </ExternalLink>
-                          <button onClick={handleCopyHash}>
-                            {copied ? "Copied" : "Copy hash"}
-                          </button>
+                          </a>
+                          <button onClick={handleCopyHash}>{copied ? "Copied" : "Copy hash"}</button>
                         </div>
                       </article>
                     )}
 
-                  {depositStage === "failed" && (
-                    <article className="error-card">
-                      <strong>Approval not confirmed</strong>
-                      <p>
-                        No funds were added to the vault. Retry after confirming
-                        the wallet prompt or checking your network status.
-                      </p>
-                    </article>
-                  )}
+                    {depositStage === "failed" && (
+                      <article className="error-card">
+                        <strong>Approval not confirmed</strong>
+                        <p>No funds were added to the vault. Retry after confirming the wallet prompt or checking your network status.</p>
+                      </article>
+                    )}
 
-                  {depositStage === "confirmed" && (
-                    <article className="success-card">
-                      <strong>Deposit successful</strong>
-                      <p>
-                        Your updated vault balance is {formatUsdc(vaultBalance)}{" "}
-                        USDC and ready for usage.
-                      </p>
-                    </article>
-                  )}
+                    {depositStage === "confirmed" && (
+                      <article className="success-card">
+                        <strong>Deposit successful</strong>
+                        <p>Your updated vault balance is {formatUsdc(vaultBalance)} USDC and ready for usage.</p>
+                      </article>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="modal-actions">
-              {depositStage === "failed" ? (
-                <button className="primary-button" onClick={handleRetry}>
-                  Retry deposit
-                </button>
-              ) : depositStage === "confirmed" ? (
-                <button
-                  className="primary-button"
-                  onClick={handleDepositAnother}
-                >
-                  Deposit another amount
-                </button>
-              ) : (
-                <button
-                  className="primary-button"
-                  onClick={handleApproveTransaction}
-                  disabled={!hasValidAmount || isBusy}
-                >
-                  {depositStage === "approving"
-                    ? "Approve in wallet..."
-                    : depositStage === "pending"
-                      ? "Transaction submitted..."
-                      : "Approve Transaction"}
-                </button>
-              )}
+              <div className="modal-actions">
+                {depositStage === "failed" ? (
+                  <button className="primary-button" onClick={handleRetry}>
+                    Retry deposit
+                  </button>
+                ) : depositStage === "confirmed" ? (
+                  <button className="primary-button" onClick={handleDepositAnother}>
+                    Deposit another amount
+                  </button>
+                ) : (
+                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy}>
+                    {depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
+                  </button>
+                )}
 
-              <button
-                className="secondary-button"
-                onClick={closeDeposit}
-                disabled={isBusy}
-              >
-                Cancel
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-    </div>
+                <button className="secondary-button" onClick={closeDeposit} disabled={isBusy}>
+                  Cancel
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+      </div>
+    </ToastProvider>
   );
 }
 

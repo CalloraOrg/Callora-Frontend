@@ -1,9 +1,21 @@
 // @vitest-environment jsdom
 
 import { act } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CollectionsProvider } from "../state/collectionsStore";
 import MarketplacePage from "./MarketplacePage";
+
+function renderMarketplacePage() {
+  return render(
+    <MemoryRouter>
+      <CollectionsProvider>
+        <MarketplacePage />
+      </CollectionsProvider>
+    </MemoryRouter>
+  );
+}
 
 function settleMarketplaceTimers() {
   act(() => {
@@ -14,6 +26,19 @@ function settleMarketplaceTimers() {
 describe("MarketplacePage", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
   });
 
   afterEach(() => {
@@ -22,7 +47,7 @@ describe("MarketplacePage", () => {
   });
 
   it("filters marketplace results when a tag chip is clicked", () => {
-    render(<MarketplacePage />);
+    renderMarketplacePage();
     settleMarketplaceTimers();
 
     const weatherTag = screen.getByRole("button", {
@@ -37,7 +62,7 @@ describe("MarketplacePage", () => {
   });
 
   it("toggles an active tag filter off when the same tag is clicked again", () => {
-    render(<MarketplacePage />);
+    renderMarketplacePage();
     settleMarketplaceTimers();
 
     const weatherTag = screen.getByRole("button", {
@@ -58,7 +83,7 @@ describe("MarketplacePage", () => {
   it("keeps card navigation from firing when a tag chip is clicked", () => {
     const pushStateSpy = vi.spyOn(window.history, "pushState");
 
-    render(<MarketplacePage />);
+    renderMarketplacePage();
     settleMarketplaceTimers();
 
     fireEvent.click(screen.getByRole("button", {
