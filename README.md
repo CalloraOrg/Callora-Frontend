@@ -15,6 +15,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - Dashboard (usage stats, vault balance)
 - Screen-reader-friendly dashboard usage gauge with visible usage state and remaining allowance
 - Marketplace (browse and compare APIs)
+- Pinned APIs on the dashboard for fast access to saved marketplace APIs
 - Billing (USDC deposit, Stellar settlement, transaction tracking)
 - API Usage analytics view
 - 500 error page with retry flow

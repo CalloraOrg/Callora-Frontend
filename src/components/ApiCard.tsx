@@ -601,7 +601,7 @@ export default function ApiCard({
          aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
          aria-pressed={isCompared}
        >
-         {isCompared ? "Pinned" : "Pin"}
+         {isCompared ? "Compared" : "Compare"}
        </button>
 
 
