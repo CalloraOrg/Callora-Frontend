@@ -6,8 +6,8 @@ import { useFavorites } from "../hooks/useFavorites";
 import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
-import FiltersSidebar from "../components/FiltersSidebar";
-import ActiveFilterChips from "../components/ActiveFilterChips";
+import CategoryPills from "../components/CategoryPills";
+import FiltersSidebar, { ALL_CATEGORIES } from "../components/FiltersSidebar";
 import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
@@ -304,6 +304,11 @@ export default function MarketplacePage(): JSX.Element {
     setSearchParams({ page: "1" });
   };
 
+  const clearCategories = () => {
+    setSelectedCategories(new Set());
+    setSearchParams({ page: "1" });
+  };
+
   const clearFilters = () => {
     setSelectedCategories(new Set());
     setSelectedTag(null);
@@ -460,18 +465,11 @@ export default function MarketplacePage(): JSX.Element {
             </div>
           </div>
 
-          <ActiveFilterChips
-            categories={selectedCategories}
-            minPrice={minPrice}
-            maxPrice={maxPrice}
-            popularity={popularity}
-            favoritesOnly={favoritesOnly}
-            onRemoveCategory={(c) => toggleCategory(c)}
-            onRemoveMinPrice={() => setMinPrice(null)}
-            onRemoveMaxPrice={() => setMaxPrice(null)}
-            onRemovePopularity={() => setPopularity("any")}
-            onRemoveFavoritesOnly={() => setFavoritesOnly(false)}
-            onClearAll={clearFilters}
+          <CategoryPills
+            categories={ALL_CATEGORIES}
+            selectedCategories={selectedCategories}
+            toggleCategory={toggleCategory}
+            clearCategories={clearCategories}
           />
 
           {fetchError ? (
