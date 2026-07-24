@@ -101,6 +101,18 @@ describe("ApiDetailPage", () => {
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
   });
 
+  // ── Not found / Empty state ───────────────────────────────────────────────
+
+  it("shows the EmptyState when API is not found", () => {
+    window.history.pushState({}, "", "/details/non-existent-api");
+    renderWithProviders(<ApiDetailPage />);
+    settleLoadingState();
+
+    expect(screen.getByRole("heading", { name: "API not found" })).toBeTruthy();
+    expect(screen.getByText("We couldn't find that API. Try the marketplace.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to marketplace" })).toBeTruthy();
+  });
+
   // ── Tab switching ─────────────────────────────────────────────────────────
 
   it("defaults to the overview tab", () => {
