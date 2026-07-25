@@ -132,6 +132,37 @@
     border-radius: 2px;
   }
 
+  /* ── ApiDetailPage: Tabs component buttons ──────────────────────────── */
+  /*
+   * The Tabs component renders role="tab" buttons that sit inside the
+   * sticky tab bar.  These buttons need a visible focus ring so keyboard
+   * users can see which tab is focused before activating it.
+   */
+  .api-detail-tabs [role="tab"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* ── ApiDetailPage: Breadcrumb links ──────────────────────────────────── */
+  .api-detail-page .breadcrumb a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* ── ApiDetailPage: SubscribeButton ───────────────────────────────────── */
+  .api-detail-page .subscribe-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  /* ── ApiDetailPage: Back button in hero ───────────────────────────────── */
+  .api-detail-hero .ghost-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
   /* ── ApiDetailPage: EndpointSaveButton dialog ──────────────────────────── */
   /*
    * The save-to-collection dialog contains its own buttons and inputs that
