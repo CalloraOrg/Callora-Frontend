@@ -139,7 +139,7 @@ Displays API information in a card format for marketplace listings.
 **Variants:**
 
 - `ApiCard` - Standard card with hover effects
-- `ApiCardSkeleton` - Loading state with skeleton placeholders
+- `ApiCardSkeleton` - Loading state with themed skeleton placeholders
 
 **Visual Spec:**
 
@@ -173,6 +173,7 @@ Displays API information in a card format for marketplace listings.
 
 ```tsx
 <ApiCard api={apiData} onViewDetails={(api) => navigate(`/api/${api.id}`)} />
+<ApiCard loading />
 ```
 
 ---
@@ -836,6 +837,7 @@ Loading placeholder for content.
 - `width?: string | number` - Skeleton width
 - `height?: string | number` - Skeleton height
 - `borderRadius?: string | number` - Border radius
+- `tone?: "neutral" | "stellar"` - Optional GrantFox/Stellar Wave themed shimmer
 - `style?: CSSProperties` - Additional inline styles
 - `className?: string` - Additional CSS classes
 

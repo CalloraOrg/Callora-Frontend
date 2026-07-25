@@ -3619,8 +3619,26 @@ code,
   border-radius: 4px;
 }
 
+.skeleton--stellar {
+  background:
+    linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 20%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
+  background-size: 200% 100%;
+}
+
+.api-card-skeleton {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 44%),
+    var(--surface-soft);
+}
+
 [data-theme="light"] .skeleton {
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.04) 25%, rgba(0, 0, 0, 0.08) 50%, rgba(0, 0, 0, 0.04) 75%);
+  background-size: 200% 100%;
+}
+
+[data-theme="light"] .skeleton--stellar {
+  background:
+    linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 16%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
   background-size: 200% 100%;
 }
 /* Filters Sidebar accessibility styles */
@@ -4224,8 +4242,26 @@ code,
   border-radius: 4px;
 }
 
+.skeleton--stellar {
+  background:
+    linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 20%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
+  background-size: 200% 100%;
+}
+
+.api-card-skeleton {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 44%),
+    var(--surface-soft);
+}
+
 [data-theme="light"] .skeleton {
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.04) 25%, rgba(0, 0, 0, 0.08) 50%, rgba(0, 0, 0, 0.04) 75%);
+  background-size: 200% 100%;
+}
+
+[data-theme="light"] .skeleton--stellar {
+  background:
+    linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 16%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
   background-size: 200% 100%;
 }
 
