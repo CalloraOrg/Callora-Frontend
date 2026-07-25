@@ -12,20 +12,32 @@ vi.mock("../state/collectionsStore", () => ({
     addEndpointToCollection: vi.fn(),
     removeEndpointFromCollection: vi.fn(),
     collectionIdsForEndpoint: () => new Set(),
-      createCollectionWithEndpoint: vi.fn(),
+    createCollectionWithEndpoint: vi.fn(),
+  }),
+}));
+
+const mockCompareStore = {
+  apis: [],
+  isOpen: false,
+  addApi: vi.fn(),
+  removeApi: vi.fn(),
+  setOpen: vi.fn(),
+  subscribe: vi.fn(() => () => {}),
+  getSnapshot: vi.fn(() => ({ apis: [], isOpen: false })),
+};
+
+vi.mock("../state/compareStore", () => ({
+  useCompareStore: () => ({ apis: [], isOpen: false }),
+  compareStore: {
+    apis: [],
+    isOpen: false,
+    addApi: vi.fn(),
     removeApi: vi.fn(),
     setOpen: vi.fn(),
-    subscribe: vi.fn((listener) => {
-      return () => {};
-    }),
+    subscribe: vi.fn(() => () => {}),
     getSnapshot: vi.fn(() => ({ apis: [], isOpen: false })),
-  };
-
-  return {
-    compareStore: mockCompareStore,
-    useCompareStore: () => ({ apis: [], isOpen: false }),
-  };
-});
+  },
+}));
 
 describe("ApiCard Accessibility and Context Layouts", () => {
   const mockApi: APIItem = {
@@ -116,5 +128,27 @@ describe("ApiCard Accessibility and Context Layouts", () => {
 
     expect(pinButton.getAttribute("aria-pressed")).toBe("true");
     expect(pinButton.getAttribute("aria-label")).toBe("Unpin api-1 from dashboard");
+  });
+
+  it("renders keyboard shortcut hints with correct keys and descriptions", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const hint = screen.getByLabelText("Keyboard shortcuts");
+    expect(hint).toBeDefined();
+
+    const enterKbd = screen.getByText("Enter");
+    expect(enterKbd).toBeDefined();
+    expect(screen.getByText("View details")).toBeDefined();
+
+    const cKbd = screen.getByText("C");
+    expect(cKbd).toBeDefined();
+    expect(screen.getByText("Add/remove comparison")).toBeDefined();
+  });
+
+  it("hides keyboard hint when no shortcuts are provided", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const hint = screen.getByLabelText("Keyboard shortcuts");
+    expect(hint.children.length).toBeGreaterThan(0);
   });
 });
