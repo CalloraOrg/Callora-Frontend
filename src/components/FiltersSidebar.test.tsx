@@ -442,5 +442,13 @@ describe("FiltersSidebar", () => {
       checkbox.focus();
       expect(document.activeElement).toBe(checkbox);
     });
+
+    it("price inputs have tabular-nums class for aligned numeric display", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const minInput = screen.getByLabelText("Minimum price") as HTMLInputElement;
+      const maxInput = screen.getByLabelText("Maximum price") as HTMLInputElement;
+      expect(minInput.classList.contains("tabular-nums")).toBe(true);
+      expect(maxInput.classList.contains("tabular-nums")).toBe(true);
+    });
   });
 });
