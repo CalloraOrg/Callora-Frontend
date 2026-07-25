@@ -128,7 +128,7 @@ export default function MarketplacePage(): JSX.Element {
       { replace: true },
     );
   };
-  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+  const { favorites } = useFavorites();
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const sortParam = (searchParams.get("sort") ?? "popularity") as SortValue;
   const setSortParam = (value: SortValue) => {
@@ -140,7 +140,6 @@ export default function MarketplacePage(): JSX.Element {
       { replace: true },
     );
   };
-  const [shown, setShown] = useState<number>(12);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -291,17 +290,7 @@ export default function MarketplacePage(): JSX.Element {
     sortParam,
   ]);
 
-  useEffect(() => {
-    setShown(12);
-  }, [
-    debouncedSearch,
-    selectedCategories,
-    selectedTag,
-    minPrice,
-    maxPrice,
-    popularity,
-    sortParam,
-  ]);
+
 
   const handleTagClick = (tag: string) => {
     setSelectedTag(
@@ -345,7 +334,6 @@ export default function MarketplacePage(): JSX.Element {
     setFavoritesOnly(false);
     setSortParam("popularity");
     setSearch("");
-    setShown(12);
   };
 
   const handlePageChange = (page: number) => {

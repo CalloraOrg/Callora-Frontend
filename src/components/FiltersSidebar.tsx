@@ -3,6 +3,7 @@ import Dropdown from "./Dropdown";
 import EmptyState from "./EmptyState";
 import { useState, useRef, useEffect } from "react";
 import { usePersistedState } from "../hooks/usePersistedState";
+import { FiltersSidebarSkeleton } from "./Skeleton";
 
 const POPULARITY_OPTIONS = [
   { value: "any", label: "Any" },
@@ -93,8 +94,7 @@ export default function FiltersSidebar({
   resultCount?: number;
 }) {
   // Inverted price range — show a warning without silently discarding filters.
-  const hasPriceRangeError =
-    minPrice !== null && maxPrice !== null && minPrice > maxPrice;
+  const hasPriceRangeError = minPrice !== null && maxPrice !== null && minPrice > maxPrice;
 
   const hasActiveFilters =
     selectedCategories.size > 0 ||
