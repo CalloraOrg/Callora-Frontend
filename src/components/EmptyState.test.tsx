@@ -15,7 +15,7 @@ describe("EmptyState", () => {
   });
 
   describe("variants", () => {
-    const variants: EmptyStateVariant[] = ["empty", "filtered", "error"];
+    const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
 
     it.each(variants)("renders the %s variant illustration", (variant) => {
       render(<EmptyState variant={variant} />);
@@ -28,6 +28,7 @@ describe("EmptyState", () => {
       render(<EmptyState variant={variant} />);
       const titles = {
         empty: /No APIs available/i,
+        "api-detail": /API not found/i,
         filtered: /No results found/i,
         error: /Failed to load APIs/i,
       };
@@ -199,7 +200,7 @@ describe("EmptyState", () => {
     });
 
     it("nested SVG illustrations also carry aria-hidden (WCAG 1.1.1 Non-text Content)", () => {
-      const variants: EmptyStateVariant[] = ["empty", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
       variants.forEach((variant) => {
         const { container, unmount } = render(<EmptyState variant={variant} />);
         const svgs = container.querySelectorAll("svg");
@@ -211,7 +212,7 @@ describe("EmptyState", () => {
     });
 
     it("SVG illustrations use strokeLinecap='round' for consistent v7 line-art style", () => {
-      const variants: EmptyStateVariant[] = ["empty", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
       variants.forEach((variant) => {
         const { container, unmount } = render(
           <EmptyState variant={variant} size="default" />,
@@ -249,6 +250,15 @@ describe("EmptyState", () => {
       expect(svg).toBeTruthy();
       const accentFills = svg?.querySelectorAll('[fill="var(--accent)"]');
       expect((accentFills?.length ?? 0) >= 2).toBe(true);
+    });
+
+    it("api-detail illustration uses tokenized API card and plug motifs", () => {
+      const { container } = render(<EmptyState variant="api-detail" />);
+      const svg = container.querySelector("svg");
+      expect(svg?.querySelector("rect")).toBeTruthy();
+      expect(
+        (svg?.querySelectorAll('[stroke="var(--accent)"]').length ?? 0) >= 1,
+      ).toBe(true);
     });
 
     it("error illustration uses var(--accent) for the exclamation caret highlight", () => {
@@ -303,7 +313,7 @@ describe("EmptyState", () => {
     });
 
     it("no illustration contains hardcoded hex colors — all strokes/fills reference design tokens", () => {
-      const variants: EmptyStateVariant[] = ["empty", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
       const hexRe = /#[0-9a-f]{3,8}/i;
       variants.forEach((variant) => {
         const { container, unmount } = render(<EmptyState variant={variant} />);
