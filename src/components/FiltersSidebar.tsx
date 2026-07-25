@@ -201,6 +201,7 @@ export default function FiltersSidebar({
               }
               aria-label="Minimum price"
               aria-invalid={hasPriceRangeError}
+              aria-describedby={hasPriceRangeError ? "filters-price-error" : undefined}
               style={{ flex: 1, minWidth: 0 }}
             />
           </div>
@@ -226,11 +227,13 @@ export default function FiltersSidebar({
               }
               aria-label="Maximum price"
               aria-invalid={hasPriceRangeError}
+              aria-describedby={hasPriceRangeError ? "filters-price-error" : undefined}
               style={{ flex: 1, minWidth: 0 }}
             />
           </div>
           {hasPriceRangeError && (
             <p
+              id="filters-price-error"
               className="error-text"
               role="alert"
               style={{
