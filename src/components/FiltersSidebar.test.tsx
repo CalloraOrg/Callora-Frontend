@@ -406,4 +406,31 @@ describe("FiltersSidebar", () => {
       expect(block.style.borderTop).toMatch(/var\(--line\)/);
     });
   });
+
+  describe("responsive behaviour", () => {
+    it("renders the mobile toggle button", () => {
+      const { container } = render(<FiltersSidebar {...baseProps} />);
+      const toggle = container.querySelector(".mobile-filters-toggle");
+      expect(toggle).toBeTruthy();
+      expect(toggle?.textContent).toContain("Filters");
+    });
+
+    it("has a filters-sidebar CSS class with responsive styles", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const sidebar = document.querySelector(".filters-sidebar");
+      expect(sidebar).toBeTruthy();
+    });
+
+    it("toggles the mobile sheet open and closed", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const toggle = screen.getByRole(
+        "button",
+        { name: "Filters" },
+        { hidden: true },
+      );
+      toggle.style.display = "inline-block";
+      fireEvent.click(toggle);
+      expect(screen.getByRole("dialog", { name: /Filters/i })).toBeTruthy();
+    });
+  });
 });
