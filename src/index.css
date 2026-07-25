@@ -1567,6 +1567,68 @@ code,
   }
 }
 
+/* ── MarketplacePage skeleton ───────────────────────────────────
+   Route-level loading shell that mirrors the full marketplace
+   layout. Uses design tokens for spacing, typography, and colour
+   so it stays consistent across light/dark modes and responsive
+   breakpoints. */
+.marketplace-skeleton {
+  padding: var(--mkt-page-padding);
+}
+
+.marketplace-skeleton .marketplace-header {
+  gap: var(--mkt-space-lg);
+  margin-bottom: var(--mkt-space-3xl);
+}
+
+.marketplace-skeleton .marketplace-layout {
+  gap: var(--mkt-space-3xl);
+}
+
+.marketplace-skeleton .marketplace-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mkt-space-md);
+  padding-left: var(--mkt-sidebar-padding-start);
+}
+
+.marketplace-skeleton .marketplace-toolbar {
+  gap: var(--mkt-space-lg);
+  margin-bottom: var(--mkt-space-lg);
+}
+
+.marketplace-skeleton .marketplace-grid {
+  gap: var(--mkt-space-lg);
+}
+
+.marketplace-skeleton .marketplace-count,
+.marketplace-skeleton .marketplace-actions {
+  display: flex;
+  align-items: center;
+}
+
+/* Responsive: stack sidebar below main on narrow viewports */
+@media (max-width: 1024px) {
+  .marketplace-skeleton .marketplace-layout {
+    grid-template-columns: 1fr;
+    gap: var(--mkt-space-xl);
+  }
+
+  .marketplace-skeleton .marketplace-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--mkt-space-sm);
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .marketplace-skeleton .marketplace-page,
+  .marketplace-skeleton .api-detail-page {
+    padding: var(--mkt-page-padding-sm);
+  }
+}
+
 .marketplace-results {
   min-width: 0;
 }
