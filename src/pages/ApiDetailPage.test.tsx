@@ -468,4 +468,20 @@ describe("ApiDetailPage", () => {
       expect((buttons?.length ?? 0)).toBeGreaterThanOrEqual(2);
     });
   });
+
+  describe("keyboard navigation and focus", () => {
+    it("ensures tabpanels are focusable to support visible focus outlines (see focus.css)", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const overviewPanel = screen.getByRole("tabpanel", { name: "Overview" });
+      expect(overviewPanel).toBeTruthy();
+      expect(overviewPanel.tabIndex).toBe(0);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      const docPanel = screen.getByRole("tabpanel", { name: "Documentation" });
+      expect(docPanel).toBeTruthy();
+      expect(docPanel.tabIndex).toBe(0);
+    });
+  });
 });
