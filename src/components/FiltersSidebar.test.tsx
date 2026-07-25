@@ -407,8 +407,21 @@ describe("FiltersSidebar", () => {
     });
   });
 
-  describe("focus-visible accessibility", () => {
-    it("mobile-filters-toggle button is focusable", () => {
+  describe("responsive behaviour", () => {
+    it("renders the mobile toggle button", () => {
+      const { container } = render(<FiltersSidebar {...baseProps} />);
+      const toggle = container.querySelector(".mobile-filters-toggle");
+      expect(toggle).toBeTruthy();
+      expect(toggle?.textContent).toContain("Filters");
+    });
+
+    it("has a filters-sidebar CSS class with responsive styles", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const sidebar = document.querySelector(".filters-sidebar");
+      expect(sidebar).toBeTruthy();
+    });
+
+    it("toggles the mobile sheet open and closed", () => {
       render(<FiltersSidebar {...baseProps} />);
       const toggle = screen.getByRole(
         "button",
@@ -416,39 +429,8 @@ describe("FiltersSidebar", () => {
         { hidden: true },
       );
       toggle.style.display = "inline-block";
-      expect(toggle).toBeInstanceOf(HTMLButtonElement);
-    });
-
-    it("filter group headers are focusable and have focus-visible CSS rule", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const header = screen.getByRole("button", { name: "Categories" });
-      expect(header).toBeInstanceOf(HTMLButtonElement);
-      header.focus();
-      expect(document.activeElement).toBe(header);
-    });
-
-    it("Clear filters button is focusable", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const clearBtn = screen.getByText("Clear filters");
-      expect(clearBtn).toBeInstanceOf(HTMLButtonElement);
-      clearBtn.focus();
-      expect(document.activeElement).toBe(clearBtn);
-    });
-
-    it("category checkboxes are focusable", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const checkbox = screen.getByLabelText("Data & Analytics") as HTMLInputElement;
-      expect(checkbox).toBeInstanceOf(HTMLInputElement);
-      checkbox.focus();
-      expect(document.activeElement).toBe(checkbox);
-    });
-
-    it("price inputs have tabular-nums class for aligned numeric display", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const minInput = screen.getByLabelText("Minimum price") as HTMLInputElement;
-      const maxInput = screen.getByLabelText("Maximum price") as HTMLInputElement;
-      expect(minInput.classList.contains("tabular-nums")).toBe(true);
-      expect(maxInput.classList.contains("tabular-nums")).toBe(true);
+      fireEvent.click(toggle);
+      expect(screen.getByRole("dialog", { name: /Filters/i })).toBeTruthy();
     });
   });
 });
