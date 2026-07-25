@@ -180,6 +180,38 @@ describe("FiltersSidebar", () => {
         screen.queryByText(/Min price cannot exceed max price/i),
       ).toBeNull();
     });
+
+    it("wires aria-describedby on min-price input to the error region when invalid", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      const minInput = screen.getByLabelText("Minimum price");
+      expect(minInput.getAttribute("aria-describedby")).toBe(
+        "filters-price-error",
+      );
+    });
+
+    it("wires aria-describedby on max-price input to the error region when invalid", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      const maxInput = screen.getByLabelText("Maximum price");
+      expect(maxInput.getAttribute("aria-describedby")).toBe(
+        "filters-price-error",
+      );
+    });
+
+    it("does not set aria-describedby on price inputs when range is valid", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={50} maxPrice={100} />);
+      const minInput = screen.getByLabelText("Minimum price");
+      const maxInput = screen.getByLabelText("Maximum price");
+      expect(minInput.getAttribute("aria-describedby")).toBeNull();
+      expect(maxInput.getAttribute("aria-describedby")).toBeNull();
+    });
+
+    it("error paragraph has correct id matching aria-describedby reference", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      const errorEl = document.getElementById("filters-price-error");
+      expect(errorEl).toBeTruthy();
+      expect(errorEl?.getAttribute("role")).toBe("alert");
+      expect(errorEl?.textContent).toContain("Min price cannot exceed max price");
+    });
   });
 
   describe("mobile sheet behavior", () => {
