@@ -149,18 +149,27 @@ export default function MarketplacePage(): JSX.Element {
 
   useEffect(() => {
     const abortController = new AbortController();
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     trackFetch(
       new Promise<void>((resolve) => {
-        const timer = setTimeout(() => {
-          if (!abortController.signal.aborted) {
-            setIsLoading(false);
-            resolve();
-          }
-        }, LOADING_DELAY_MS);
-        abortController.signal.addEventListener("abort", () => {
-          clearTimeout(timer);
+        if (prefersReducedMotion) {
+          setIsLoading(false);
           resolve();
-        });
+        } else {
+          const timer = setTimeout(() => {
+            if (!abortController.signal.aborted) {
+              setIsLoading(false);
+              resolve();
+            }
+          }, LOADING_DELAY_MS);
+          abortController.signal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+        }
       }),
     );
     return () => abortController.abort();
@@ -355,12 +364,7 @@ export default function MarketplacePage(): JSX.Element {
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
+
 
   // If page is invalid, update URL
   useEffect(() => {

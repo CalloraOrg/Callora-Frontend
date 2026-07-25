@@ -14,6 +14,7 @@ import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import { useFavorites } from "../hooks/useFavorites";
 import type { APIItem } from "../data/mockApis";
+import { LiveRegion } from "./LiveRegion";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import { usePinnedApis, pinnedApisStore } from "../state/pinnedApis";
@@ -119,9 +120,10 @@ interface FavoriteButtonProps {
   isFavorite: boolean;
   onToggle: (id: string) => void;
   prefersReducedMotion?: boolean;
+  onAnnounce?: (msg: string) => void;
 }
 
-function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion = false }: FavoriteButtonProps) {
+function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion = false, onAnnounce }: FavoriteButtonProps) {
   const btnRef = useRef<HTMLButtonElement>(null);
 
   const handleMouseEnter = prefersReducedMotion
@@ -138,6 +140,7 @@ function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion
       onClick={(e) => {
         e.stopPropagation();
         onToggle(endpointId);
+        onAnnounce?.(!isFavorite ? "Added to favorites" : "Removed from favorites");
       }}
       style={{
         position: "absolute",
@@ -183,9 +186,10 @@ function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion
 interface BookmarkButtonProps {
   endpointId: string;
   prefersReducedMotion?: boolean;
+  onAnnounce?: (msg: string) => void;
 }
 
-function BookmarkButton({ endpointId, prefersReducedMotion = false }: BookmarkButtonProps) {
+function BookmarkButton({ endpointId, prefersReducedMotion = false, onAnnounce }: BookmarkButtonProps) {
   const {
     collections,
     isEndpointSaved,
@@ -227,10 +231,13 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false }: BookmarkBu
   const toggleSave = () => setPopoverOpen((s) => !s);
 
   const handleToggleCollection = (colId: string) => {
+    const colName = collections.find(c => c.id === colId)?.name || "collection";
     if (savedIn.has(colId)) {
       removeEndpointFromCollection(colId, endpointId);
+      onAnnounce?.(`Removed from ${colName}`);
     } else {
       addEndpointToCollection(colId, endpointId);
+      onAnnounce?.(`Saved to ${colName}`);
     }
   };
 
@@ -246,9 +253,10 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false }: BookmarkBu
     const trimmed = newName.trim();
     if (!trimmed) return;
     createCollectionWithEndpoint(trimmed, endpointId);
+    onAnnounce?.(`Created and saved to ${trimmed}`);
     setNewName("");
     setShowNew(false);
-  }, [newName, createCollectionWithEndpoint, endpointId]);
+  }, [newName, createCollectionWithEndpoint, endpointId, onAnnounce]);
 
   const handleNewKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -422,7 +430,7 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false }: BookmarkBu
 // ─── Pin button ───────────────────────────────────────────────────────────────
 
 /** Quick-menu button that pins/unpins an API to the dashboard. */
-function PinButton({ apiId, prefersReducedMotion = false }: { apiId: string; prefersReducedMotion?: boolean }) {
+function PinButton({ apiId, prefersReducedMotion = false, onAnnounce }: { apiId: string; prefersReducedMotion?: boolean; onAnnounce?: (msg: string) => void }) {
   const pinned = usePinnedApis();
   const isPinned = pinned.has(apiId);
 
@@ -431,6 +439,7 @@ function PinButton({ apiId, prefersReducedMotion = false }: { apiId: string; pre
       onClick={(e) => {
         e.stopPropagation();
         pinnedApisStore.toggle(apiId);
+        onAnnounce?.(!isPinned ? "Pinned to dashboard" : "Unpinned from dashboard");
       }}
       style={{
         position: "absolute",
@@ -520,6 +529,8 @@ export default function ApiCard({
     return <ApiCardSkeleton />;
   }
 
+  const [liveMessage, setLiveMessage] = useState("");
+
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
@@ -559,8 +570,10 @@ export default function ApiCard({
     e.stopPropagation();
     if (isCompared) {
       compareStore.removeApi(api.id);
+      setLiveMessage(`${api.name} removed from comparison`);
     } else if (canCompare) {
       compareStore.addApi(api);
+      setLiveMessage(`${api.name} added to comparison`);
     }
   };
 
@@ -660,18 +673,20 @@ export default function ApiCard({
         gap: isCompact ? 6 : 8,
       }}
     >
+      <LiveRegion message={liveMessage} />
       {menuPos && <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)} actions={contextActions} />}
       {/* Absolutely-positioned bookmark button in the top-right corner */}
-      <BookmarkButton endpointId={api.id} prefersReducedMotion={prefersReducedMotion} />
+      <BookmarkButton endpointId={api.id} prefersReducedMotion={prefersReducedMotion} onAnnounce={setLiveMessage} />
 
       {/* Pin/unpin button — below bookmark, top-right */}
-      <PinButton apiId={api.id} prefersReducedMotion={prefersReducedMotion} />
+      <PinButton apiId={api.id} prefersReducedMotion={prefersReducedMotion} onAnnounce={setLiveMessage} />
       
       <FavoriteButton
         endpointId={api.id}
         isFavorite={isFavorite(api.id)}
         onToggle={toggleFavorite}
         prefersReducedMotion={prefersReducedMotion}
+        onAnnounce={setLiveMessage}
       />
 
        {/* Compare button - absolutely positioned, top-left */}
