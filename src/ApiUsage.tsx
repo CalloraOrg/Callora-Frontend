@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import EmptyState from './components/EmptyState';
 import Skeleton from './components/Skeleton';
+import CallHistoryRow from './pages/CallHistoryRow';
 import { formatPrice } from './utils/format';
 
 type ApiEndpoint = {
@@ -497,36 +498,12 @@ export default function ApiUsage() {
                 <EmptyState message="No call records match the selected filter." />
               ) : (
                 filteredCallHistory.map(call => (
-                  <div key={call.id} className="table-row">
-                    <span>{formatTimestamp(call.timestamp)}</span>
-                    <span className="endpoint-cell">{call.endpoint}</span>
-                    <span className={`status-cell ${call.status}`}>
-                      {call.status === 'success' ? '✓' : '✗'} {call.status}
-                    </span>
-                    <span>{formatTime(call.responseTime)}</span>
-                    <span>{formatPrice(call.cost)} USDC</span>
-                    <span>
-                      <button
-                        className="ghost-button"
-                        onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
-                      >
-                        {expandedCall === call.id ? 'Hide' : 'View'}
-                      </button>
-                    </span>
-
-                    {expandedCall === call.id && (
-                      <div className="expanded-details">
-                        <div className="detail-section">
-                          <h4>Request</h4>
-                          <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
-                        </div>
-                        <div className="detail-section">
-                          <h4>Response</h4>
-                          <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <CallHistoryRow
+                    key={call.id}
+                    call={call}
+                    isExpanded={expandedCall === call.id}
+                    onToggle={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
+                  />
                 ))
               )}
         </div>
