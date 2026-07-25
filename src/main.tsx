@@ -7,6 +7,7 @@ import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { ToastProvider } from "./components/Toast";
 import "./index.css";
 import "./styles/tokens.css";
+import "./styles/typography.css";
 import "./styles/patterns.css";
 import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";

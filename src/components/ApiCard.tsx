@@ -437,7 +437,7 @@ function renderStatValue(value: string | undefined) {
       </span>
     );
   }
-  return <span className="api-card__stat-value">{value}</span>;
+  return <span className="api-card__stat-value numeric-tabular">{value}</span>;
 }
 export default function ApiCard({
   api,
@@ -659,7 +659,7 @@ export default function ApiCard({
 
         {/* Price — bookmark moved out of here, paddingRight leaves room for it */}
         <div
-          className="api-marketplace-card-price"
+          className="api-marketplace-card-price numeric-tabular"
           style={{ textAlign: "right", paddingRight: 36, flexShrink: 0 }}
         >
           <div style={{ color: "var(--muted)", fontSize: 12 }}>
