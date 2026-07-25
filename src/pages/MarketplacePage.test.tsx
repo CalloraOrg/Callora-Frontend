@@ -94,4 +94,14 @@ describe("MarketplacePage", () => {
 
     pushStateSpy.mockRestore();
   });
+
+  it("renders keyboard shortcuts hint", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    const hint = screen.getByRole("complementary", { name: "Keyboard shortcuts" });
+    expect(hint).toBeTruthy();
+    expect(screen.getByText("Focus search bar")).toBeTruthy();
+    expect(screen.getByText("Add/remove focused API card to comparison")).toBeTruthy();
+  });
 });
