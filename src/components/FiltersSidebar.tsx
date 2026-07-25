@@ -306,32 +306,33 @@ export default function FiltersSidebar({
         </div>
       </FilterGroup>
 
-      {/* ── Zero-results illustration (v7) ───────────────────────────────
-         Visually separates from the filter groups above with a soft token-
-         based top border so the call-to-action feels grouped with the
-         result-count feedback rather than with the Favorites section.
-         The wrapper is aria-live="polite" so screen readers announce the
-         zero-results state when filters narrow the count to 0. */}
-      {typeof resultCount === "number" &&
-        resultCount === 0 &&
-        hasActiveFilters && (
-          <div
-            data-testid="filters-zero-results"
-            style={{
-              margin: "12px 0 12px",
-              paddingTop: "12px",
-              borderTop: "1px solid var(--line)",
-            }}
-            role="status"
-            aria-live="polite"
-          >
-            <EmptyState
-              variant="filtered"
-              size="compact"
-              onClearFilters={hasActiveFilters ? clearFilters : undefined}
-            />
-          </div>
-        )}
+      {/* ── Zero-results / Empty-state illustration (v7) ─────────────────
+         Two distinct cases:
+         1. Active filters + zero results → "filtered" variant with a
+            Clear-filters CTA so users can broaden their search.
+         2. No filters active + zero results → "empty" variant telling
+            users no APIs are available yet.
+
+         Both are wrapped in role="status" aria-live="polite" so screen
+         readers announce the state change. */}
+      {typeof resultCount === "number" && resultCount === 0 && (
+        <div
+          data-testid="filters-zero-results"
+          style={{
+            margin: "12px 0 12px",
+            paddingTop: "12px",
+            borderTop: "1px solid var(--line)",
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <EmptyState
+            variant={hasActiveFilters ? "filtered" : "empty"}
+            size="compact"
+            onClearFilters={hasActiveFilters ? clearFilters : undefined}
+          />
+        </div>
+      )}
 
       {/* ── Clear ──────────────────────────────────────────────────────── */}
       <div style={{ marginTop: 8 }}>
