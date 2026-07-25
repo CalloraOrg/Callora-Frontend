@@ -81,7 +81,7 @@ export default function UsageGauge({
     : `${stateLabels[usageState]}: ${formattedUsed} ${unit} used. Add a usage limit to track remaining allowance.`;
 
   return (
-    <section className="usage-gauge" aria-labelledby={titleId} aria-describedby={descriptionId}>
+    <section className="usage-gauge" aria-labelledby={titleId} aria-describedby={descriptionId} aria-label={label}>
       <div className="usage-gauge__header">
         <div>
           <h3 id={titleId} className="eyebrow usage-gauge__title">
@@ -99,6 +99,7 @@ export default function UsageGauge({
         role="progressbar"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
+        aria-label={label}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={hasLimit ? Math.min(Math.max(percentUsed, 0), 100) : 0}
