@@ -1,5 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ApiUsage from './ApiUsage';
 
 // Mock dependencies
@@ -91,11 +91,71 @@ describe('ApiUsage - Tabular Numerals', () => {
     const statValues = document.querySelectorAll('.stat-value.tabular-nums');
     expect(statValues.length).toBe(5);
     const labels = ['Calls Today', 'Calls This Week', 'Total Spent', 'Avg Response Time', 'Success Rate'];
-    statValues.forEach((el, i) => {
-      expect(el.classList.contains('tabular-nums')).toBe(true);
-      const card = el.closest('.stat-card');
-      expect(card.querySelector('.stat-label').textContent).toBe(labels[i]);
-    });
-  });
+statValues.forEach((el, i) => {
+       expect(el.classList.contains('tabular-nums')).toBe(true);
+       const card = el.closest('.stat-card');
+       expect(card.querySelector('.stat-label').textContent).toBe(labels[i]);
+     });
+   });
+ });
 
-});
+describe('ApiUsage - prefers-reduced-motion', () => {
+   let originalMatchMedia: typeof window.matchMedia;
+
+   beforeEach(() => {
+     vi.useFakeTimers();
+     originalMatchMedia = window.matchMedia;
+   });
+
+   afterEach(() => {
+     vi.useRealTimers();
+     window.matchMedia = originalMatchMedia;
+   });
+
+   it('bypasses table loading delay and shows content immediately when prefers-reduced-motion is active', async () => {
+     window.matchMedia = vi.fn().mockImplementation((query) => ({
+       matches: query === '(prefers-reduced-motion: reduce)' || query.includes('reduce'),
+       media: query,
+       onchange: null,
+       addListener: vi.fn(),
+       removeListener: vi.fn(),
+       addEventListener: vi.fn(),
+       removeEventListener: vi.fn(),
+       dispatchEvent: vi.fn(),
+     }));
+
+     render(<ApiUsage />);
+
+     await act(async () => {
+       await vi.advanceTimersByTimeAsync(0);
+     });
+
+     expect(screen.getByText('Call History')).toBeTruthy();
+     const skeletonRows = document.querySelectorAll('.skeleton-cell');
+     expect(skeletonRows.length).toBe(0);
+   });
+
+   it('uses the normal loading delay when prefers-reduced-motion is not active', async () => {
+     window.matchMedia = vi.fn().mockImplementation((query) => ({
+       matches: false,
+       media: query,
+       onchange: null,
+       addListener: vi.fn(),
+       removeListener: vi.fn(),
+       addEventListener: vi.fn(),
+       removeEventListener: vi.fn(),
+       dispatchEvent: vi.fn(),
+     }));
+
+     render(<ApiUsage />);
+
+     const skeletonRows = document.querySelectorAll('.skeleton-cell');
+     expect(skeletonRows.length).toBeGreaterThan(0);
+
+     await act(async () => {
+       await vi.advanceTimersByTimeAsync(500);
+     });
+
+     expect(screen.getByText('Call History')).toBeTruthy();
+   });
+ });

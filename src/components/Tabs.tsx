@@ -331,5 +331,3 @@ export default function Tabs({
     </>
   );
 }
-/ /   R e - t r i g g e r i n g   P R  
- 
