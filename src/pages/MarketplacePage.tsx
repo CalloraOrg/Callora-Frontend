@@ -447,8 +447,11 @@ export default function MarketplacePage(): JSX.Element {
         </aside>
 
         <main
-          className="marketplace-results"
-          style={isTrayVisible ? { paddingBottom: "80px" } : {}}
+          className={
+            isTrayVisible
+              ? "marketplace-results marketplace-results--tray-open"
+              : "marketplace-results"
+          }
         >
           <div className="marketplace-toolbar">
             <div className="marketplace-count">
