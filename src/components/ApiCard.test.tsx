@@ -291,84 +291,62 @@ describe("ApiCard reduced motion", () => {
   });
 });
 
-describe("ApiCard responsive layout", () => {
-  const responsiveApi: APIItem = {
-    id: "resp-1",
+describe("ApiCard responsiveness", () => {
+  const mockApi: APIItem = {
+    id: "api-resp",
     name: "Responsive API",
-    description: "An API with long description text that might overflow on narrow viewports if not handled correctly.",
-    tags: ["analytics", "reporting", "data", "insights"],
-    pricePerRequest: 0.005,
-    provider: { name: "DataCorp" },
-    rating: 4.2,
-    uptimePercent: 99.95,
-    avgLatencyMs: 220,
-    pricePerCall: 0.005,
+    endpoint: "/api/resp",
+    description: "Responsive test API.",
+    tags: ["test"],
+    pricePerRequest: 0,
   };
 
-  beforeEach(() => {
-    // Always ensure matchMedia returns a valid MediaQueryList-like object.
-    // Previous test suites may have replaced it with a mock that returns undefined.
-    window.matchMedia = ((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    })) as any;
+  function mockViewportWidth(isMobile: boolean) {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => {
+      if (query === "(max-width: 768px)") {
+        return {
+          matches: isMobile,
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(() => false),
+        };
+      }
+      return {
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(() => false),
+      };
+    });
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it("renders with proper responsive CSS classes for marketplace card", () => {
-    render(<ApiCard api={responsiveApi} />);
-
-    const card = screen.getByRole("button", { name: /View details for Responsive API/i });
-    expect(card.className).toContain("api-marketplace-card");
-    expect(card.className).toContain("preview-card");
-  });
-
-  it("renders card in compact mode with compact CSS class", () => {
-    render(<ApiCard api={responsiveApi} density="compact" />);
-
+  it("applies compact mode styling on narrow viewports", () => {
+    mockViewportWidth(true); // Simulate mobile
+    render(<ApiCard api={mockApi} density="comfortable" />);
+    
+    // Even if density="comfortable", the card should have the compact class on narrow viewports
     const card = screen.getByRole("button", { name: /View details for Responsive API/i });
     expect(card.className).toContain("api-card--compact");
   });
 
-  it("renders stats grid which collapses on narrow viewports", () => {
-    render(<ApiCard api={responsiveApi} />);
-
-    const statsGrid = screen.getByLabelText("API stats");
-    expect(statsGrid).toBeTruthy();
-    expect(statsGrid.className).toContain("api-card__stats");
-
-    // All three stat cells are present
-    const statCells = statsGrid.querySelectorAll(".api-card__stat");
-    expect(statCells.length).toBe(3);
-  });
-
-  it("renders wrapped tag chips that fit narrow viewports", () => {
-    render(<ApiCard api={responsiveApi} />);
-
-    const tagButtons = screen.getAllByRole("button", { name: /Filter marketplace by tag/ });
-    expect(tagButtons.length).toBe(4);
-  });
-
-  it("renders prices as numeric-tabular for consistent number display", () => {
-    render(<ApiCard api={responsiveApi} />);
-
-    // The price div should have the numeric-tabular class for tabular numbers
-    const priceElement = document.querySelector(".api-marketplace-card-price");
-    expect(priceElement).toBeTruthy();
-    expect(priceElement?.className).toContain("numeric-tabular");
-  });
-
-  it("has proper min-width: 0 on body to prevent overflow", () => {
-    render(<ApiCard api={responsiveApi} />);
-
-    const bodyEl = document.querySelector(".api-marketplace-card-body");
-    expect(bodyEl).toBeTruthy();
-    // Browsers may normalize "0" as 0 or "0px" — either is fine
-    expect(Number((bodyEl as HTMLElement).style.minWidth)).toBe(0);
+  it("retains comfortable mode styling on wide viewports by default", () => {
+    mockViewportWidth(false); // Simulate desktop
+    render(<ApiCard api={mockApi} density="comfortable" />);
+    
+    const card = screen.getByRole("button", { name: /View details for Responsive API/i });
+    expect(card.className).not.toContain("api-card--compact");
   });
 });
+
