@@ -14,6 +14,8 @@ import CallsHeatmap from './components/CallsHeatmap';
 import Tabs from './components/Tabs';
 import { Icons } from './utils/icons';
 import { LinkIcon } from './components/icons';
+import KbdHint from './components/KbdHint';
+import { SHORTCUTS } from './hooks/useGlobalShortcuts';
 import {
   clearHistory,
   loadHistory,
@@ -193,6 +195,10 @@ curl -X GET "https://api.callora.com/v1/user/profile" \\
   -H "Authorization: Bearer your-api-key-here" \\
   -H "Content-Type: application/json"`
 };
+
+const API_USAGE_SHORTCUTS = SHORTCUTS.filter(
+  (s) => s.category === "ApiUsage",
+);
 
 
 
@@ -567,6 +573,8 @@ export default function ApiUsage() {
           </div>
         </div>
       </div>
+
+      <KbdHint shortcuts={API_USAGE_SHORTCUTS} />
 
       {/* API Key Section */}
       <div className="surface api-key-section">

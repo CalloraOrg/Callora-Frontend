@@ -99,6 +99,53 @@ statValues.forEach((el, i) => {
    });
  });
 
+describe('ApiUsage - Keyboard Shortcut Hints', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'location', {
+      value: { search: '', pathname: '/api-usage' },
+      writable: true,
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: false, media: query, onchange: null,
+        addListener: vi.fn(), removeListener: vi.fn(),
+        addEventListener: vi.fn(), removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    vi.clearAllMocks();
+  });
+
+  it('renders the KbdHint component with ApiUsage shortcuts', () => {
+    render(<ApiUsage />);
+    const kbdHint = document.querySelector('.kbd-hint');
+    expect(kbdHint).toBeTruthy();
+    expect(kbdHint?.getAttribute('aria-label')).toBe('Keyboard shortcuts');
+  });
+
+  it('displays the make test call shortcut key', () => {
+    render(<ApiUsage />);
+    const kbdHint = document.querySelector('.kbd-hint');
+    expect(kbdHint?.textContent).toContain('m');
+    expect(kbdHint?.textContent).toContain('Make test call');
+  });
+
+  it('displays the toggle history shortcut key', () => {
+    render(<ApiUsage />);
+    const kbdHint = document.querySelector('.kbd-hint');
+    expect(kbdHint?.textContent).toContain('h');
+    expect(kbdHint?.textContent).toContain('Toggle request history');
+  });
+
+  it('displays the reset filters shortcut key', () => {
+    render(<ApiUsage />);
+    const kbdHint = document.querySelector('.kbd-hint');
+    expect(kbdHint?.textContent).toContain('r');
+    expect(kbdHint?.textContent).toContain('Reset call history filters');
+  });
+});
+
 describe('ApiUsage - prefers-reduced-motion', () => {
    let originalMatchMedia: typeof window.matchMedia;
 
