@@ -15,7 +15,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - Dashboard (usage stats, vault balance)
 - Marketplace (browse and compare APIs)
 - Billing (USDC deposit, Stellar settlement, transaction tracking)
-- API Usage analytics view
+- API Usage analytics view with screen-reader announcements for call status changes
 - 500 error page with retry flow
 - 404 catch-all page
 - Dev proxy to backend at `http://localhost:3000` for `/api`
