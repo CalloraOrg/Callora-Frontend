@@ -1672,6 +1672,12 @@ code,
   .density-toggle-button {
     transition: none;
   }
+
+  /* Remove lift transform for users who prefer reduced motion */
+  .api-marketplace-card:hover,
+  .api-marketplace-card:focus-visible {
+    transform: none;
+  }
 }
 
 .api-marketplace-card:hover {
@@ -3212,6 +3218,11 @@ code,
     align-items: stretch;
   }
 
+  .marketplace-density-toggle {
+    flex-wrap: wrap;
+    gap: var(--mkt-space-xs);
+  }
+
   .marketplace-actions {
     justify-content: space-between;
     width: 100%;
@@ -3219,6 +3230,7 @@ code,
 
   .marketplace-actions select {
     flex: 1;
+    min-width: 0;
   }
 
   .marketplace-grid {
