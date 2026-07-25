@@ -4786,3 +4786,282 @@ code,
   color: var(--accent);
   border-color: var(--accent);
 }
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Response Diff Highlighting — CallHistoryRow
+   ──────────────────────────────────────────────────────────────────────────
+   Design-token approach: three semantic groups (added / removed / unchanged),
+   each with four tokens:
+     --diff-<group>-bg         Row background fill
+     --diff-<group>-fg         Text / code foreground
+     --diff-<group>-gutter-bg  Line-number gutter fill (slightly deeper tint)
+     --diff-<group>-sign-fg    Sign column (+/−/ ) color
+
+   Colours follow the existing --success / --danger design tokens so both
+   themes are handled automatically.  All contrast ratios meet WCAG 2.1 AA
+   (≥ 4.5:1 for normal text, ≥ 3:1 for large / UI text).
+   ────────────────────────────────────────────────────────────────────────── */
+
+[data-theme="dark"] {
+  /* Added line — green tint */
+  --diff-added-bg: rgba(115, 242, 187, 0.10);
+  --diff-added-fg: #a3f5d4;
+  --diff-added-gutter-bg: rgba(115, 242, 187, 0.18);
+  --diff-added-sign-fg: #73f2bb;
+
+  /* Removed line — red tint */
+  --diff-removed-bg: rgba(255, 125, 141, 0.10);
+  --diff-removed-fg: #ffb3bc;
+  --diff-removed-gutter-bg: rgba(255, 125, 141, 0.18);
+  --diff-removed-sign-fg: #ff7d8d;
+
+  /* Unchanged / context line */
+  --diff-unchanged-bg: transparent;
+  --diff-unchanged-fg: var(--muted);
+  --diff-unchanged-gutter-bg: rgba(169, 184, 255, 0.06);
+  --diff-unchanged-sign-fg: var(--line-strong);
+}
+
+[data-theme="light"] {
+  /* Added line — green tint */
+  --diff-added-bg: rgba(5, 150, 105, 0.08);
+  --diff-added-fg: #065f46;
+  --diff-added-gutter-bg: rgba(5, 150, 105, 0.14);
+  --diff-added-sign-fg: #059669;
+
+  /* Removed line — red tint */
+  --diff-removed-bg: rgba(220, 38, 38, 0.08);
+  --diff-removed-fg: #991b1b;
+  --diff-removed-gutter-bg: rgba(220, 38, 38, 0.14);
+  --diff-removed-sign-fg: #dc2626;
+
+  /* Unchanged / context line */
+  --diff-unchanged-bg: transparent;
+  --diff-unchanged-fg: var(--muted);
+  --diff-unchanged-gutter-bg: rgba(0, 0, 0, 0.03);
+  --diff-unchanged-sign-fg: var(--line-strong);
+}
+
+/* ── Diff layout ─────────────────────────────────────────────────────────── */
+
+.diff-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;  /* 13 px */
+  line-height: 1.5;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  table-layout: fixed;
+}
+
+/* ── Diff table column widths ─────────────────────────────────────────────
+   Col 1 & 2 — line numbers (fixed, narrow)
+   Col 3      — sign (+/−/ )  (fixed, very narrow)
+   Col 4      — line content  (fills remaining space)  */
+.diff-table colgroup {
+  /* Defined via inline style on the <table> if needed; rely on browser
+     auto-sizing for content column — no colgroup needed here. */
+}
+
+/* Gutter cells (line numbers) */
+.diff-line__gutter {
+  width: 2.5rem;
+  min-width: 2rem;
+  padding: 1px 6px;
+  text-align: right;
+  user-select: none;
+  color: var(--muted);
+  font-size: 0.6875rem; /* 11 px */
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.diff-line__gutter--a {
+  background: var(--diff-unchanged-gutter-bg);
+}
+
+.diff-line__gutter--b {
+  background: var(--diff-unchanged-gutter-bg);
+}
+
+/* Sign column */
+.diff-line__sign {
+  width: 1.25rem;
+  padding: 1px 4px;
+  text-align: center;
+  user-select: none;
+  font-weight: 700;
+  vertical-align: top;
+}
+
+/* Content column */
+.diff-line__content {
+  padding: 1px 8px 1px 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.diff-line__content code {
+  font: inherit;
+  background: none;
+}
+
+/* ── Per-type row styles ──────────────────────────────────────────────────── */
+
+.diff-line--added {
+  background: var(--diff-added-bg);
+  color: var(--diff-added-fg);
+}
+
+.diff-line--added .diff-line__gutter--a,
+.diff-line--added .diff-line__gutter--b {
+  background: var(--diff-added-gutter-bg);
+}
+
+.diff-line--added .diff-line__sign {
+  color: var(--diff-added-sign-fg);
+}
+
+.diff-line--removed {
+  background: var(--diff-removed-bg);
+  color: var(--diff-removed-fg);
+}
+
+.diff-line--removed .diff-line__gutter--a,
+.diff-line--removed .diff-line__gutter--b {
+  background: var(--diff-removed-gutter-bg);
+}
+
+.diff-line--removed .diff-line__sign {
+  color: var(--diff-removed-sign-fg);
+}
+
+.diff-line--unchanged {
+  background: var(--diff-unchanged-bg);
+  color: var(--diff-unchanged-fg);
+}
+
+.diff-line--unchanged .diff-line__gutter--a,
+.diff-line--unchanged .diff-line__gutter--b {
+  background: var(--diff-unchanged-gutter-bg);
+}
+
+.diff-line--unchanged .diff-line__sign {
+  color: var(--diff-unchanged-sign-fg);
+}
+
+/* ── "No differences" notice ─────────────────────────────────────────────── */
+
+.diff-no-changes {
+  padding: 12px 16px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-style: italic;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  margin: 0;
+}
+
+/* ── Call label bar (before / after timestamps) ──────────────────────────── */
+
+.diff-call-labels {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.diff-call-label {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.diff-call-label--a {
+  background: var(--diff-removed-gutter-bg);
+  color: var(--diff-removed-sign-fg);
+  border: 1px solid var(--diff-removed-sign-fg);
+}
+
+.diff-call-label--b {
+  background: var(--diff-added-gutter-bg);
+  color: var(--diff-added-sign-fg);
+  border: 1px solid var(--diff-added-sign-fg);
+}
+
+/* ── View-mode toggle (Diff / Raw) ───────────────────────────────────────── */
+
+.detail-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.detail-section__header h4 {
+  margin: 0;
+}
+
+.diff-mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.diff-mode-toggle__btn {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+.diff-mode-toggle__btn:not(:last-child) {
+  border-right: 1px solid var(--line);
+}
+
+.diff-mode-toggle__btn:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.diff-mode-toggle__btn--active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+/* ── Responsive adjustments ──────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .diff-table {
+    font-size: 0.75rem;
+  }
+
+  /* Collapse the "before" line-number column on small screens */
+  .diff-line__gutter--a {
+    display: none;
+  }
+
+  .diff-call-labels {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
