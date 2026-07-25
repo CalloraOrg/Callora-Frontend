@@ -26,6 +26,14 @@ import { ToastProvider } from "./components/Toast";
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
 
+const STAGE_LABELS: Record<DepositStage, string> = {
+  input: "Enter Amount",
+  approving: "Approving",
+  pending: "Pending",
+  confirmed: "Confirmed",
+  failed: "Failed",
+};
+
 type Feature = {
   icon: string;
   title: string;
@@ -610,11 +618,11 @@ function App() {
                   <aside className="surface prototype-panel">
                     <p className="eyebrow">Prototype state preview</p>
                     <h2>Review both success and failure flows.</h2>
-                    <div className="outcome-toggle">
-                      <button className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
+                    <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
+                      <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
                         Confirmed path
                       </button>
-                      <button className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
+                      <button role="radio" aria-checked={demoOutcome === "failed"} className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
                         Failed path
                       </button>
                     </div>
@@ -713,12 +721,12 @@ function App() {
 
               <div className="modal-body">
                 <div className="stage-strip" aria-label="Transaction flow status">
-                  {["input", "approving", "pending", demoOutcome === "confirmed" ? "confirmed" : "failed"].map((item) => {
+                  {(["input", "approving", "pending", demoOutcome === "confirmed" ? "confirmed" : "failed"] as const).map((item) => {
                     const isActive = item === depositStage || (item === "input" && depositStage === "input" && hasValidAmount);
 
                     return (
                       <span key={item} className={`stage-pill ${isActive ? "active" : ""}`}>
-                        {item}
+                        {STAGE_LABELS[item]}
                       </span>
                     );
                   })}
@@ -729,7 +737,7 @@ function App() {
                     <strong>{stageLabel}</strong>
                     <p>{statusMessage}</p>
                   </div>
-                  <span className={`status-chip ${depositStage}`}>{depositStage}</span>
+                  <span className={`status-chip ${depositStage}`}>{STAGE_LABELS[depositStage]}</span>
                 </div>
 
                 <div className="modal-grid">
@@ -759,9 +767,10 @@ function App() {
                         disabled={isBusy}
                         placeholder="0.00"
                         aria-describedby="deposit-help"
+                        aria-invalid={validationMessage.length > 0 && depositStage === "input"}
                       />
                       <span>USDC</span>
-                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy}>
+                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy} aria-label={`Set maximum amount: ${formatUsdShortcut(walletBalance)}`}>
                         Max
                       </button>
                     </div>
@@ -772,13 +781,13 @@ function App() {
 
                     {validationMessage && depositStage === "input" && <p className="error-text">{validationMessage}</p>}
 
-                    <div className="preset-row">
+                    <div className="preset-row" role="radiogroup" aria-label="Deposit amount preset">
                       {PRESET_AMOUNTS.map((preset) => (
-                        <button key={preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
+                        <button key={preset} role="radio" aria-checked={selectedPreset === preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
                           ${preset}
                         </button>
                       ))}
-                      <button className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy}>
+                      <button role="radio" aria-checked={selectedPreset === "custom"} className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy}>
                         Custom
                       </button>
                     </div>
@@ -871,7 +880,7 @@ function App() {
                     Deposit another amount
                   </button>
                 ) : (
-                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy}>
+                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
                     {depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
                   </button>
                 )}
