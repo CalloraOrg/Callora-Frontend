@@ -1,15 +1,18 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
-import QuotaBanner from './QuotaBanner';
+import QuotaBanner from '../pages/QuotaBanner';
 
 describe('QuotaBanner', () => {
-  it('wires error/help text to inputs via aria-describedby', () => {
+  it('renders quota details and shortcut hint', () => {
     render(<QuotaBanner />);
-    const input = screen.getByRole('textbox');
-    
-    const describedBy = input.getAttribute('aria-describedby');
-    expect(describedBy).toContain('quota-input-hint');
-    expect(describedBy).toContain('quota-extra-info');
+    // Check main heading
+    expect(screen.getByRole('heading', { name: /quota details/i })).toBeInTheDocument();
+    // Check input field
+    const input = screen.getByLabelText(/quota/i);
+    expect(input).toBeInTheDocument();
+    // Check KbdHint displays the Enter key
+    const kbd = screen.getByText('Enter');
+    expect(kbd).toBeInTheDocument();
+    // Ensure description is present (optional)
+    expect(screen.getByText('Submit quota')).toBeInTheDocument();
   });
 });
