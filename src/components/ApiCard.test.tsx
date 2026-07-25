@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import ApiCard from "./ApiCard";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
 import type { APIItem } from "../data/mockApis";
 import { pinnedApisStore } from "../state/pinnedApis";
@@ -12,20 +12,17 @@ vi.mock("../state/collectionsStore", () => ({
     addEndpointToCollection: vi.fn(),
     removeEndpointFromCollection: vi.fn(),
     collectionIdsForEndpoint: () => new Set(),
-      createCollectionWithEndpoint: vi.fn(),
-    removeApi: vi.fn(),
-    setOpen: vi.fn(),
-    subscribe: vi.fn((listener) => {
-      return () => {};
-    }),
-    getSnapshot: vi.fn(() => ({ apis: [], isOpen: false })),
-  };
+    createCollectionWithEndpoint: vi.fn(),
+  }),
+}));
 
-  return {
-    compareStore: mockCompareStore,
-    useCompareStore: () => ({ apis: [], isOpen: false }),
-  };
-});
+vi.mock("../state/compareStore", () => ({
+  useCompareStore: () => ({ apis: [], isOpen: false }),
+  compareStore: {
+    addApi: vi.fn(),
+    removeApi: vi.fn(),
+  },
+}));
 
 describe("ApiCard Accessibility and Context Layouts", () => {
   const mockApi: APIItem = {
@@ -116,5 +113,87 @@ describe("ApiCard Accessibility and Context Layouts", () => {
 
     expect(pinButton.getAttribute("aria-pressed")).toBe("true");
     expect(pinButton.getAttribute("aria-label")).toBe("Unpin api-1 from dashboard");
+  });
+});
+
+describe("ApiCard reduced motion", () => {
+  const mockApi: APIItem = {
+    id: "api-1",
+    name: "Stellar Metering API",
+    endpoint: "/api/v1/meter",
+    description: "A mock API for testing.",
+    tags: ["weather", "forecast", "geo"],
+    pricePerRequest: 0.01,
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    pinnedApisStore._reset();
+  });
+
+  function mockReducedMotion(enabled: boolean) {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: enabled,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+  }
+
+  it("uses none transition on action buttons when prefers-reduced-motion is set", () => {
+    mockReducedMotion(true);
+    render(<ApiCard api={mockApi} />);
+
+    const buttons = screen.getAllByRole("button");
+    const reducedButtons = buttons.filter(
+      (btn) =>
+        btn.style.transition === "none" &&
+        (btn.getAttribute("aria-label")?.includes("api-1") ||
+          btn.getAttribute("aria-label")?.includes("favorites") ||
+          btn.getAttribute("aria-label")?.includes("collection"))
+    );
+    expect(reducedButtons.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("preserves normal transitions when prefers-reduced-motion is not set", () => {
+    mockReducedMotion(false);
+    render(<ApiCard api={mockApi} />);
+
+    const buttons = screen.getAllByRole("button");
+    const normalButtons = buttons.filter(
+      (btn) => btn.style.transition && btn.style.transition !== "none"
+    );
+    expect(normalButtons.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("does not apply hover transform on FavoriteButton when reduced motion is active", () => {
+    mockReducedMotion(true);
+    render(<ApiCard api={mockApi} />);
+
+    const favButton = screen.getByLabelText("Add to favorites");
+    expect(favButton.onmouseenter).toBeNull();
+    expect(favButton.onmouseleave).toBeNull();
+  });
+
+  it("does not apply hover transform on PinButton when reduced motion is active", () => {
+    mockReducedMotion(true);
+    render(<ApiCard api={mockApi} />);
+
+    const pinButton = screen.getByRole("button", { name: /Pin api-1 to dashboard/i });
+    expect(pinButton.onmouseenter).toBeNull();
+    expect(pinButton.onmouseleave).toBeNull();
+  });
+
+  it("renders correctly when matchMedia is undefined (SSR)", () => {
+    const origMatchMedia = window.matchMedia;
+    (window as any).matchMedia = undefined;
+    render(<ApiCard api={mockApi} />);
+
+    expect(screen.getByText("Stellar Metering API")).toBeDefined();
+    window.matchMedia = origMatchMedia;
   });
 });

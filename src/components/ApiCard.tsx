@@ -6,7 +6,7 @@
  * allowing users to add/remove the endpoint from collections.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ContextMenu } from './ContextMenu';
 import Skeleton from "./Skeleton";
 import TagChip from "./TagChip";
@@ -115,10 +115,19 @@ interface FavoriteButtonProps {
   endpointId: string;
   isFavorite: boolean;
   onToggle: (id: string) => void;
+  prefersReducedMotion?: boolean;
 }
 
-function FavoriteButton({ endpointId, isFavorite, onToggle }: FavoriteButtonProps) {
+function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion = false }: FavoriteButtonProps) {
   const btnRef = useRef<HTMLButtonElement>(null);
+
+  const handleMouseEnter = prefersReducedMotion
+    ? undefined
+    : ((e: React.MouseEvent) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)"));
+
+  const handleMouseLeave = prefersReducedMotion
+    ? undefined
+    : ((e: React.MouseEvent) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)"));
 
   return (
     <button
@@ -138,11 +147,11 @@ function FavoriteButton({ endpointId, isFavorite, onToggle }: FavoriteButtonProp
         alignItems: "center",
         justifyContent: "center",
         cursor: "pointer",
-        transition: "background 160ms ease, transform 160ms ease",
+        transition: prefersReducedMotion ? "none" : "background 160ms ease, transform 160ms ease",
         flexShrink: 0,
       }}
-      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)")}
-      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
       aria-pressed={isFavorite}
     >
@@ -167,9 +176,10 @@ function FavoriteButton({ endpointId, isFavorite, onToggle }: FavoriteButtonProp
 
 interface BookmarkButtonProps {
   endpointId: string;
+  prefersReducedMotion?: boolean;
 }
 
-function BookmarkButton({ endpointId }: BookmarkButtonProps) {
+function BookmarkButton({ endpointId, prefersReducedMotion = false }: BookmarkButtonProps) {
   const {
     collections,
     isEndpointSaved,
@@ -262,11 +272,11 @@ function BookmarkButton({ endpointId }: BookmarkButtonProps) {
           justifyContent: "center",
           cursor: "pointer",
           zIndex: 10,
-          transition: "background 160ms ease, transform 160ms ease",
+          transition: prefersReducedMotion ? "none" : "background 160ms ease, transform 160ms ease",
           flexShrink: 0,
         }}
-        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)")}
-        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
+        onMouseEnter={prefersReducedMotion ? undefined : (e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)")}
+        onMouseLeave={prefersReducedMotion ? undefined : (e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
         aria-label={isSaved ? "Remove from collection" : "Save to collection"}
         aria-pressed={isSaved}
         aria-haspopup="dialog"
@@ -377,7 +387,7 @@ function BookmarkButton({ endpointId }: BookmarkButtonProps) {
 // ─── Pin button ───────────────────────────────────────────────────────────────
 
 /** Quick-menu button that pins/unpins an API to the dashboard. */
-function PinButton({ apiId }: { apiId: string }) {
+function PinButton({ apiId, prefersReducedMotion = false }: { apiId: string; prefersReducedMotion?: boolean }) {
   const pinned = usePinnedApis();
   const isPinned = pinned.has(apiId);
 
@@ -398,11 +408,11 @@ function PinButton({ apiId }: { apiId: string }) {
         justifyContent: "center",
         cursor: "pointer",
         zIndex: 10,
-        transition: "background 160ms ease, transform 160ms ease",
+        transition: prefersReducedMotion ? "none" : "background 160ms ease, transform 160ms ease",
         flexShrink: 0,
       }}
-      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)")}
-      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
+      onMouseEnter={prefersReducedMotion ? undefined : (e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)")}
+      onMouseLeave={prefersReducedMotion ? undefined : (e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
       aria-label={isPinned ? `Unpin ${apiId} from dashboard` : `Pin ${apiId} to dashboard`}
       aria-pressed={isPinned}
     >
@@ -456,6 +466,12 @@ export default function ApiCard({
   const avgLatencyMs = api.avgLatencyMs;
   const uptimePercent = api.uptimePercent;
   const isCompact = density === "compact";
+
+  const prefersReducedMotion = useMemo(() => {
+    return typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
 
   const { isFavorite, toggleFavorite } = useFavorites();
   const { apis: comparedApis } = useCompareStore();
@@ -566,15 +582,16 @@ export default function ApiCard({
         />
       )}
       {/* Absolutely-positioned bookmark button in the top-right corner */}
-      <BookmarkButton endpointId={api.id} />
+      <BookmarkButton endpointId={api.id} prefersReducedMotion={prefersReducedMotion} />
 
       {/* Pin/unpin button — below bookmark, top-right */}
-      <PinButton apiId={api.id} />
+      <PinButton apiId={api.id} prefersReducedMotion={prefersReducedMotion} />
       
       <FavoriteButton
         endpointId={api.id}
         isFavorite={isFavorite(api.id)}
         onToggle={toggleFavorite}
+        prefersReducedMotion={prefersReducedMotion}
       />
 
        {/* Pin button - absolutely positioned, top-left */}
@@ -596,7 +613,7 @@ export default function ApiCard({
            fontWeight: 600,
            cursor: canCompare ? "pointer" : "not-allowed",
            opacity: isCompared ? 1 : 0.6,
-           transition: "opacity 0.2s, background 0.2s"
+           transition: prefersReducedMotion ? "none" : "opacity 0.2s, background 0.2s"
          }}
          aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
          aria-pressed={isCompared}
