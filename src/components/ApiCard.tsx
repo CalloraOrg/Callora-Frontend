@@ -460,7 +460,7 @@ function renderStatValue(value: string | undefined) {
   if (!value) {
     return <span className="api-card__stat-value api-card__stat-value--empty">{EM_DASH}</span>;
   }
-  return <span className="api-card__stat-value">{value}</span>;
+  return <span className="api-card__stat-value numeric-tabular">{value}</span>;
 }
 export default function ApiCard({
   api,
@@ -668,8 +668,13 @@ export default function ApiCard({
         </div>
 
         {/* Price — bookmark moved out of here, paddingRight leaves room for it */}
-        <div className="api-marketplace-card-price" style={{ textAlign: "right", paddingRight: 36, flexShrink: 0 }}>
-          <div style={{ color: "var(--muted)", fontSize: 12 }}>{`$${formatPrice(pricePerCall)}`} / call</div>
+        <div
+          className="api-marketplace-card-price numeric-tabular"
+          style={{ textAlign: "right", paddingRight: 36, flexShrink: 0 }}
+        >
+          <div style={{ color: "var(--muted)", fontSize: 12 }}>
+            {`$${formatPrice(pricePerCall)}`} / call
+          </div>
           {api.rating !== undefined && (
             <div style={{ color: "var(--muted)", marginTop: 6 }}>
               <RatingHistogram rating={api.rating} distribution={api.ratingDistribution} placement="top-end">

@@ -22,12 +22,14 @@ vi.mock("../state/collectionsStore", () => ({
   }),
 }));
 
-vi.mock("../state/compareStore", () => ({
-  compareStore: {
+vi.mock("../state/compareStore", () => {
+  const mockCompareStore = {
     addApi: vi.fn(),
     removeApi: vi.fn(),
     setOpen: vi.fn(),
-    subscribe: vi.fn(() => () => {}),
+    subscribe: vi.fn(() => {
+      return () => {};
+    }),
     getSnapshot: vi.fn(() => ({ apis: [], isOpen: false })),
   },
   useCompareStore: () => ({ apis: [], isOpen: false }),
@@ -217,5 +219,23 @@ describe("ApiCard — Accessibility and Tag Chips", () => {
 
     expect(pinButton.getAttribute("aria-pressed")).toBe("true");
     expect(pinButton.getAttribute("aria-label")).toBe("Unpin api-1 from dashboard");
+  });
+
+  it("uses tabular numerals for ApiCard amount and metric displays", () => {
+    render(
+      <ApiCard
+        api={{
+          ...mockApi,
+          pricePerCall: 0.0015,
+          avgLatencyMs: 123,
+          uptimePercent: 99.95,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("$0.0015 / call").className).toContain("numeric-tabular");
+    expect(screen.getByText("$0.0015").className).toContain("numeric-tabular");
+    expect(screen.getByText("123 ms").className).toContain("numeric-tabular");
+    expect(screen.getByText("99.95%").className).toContain("numeric-tabular");
   });
 });

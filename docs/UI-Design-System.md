@@ -150,7 +150,7 @@ Displays API information in a card format for marketplace listings.
 - Background: Uses `--surface-soft` token
 - Tags: Reusable clickable chips with pill styling, token-based colors, and active-state highlighting
 - Footer: Three-column micro-stat row with a muted label above a prominent value for price, latency, and uptime
-- Numeric values: Use tabular numerals for easier comparison across marketplace rows
+- Numeric values: Use the shared `numeric-tabular` utility for easier comparison across marketplace rows and ApiCard amount displays
 - Missing stats: Render a muted em dash so card heights remain consistent
 
 **States:**
