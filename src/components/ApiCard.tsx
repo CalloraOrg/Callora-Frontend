@@ -488,6 +488,19 @@ function renderStatValue(value: string | undefined) {
   }
   return <span className="api-card__stat-value numeric-tabular">{value}</span>;
 }
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mql = window.matchMedia(query);
+    setMatches(mql.matches);
+    const handler = (e: any) => setMatches(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
+
 export default function ApiCard({
   api,
   loading = false,
@@ -507,10 +520,13 @@ export default function ApiCard({
     return <ApiCardSkeleton />;
   }
 
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
   const avgLatencyMs = api.avgLatencyMs;
   const uptimePercent = api.uptimePercent;
-  const isCompact = density === "compact";
+  const isCompact = density === "compact" || isMobile;
 
   const prefersReducedMotion = useMemo(() => {
     return typeof window !== "undefined" &&
@@ -642,7 +658,7 @@ export default function ApiCard({
         prefersReducedMotion={prefersReducedMotion}
       />
 
-       {/* Pin button - absolutely positioned, top-left */}
+       {/* Compare button - absolutely positioned, top-left */}
        <button
          onClick={handleCompareClick}
          disabled={!canCompare}
@@ -668,33 +684,6 @@ export default function ApiCard({
        >
          {isCompared ? "Compared" : "Compare"}
        </button>
-
-      {/* Pin button - absolutely positioned, top-left */}
-      <button
-        onClick={handleCompareClick}
-        disabled={!canCompare}
-        className="api-card__compare-btn"
-        style={{
-          position: "absolute",
-          top: "8px",
-          left: "48px",
-          zIndex: 10,
-          background: isCompared ? "var(--accent)" : "rgba(0,0,0,0.5)",
-          color: "white",
-          border: "none",
-          borderRadius: "8px",
-          padding: "4px 8px",
-          fontSize: "0.75rem",
-          fontWeight: 600,
-          cursor: canCompare ? "pointer" : "not-allowed",
-          opacity: isCompared ? 1 : 0.6,
-          transition: "opacity 0.2s, background 0.2s",
-        }}
-        aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
-        aria-pressed={isCompared}
-      >
-        {isCompared ? "Compared" : "Compare"}
-      </button>
 
       <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <div

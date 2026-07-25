@@ -286,3 +286,63 @@ describe("ApiCard reduced motion", () => {
     window.matchMedia = origMatchMedia;
   });
 });
+
+describe("ApiCard responsiveness", () => {
+  const mockApi: APIItem = {
+    id: "api-resp",
+    name: "Responsive API",
+    endpoint: "/api/resp",
+    description: "Responsive test API.",
+    tags: ["test"],
+    pricePerRequest: 0,
+  };
+
+  function mockViewportWidth(isMobile: boolean) {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => {
+      if (query === "(max-width: 768px)") {
+        return {
+          matches: isMobile,
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(() => false),
+        };
+      }
+      return {
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(() => false),
+      };
+    });
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("applies compact mode styling on narrow viewports", () => {
+    mockViewportWidth(true); // Simulate mobile
+    render(<ApiCard api={mockApi} density="comfortable" />);
+    
+    // Even if density="comfortable", the card should have the compact class on narrow viewports
+    const card = screen.getByRole("button", { name: /View details for Responsive API/i });
+    expect(card.className).toContain("api-card--compact");
+  });
+
+  it("retains comfortable mode styling on wide viewports by default", () => {
+    mockViewportWidth(false); // Simulate desktop
+    render(<ApiCard api={mockApi} density="comfortable" />);
+    
+    const card = screen.getByRole("button", { name: /View details for Responsive API/i });
+    expect(card.className).not.toContain("api-card--compact");
+  });
+});
+
