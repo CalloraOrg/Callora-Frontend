@@ -399,9 +399,11 @@ function App() {
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
-  const openDeposit = () => {
+  const openDeposit = (presetAmount?: number) => {
     navigate(APP_ROUTES.billing);
-    resetFlow(amountInput, selectedPreset);
+    const nextAmount = presetAmount !== undefined ? String(presetAmount) : amountInput;
+    const nextPreset: number | "custom" = presetAmount !== undefined ? presetAmount : selectedPreset;
+    resetFlow(nextAmount, nextPreset);
     setIsDepositOpen(true);
   };
 
@@ -557,7 +559,7 @@ function App() {
 
             <Route path={APP_ROUTES.publish} element={<PublishApi />} />
 
-            <Route path={APP_ROUTES.dashboard} element={<Dashboard vaultBalance={vaultBalance} walletBalance={walletBalance} openDeposit={openDeposit} />} />
+            <Route path={APP_ROUTES.dashboard} element={<Dashboard vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
 
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
