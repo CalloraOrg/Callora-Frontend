@@ -271,4 +271,63 @@ describe('CodeExample', () => {
       });
     });
   });
+
+  describe('narrow viewport layout (≤375px)', () => {
+    it('tab buttons have minimum tap-target height of 36px', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const tabs = screen.getAllByRole('tab');
+      tabs.forEach(tab => {
+        expect(tab.style.minHeight).toBe('36px');
+      });
+    });
+
+    it('tab buttons have minimum width of 44px for touch accessibility', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const tabs = screen.getAllByRole('tab');
+      tabs.forEach(tab => {
+        expect(tab.style.minWidth).toBe('44px');
+      });
+    });
+
+    it('copy button has minimum tap-target height of 36px', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const copyBtn = screen.getByLabelText(/copy code/i);
+      expect(copyBtn.style.minHeight).toBe('36px');
+    });
+
+    it('header wraps on narrow viewports via flexWrap', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const header = document.querySelector('.code-sample__header') as HTMLElement;
+      expect(header).toBeTruthy();
+      expect(header.style.flexWrap).toBe('wrap');
+    });
+
+    it('tablist scrolls horizontally on narrow viewports', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const tablist = screen.getByRole('tablist');
+      expect(tablist.style.overflowX).toBe('auto');
+    });
+
+    it('tab buttons do not shrink on narrow viewports', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const tabs = screen.getAllByRole('tab');
+      tabs.forEach(tab => {
+        expect(tab.style.flexShrink).toBe('0');
+      });
+    });
+
+    it('code panel is horizontally scrollable on narrow viewports', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const panel = screen.getByRole('tabpanel');
+      expect(panel.style.overflowX).toBe('auto');
+    });
+
+    it('tabs have whitespace nowrap to prevent text breaking', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const tabs = screen.getAllByRole('tab');
+      tabs.forEach(tab => {
+        expect(tab.style.whiteSpace).toBe('nowrap');
+      });
+    });
+  });
 });
