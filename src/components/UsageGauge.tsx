@@ -13,10 +13,6 @@ export interface UsageGaugeProps {
   warningThreshold?: number;
   /** Percentage at which the gauge moves into the critical state. */
   criticalThreshold?: number;
-  /** Optional estimated unit cost per API call – used to calculate "call runway" buffer estimate. */
-  estCostPerCall?: number;
-  /** When true, displays the "Buffer remaining" runway estimate below the meta row (requires limit). */
-  showRunway?: boolean;
 }
 
 type UsageState = 'unconfigured' | 'ok' | 'warning' | 'critical' | 'exhausted';
@@ -31,12 +27,6 @@ function normalizeAmount(value: number) {
 function formatAmount(value: number) {
   return new Intl.NumberFormat('en-US', {
     maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatRunway(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: 0,
   }).format(value);
 }
 
@@ -61,11 +51,6 @@ const stateLabels: Record<UsageState, string> = {
  * screen-reader text. The progressbar exposes numeric ARIA values while the
  * companion description announces the human-readable usage state and remaining
  * allowance for assistive technology users.
- *
- * Stellar Wave enhancement (FWC26): when `showRunway` + `estCostPerCall` are
- * provided, an extra "Buffer remaining / Estimated call runway" row renders
- * below the meta text so teams can translate USDC balance into tangible
- * "number of calls" runway.
  */
 export default function UsageGauge({
   label = 'Usage',
@@ -74,8 +59,6 @@ export default function UsageGauge({
   unit = 'USDC',
   warningThreshold = DEFAULT_WARNING_THRESHOLD,
   criticalThreshold = DEFAULT_CRITICAL_THRESHOLD,
-  estCostPerCall,
-  showRunway = false,
 }: UsageGaugeProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -92,11 +75,6 @@ export default function UsageGauge({
   const formattedUsed = formatAmount(safeUsed);
   const formattedLimit = formatAmount(safeLimit);
   const formattedRemaining = formatAmount(remaining);
-
-  const hasRunwayInfo = Boolean(showRunway && estCostPerCall != null && estCostPerCall > 0 && hasLimit);
-  const estimatedCalls = hasRunwayInfo
-    ? Math.max(Math.floor(remaining / estCostPerCall), 0)
-    : 0;
 
   const accessibleDescription = hasLimit
     ? `${stateLabels[usageState]}: ${formattedUsed} of ${formattedLimit} ${unit} used, ${formattedRemaining} ${unit} remaining, ${percentUsed}% used.`
@@ -138,26 +116,8 @@ export default function UsageGauge({
           ? `${formattedUsed} of ${formattedLimit} ${unit} used · ${formattedRemaining} ${unit} remaining`
           : `${formattedUsed} ${unit} used · Set a limit to track remaining allowance`}
       </p>
-
-      {hasRunwayInfo && (
-        <div className="usage-gauge__runway" data-state={usageState}>
-          <span className="usage-gauge__runway-label">
-            Buffer remaining
-          </span>
-          <span className="usage-gauge__runway-value">
-            ≈ <strong>{formatRunway(estimatedCalls)}</strong> calls
-            <span className="usage-gauge__runway-hint">
-              {' '}@ ~${estCostPerCall.toFixed(3)} / call
-            </span>
-          </span>
-        </div>
-      )}
-
       <p id={descriptionId} className="usage-gauge__sr-only">
         {accessibleDescription}
-        {hasRunwayInfo
-          ? ` Buffer remaining: approximately ${formatRunway(estimatedCalls)} calls at ${estCostPerCall.toFixed(3)} dollars per call.`
-          : ''}
       </p>
     </section>
   );

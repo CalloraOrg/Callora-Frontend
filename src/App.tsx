@@ -399,14 +399,9 @@ function App() {
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
-  const openDeposit = (presetAmount?: number) => {
+  const openDeposit = () => {
     navigate(APP_ROUTES.billing);
-    if (typeof presetAmount === 'number' && presetAmount > 0) {
-      const isPreset = (PRESET_AMOUNTS as readonly number[]).includes(presetAmount);
-      resetFlow(String(presetAmount), isPreset ? presetAmount : 'custom');
-    } else {
-      resetFlow(amountInput, selectedPreset);
-    }
+    resetFlow(amountInput, selectedPreset);
     setIsDepositOpen(true);
   };
 
