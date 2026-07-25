@@ -107,6 +107,7 @@ const COLOUR_GROUPS: ColourGroup[] = [
     tokens: [
       { token: "--line", cssVar: "var(--line)", description: "Standard borders and dividers" },
       { token: "--line-strong", cssVar: "var(--line-strong)", description: "Emphasised borders" },
+      { token: "--line-soft", cssVar: "var(--line-soft)", description: "Subtle dividers (activity rows, lists)" },
     ],
   },
 ];

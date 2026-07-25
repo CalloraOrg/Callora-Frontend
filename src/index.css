@@ -29,6 +29,7 @@
   --surface-soft: rgba(255, 255, 255, 0.04);
   --line: rgba(169, 184, 255, 0.16);
   --line-strong: rgba(169, 184, 255, 0.28);
+  --line-soft: rgba(169, 184, 255, 0.08);
   --text: #f3f5fb;
   --muted: #93a0bf;
   --accent: #4e85ff;
@@ -72,6 +73,7 @@
   --surface-soft: rgba(0, 0, 0, 0.06);
   --line: rgba(0, 0, 0, 0.8);
   --line-strong: rgba(0, 0, 0, 0.12);
+  --line-soft: rgba(0, 0, 0, 0.06);
   --text: #1a2332;
   --muted: #64748b;
   --accent: #2563eb;

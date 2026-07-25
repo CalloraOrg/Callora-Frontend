@@ -14,7 +14,7 @@ import MOCK_APIS from '../data/mockApis';
 interface DashboardProps {
   vaultBalance: number;
   walletBalance: number;
-  openDeposit: () => void;
+  openDeposit: (presetAmount?: number) => void;
 }
 
 interface ActivityItem {
@@ -69,6 +69,8 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
         used={totalUsage}
         limit={vaultBalance}
         unit="USDC"
+        showRunway
+        estCostPerCall={0.034}
       />
 
       {/* Quick actions */}
