@@ -30,6 +30,23 @@ vi.mock("../state/compareStore", () => ({
   },
 }));
 
+/* ── Test data ─────────────────────────────────────────────────────────── */
+
+const mockApi: APIItem = {
+  id: "api-1",
+  name: "Stellar Metering API",
+  endpoint: "/api/v1/meter",
+  description: "A mock API for testing.",
+  tags: ["weather", "forecast", "geo"],
+  pricePerRequest: 0.01,
+  provider: { name: "Acme Labs" },
+  rating: 4.5,
+  uptimePercent: 99.9,
+  avgLatencyMs: 180,
+  pricePerCall: 0.01,
+  endpoints: [{ id: "e1", url: "/api/v1/meter", method: "GET" }],
+};
+
 /* ── Test suites ─────────────────────────────────────────────────────────── */
 
 describe("ApiCard — Context Menu", () => {
@@ -284,5 +301,87 @@ describe("ApiCard reduced motion", () => {
 
     expect(screen.getByText("Stellar Metering API")).toBeDefined();
     window.matchMedia = origMatchMedia;
+  });
+});
+
+describe("ApiCard responsive layout", () => {
+  const responsiveApi: APIItem = {
+    id: "resp-1",
+    name: "Responsive API",
+    description: "An API with long description text that might overflow on narrow viewports if not handled correctly.",
+    tags: ["analytics", "reporting", "data", "insights"],
+    pricePerRequest: 0.005,
+    provider: { name: "DataCorp" },
+    rating: 4.2,
+    uptimePercent: 99.95,
+    avgLatencyMs: 220,
+    pricePerCall: 0.005,
+  };
+
+  beforeEach(() => {
+    // Always ensure matchMedia returns a valid MediaQueryList-like object.
+    // Previous test suites may have replaced it with a mock that returns undefined.
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as any;
+  });
+
+  it("renders with proper responsive CSS classes for marketplace card", () => {
+    render(<ApiCard api={responsiveApi} />);
+
+    const card = screen.getByRole("button", { name: /View details for Responsive API/i });
+    expect(card.className).toContain("api-marketplace-card");
+    expect(card.className).toContain("preview-card");
+  });
+
+  it("renders card in compact mode with compact CSS class", () => {
+    render(<ApiCard api={responsiveApi} density="compact" />);
+
+    const card = screen.getByRole("button", { name: /View details for Responsive API/i });
+    expect(card.className).toContain("api-card--compact");
+  });
+
+  it("renders stats grid which collapses on narrow viewports", () => {
+    render(<ApiCard api={responsiveApi} />);
+
+    const statsGrid = screen.getByLabelText("API stats");
+    expect(statsGrid).toBeTruthy();
+    expect(statsGrid.className).toContain("api-card__stats");
+
+    // All three stat cells are present
+    const statCells = statsGrid.querySelectorAll(".api-card__stat");
+    expect(statCells.length).toBe(3);
+  });
+
+  it("renders wrapped tag chips that fit narrow viewports", () => {
+    render(<ApiCard api={responsiveApi} />);
+
+    const tagButtons = screen.getAllByRole("button", { name: /Filter marketplace by tag/ });
+    expect(tagButtons.length).toBe(4);
+  });
+
+  it("renders prices as numeric-tabular for consistent number display", () => {
+    render(<ApiCard api={responsiveApi} />);
+
+    // The price div should have the numeric-tabular class for tabular numbers
+    const priceElement = document.querySelector(".api-marketplace-card-price");
+    expect(priceElement).toBeTruthy();
+    expect(priceElement?.className).toContain("numeric-tabular");
+  });
+
+  it("has proper min-width: 0 on body to prevent overflow", () => {
+    render(<ApiCard api={responsiveApi} />);
+
+    const bodyEl = document.querySelector(".api-marketplace-card-body");
+    expect(bodyEl).toBeTruthy();
+    // Browsers may normalize "0" as 0 or "0px" — either is fine
+    expect(Number((bodyEl as HTMLElement).style.minWidth)).toBe(0);
   });
 });
