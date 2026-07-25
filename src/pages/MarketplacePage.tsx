@@ -7,6 +7,7 @@ import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import CategoryPills from "../components/CategoryPills";
+import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
 import FiltersSidebar, { ALL_CATEGORIES } from "../components/FiltersSidebar";
 import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
@@ -19,7 +20,6 @@ import {
   persistDensityPreference,
   type DensityPreference,
 } from "../utils/density";
-import CompareDrawer from "../components/CompareDrawer";
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
 import { useCompareStore } from "../state/compareStore";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
@@ -128,7 +128,7 @@ export default function MarketplacePage(): JSX.Element {
       { replace: true },
     );
   };
-  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+  const { favorites } = useFavorites();
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const sortParam = (searchParams.get("sort") ?? "popularity") as SortValue;
   const setSortParam = (value: SortValue) => {
@@ -140,7 +140,6 @@ export default function MarketplacePage(): JSX.Element {
       { replace: true },
     );
   };
-  const [shown, setShown] = useState<number>(12);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -208,6 +207,9 @@ export default function MarketplacePage(): JSX.Element {
     await trackFetch(new Promise((resolve) => setTimeout(resolve, 500)));
     setIsLoading(false);
   };
+
+  /** Tag list memoised from the mock dataset — stable across re-renders. */
+  const allTags = useMemo(() => getAllUniqueTags(), []);
 
   // Filter and sort items
   const filtered = useMemo(() => {
@@ -291,17 +293,7 @@ export default function MarketplacePage(): JSX.Element {
     sortParam,
   ]);
 
-  useEffect(() => {
-    setShown(12);
-  }, [
-    debouncedSearch,
-    selectedCategories,
-    selectedTag,
-    minPrice,
-    maxPrice,
-    popularity,
-    sortParam,
-  ]);
+
 
   const handleTagClick = (tag: string) => {
     setSelectedTag(
@@ -345,7 +337,6 @@ export default function MarketplacePage(): JSX.Element {
     setFavoritesOnly(false);
     setSortParam("popularity");
     setSearch("");
-    setShown(12);
   };
 
   const handlePageChange = (page: number) => {
@@ -455,8 +446,11 @@ export default function MarketplacePage(): JSX.Element {
         </aside>
 
         <main
-          className="marketplace-results"
-          style={isTrayVisible ? { paddingBottom: "80px" } : {}}
+          className={
+            isTrayVisible
+              ? "marketplace-results marketplace-results--tray-open"
+              : "marketplace-results"
+          }
         >
           <div className="marketplace-toolbar">
             <div className="marketplace-count">
@@ -514,8 +508,20 @@ export default function MarketplacePage(): JSX.Element {
             clearCategories={clearCategories}
           />
 
+          <ApiTagFilter
+            tags={allTags}
+            selectedTag={selectedTag}
+            onTagChange={setSelectedTag}
+          />
+
           {fetchError ? (
             <EmptyState variant="error" onRetry={handleRetryFetch} />
+          ) : isLoading ? (
+            <div className="marketplace-grid" aria-label="Loading APIs">
+              {Array.from({ length: pageSize }).map((_, index) => (
+                <ApiCard key={index} loading />
+              ))}
+            </div>
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}

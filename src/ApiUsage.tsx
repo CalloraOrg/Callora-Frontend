@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import EmptyState from './components/EmptyState';
 import Skeleton, { SkeletonRow } from './components/Skeleton';
 import { formatPrice } from './utils/format';
@@ -230,12 +230,19 @@ export default function ApiUsage() {
   const toggleHistory = useCallback(() => setIsHistoryOpen(prev => !prev), []);
   const [historyEntries, setHistoryEntries] = useState<any[]>([]);
 
+  const prefersReducedMotion = useMemo(() => {
+    return typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+
   useEffect(() => {
+    const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
     const timer = setTimeout(() => {
       setIsTableLoading(false);
-    }, LOADING_DELAY_MS);
+    }, delay);
     return () => clearTimeout(timer);
-  }, []);
+  }, [prefersReducedMotion]);
 
   const [selectedRange, setSelectedRange] = useState<DateRange>({ preset: '24h' });
   const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
@@ -675,8 +682,8 @@ export default function ApiUsage() {
             ) : (
               <div className="response-content">
                 <div className="response-meta">
-                  <span className="response-time">Response time: {formatTime(responseTime || 0)}</span>
-                  <span className="response-cost">Cost: {formatPrice(callCost || 0)} USDC</span>
+                  <span className="response-time tabular-nums">Response time: {formatTime(responseTime || 0)}</span>
+                  <span className="response-cost tabular-nums">Cost: {formatPrice(callCost || 0)} USDC</span>
                 </div>
                 <pre className="response-json">
                   {JSON.stringify(apiResponse, null, 2)}
@@ -693,23 +700,23 @@ export default function ApiUsage() {
         <div className="stats-grid">
           <div className="stat-card">
             <span className="stat-label">Calls Today</span>
-            <strong className="stat-value">{usageStats.callsToday}</strong>
+            <strong className="stat-value tabular-nums">{usageStats.callsToday}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Calls This Week</span>
-            <strong className="stat-value">{usageStats.callsWeek}</strong>
+            <strong className="stat-value tabular-nums">{usageStats.callsWeek}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Total Spent</span>
-            <strong className="stat-value">{formatPrice(usageStats.totalSpent)} USDC</strong>
+            <strong className="stat-value tabular-nums">{formatPrice(usageStats.totalSpent)} USDC</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Avg Response Time</span>
-            <strong className="stat-value">{formatTime(usageStats.avgResponseTime)}</strong>
+            <strong className="stat-value tabular-nums">{formatTime(usageStats.avgResponseTime)}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Success Rate</span>
-            <strong className="stat-value">{usageStats.successRate}%</strong>
+            <strong className="stat-value tabular-nums">{usageStats.successRate}%</strong>
           </div>
         </div>
 

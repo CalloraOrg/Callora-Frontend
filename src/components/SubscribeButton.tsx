@@ -23,6 +23,8 @@ type Props = {
  * Focus management: When the confirmation dialog opens, focus is moved to the
  * "Confirm" button so keyboard-only users can immediately confirm or cancel
  * with a single keystroke.
+ * 
+ * Part of GrantFox FWC26 campaign UI/UX requirements.
  */
 export default function SubscribeButton({ apiName, onSubscribe, className }: Props) {
   const [status, setStatus] = useState<SubscribeStatus>("idle");

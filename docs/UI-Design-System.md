@@ -139,7 +139,7 @@ Displays API information in a card format for marketplace listings.
 **Variants:**
 
 - `ApiCard` - Standard card with hover effects
-- `ApiCardSkeleton` - Loading state with skeleton placeholders
+- `ApiCardSkeleton` - Loading state with themed skeleton placeholders
 
 **Visual Spec:**
 
@@ -150,7 +150,7 @@ Displays API information in a card format for marketplace listings.
 - Background: Uses `--surface-soft` token
 - Tags: Reusable clickable chips with pill styling, token-based colors, and active-state highlighting
 - Footer: Three-column micro-stat row with a muted label above a prominent value for price, latency, and uptime
-- Numeric values: Use tabular numerals for easier comparison across marketplace rows
+- Numeric values: Use the shared `numeric-tabular` utility for easier comparison across marketplace rows and ApiCard amount displays
 - Missing stats: Render a muted em dash so card heights remain consistent
 
 **States:**
@@ -173,6 +173,7 @@ Displays API information in a card format for marketplace listings.
 
 ```tsx
 <ApiCard api={apiData} onViewDetails={(api) => navigate(`/api/${api.id}`)} />
+<ApiCard loading />
 ```
 
 ---
@@ -319,6 +320,7 @@ size tailored specifically for inline use inside FiltersSidebar.
 
 - **Illustrations** are custom line-art SVGs, one per variant:
   - `empty`: Open crate/box with subtle accent sparkles → "nothing to show yet"
+  - `api-detail`: API card with a plug motif → "requested API is unavailable"
   - `filtered`: Funnel shape + magnifier-with-slash focal motif, accent tag pills → "filters exclude everything"
   - `error`: Warning triangle with accent-marked exclamation caret, dashed baseline → "something went wrong"
 - All strokes use `var(--muted)` (primary) and `var(--accent)` (subordinate accents). **No hardcoded hex.**
@@ -341,6 +343,7 @@ size tailored specifically for inline use inside FiltersSidebar.
 | Variant  | Default title         | Default message (default)                           | Default message (compact)                 |
 | -------- | --------------------- | --------------------------------------------------- | ----------------------------------------- |
 | empty    | "No APIs available"   | "Check back soon for new integrations."             | same (compact not typical)                |
+| api-detail | "API not found"     | "This API may have moved or is no longer available." | same (compact not typical)               |
 | filtered | "No results found"    | "Your filters are too narrow. Try adjusting them."  | "Adjust filters or clear to see results." |
 | error    | "Failed to load APIs" | "We encountered an error fetching the marketplace…" | "Error loading results. Please retry."    |
 
@@ -374,14 +377,10 @@ size tailored specifically for inline use inside FiltersSidebar.
   /* Marketplace results area */
 }
 {
-  filteredApis.length === 0 && Object.keys(activeFilters).length === 0 && (
-    <EmptyState variant="empty" />
-  );
+  filteredApis.length === 0 && Object.keys(activeFilters).length === 0 && <EmptyState variant="empty" />;
 }
 {
-  filteredApis.length === 0 && Object.keys(activeFilters).length > 0 && (
-    <EmptyState variant="filtered" onClearFilters={resetFilters} />
-  );
+  filteredApis.length === 0 && Object.keys(activeFilters).length > 0 && <EmptyState variant="filtered" onClearFilters={resetFilters} />;
 }
 {
   fetchError && <EmptyState variant="error" onRetry={refetch} />;
@@ -391,13 +390,7 @@ size tailored specifically for inline use inside FiltersSidebar.
   /* FiltersSidebar inline zero-results notice */
 }
 {
-  resultCount === 0 && hasActiveFilters && (
-    <EmptyState
-      variant="filtered"
-      size="compact"
-      onClearFilters={clearFilters}
-    />
-  );
+  resultCount === 0 && hasActiveFilters && <EmptyState variant="filtered" size="compact" onClearFilters={clearFilters} />;
 }
 ```
 
@@ -678,12 +671,53 @@ Displays a tooltip with a 5-star rating distribution breakdown upon hovering or 
 **Usage Example:**
 
 ```tsx
-<RatingHistogram
-  rating={4.5}
-  distribution={{ 5: 100, 4: 50, 3: 10, 2: 5, 1: 0 }}
->
+<RatingHistogram rating={4.5} distribution={{ 5: 100, 4: 50, 3: 10, 2: 5, 1: 0 }}>
   <span>⭐ 4.5</span>
 </RatingHistogram>
+```
+
+### ContextMenu
+
+Accessible context menu for `ApiCard`. Triggered by right-click on desktop or a 600 ms long-press on touch devices.
+
+**Props:**
+
+- `x: number` — Viewport X coordinate to anchor the menu
+- `y: number` — Viewport Y coordinate to anchor the menu
+- `onClose: () => void` — Called when the menu should close
+- `actions: ContextMenuAction[]` — Array of `{ label, action, isCritical? }`
+
+**Visual Spec:**
+
+- Background: `var(--surface-strong)` with `backdrop-filter: blur(20px)`
+- Border: `1px solid var(--line-strong)`
+- Border radius: `var(--radius-md)`
+- Shadow: `var(--shadow)`
+- Item height: ~40px, `0.875rem` font, `var(--text)` color
+- Critical items: `var(--danger)` color
+- Hover/focus: `var(--surface-soft)` background
+
+**Behavior:**
+
+- Viewport-edge clamped: never renders off-screen
+- Auto-focuses the first `menuitem` on mount
+- Closes on: Escape, outside click/touch, or after any action is selected
+- Does not open when the right-click/touch target is a `<button>` or `<a>` inside the card
+
+**Accessibility (WCAG 2.1 AA):**
+
+- `role="menu"` with `aria-label="API Card Options"` on the container
+- `role="menuitem"` on each action button
+- Auto-focuses first item on open (2.4.3 Focus Order)
+- Keyboard dismiss via Escape (2.1.1 Keyboard)
+- All colors use design tokens; no hardcoded hex
+
+**Usage:**
+
+```tsx
+{
+  menuPos && <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)} actions={contextActions} />;
+}
 ```
 
 ---
@@ -771,11 +805,7 @@ Search input with clear button and keyboard shortcuts.
 **Usage Example:**
 
 ```tsx
-<SearchBar
-  value={searchQuery}
-  onChange={setSearchQuery}
-  onSearch={handleSearch}
-/>
+<SearchBar value={searchQuery} onChange={setSearchQuery} onSearch={handleSearch} />
 ```
 
 ---
@@ -817,12 +847,7 @@ Server error display with retry functionality.
 **Usage Example:**
 
 ```tsx
-<ServerError
-  onRetry={fetchData}
-  requestId="req_abc123"
-  title="Connection failed"
-  description="Unable to reach the server. Please check your connection."
-/>
+<ServerError onRetry={fetchData} requestId="req_abc123" title="Connection failed" description="Unable to reach the server. Please check your connection." />
 ```
 
 ---
@@ -836,6 +861,7 @@ Loading placeholder for content.
 - `width?: string | number` - Skeleton width
 - `height?: string | number` - Skeleton height
 - `borderRadius?: string | number` - Border radius
+- `tone?: "neutral" | "stellar"` - Optional GrantFox/Stellar Wave themed shimmer
 - `style?: CSSProperties` - Additional inline styles
 - `className?: string` - Additional CSS classes
 
@@ -896,6 +922,72 @@ The following utility classes are defined in `src/index.css` and should be used 
 - `.not-found` - 404 page container
 - `.server-error` - Error page container
 - `.placeholder-card` - Generic placeholder container
+
+---
+
+---
+
+## Theme Transition System
+
+Callora's light/dark switch is polished with a smooth color transition so the
+switch feels intentional rather than jarring.
+
+### How it works
+
+1. **`src/styles/theme-transition.css`** — Applies `transition: background-color,
+   border-color, color, fill, stroke, outline-color` to every semantic HTML element
+   and SVG shape.  The transition is guarded by the `.theme-transitions-ready` class
+   on `<html>`, which `ThemeProvider` adds via `requestAnimationFrame` after the
+   very first paint.  This prevents the initial page load from animating into the
+   user's saved theme (which would look like a flash).
+
+2. **`ThemeProvider`** (`src/ThemeContext.tsx`) — Sets `.theme-transitions-ready`
+   after the first paint and exposes two helpers to consumers:
+   - `THEME_TRANSITION_MS` (number, `240`) — matches the `--transition-speed` CSS
+     token.  Import it when you need to delay or coordinate JS-side changes with
+     the CSS animation.
+   - `isTransitioning` (boolean) — `true` from the moment `data-theme` changes
+     until `THEME_TRANSITION_MS` has elapsed.  Useful for suppressing or
+     coordinating secondary UI updates during the switch.
+
+3. **`ThemeToggle`** (`src/ThemeToggle.tsx`) — Adds
+   `.theme-toggle-icon--swapping` to the icon `<span>` for the first half of the
+   transition (`THEME_TRANSITION_MS / 2` ms), hiding the outgoing SVG with an
+   opacity fade so the icon swap feels deliberate (fade-out → swap → fade-in).
+
+### Opting out
+
+Any element (or its subtree) that must not participate in the theme transition —
+for example, elements controlled by `animation` keyframes — should use the
+`.no-theme-transition` class:
+
+```html
+<!-- Toast wrapper: opacity/transform are already animated by keyframes -->
+<div class="toast-queue no-theme-transition">…</div>
+```
+
+The stylesheet also automatically excludes the following known animated
+components so you do not need to add the class to them manually:
+`.toast-queue`, `.skeleton`, `.button-spinner`, `.status-dot`,
+`.route-progress-bar`, `.bottom-sheet`, `.history-panel`,
+`.history-bottom-sheet`.
+
+### Reduced motion
+
+All color transitions are disabled when `prefers-reduced-motion: reduce` is set.
+The `@media (prefers-reduced-motion: reduce)` block in `theme-transition.css`
+overrides every transition with `none !important`, so users who prefer instant
+switches always get them.
+
+### Adding new UI
+
+- Color-bearing elements receive the transition automatically — no opt-in needed.
+- If you add a component with its own `animation` keyframes that animate
+  `background-color`, `color`, or `border-color`, add `.no-theme-transition` to
+  that component's root element or add its class to the exclusion list in
+  `theme-transition.css`.
+- Never hardcode the 240 ms duration in JS.  Use the exported
+  `THEME_TRANSITION_MS` constant from `ThemeContext` instead.
 
 ---
 

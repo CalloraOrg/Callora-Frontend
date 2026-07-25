@@ -23,6 +23,7 @@ import RelatedApisRail from "../components/RelatedApisRail";
 import MOCK_APIS from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
+import PlanBadge from "../components/PlanBadge";
 
 /**
  * ApiDetailPage
@@ -457,12 +458,13 @@ export default function ApiDetailPage({ onBack }: Props) {
               { label: "Not Found", href: "", isCurrent: true },
             ]}
           />
-          <EmptyState title="API not found" message="We couldn't find that API. Try the marketplace." />
-          <div style={{ textAlign: "center", marginTop: 12 }}>
-            <button className="primary-button" onClick={() => (window.location.href = "/marketplace")}>
-              Back to marketplace
-            </button>
-          </div>
+          <EmptyState
+            variant="api-detail"
+            action={{
+              label: "Back to marketplace",
+              onClick: () => (window.location.href = "/marketplace"),
+            }}
+          />
         </div>
       </div>
     );
@@ -640,7 +642,8 @@ print(response.json())`;
           </div>
 
           {/* ── CTA row (below hero, above tabs) ──────────────────────────── */}
-          <div className="api-hero__cta no-print" style={{ display: "flex", gap: "0.75rem", padding: "0 0 16px" }}>
+          {/* Responsive class handles flex→column stacking on narrow viewports */}
+          <div className="api-hero__cta api-hero__cta--detail no-print">
             <button className="primary-button">Try API</button>
             <button className="secondary-button" onClick={() => setTab("pricing")}>
               View Pricing

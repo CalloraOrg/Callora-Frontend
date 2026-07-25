@@ -101,6 +101,21 @@ describe("ApiDetailPage", () => {
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
   });
 
+  // ── Not found / Empty state ───────────────────────────────────────────────
+
+  it("shows the EmptyState when API is not found", () => {
+    window.history.pushState({}, "", "/details/non-existent-api");
+    renderWithProviders(<ApiDetailPage />);
+    settleLoadingState();
+
+    expect(screen.getByRole("heading", { name: "API not found" })).toBeTruthy();
+    expect(
+      screen.getByText("This API may have moved or is no longer available."),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back to marketplace" })).toBeTruthy();
+    expect(screen.getByTestId("empty-state-api-detail").querySelector("svg")).toBeTruthy();
+  });
+
   // ── Tab switching ─────────────────────────────────────────────────────────
 
   it("defaults to the overview tab", () => {
@@ -292,6 +307,181 @@ describe("ApiDetailPage", () => {
       const tabContent = document.querySelector(".tab-content");
       expect(tabContent).toBeTruthy();
       expect(tabContent?.getAttribute("style")).toContain("animation: none");
+    });
+  });
+
+  // ── Responsive layout ─────────────────────────────────────────────────────
+  //
+  // jsdom does not process CSS media queries, so these tests verify the
+  // structural contracts that enable correct responsive behaviour at runtime:
+  //
+  //   1. CTA row uses the CSS class that carries the breakpoint rules — NOT an
+  //      inline `display:"flex"` that would override media-query styles.
+  //   2. Key layout containers carry their expected class names so the
+  //      breakpoint rules defined in index.css can reach them.
+  //   3. Print-hidden elements carry `.no-print` so they are suppressed in
+  //      print output (enforced by the `@media print` block in index.css).
+  //   4. Sticky tab bar carries both the sticky class and `padding-bottom`
+  //      (merged into the base rule) to avoid overlap with content below.
+  //   5. The sidebar rail carries the CSS class that triggers its sticky →
+  //      static 2-column transition at ≤ 980 px.
+
+  describe("responsive layout", () => {
+    it("CTA row uses the CSS class instead of an inline display style", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The CTA row must carry the class that provides responsive flex/column
+      // behaviour via media queries. An inline `display` style would override
+      // the CSS rules and prevent the mobile-stack from working.
+      const ctaRow = document.querySelector(".api-hero__cta--detail");
+      expect(ctaRow).toBeTruthy();
+
+      // Must NOT have an inline display property that would block the CSS
+      const inlineDisplay = (ctaRow as HTMLElement)?.style?.display;
+      expect(inlineDisplay).toBeFalsy();
+    });
+
+    it("CTA row has no inline gap or padding that would override CSS breakpoints", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const ctaRow = document.querySelector(".api-hero__cta--detail") as HTMLElement;
+      expect(ctaRow).toBeTruthy();
+
+      // The inline style object must be empty (or absent) so media queries win.
+      expect(ctaRow.style.gap).toBe("");
+      expect(ctaRow.style.padding).toBe("");
+    });
+
+    it("CTA row also carries the base api-hero__cta class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const ctaRow = document.querySelector(".api-hero__cta");
+      expect(ctaRow).toBeTruthy();
+      // And it should be the same element as the --detail modifier.
+      expect(ctaRow?.classList.contains("api-hero__cta--detail")).toBe(true);
+    });
+
+    it("CTA row carries the no-print class to suppress it in print output", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const ctaRow = document.querySelector(".api-hero__cta--detail");
+      expect(ctaRow?.classList.contains("no-print")).toBe(true);
+    });
+
+    it("hero section uses the api-detail-hero CSS class for responsive grid", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The grid that switches from 2-col to 1-col at ≤ 980 px.
+      expect(document.querySelector(".api-detail-hero")).toBeTruthy();
+    });
+
+    it("content area uses the api-detail-content-grid class for sidebar responsive layout", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The grid that collapses the 340px sidebar below at ≤ 980 px.
+      expect(document.querySelector(".api-detail-content-grid")).toBeTruthy();
+    });
+
+    it("sidebar inner uses the api-detail-sidebar-inner class (sticky → 2-col → 1-col)", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // sticky at desktop, 2-column at ≤ 980 px, 1-column at ≤ 720 px.
+      expect(document.querySelector(".api-detail-sidebar-inner")).toBeTruthy();
+    });
+
+    it("metrics grid uses the api-detail-metrics class (3-col → 2-col → 1-col)", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // 3-col base → 2-col at ≤ 720 px (min 481 px) → 1-col below.
+      expect(document.querySelector(".api-detail-metrics")).toBeTruthy();
+    });
+
+    it("overview two-column section uses the api-detail-two-column class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // auto-fill at mid range (721–980 px), 1-col at ≤ 720 px.
+      expect(document.querySelector(".api-detail-two-column")).toBeTruthy();
+    });
+
+    it("tab bar carries the api-detail-tabs sticky class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Base rule adds position:sticky, z-index:20, and padding-bottom:4px.
+      expect(document.querySelector(".api-detail-tabs")).toBeTruthy();
+    });
+
+    it("sidebar element carries the no-print class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const sidebar = document.querySelector(".api-detail-sidebar");
+      expect(sidebar).toBeTruthy();
+      expect(sidebar?.classList.contains("no-print")).toBe(true);
+    });
+
+    it("tab navigation carries the no-print class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const tabs = document.querySelector(".api-detail-tabs");
+      expect(tabs).toBeTruthy();
+      expect(tabs?.classList.contains("no-print")).toBe(true);
+    });
+
+    it("container is bounded by api-detail-container for wide viewport max-width", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // max-width: 1280px in the base rule ensures content is capped on wide screens.
+      expect(document.querySelector(".api-detail-container")).toBeTruthy();
+    });
+
+    it("pricing grid uses the api-detail-pricing-grid class (2-col → 1-col)", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      // 2-col base, collapses to 1-col at ≤ 720 px.
+      expect(document.querySelector(".api-detail-pricing-grid")).toBeTruthy();
+    });
+
+    it("CTA row contains at least two interactive buttons", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const ctaRow = document.querySelector(".api-hero__cta--detail");
+      expect(ctaRow).toBeTruthy();
+
+      const buttons = ctaRow?.querySelectorAll("button");
+      // "Try API", "View Pricing", and SubscribeButton
+      expect((buttons?.length ?? 0)).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe("keyboard navigation and focus", () => {
+    it("ensures tabpanels are focusable to support visible focus outlines (see focus.css)", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const overviewPanel = screen.getByRole("tabpanel", { name: "Overview" });
+      expect(overviewPanel).toBeTruthy();
+      expect(overviewPanel.tabIndex).toBe(0);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      const docPanel = screen.getByRole("tabpanel", { name: "Documentation" });
+      expect(docPanel).toBeTruthy();
+      expect(docPanel.tabIndex).toBe(0);
     });
   });
 });

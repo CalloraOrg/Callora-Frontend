@@ -10,6 +10,19 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import FiltersSidebar from "./FiltersSidebar";
 
+function mockReducedMotion(enabled: boolean) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: enabled,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(() => false),
+  }));
+}
+
 const baseProps = {
   selectedCategories: new Set<string>(),
   toggleCategory: vi.fn(),
@@ -171,6 +184,38 @@ describe("FiltersSidebar", () => {
       expect(
         screen.queryByText(/Min price cannot exceed max price/i),
       ).toBeNull();
+    });
+
+    it("wires aria-describedby on min-price input to the error region when invalid", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      const minInput = screen.getByLabelText("Minimum price");
+      expect(minInput.getAttribute("aria-describedby")).toBe(
+        "filters-price-error",
+      );
+    });
+
+    it("wires aria-describedby on max-price input to the error region when invalid", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      const maxInput = screen.getByLabelText("Maximum price");
+      expect(maxInput.getAttribute("aria-describedby")).toBe(
+        "filters-price-error",
+      );
+    });
+
+    it("does not set aria-describedby on price inputs when range is valid", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={50} maxPrice={100} />);
+      const minInput = screen.getByLabelText("Minimum price");
+      const maxInput = screen.getByLabelText("Maximum price");
+      expect(minInput.getAttribute("aria-describedby")).toBeNull();
+      expect(maxInput.getAttribute("aria-describedby")).toBeNull();
+    });
+
+    it("error paragraph has correct id matching aria-describedby reference", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      const errorEl = document.getElementById("filters-price-error");
+      expect(errorEl).toBeTruthy();
+      expect(errorEl?.getAttribute("role")).toBe("alert");
+      expect(errorEl?.textContent).toContain("Min price cannot exceed max price");
     });
   });
 
@@ -404,6 +449,83 @@ describe("FiltersSidebar", () => {
         "filters-zero-results",
       ) as HTMLElement;
       expect(block.style.borderTop).toMatch(/var\(--line\)/);
+    });
+  });
+
+  describe("prefers-reduced-motion", () => {
+    it("sets transition to none on category group header when reduced motion is active", () => {
+      mockReducedMotion(true);
+      render(<FiltersSidebar {...baseProps} />);
+      const header = screen.getByRole("button", { name: "Categories" });
+      expect(header.style.transition).toBe("none");
+    });
+
+    it("sets transition to none on category group chevron when reduced motion is active", () => {
+      mockReducedMotion(true);
+      render(<FiltersSidebar {...baseProps} />);
+      const header = screen.getByRole("button", { name: "Categories" });
+      const chevron = header.querySelector(".filter-group__chevron");
+      expect(chevron?.getAttribute("style")).toContain("transition: none");
+    });
+
+    it("sets transition to none on all filter group headers when reduced motion is active", () => {
+      mockReducedMotion(true);
+      render(<FiltersSidebar {...baseProps} />);
+      expect(
+        screen.getByRole("button", { name: "Categories" }).style.transition,
+      ).toBe("none");
+      expect(
+        screen.getByRole("button", { name: "Price range" }).style.transition,
+      ).toBe("none");
+      expect(
+        screen.getByRole("button", { name: "Popularity" }).style.transition,
+      ).toBe("none");
+      expect(
+        screen.getByRole("button", { name: "Favorites" }).style.transition,
+      ).toBe("none");
+    });
+
+    it("preserves normal transitions when reduced motion is not active", () => {
+      mockReducedMotion(false);
+      render(<FiltersSidebar {...baseProps} />);
+      const header = screen.getByRole("button", { name: "Categories" });
+      expect(header.style.transition).not.toBe("none");
+    });
+
+    it("gracefully handles missing matchMedia (SSR environment)", () => {
+      const origMatchMedia = window.matchMedia;
+      delete (window as any).matchMedia;
+      render(<FiltersSidebar {...baseProps} />);
+      const header = screen.getByRole("button", { name: "Categories" });
+      expect(header.style.transition).not.toBe("none");
+      (window as any).matchMedia = origMatchMedia;
+    });
+  });
+
+  describe("responsive behaviour", () => {
+    it("renders the mobile toggle button", () => {
+      const { container } = render(<FiltersSidebar {...baseProps} />);
+      const toggle = container.querySelector(".mobile-filters-toggle");
+      expect(toggle).toBeTruthy();
+      expect(toggle?.textContent).toContain("Filters");
+    });
+
+    it("has a filters-sidebar CSS class with responsive styles", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const sidebar = document.querySelector(".filters-sidebar");
+      expect(sidebar).toBeTruthy();
+    });
+
+    it("toggles the mobile sheet open and closed", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const toggle = screen.getByRole(
+        "button",
+        { name: "Filters" },
+        { hidden: true },
+      );
+      toggle.style.display = "inline-block";
+      fireEvent.click(toggle);
+      expect(screen.getByRole("dialog", { name: /Filters/i })).toBeTruthy();
     });
   });
 });

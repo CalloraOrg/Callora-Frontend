@@ -1,7 +1,7 @@
 import React from "react";
 import ExternalLink from "./ExternalLink";
 
-export type EmptyStateVariant = "empty" | "filtered" | "error";
+export type EmptyStateVariant = "empty" | "api-detail" | "filtered" | "error";
 export type EmptyStateSize = "default" | "compact";
 
 export interface EmptyStateProps {
@@ -73,6 +73,47 @@ function EmptyIllustration({
           d="M50 40l2 2M54 44l1.5 1.5"
           stroke="var(--accent)"
           strokeWidth={accentStroke}
+        />
+      </svg>
+    );
+  }
+
+  if (variant === "api-detail") {
+    return (
+      <svg
+        width={box}
+        height={box}
+        viewBox="0 0 64 64"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <rect
+          x="13"
+          y="16"
+          width="38"
+          height="32"
+          rx="6"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+        />
+        <path
+          d="M20 25h14M20 32h10M20 39h7"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.85}
+        />
+        <path
+          d="M40 28v-4M46 28v-4M38 28h10v8a5 5 0 0 1-10 0v-8zM43 41v7"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+        <circle cx="52" cy="13" r="1.5" fill="var(--accent)" stroke="none" />
+        <path
+          d="M10 51h18"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.7}
+          strokeDasharray="2 3"
         />
       </svg>
     );
@@ -177,6 +218,7 @@ function EmptyIllustration({
  *
  * Variants:
  * - empty:    Default state when no APIs exist in the marketplace.
+ * - api-detail: A requested API listing is unavailable. Uses an API-card illustration.
  * - filtered: Active filters yield zero results. Shows a "Clear all filters" CTA.
  *             Used inline inside FiltersSidebar (compact) and the results grid (default).
  * - error:    Network/fetch failure. Shows a "Retry" button plus a status link.
@@ -215,6 +257,10 @@ export default function EmptyState({
     empty: {
       title: "No APIs available",
       message: "Check back soon for new integrations.",
+    },
+    "api-detail": {
+      title: "API not found",
+      message: "This API may have moved or is no longer available.",
     },
     filtered: {
       title: "No results found",
