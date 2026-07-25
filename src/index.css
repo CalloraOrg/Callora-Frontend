@@ -1567,6 +1567,25 @@ code,
   }
 }
 
+/* ── FiltersSidebar keyboard shortcuts hint ───────────────────── */
+.filters-sidebar .kbd-hint {
+  justify-content: flex-start;
+  padding: 8px 0 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 0.7rem;
+}
+
+.filters-sidebar .kbd-hint__item {
+  font-size: 0.7rem;
+}
+
+.filters-sidebar .kbd-hint__key {
+  min-width: 22px;
+  padding: 2px 5px;
+  font-size: 0.65rem;
+}
+
 /* ── MarketplacePage skeleton ───────────────────────────────────
    Route-level loading shell that mirrors the full marketplace
    layout. Uses design tokens for spacing, typography, and colour
