@@ -4999,6 +4999,154 @@ code,
 }
 
 /* ============================================================
+   ApiTagFilter — responsive tag filter bar
+   BEM block: .api-tag-filter
+
+   Design tokens: --accent, --muted, --surface-soft, --line,
+                  --transition-speed, --page-bg
+   WCAG 2.1 AA: focus-visible ring (global layer), 44 px touch
+                 targets, accessible pressed state.
+
+   Responsive strategy:
+   - >= 768 px → flex-wrap row, tags flow naturally.
+   - <  768 px → horizontal scroll rail with thin custom
+                   scrollbar.  Items stay single-line
+                   (white-space: nowrap) to avoid flooding
+                   small phones with wrapped chips.
+   - <  480 px → reduced font size and tighter padding so
+                   more pills fit on screen without
+                   excessive scrolling.
+   ============================================================ */
+
+.api-tag-filter {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 16px;
+  scrollbar-width: thin;
+  /* On wide viewports, allow wrapping instead of scrolling */
+  flex-wrap: wrap;
+}
+
+/* Custom scrollbar — visible only when the rail overflows
+   (narrow viewports).  Matches the pill-bar scrollbar style. */
+.api-tag-filter::-webkit-scrollbar {
+  height: 6px;
+}
+
+.api-tag-filter::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.api-tag-filter::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+
+/* ── Individual pill ────────────────────────────────────────── */
+.api-tag-filter__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  padding: 0 14px;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition:
+    background var(--transition-speed) ease,
+    border-color var(--transition-speed) ease,
+    color var(--transition-speed) ease;
+  /* Ensure touch target meets WCAG 2.5.5 (44 px min) */
+  flex-shrink: 0;
+}
+
+.api-tag-filter__pill:hover,
+.api-tag-filter__pill:focus-visible {
+  background: var(--line);
+}
+
+/* Active / selected state — accent tint with accent border. */
+.api-tag-filter__pill--active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.api-tag-filter__pill--active:hover,
+.api-tag-filter__pill--active:focus-visible {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* ── Count badge inside each pill ───────────────────────────────
+   Small, muted number showing how many APIs carry that tag. */
+.api-tag-filter__count {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 1px;
+  /* Prevent the count from wrapping independently of the tag
+     label on narrow viewports. */
+  white-space: nowrap;
+}
+
+.api-tag-filter__pill--active .api-tag-filter__count {
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+/* ── Narrow viewport: horizontal scroll only, no wrap ───────── */
+@media (max-width: 767px) {
+  .api-tag-filter {
+    flex-wrap: nowrap;
+    /* Subtle fade hint on the right edge so users know there
+       is more content to scroll to. */
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black calc(100% - 36px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      black calc(100% - 36px),
+      transparent 100%
+    );
+  }
+}
+
+/* ── Extra-narrow viewport (< 480 px): tight spacing ────────── */
+@media (max-width: 479px) {
+  .api-tag-filter {
+    gap: 6px;
+  }
+
+  .api-tag-filter__pill {
+    padding: 0 10px;
+    min-height: 40px;
+    font-size: 0.75rem;
+    gap: 4px;
+  }
+
+  .api-tag-filter__count {
+    font-size: 0.625rem;
+  }
+}
+
+/* Respect user motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  .api-tag-filter__pill {
+    transition: none;
+  }
+}
+
+/* ============================================================
    WhyApi — "Why this API?" disclosure widget
    BEM block: .why-api
    Placed inside the marketplace ApiCard (non-compact variant).

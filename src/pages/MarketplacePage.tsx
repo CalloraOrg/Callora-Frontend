@@ -7,6 +7,7 @@ import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import CategoryPills from "../components/CategoryPills";
+import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
 import FiltersSidebar, { ALL_CATEGORIES } from "../components/FiltersSidebar";
 import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
@@ -207,6 +208,9 @@ export default function MarketplacePage(): JSX.Element {
     await trackFetch(new Promise((resolve) => setTimeout(resolve, 500)));
     setIsLoading(false);
   };
+
+  /** Tag list memoised from the mock dataset — stable across re-renders. */
+  const allTags = useMemo(() => getAllUniqueTags(), []);
 
   // Filter and sort items
   const filtered = useMemo(() => {
@@ -500,6 +504,12 @@ export default function MarketplacePage(): JSX.Element {
             selectedCategories={selectedCategories}
             toggleCategory={toggleCategory}
             clearCategories={clearCategories}
+          />
+
+          <ApiTagFilter
+            tags={allTags}
+            selectedTag={selectedTag}
+            onTagChange={setSelectedTag}
           />
 
           {fetchError ? (
