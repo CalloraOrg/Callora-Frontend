@@ -138,17 +138,14 @@ describe("EmptyState", () => {
     });
 
     it("calls onRetry exactly once per click and handles async", async () => {
-      const onRetry = vi.fn(() => new Promise((r) => setTimeout(r, 10)));
+      let resolveRetry!: () => void;
+      const onRetry = vi.fn(() => new Promise<void>((r) => (resolveRetry = r)));
       render(<EmptyState variant="error" onRetry={onRetry} />);
       const btn = screen.getByText(/^Retry$/);
       fireEvent.click(btn);
       expect(onRetry).toHaveBeenCalledTimes(1);
-      while (
-        onRetry.mock.calls.length &&
-        !(await onRetry.mock.results[0]?.value)
-      ) {
-        await new Promise((r) => setTimeout(r, 5));
-      }
+      resolveRetry();
+      await new Promise((r) => setTimeout(r, 20));
     });
 
     it("shows loading state while retrying (aria-busy)", async () => {
@@ -157,7 +154,7 @@ describe("EmptyState", () => {
       render(<EmptyState variant="error" onRetry={onRetry} />);
       const btn = screen.getByText(/^Retry$/);
       fireEvent.click(btn);
-      expect(btn.getAttribute("disabled")).toBeTruthy();
+      expect(btn.hasAttribute("disabled")).toBe(true);
       expect(btn.getAttribute("aria-busy")).toBe("true");
       expect(btn.textContent).toMatch(/Retrying/);
       resolveRetry();

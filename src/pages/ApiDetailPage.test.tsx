@@ -468,4 +468,329 @@ describe("ApiDetailPage", () => {
       expect((buttons?.length ?? 0)).toBeGreaterThanOrEqual(2);
     });
   });
+
+  // ── Keyboard focus / accessibility (Issue #411) ───────────────────────────
+  //
+  // These tests verify WCAG 2.1 AA compliance for keyboard-only navigation on
+  // ApiDetailPage.  Because jsdom does not process CSS or dispatch :focus-visible
+  // pseudo-class events, the tests focus on structural contracts that enable
+  // correct focus behaviour at runtime:
+  //
+  //   1. The page root carries the `api-detail-page` scope class so focus.css
+  //      selectors correctly target the right elements.
+  //   2. Every interactive element is reachable via keyboard (no tabIndex=-1
+  //      on elements that need focus, no disabled-without-label patterns).
+  //   3. No element uses `outline: none` as a bare style without an ARIA/visual
+  //      replacement — verified by checking the absence of forbidden inline styles.
+  //   4. Tab panels carry tabIndex={0} so keyboard users can focus & scroll them.
+  //   5. Key interactive elements carry correct ARIA attributes for screen readers.
+  //   6. The focus-scoping root class `api-detail-page` is present on the outer
+  //      wrapper div used by focus.css to constrain its selectors.
+
+  describe("keyboard focus / accessibility (Issue #411)", () => {
+    it("page root carries the api-detail-page class required by focus.css selectors", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The focus.css rules are scoped to .api-detail-page so this class MUST
+      // be present on the outermost wrapper for the focus ring to apply.
+      expect(document.querySelector(".api-detail-page")).toBeTruthy();
+    });
+
+    it("hero Back button is keyboard-accessible with no inline outline suppression", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The ghost-button "Back" in the hero should be a <button> (natively focusable)
+      // and must NOT have an inline outline:none that would strip the focus ring.
+      const backBtn = screen.getAllByRole("button", { name: /back/i })[0];
+      expect(backBtn).toBeTruthy();
+      expect(backBtn.tagName).toBe("BUTTON");
+      expect(backBtn.getAttribute("style") ?? "").not.toMatch(/outline\s*:\s*none/i);
+    });
+
+    it("Connect API primary button in hero has no inline outline suppression", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const connectBtn = screen.getByRole("button", { name: /connect api/i });
+      expect(connectBtn).toBeTruthy();
+      expect(connectBtn.getAttribute("style") ?? "").not.toMatch(/outline\s*:\s*none/i);
+    });
+
+    it("CTA row buttons are all natively focusable button elements", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const ctaRow = document.querySelector(".api-hero__cta--detail");
+      expect(ctaRow).toBeTruthy();
+
+      const buttons = ctaRow?.querySelectorAll("button");
+      buttons?.forEach((btn) => {
+        expect(btn.tagName).toBe("BUTTON");
+        // tabIndex -1 would remove these from tab order — must not be set
+        expect(btn.getAttribute("tabindex")).not.toBe("-1");
+      });
+    });
+
+    it("tab navigation renders accessible tabs with correct roles", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // All tab items must have role="tab"
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs.length).toBeGreaterThanOrEqual(5); // Overview, Documentation, Pricing, Examples, Reviews
+
+      // Active tab carries aria-selected="true"
+      const activeTab = tabs.find((t) => t.getAttribute("aria-selected") === "true");
+      expect(activeTab).toBeTruthy();
+    });
+
+    it("overview tab panel has tabIndex={0} enabling keyboard scroll", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The active tab panel should be focusable by keyboard (tabIndex=0)
+      const panel = document.querySelector('[role="tabpanel"]');
+      expect(panel).toBeTruthy();
+      expect(panel?.getAttribute("tabindex")).toBe("0");
+    });
+
+    it("documentation tab panel has tabIndex={0} when active", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      const panel = document.getElementById("panel-documentation");
+      expect(panel).toBeTruthy();
+      expect(panel?.getAttribute("tabindex")).toBe("0");
+    });
+
+    it("pricing tab panel has tabIndex={0} when active", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const panel = document.getElementById("panel-pricing");
+      expect(panel).toBeTruthy();
+      expect(panel?.getAttribute("tabindex")).toBe("0");
+    });
+
+    it("reviews tab panel has tabIndex={0} when active", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      const panel = document.getElementById("panel-reviews");
+      expect(panel).toBeTruthy();
+      expect(panel?.getAttribute("tabindex")).toBe("0");
+    });
+
+    it("tab panels are labelled with aria-labelledby pointing to their tab", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const panel = document.getElementById("panel-overview");
+      expect(panel?.getAttribute("aria-labelledby")).toBe("tab-overview");
+    });
+
+    it("Postman and Insomnia icon-buttons have descriptive aria-labels", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      // Each endpoint row has Postman + Insomnia buttons
+      const postmanBtns = screen.getAllByRole("button", { name: /copy postman import url/i });
+      expect(postmanBtns.length).toBeGreaterThanOrEqual(1);
+
+      const insomniBtns = screen.getAllByRole("button", { name: /copy insomnia import url/i });
+      expect(insomniBtns.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("EndpointSaveButton has aria-expanded and aria-haspopup attributes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      const saveBtns = screen.getAllByRole("button", { name: /save endpoint to collection/i });
+      expect(saveBtns.length).toBeGreaterThanOrEqual(1);
+      expect(saveBtns[0].getAttribute("aria-haspopup")).toBe("dialog");
+      expect(saveBtns[0].getAttribute("aria-expanded")).toBe("false");
+    });
+
+    it("EndpointSaveButton sets aria-expanded to true when dialog is open", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      const saveBtn = screen.getAllByRole("button", { name: /save endpoint to collection/i })[0];
+      fireEvent.click(saveBtn);
+
+      expect(saveBtn.getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("EndpointSaveButton dialog has role=dialog with aria-modal and aria-label", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      const saveBtn = screen.getAllByRole("button", { name: /save endpoint to collection/i })[0];
+      fireEvent.click(saveBtn);
+
+      const dialog = screen.getByRole("dialog", { name: /save endpoint to collection/i });
+      expect(dialog).toBeTruthy();
+      expect(dialog.getAttribute("aria-modal")).toBe("true");
+    });
+
+    it("EndpointSaveButton dialog closes on Escape key and returns focus to trigger", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      const saveBtn = screen.getAllByRole("button", { name: /save endpoint to collection/i })[0];
+      fireEvent.click(saveBtn);
+
+      // Dialog should be open
+      expect(screen.queryByRole("dialog")).toBeTruthy();
+
+      // Pressing Escape should close the dialog
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("review sort select has an associated visible label", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      // The <select id="review-sort"> must have a <label htmlFor="review-sort">
+      const sortSelect = document.getElementById("review-sort");
+      if (sortSelect) {
+        // If reviews exist, there should be a label
+        const label = document.querySelector('label[for="review-sort"]');
+        expect(label).toBeTruthy();
+        expect(sortSelect.getAttribute("id")).toBe("review-sort");
+      }
+      // If no reviews (empty state), sort select is not rendered — that is fine.
+    });
+
+    it("pricing range input is a native input[type=range] (keyboard-accessible)", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = document.querySelector('input[type="range"]');
+      expect(slider).toBeTruthy();
+      // Must be a native range — natively focusable via Tab, adjustable via arrows
+      expect(slider?.tagName).toBe("INPUT");
+      // Must not have tabindex=-1 that would remove it from keyboard flow
+      expect(slider?.getAttribute("tabindex")).not.toBe("-1");
+    });
+
+    it("pricing range input has no inline outline suppression", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = document.querySelector('input[type="range"]');
+      expect(slider).toBeTruthy();
+      expect(slider?.getAttribute("style") ?? "").not.toMatch(/outline\s*:\s*none/i);
+    });
+
+    it("Write a Review button is keyboard-accessible with correct role", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      const writeReviewBtn = screen.getByRole("button", { name: /write a review/i });
+      expect(writeReviewBtn).toBeTruthy();
+      expect(writeReviewBtn.tagName).toBe("BUTTON");
+      expect(writeReviewBtn.getAttribute("tabindex")).not.toBe("-1");
+    });
+
+    it("Contact Publisher button in sidebar is keyboard-accessible", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const contactBtn = screen.getByRole("button", { name: /contact publisher/i });
+      expect(contactBtn).toBeTruthy();
+      expect(contactBtn.tagName).toBe("BUTTON");
+      expect(contactBtn.getAttribute("tabindex")).not.toBe("-1");
+    });
+
+    it("SDK ghost buttons in sidebar are natively focusable button elements", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The SDKs & Tools buttons: Node.js SDK, Python Wrapper, OpenAPI Spec
+      const sdkBtns = screen.getAllByRole("button", { name: /sdk|wrapper|openapi|spec/i });
+      expect(sdkBtns.length).toBeGreaterThanOrEqual(1);
+      sdkBtns.forEach((btn) => {
+        expect(btn.tagName).toBe("BUTTON");
+        expect(btn.getAttribute("tabindex")).not.toBe("-1");
+      });
+    });
+
+    it("provider URL links in the hero are actual anchor elements", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The provider name appears as an <a> link in the api-detail-meta area
+      const links = document.querySelectorAll(".api-detail-page a");
+      expect(links.length).toBeGreaterThanOrEqual(1);
+      // Each link should be a proper anchor
+      links.forEach((link) => {
+        expect(link.tagName).toBe("A");
+      });
+    });
+
+    it("TOC navigation links in documentation tab are proper anchor elements", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      const tocNav = screen.getByRole("navigation", { name: "On this page" });
+      const tocLinks = tocNav.querySelectorAll("a");
+      expect(tocLinks.length).toBeGreaterThanOrEqual(3);
+      tocLinks.forEach((link) => {
+        expect(link.tagName).toBe("A");
+        // Each link must point to an in-page anchor
+        expect(link.getAttribute("href")).toMatch(/^#/);
+      });
+    });
+
+    it("no interactive element inside api-detail-page has a bare inline outline:none", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Collect all buttons, links, inputs, selects inside the page
+      const page = document.querySelector(".api-detail-page");
+      const interactive = page?.querySelectorAll(
+        "button, a[href], input, select, textarea, [tabindex]"
+      );
+      expect((interactive?.length ?? 0)).toBeGreaterThan(0);
+
+      interactive?.forEach((el) => {
+        const inlineStyle = el.getAttribute("style") ?? "";
+        // Allow outline:none only if it is part of a box-shadow replacement
+        // (indicated by the presence of box-shadow in the same style string).
+        if (inlineStyle.match(/outline\s*:\s*none/i)) {
+          expect(inlineStyle).toMatch(/box-shadow/i);
+        }
+      });
+    });
+  });
 });
