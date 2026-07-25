@@ -30,6 +30,16 @@ vi.mock("../state/compareStore", () => ({
   },
 }));
 
+const mockApi: APIItem = {
+  id: "api-1",
+  name: "Stellar Metering API",
+  endpoint: "/api/v1/meter",
+  endpoints: [{ url: "/api/v1/meter" }],
+  description: "A mock API for testing.",
+  tags: ["weather", "forecast", "geo"],
+  pricePerRequest: 0.01,
+};
+
 /* ── Test suites ─────────────────────────────────────────────────────────── */
 
 describe("ApiCard — Context Menu", () => {
@@ -206,14 +216,6 @@ describe("ApiCard — Accessibility and Tag Chips", () => {
 });
 
 describe("ApiCard reduced motion", () => {
-  const mockApi: APIItem = {
-    id: "api-1",
-    name: "Stellar Metering API",
-    endpoint: "/api/v1/meter",
-    description: "A mock API for testing.",
-    tags: ["weather", "forecast", "geo"],
-    pricePerRequest: 0.01,
-  };
 
   afterEach(() => {
     vi.restoreAllMocks();

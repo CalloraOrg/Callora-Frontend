@@ -9,5 +9,6 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     // Enable CSS handling if components import CSS.
     css: true,
+    setupFiles: ["src/setupTests.ts"],
   },
 });
