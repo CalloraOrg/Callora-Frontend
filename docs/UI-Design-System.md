@@ -320,6 +320,7 @@ size tailored specifically for inline use inside FiltersSidebar.
 
 - **Illustrations** are custom line-art SVGs, one per variant:
   - `empty`: Open crate/box with subtle accent sparkles → "nothing to show yet"
+  - `api-detail`: API card with a plug motif → "requested API is unavailable"
   - `filtered`: Funnel shape + magnifier-with-slash focal motif, accent tag pills → "filters exclude everything"
   - `error`: Warning triangle with accent-marked exclamation caret, dashed baseline → "something went wrong"
 - All strokes use `var(--muted)` (primary) and `var(--accent)` (subordinate accents). **No hardcoded hex.**
@@ -342,6 +343,7 @@ size tailored specifically for inline use inside FiltersSidebar.
 | Variant  | Default title         | Default message (default)                           | Default message (compact)                 |
 | -------- | --------------------- | --------------------------------------------------- | ----------------------------------------- |
 | empty    | "No APIs available"   | "Check back soon for new integrations."             | same (compact not typical)                |
+| api-detail | "API not found"     | "This API may have moved or is no longer available." | same (compact not typical)               |
 | filtered | "No results found"    | "Your filters are too narrow. Try adjusting them."  | "Adjust filters or clear to see results." |
 | error    | "Failed to load APIs" | "We encountered an error fetching the marketplace…" | "Error loading results. Please retry."    |
 
