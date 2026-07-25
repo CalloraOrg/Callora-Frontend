@@ -10,6 +10,8 @@ import "./styles/tokens.css";
 import "./styles/patterns.css";
 import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
+import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
+import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 

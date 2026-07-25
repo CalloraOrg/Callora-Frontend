@@ -36,6 +36,14 @@ describe("FiltersSidebar", () => {
     expect(screen.getByText("Popularity")).toBeTruthy();
   });
 
+  it("renders the skeleton when isLoading is true", () => {
+    const { container } = render(<FiltersSidebar {...baseProps} isLoading={true} />);
+    const skeleton = container.querySelector(".filters-sidebar-skeleton");
+    expect(skeleton).toBeTruthy();
+    // Verify that the actual categories are not rendered
+    expect(screen.queryByText("Categories")).toBeNull();
+  });
+
   it("renders category checkboxes", () => {
     render(<FiltersSidebar {...baseProps} />);
     expect(screen.getByLabelText("Data & Analytics")).toBeTruthy();

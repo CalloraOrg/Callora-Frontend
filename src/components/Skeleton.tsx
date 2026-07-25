@@ -1,4 +1,4 @@
-import React, { CSSProperties, Fragment } from "react";
+import { CSSProperties, Fragment } from "react";
 
 interface SkeletonProps {
   width?: string | number;
@@ -49,6 +49,26 @@ export function SkeletonRow({ rows = 5 }: { rows?: number }) {
         <Fragment key={i}>{rowSkeleton}</Fragment>
       ))}
     </>
+  );
+}
+
+export function FiltersSidebarSkeleton() {
+  return (
+    <div className="filters-sidebar-skeleton" aria-hidden="true" style={{ display: "grid", gap: 16 }}>
+      {/* Section heading */}
+      <Skeleton width="55%" height={22} />
+      {/* Filter groups */}
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} style={{ display: "grid", gap: 8 }}>
+          <Skeleton width="40%" height={14} />
+          <Skeleton width="100%" height={40} borderRadius={10} />
+        </div>
+      ))}
+      {/* Price range label */}
+      <Skeleton width="48%" height={14} />
+      {/* Apply / clear button */}
+      <Skeleton width="100%" height={44} borderRadius={12} />
+    </div>
   );
 }
 

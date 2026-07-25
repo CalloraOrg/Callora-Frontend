@@ -230,6 +230,7 @@ export default function FiltersBottomSheet({
             clearFilters={clearFilters}
             favoritesOnly={favoritesOnly}
             toggleFavoritesOnly={toggleFavoritesOnly}
+            isLoading={false}
           />
         </div>
 
