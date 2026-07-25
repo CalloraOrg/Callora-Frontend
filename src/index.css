@@ -1840,6 +1840,114 @@ code,
   color: var(--muted);
 }
 
+/* ─── ApiCard responsive breakpoints ────────────────────────────────────── */
+/* Narrow viewports (≤768px): reduce spacing and adjust stat grid. */
+@media (max-width: 768px) {
+  .api-marketplace-card {
+    padding: 10px;
+    gap: 6px;
+    min-height: auto;
+  }
+
+  .api-marketplace-card-header {
+    gap: 8px;
+  }
+
+  .api-marketplace-card-icon {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    font-size: 16px;
+    border-radius: 8px;
+  }
+
+  .api-marketplace-card-price {
+    padding-right: 28px;
+  }
+
+  .api-card__stats {
+    gap: 8px;
+    padding: 10px 0 0;
+  }
+
+  .api-card__stat-label {
+    font-size: 10px;
+  }
+
+  .api-card__stat-value {
+    font-size: 0.875rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .api-marketplace-card-footer-row {
+    gap: 8px;
+  }
+
+  .kbd-hint {
+    gap: 8px;
+  }
+
+  .kbd-hint__item {
+    font-size: 0.65rem;
+  }
+}
+
+/* Extra-narrow viewports (≤480px): stack content, collapse stats. */
+@media (max-width: 480px) {
+  .api-marketplace-card {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .api-marketplace-card-header {
+    gap: 6px;
+  }
+
+  .api-marketplace-card-title-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .api-marketplace-card-description {
+    font-size: 0.8125rem;
+  }
+
+  .api-card__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px 0 0;
+  }
+
+  .api-card__stat-value {
+    font-size: 0.8125rem;
+  }
+
+  .api-card__compare-btn {
+    padding: 4px 6px;
+    font-size: 0.65rem;
+    left: 44px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .kbd-hint {
+    gap: 4px;
+    padding: 4px 0;
+  }
+
+  .kbd-hint__item {
+    font-size: 0.6rem;
+    gap: 2px;
+  }
+
+  .kbd-hint__key {
+    min-width: 20px;
+    padding: 1px 4px;
+    font-size: 0.65rem;
+  }
+}
+
 .marketplace-filter-modal {
   position: fixed;
   inset: 0;

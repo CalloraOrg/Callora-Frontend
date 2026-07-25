@@ -21,7 +21,7 @@ import Sparkline from "./Sparkline";
 import type { Shortcut } from "../hooks/useGlobalShortcuts";
 import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
-import { TagIcon, ClockIcon, BoltIcon } from "./icons";
+import { ClockIcon, BoltIcon } from "./icons";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -488,6 +488,19 @@ function renderStatValue(value: string | undefined) {
   }
   return <span className="api-card__stat-value numeric-tabular">{value}</span>;
 }
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mql = window.matchMedia(query);
+    setMatches(mql.matches);
+    const handler = (e: any) => setMatches(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
+
 export default function ApiCard({
   api,
   loading = false,
@@ -507,10 +520,13 @@ export default function ApiCard({
     return <ApiCardSkeleton />;
   }
 
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
   const avgLatencyMs = api.avgLatencyMs;
   const uptimePercent = api.uptimePercent;
-  const isCompact = density === "compact";
+  const isCompact = density === "compact" || isMobile;
 
   const prefersReducedMotion = useMemo(() => {
     return typeof window !== "undefined" &&
@@ -522,6 +538,22 @@ export default function ApiCard({
   const { apis: comparedApis } = useCompareStore();
   const isCompared = comparedApis.some((item) => item.id === api.id);
   const canCompare = isCompared || comparedApis.length < 3;
+
+  const sparklineValues = useMemo(() => {
+    if (api.sparklineValues && api.sparklineValues.length > 0) {
+      return api.sparklineValues;
+    }
+    // Generate deterministic values based on API properties/id so every API has a unique visually appealing trend
+    const seed = api.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const vals = [];
+    let current = 20 + (seed % 30);
+    for (let i = 0; i < 12; i++) {
+      const step = Math.sin(seed + i) * 10;
+      current = Math.max(5, Math.min(100, current + step));
+      vals.push(Math.round(current));
+    }
+    return vals;
+  }, [api.id, api.sparklineValues]);
 
   const handleCompareClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -642,7 +674,7 @@ export default function ApiCard({
         prefersReducedMotion={prefersReducedMotion}
       />
 
-       {/* Pin button - absolutely positioned, top-left */}
+       {/* Compare button - absolutely positioned, top-left */}
        <button
          onClick={handleCompareClick}
          disabled={!canCompare}
@@ -669,33 +701,6 @@ export default function ApiCard({
          {isCompared ? "Compared" : "Compare"}
        </button>
 
-      {/* Pin button - absolutely positioned, top-left */}
-      <button
-        onClick={handleCompareClick}
-        disabled={!canCompare}
-        className="api-card__compare-btn"
-        style={{
-          position: "absolute",
-          top: "8px",
-          left: "48px",
-          zIndex: 10,
-          background: isCompared ? "var(--accent)" : "rgba(0,0,0,0.5)",
-          color: "white",
-          border: "none",
-          borderRadius: "8px",
-          padding: "4px 8px",
-          fontSize: "0.75rem",
-          fontWeight: 600,
-          cursor: canCompare ? "pointer" : "not-allowed",
-          opacity: isCompared ? 1 : 0.6,
-          transition: "opacity 0.2s, background 0.2s",
-        }}
-        aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
-        aria-pressed={isCompared}
-      >
-        {isCompared ? "Compared" : "Compare"}
-      </button>
-
       <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <div
           className="api-marketplace-card-icon"
@@ -715,7 +720,7 @@ export default function ApiCard({
         </div>
 
         <div className="api-marketplace-card-body" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
             <strong>{api.name}</strong>
             <div style={{ color: "var(--muted)", fontSize: 12 }}>{api.provider?.name}</div>
           </div>
@@ -771,6 +776,7 @@ export default function ApiCard({
           alignItems: "center",
           justifyContent: "space-between",
           gap: 12,
+          flexWrap: "wrap",
         }}
       >
         <span
@@ -783,7 +789,7 @@ export default function ApiCard({
           Last 24h
         </span>
 
-        <Sparkline values={[18, 22, 20, 24, 26, 25, 30, 32, 31, 34, 36, 35]} width={90} height={28} />
+        <Sparkline values={sparklineValues} width={90} height={28} />
       </div>
 
       <div
@@ -823,6 +829,7 @@ export default function ApiCard({
             justifyContent: "space-between",
             alignItems: "center",
             gap: 12,
+            flexWrap: "wrap",
           }}
         >
           <span className="ghost-button" aria-hidden="true" style={{ display: "inline-flex", alignItems: "center" }}>

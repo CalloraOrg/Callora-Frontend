@@ -32,6 +32,7 @@ export type APIItem = {
   ratingDistribution?: Record<number, number>;
   hourlyHealth?: ("operational" | "degraded" | "down")[];
   reviews?: Review[];
+  sparklineValues?: number[];
 };
 
 
@@ -88,6 +89,7 @@ export const MOCK_APIS: APIItem[] = [
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
     ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
     hourlyHealth: Array(24).fill("operational").map((_, i) => i === 12 || i === 13 ? "degraded" : "operational"),
+    sparklineValues: [15, 17, 16, 19, 21, 20, 24, 25, 23, 26, 28, 27],
   },
   {
     id: "pay-qr",
@@ -128,6 +130,7 @@ export const MOCK_APIS: APIItem[] = [
       },
     ],
     hourlyHealth: Array(24).fill("operational"),
+    sparklineValues: [30, 28, 35, 32, 40, 38, 45, 42, 50, 48, 55, 52],
   },
   {
     id: "msg-01",
@@ -160,6 +163,7 @@ export const MOCK_APIS: APIItem[] = [
       },
     ],
     hourlyHealth: Array(24).fill("operational").map((_, i) => i > 18 && i < 22 ? "down" : "operational"),
+    sparklineValues: [8, 10, 9, 12, 14, 13, 16, 17, 15, 18, 20, 19],
   },
   // minimal demo items
   ...Array.from({ length: 10 }).map((_, i) => {

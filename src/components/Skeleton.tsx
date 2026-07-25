@@ -55,7 +55,9 @@ export function SkeletonRow({ rows = 5 }: { rows?: number }) {
 
 export function FiltersSidebarSkeleton() {
   return (
-    <div className="filters-sidebar-skeleton" aria-hidden="true" style={{ display: "grid", gap: 16 }}>
+    <div className="filters-sidebar filters-sidebar-skeleton" aria-hidden="true" style={{ display: "grid", gap: 16 }}>
+      {/* Section heading */}
+      <Skeleton width="55%" height={22} />
       <Skeleton width="55%" height={22} />
       {Array.from({ length: 4 }).map((_, index) => (
         <div key={index} style={{ display: "grid", gap: 8 }}>

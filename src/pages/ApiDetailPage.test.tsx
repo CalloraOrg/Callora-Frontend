@@ -109,8 +109,11 @@ describe("ApiDetailPage", () => {
     settleLoadingState();
 
     expect(screen.getByRole("heading", { name: "API not found" })).toBeTruthy();
-    expect(screen.getByText("We couldn't find that API. Try the marketplace.")).toBeTruthy();
+    expect(
+      screen.getByText("This API may have moved or is no longer available."),
+    ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Back to marketplace" })).toBeTruthy();
+    expect(screen.getByTestId("empty-state-api-detail").querySelector("svg")).toBeTruthy();
   });
 
   // ── Tab switching ─────────────────────────────────────────────────────────
@@ -463,6 +466,22 @@ describe("ApiDetailPage", () => {
       const buttons = ctaRow?.querySelectorAll("button");
       // "Try API", "View Pricing", and SubscribeButton
       expect((buttons?.length ?? 0)).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe("keyboard navigation and focus", () => {
+    it("ensures tabpanels are focusable to support visible focus outlines (see focus.css)", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const overviewPanel = screen.getByRole("tabpanel", { name: "Overview" });
+      expect(overviewPanel).toBeTruthy();
+      expect(overviewPanel.tabIndex).toBe(0);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      const docPanel = screen.getByRole("tabpanel", { name: "Documentation" });
+      expect(docPanel).toBeTruthy();
+      expect(docPanel.tabIndex).toBe(0);
     });
   });
 });

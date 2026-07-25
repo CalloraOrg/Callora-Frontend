@@ -458,10 +458,12 @@ export default function ApiDetailPage({ onBack }: Props) {
               { label: "Not Found", href: "", isCurrent: true },
             ]}
           />
-          <EmptyState 
-            title="API not found" 
-            message="We couldn't find that API. Try the marketplace." 
-            action={{ label: "Back to marketplace", onClick: () => (window.location.href = "/marketplace") }}
+          <EmptyState
+            variant="api-detail"
+            action={{
+              label: "Back to marketplace",
+              onClick: () => (window.location.href = "/marketplace"),
+            }}
           />
         </div>
       </div>
