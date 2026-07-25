@@ -516,6 +516,12 @@ export default function MarketplacePage(): JSX.Element {
 
           {fetchError ? (
             <EmptyState variant="error" onRetry={handleRetryFetch} />
+          ) : isLoading ? (
+            <div className="marketplace-grid" aria-label="Loading APIs">
+              {Array.from({ length: pageSize }).map((_, index) => (
+                <ApiCard key={index} loading />
+              ))}
+            </div>
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}

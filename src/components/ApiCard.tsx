@@ -26,7 +26,9 @@ import { TagIcon, ClockIcon, BoltIcon } from "./icons";
 export function ApiCardSkeleton() {
   return (
     <article
-      className="preview-card api-marketplace-card"
+      className="preview-card api-marketplace-card api-card-skeleton"
+      aria-busy="true"
+      aria-label="Loading API"
       style={{
         padding: 12,
         display: "flex",
@@ -37,18 +39,19 @@ export function ApiCardSkeleton() {
         pointerEvents: "none",
       }}
     >
+      <span className="sr-only">Loading API</span>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <Skeleton width={56} height={56} borderRadius={10} />
+        <Skeleton tone="stellar" width={56} height={56} borderRadius={10} />
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-            <Skeleton width="60%" height={18} />
-            <Skeleton width="20%" height={12} />
+            <Skeleton tone="stellar" width="60%" height={18} />
+            <Skeleton tone="stellar" width="20%" height={12} />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <Skeleton width="90%" height={14} />
-            <Skeleton width="70%" height={14} />
+            <Skeleton tone="stellar" width="90%" height={14} />
+            <Skeleton tone="stellar" width="70%" height={14} />
           </div>
         </div>
 
@@ -61,15 +64,15 @@ export function ApiCardSkeleton() {
             gap: 6,
           }}
         >
-          <Skeleton width={50} height={12} />
-          <Skeleton width={40} height={16} />
+          <Skeleton tone="stellar" width={50} height={12} />
+          <Skeleton tone="stellar" width={40} height={16} />
         </div>
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
-        <Skeleton width={45} height={24} borderRadius={8} />
-        <Skeleton width={55} height={24} borderRadius={8} />
-        <Skeleton width={40} height={24} borderRadius={8} />
+        <Skeleton tone="stellar" width={45} height={24} borderRadius={8} />
+        <Skeleton tone="stellar" width={55} height={24} borderRadius={8} />
+        <Skeleton tone="stellar" width={40} height={24} borderRadius={8} />
       </div>
 
       <div
@@ -83,8 +86,8 @@ export function ApiCardSkeleton() {
         <div className="api-card__stats" aria-hidden="true">
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="api-card__stat">
-              <Skeleton width="55%" height={10} />
-              <Skeleton width="75%" height={16} />
+              <Skeleton tone="stellar" width="55%" height={10} />
+              <Skeleton tone="stellar" width="75%" height={16} />
             </div>
           ))}
         </div>
@@ -97,8 +100,8 @@ export function ApiCardSkeleton() {
             gap: 12,
           }}
         >
-          <Skeleton width={100} height={36} borderRadius={14} />
-          <Skeleton width={60} height={14} />
+          <Skeleton tone="stellar" width={100} height={36} borderRadius={14} />
+          <Skeleton tone="stellar" width={60} height={14} />
         </div>
       </div>
     </article>
@@ -464,17 +467,23 @@ function renderStatValue(value: string | undefined) {
 }
 export default function ApiCard({
   api,
+  loading = false,
   density = "comfortable",
   onViewDetails,
   onTagClick,
   activeTag,
 }: {
-  api: APIItem;
+  api?: APIItem;
+  loading?: boolean;
   density?: "comfortable" | "compact";
   onViewDetails?: (api: APIItem) => void;
   onTagClick?: (tag: string) => void;
   activeTag?: string | null;
 }) {
+  if (loading || !api) {
+    return <ApiCardSkeleton />;
+  }
+
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
   const avgLatencyMs = api.avgLatencyMs;
   const uptimePercent = api.uptimePercent;

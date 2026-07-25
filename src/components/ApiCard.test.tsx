@@ -238,4 +238,20 @@ describe("ApiCard — Accessibility and Tag Chips", () => {
     expect(screen.getByText("123 ms").className).toContain("numeric-tabular");
     expect(screen.getByText("99.95%").className).toContain("numeric-tabular");
   });
+
+  it("renders an inert themed skeleton while ApiCard is loading", () => {
+    const handleViewDetails = vi.fn();
+    const { container } = render(
+      <ApiCard loading onViewDetails={handleViewDetails} />
+    );
+
+    const skeletonCard = screen.getByLabelText("Loading API");
+    expect(skeletonCard.getAttribute("aria-busy")).toBe("true");
+    expect(skeletonCard.getAttribute("role")).toBeNull();
+    expect(container.querySelectorAll(".skeleton--stellar").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /View details/i })).toBeNull();
+
+    fireEvent.click(skeletonCard);
+    expect(handleViewDetails).not.toHaveBeenCalled();
+  });
 });
