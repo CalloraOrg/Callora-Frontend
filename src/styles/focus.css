@@ -144,3 +144,9 @@
     outline-offset: 3px;
   }
 }
+
+.api-detail-page [role="tabpanel"]:focus-visible,
+.api-detail-page *:focus-visible {
+  outline: 2px solid var(--accent, #4e85ff);
+  outline-offset: 4px;
+}
