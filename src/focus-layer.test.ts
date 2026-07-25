@@ -28,4 +28,32 @@ describe("@layer focus contract", () => {
   it("SearchBar carries no inline outline override", () => {
     expect(read("src/components/SearchBar.tsx")).not.toMatch(/outline:\s*["'][^"']*none/i);
   });
+
+  it("focus.css defines a `focus` cascade layer for FiltersSidebar", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/@layer\s+focus\s*\{/);
+  });
+
+  it("focus.css uses the accent token for focus rings", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/outline:\s*2px solid var\(--accent\)/);
+  });
+
+  it("focus.css uses a 3px ring offset", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/outline-offset:\s*3px/);
+  });
+
+  it("focus.css defines focus-visible rules for FiltersSidebar interactive elements", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.filters-sidebar[\s\S]*?focus-visible/);
+    expect(focusCss).toMatch(/\.filter-group__header:focus-visible/);
+    expect(focusCss).toMatch(/\.filter-checkbox:focus-visible/);
+    expect(focusCss).toMatch(/\.filter-input:focus-visible/);
+  });
+
+  it("Dropdown trigger no longer overrides :focus-visible with inline outline:none", () => {
+    const dropdown = read("src/components/Dropdown.tsx");
+    expect(dropdown).not.toMatch(/outline:\s*open\s*\?[^:]*:\s*["']none["']/);
+  });
 });

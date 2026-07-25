@@ -25,6 +25,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - **Global Command Palette**: Instantly jump to views, search APIs by name, cycle/toggle light & dark themes, or trigger vault deposits. Use `Cmd+K` on macOS or `Ctrl+K` on Windows/Linux to open.
 - **Pattern-based status badges**: Status indicators now use distinct textures in addition to color so they remain understandable for color-blind users and in grayscale displays.
 - **Response diff highlighting**: Pass a `compareWith` prop to `CallHistoryRow` to show a line-by-line diff between two call responses, with added (green), removed (red), and unchanged context lines. Includes a Diff/Raw toggle, before/after call labels, and full WCAG 2.1 AA accessibility. See [docs/ResponseDiff.md](docs/ResponseDiff.md).
+- **Smooth theme transition**: Light/dark switches animate color tokens (background, text, border) over 240 ms instead of snapping. The transition is gated behind a `theme-transitions-ready` class that ThemeProvider adds after the first paint, preventing any flash on load. Animated elements (toasts, skeletons, spinners) are automatically excluded. Use the `.no-theme-transition` escape hatch on any element that must opt out.
 
 ## Keyboard shortcuts
 
@@ -61,6 +62,8 @@ Key principles:
 
 The dashboard includes an accessible usage gauge that summarizes API spend for the current cycle. It exposes `role="progressbar"`, numeric ARIA values, and a human-readable usage state such as “Within limit”, “Approaching limit”, “Critical usage”, “Limit reached”, or “No limit configured” so screen-reader users receive the same status information as sighted users.
 
+
+**ApiDetailPage keyboard focus (WCAG 2.1 AA, Issue #411):** All interactive elements on `ApiDetailPage` — buttons, links, inputs, selects, icon buttons, tab panels, and the pricing range slider — display a WCAG-compliant `:focus-visible` outline. The focus ring uses the theme-aware `--accent` token (2 px solid, 3 px offset), which meets the 3:1 non-text contrast requirement against both dark (`#4e85ff` on `#0b1020`) and light (`#2563eb` on `#f5f7fa`) backgrounds. Styles live in `src/styles/focus.css` inside `@layer focus` so they are always lower-priority than intentional page overrides. No mouse-triggered focus rings are shown (`outline: none` on `:focus`, restored on `:focus-visible`).
 ## Scripts
 
 | Command           | Description                         |

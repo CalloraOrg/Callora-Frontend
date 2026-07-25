@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import React from 'react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import CallHistoryRow from './CallHistoryRow';
 import type { CallRecord } from './CallHistoryRow';
@@ -102,12 +104,41 @@ describe('CallHistoryRow', () => {
     expect(screen.getByLabelText('Error')).toBeTruthy();
   });
 
-  it('status icon is hidden from assistive technology', () => {
-    renderRow({ call: successCall, expanded: false, onToggleExpand: () => {} });
-    const icon = screen.getByTestId('icon-success');
-    const svg = (icon.closest('svg') ?? icon) as Element;
-    expect(svg.getAttribute('aria-hidden')).toBe('true');
-  });
+it('status icon is hidden from assistive technology', () => {
+     renderRow({ call: successCall, expanded: false, onToggleExpand: () => {} });
+     const icon = screen.getByTestId('icon-success');
+     const svg = (icon.closest('svg') ?? icon) as Element;
+     expect(svg.getAttribute('aria-hidden')).toBe('true');
+   });
+
+   // ── Pattern fills for color-blind accessibility ──────────────────
+
+   it('success status cell has data-pattern="baseline" (no fill pattern)', () => {
+     renderRow({ call: successCall, expanded: false, onToggleExpand: () => {} });
+     const cell = screen.getByLabelText('Success');
+     expect(cell.getAttribute('data-pattern')).toBe('baseline');
+   });
+
+    it('error status cell has data-pattern="stripes" (diagonal pattern fill)', () => {
+      renderRow({ call: errorCall, expanded: false, onToggleExpand: () => {} });
+      const cell = screen.getByLabelText('Error');
+      expect(cell.getAttribute('data-pattern')).toBe('stripes');
+    });
+
+    it('exposes pattern semantics for non-color status cues', () => {
+     const { container } = render(
+       <div>
+         <CallHistoryRow call={successCall} expanded={false} onToggleExpand={() => {}} />
+         <CallHistoryRow call={errorCall} expanded={false} onToggleExpand={() => {}} />
+       </div>
+     );
+
+     const successCell = container.querySelector('.status-cell.success');
+     const errorCell = container.querySelector('.status-cell.error');
+
+     expect(successCell?.getAttribute('data-pattern')).toBe('baseline');
+     expect(errorCell?.getAttribute('data-pattern')).toBe('stripes');
+   });
 
   // ── Expand / collapse behaviour ──────────────────────────────────────────
 

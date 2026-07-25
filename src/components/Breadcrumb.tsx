@@ -93,11 +93,15 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
 
     switch (event.key) {
       case "ArrowDown":
-        focusMenuItem((currentIndex + 1) % menuItems.length);
+        focusMenuItem(
+          currentIndex === -1 ? 0 : (currentIndex + 1) % menuItems.length,
+        );
         break;
       case "ArrowUp":
         focusMenuItem(
-          (currentIndex - 1 + menuItems.length) % menuItems.length,
+          currentIndex === -1
+            ? menuItems.length - 1
+            : (currentIndex - 1 + menuItems.length) % menuItems.length,
         );
         break;
       case "Home":
@@ -283,6 +287,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                     type="button"
                     className="breadcrumb-ellipsis"
                     aria-label="Show collapsed breadcrumb items"
+                    aria-haspopup="menu"
                     aria-expanded={isPopoverOpen}
                     aria-controls={popoverId}
                     onClick={() => setIsPopoverOpen((open) => !open)}
@@ -295,6 +300,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                       className="breadcrumb-popover"
                       id={popoverId}
                       role="menu"
+                      aria-label="Collapsed breadcrumb items"
                       onKeyDown={handlePopoverKeyDown}
                     >
                       <ol className="breadcrumb-popover-list">

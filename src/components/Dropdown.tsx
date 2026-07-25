@@ -281,18 +281,9 @@ export function Dropdown<T extends string = string>({
           gap: 6,
           appearance: "none",
           background: "var(--surface-soft)",
-          border: open
-            ? "2px solid var(--accent, #2563eb)"
-            : "1px solid var(--line)",
-          borderRadius: "var(--radius-md, 16px)",
-          color: "var(--text)",
-          cursor: disabled ? "not-allowed" : "pointer",
-          fontSize: 13,
-          fontWeight: 500,
-          minHeight: 44,
-          opacity: disabled ? 0.5 : 1,
-          outline: open ? "2px solid var(--accent, #2563eb)" : "none",
-          outlineOffset: "2px",
+           border: open
+             ? "2px solid var(--accent, #2563eb)"
+             : "1px solid var(--line)",
           padding: "8px 32px 8px 12px",
           transition: "border-color 0.2s ease, box-shadow 0.2s ease",
           userSelect: "none",
