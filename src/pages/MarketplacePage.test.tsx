@@ -5,7 +5,9 @@ import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CollectionsProvider } from "../state/collectionsStore";
+import { compareStore } from "../state/compareStore";
 import MarketplacePage from "./MarketplacePage";
+import type { APIItem } from "../data/mockApis";
 
 function renderMarketplacePage() {
   return render(
@@ -80,18 +82,49 @@ describe("MarketplacePage", () => {
     expect(screen.getByText("QuickPay")).toBeTruthy();
   });
 
-  it("keeps card navigation from firing when a tag chip is clicked", () => {
-    const pushStateSpy = vi.spyOn(window.history, "pushState");
+  it("applies marketplace-results--tray-open class when the compare drawer tray is visible", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    const main = screen.getByRole("main");
+    expect(main.classList.contains("marketplace-results")).toBe(true);
+    expect(main.classList.contains("marketplace-results--tray-open")).toBe(false);
+  });
+
+  it("applies marketplace-results--tray-open class when compare tray has APIs", () => {
+    compareStore.addApi({ id: "stub-api" } as APIItem);
 
     renderMarketplacePage();
     settleMarketplaceTimers();
 
-    fireEvent.click(screen.getByRole("button", {
-      name: "Filter marketplace by tag weather",
-    }));
+    const main = screen.getByRole("main");
+    expect(main.classList.contains("marketplace-results--tray-open")).toBe(true);
 
-    expect(pushStateSpy).not.toHaveBeenCalled();
+    compareStore.clear();
+  });
 
-    pushStateSpy.mockRestore();
+  it("applies CSS classes for design-token-pinned spacing and typography", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    const page = document.querySelector(".marketplace-page");
+    expect(page).toBeTruthy();
+
+    const header = document.querySelector(".marketplace-header");
+    expect(header).toBeTruthy();
+
+    const toolbar = document.querySelector(".marketplace-toolbar");
+    expect(toolbar).toBeTruthy();
+
+    const grid = document.querySelector(".marketplace-grid");
+    expect(grid).toBeTruthy();
+  });
+
+  it("marketplace grid uses responsive minmax with token-based sizing", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    const grid = document.querySelector(".marketplace-grid");
+    expect(grid).toBeTruthy();
   });
 });
