@@ -42,7 +42,7 @@ export function ApiCardSkeleton() {
       }}
     >
       <span className="sr-only">Loading API</span>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <Skeleton tone="stellar" width={56} height={56} borderRadius={10} />
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -60,6 +60,8 @@ export function ApiCardSkeleton() {
         <div
           style={{
             textAlign: "right",
+            paddingRight: 36,
+            flexShrink: 0,
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-end",
@@ -71,13 +73,28 @@ export function ApiCardSkeleton() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+      <div className="api-marketplace-card-tags" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
         <Skeleton tone="stellar" width={45} height={24} borderRadius={8} />
         <Skeleton tone="stellar" width={55} height={24} borderRadius={8} />
         <Skeleton tone="stellar" width={40} height={24} borderRadius={8} />
       </div>
 
       <div
+        style={{
+          marginTop: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <Skeleton tone="stellar" width={50} height={12} />
+        <Skeleton tone="stellar" width={90} height={28} />
+      </div>
+
+      <div
+        className="api-marketplace-card-footer"
         style={{
           marginTop: "auto",
           display: "flex",
@@ -100,6 +117,7 @@ export function ApiCardSkeleton() {
             justifyContent: "space-between",
             alignItems: "center",
             gap: 12,
+            flexWrap: "wrap",
           }}
         >
           <Skeleton tone="stellar" width={100} height={36} borderRadius={14} />

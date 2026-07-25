@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, act, within } from "@testing-library/react";
-import ApiCard from "./ApiCard";
+import ApiCard, { ApiCardSkeleton } from "./ApiCard";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
 import type { APIItem } from "../data/mockApis";
@@ -295,10 +295,15 @@ describe("ApiCard responsiveness", () => {
   const mockApi: APIItem = {
     id: "api-resp",
     name: "Responsive API",
-    endpoint: "/api/resp",
+    endpoints: ["/api/resp"],
     description: "Responsive test API.",
     tags: ["test"],
     pricePerRequest: 0,
+    provider: {
+      name: "",
+      url: undefined,
+      avatar: undefined
+    }
   };
 
   function mockViewportWidth(isMobile: boolean) {
@@ -347,6 +352,23 @@ describe("ApiCard responsiveness", () => {
     
     const card = screen.getByRole("button", { name: /View details for Responsive API/i });
     expect(card.className).not.toContain("api-card--compact");
+  });
+});
+
+describe("ApiCardSkeleton", () => {
+  it("renders the skeleton correctly with appropriate classes", () => {
+    const { container } = render(<ApiCardSkeleton />);
+    
+    const article = container.querySelector("article.api-card-skeleton");
+    expect(article).toBeTruthy();
+    
+    const tags = container.querySelector(".api-marketplace-card-tags");
+    expect(tags).toBeTruthy();
+    
+    const footer = container.querySelector(".api-marketplace-card-footer");
+    expect(footer).toBeTruthy();
+    
+    expect(screen.getByLabelText("Loading API")).toBeTruthy();
   });
 });
 
