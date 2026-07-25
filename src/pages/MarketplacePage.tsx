@@ -522,13 +522,42 @@ export default function MarketplacePage(): JSX.Element {
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}
-              title={favoritesOnly ? "No favorites yet" : undefined}
+              title={
+                favoritesOnly
+                  ? "No favorites yet"
+                  : hasActiveFilters()
+                    ? "No results found"
+                    : "No APIs available"
+              }
               message={
                 favoritesOnly
                   ? "Try starring some APIs to see them here!"
-                  : undefined
+                  : hasActiveFilters()
+                    ? "Try adjusting your filters or clear them to see all available APIs."
+                    : "The marketplace is empty right now. Check back soon for new integrations!"
               }
               onClearFilters={hasActiveFilters() ? clearFilters : undefined}
+              action={
+                !hasActiveFilters() && !favoritesOnly
+                  ? {
+                      label: "Clear all filters",
+                      onClick: clearFilters,
+                    }
+                  : undefined
+              }
+              secondaryAction={
+                favoritesOnly
+                  ? {
+                      label: "Browse all APIs",
+                      onClick: () => setFavoritesOnly(false),
+                    }
+                  : hasActiveFilters()
+                    ? {
+                        label: "Browse all APIs",
+                        onClick: clearFilters,
+                      }
+                    : undefined
+              }
             />
           ) : (
             <div className="marketplace-grid">

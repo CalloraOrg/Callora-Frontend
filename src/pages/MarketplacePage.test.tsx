@@ -127,4 +127,38 @@ describe("MarketplacePage", () => {
     const grid = document.querySelector(".marketplace-grid");
     expect(grid).toBeTruthy();
   });
+
+  it("shows empty state with secondary CTA when favorites-only has no results", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    const favoritesCheckbox = screen.getByLabelText("Favorites only");
+    fireEvent.click(favoritesCheckbox);
+
+    expect(screen.getByText("No favorites yet")).toBeTruthy();
+    expect(screen.getByText("Try starring some APIs to see them here!")).toBeTruthy();
+
+    const browseBtn = screen.getByTestId("empty-state-secondary-action");
+    expect(browseBtn).toBeTruthy();
+    expect(browseBtn.textContent).toBe("Browse all APIs");
+
+    fireEvent.click(browseBtn);
+    expect(screen.queryByText("No favorites yet")).toBeNull();
+  });
+
+  it("shows filtered empty state with clear-all-filters CTA", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    fireEvent.change(searchInput, { target: { value: "nonexistent-api-xyz" } });
+
+    act(() => { vi.advanceTimersByTime(500); });
+
+    expect(screen.getByText("No results found")).toBeTruthy();
+    expect(screen.getByText("Try adjusting your filters or clear them to see all available APIs.")).toBeTruthy();
+
+    const browseBtn = screen.getByTestId("empty-state-secondary-action");
+    expect(browseBtn.textContent).toBe("Browse all APIs");
+  });
 });
