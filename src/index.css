@@ -4,6 +4,22 @@
   --radius-lg: 20px;
   --radius-md: 16px;
   --transition-speed: 240ms;
+  
+  /* Spacing Tokens */
+  --spacing-4: 4px;
+  --spacing-5: 5px;
+  --spacing-6: 6px;
+  --spacing-8: 8px;
+  --spacing-10: 10px;
+  --spacing-14: 14px;
+  --spacing-16: 16px;
+
+  /* Typography Tokens */
+  --text-xs: 0.625rem;    /* 10px */
+  --text-sm: 0.6875rem;   /* 11px */
+  --text-md: 0.75rem;     /* 12px */
+  --text-base: 0.8125rem; /* 13px */
+
   /* Focus ring token — used by all :focus-visible rules */
   --focus-ring: 0 0 0 3px rgba(78, 133, 255, 0.55);
   --focus-ring-offset: 0 0 0 5px rgba(78, 133, 255, 0.55);
@@ -5020,10 +5036,10 @@ code,
 
 .api-tag-filter {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-8);
   overflow-x: auto;
-  padding-bottom: 4px;
-  margin-bottom: 16px;
+  padding-bottom: var(--spacing-4);
+  margin-bottom: var(--spacing-16);
   scrollbar-width: thin;
   /* On wide viewports, allow wrapping instead of scrolling */
   flex-wrap: wrap;
@@ -5048,16 +5064,16 @@ code,
 .api-tag-filter__pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--spacing-5);
   white-space: nowrap;
-  padding: 0 14px;
+  padding: 0 var(--spacing-14);
   min-height: 44px;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--surface-soft);
   color: var(--text);
   font-weight: 500;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   cursor: pointer;
   transition:
     background var(--transition-speed) ease,
@@ -5088,7 +5104,7 @@ code,
 /* ── Count badge inside each pill ───────────────────────────────
    Small, muted number showing how many APIs carry that tag. */
 .api-tag-filter__count {
-  font-size: 0.6875rem;
+  font-size: var(--text-sm);
   color: var(--muted);
   font-weight: 400;
   margin-left: 1px;
@@ -5124,18 +5140,18 @@ code,
 /* ── Extra-narrow viewport (< 480 px): tight spacing ────────── */
 @media (max-width: 479px) {
   .api-tag-filter {
-    gap: 6px;
+    gap: var(--spacing-6);
   }
 
   .api-tag-filter__pill {
-    padding: 0 10px;
+    padding: 0 var(--spacing-10);
     min-height: 40px;
-    font-size: 0.75rem;
-    gap: 4px;
+    font-size: var(--text-md);
+    gap: var(--spacing-4);
   }
 
   .api-tag-filter__count {
-    font-size: 0.625rem;
+    font-size: var(--text-xs);
   }
 }
 
