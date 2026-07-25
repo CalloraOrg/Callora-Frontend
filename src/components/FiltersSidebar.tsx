@@ -164,10 +164,10 @@ export default function FiltersSidebar({
               Min
             </label>
             <input
-              id="filter-min-price"
-              type="number"
-              className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""}`}
-              value={minPrice ?? ""}
+               id="filter-min-price"
+               type="number"
+               className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""} tabular-nums`}
+               value={minPrice ?? ""}
               min={0}
               placeholder="0"
               onChange={(e) =>
@@ -189,10 +189,10 @@ export default function FiltersSidebar({
               Max
             </label>
             <input
-              id="filter-max-price"
-              type="number"
-              className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""}`}
-              value={maxPrice ?? ""}
+               id="filter-max-price"
+               type="number"
+               className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""} tabular-nums`}
+               value={maxPrice ?? ""}
               min={0}
               placeholder="∞"
               onChange={(e) =>
