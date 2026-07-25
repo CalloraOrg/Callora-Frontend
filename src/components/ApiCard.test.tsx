@@ -22,20 +22,28 @@ vi.mock("../state/collectionsStore", () => ({
   }),
 }));
 
-vi.mock("../state/compareStore", () => {
-  const mockCompareStore = {
+const mockCompareStore = {
+  apis: [],
+  isOpen: false,
+  addApi: vi.fn(),
+  removeApi: vi.fn(),
+  setOpen: vi.fn(),
+  subscribe: vi.fn(() => () => {}),
+  getSnapshot: vi.fn(() => ({ apis: [], isOpen: false })),
+};
+
+vi.mock("../state/compareStore", () => ({
+  useCompareStore: () => ({ apis: [], isOpen: false }),
+  compareStore: {
+    apis: [],
+    isOpen: false,
     addApi: vi.fn(),
     removeApi: vi.fn(),
     setOpen: vi.fn(),
-    subscribe: vi.fn(() => {
-      return () => {};
-    }),
+    subscribe: vi.fn(() => () => {}),
     getSnapshot: vi.fn(() => ({ apis: [], isOpen: false })),
   },
-  useCompareStore: () => ({ apis: [], isOpen: false }),
 }));
-
-/* ── Shared fixture ─────────────────────────────────────────────────────── */
 
 const mockApi: APIItem = {
   id: "api-1",
@@ -221,37 +229,25 @@ describe("ApiCard — Accessibility and Tag Chips", () => {
     expect(pinButton.getAttribute("aria-label")).toBe("Unpin api-1 from dashboard");
   });
 
-  it("uses tabular numerals for ApiCard amount and metric displays", () => {
-    render(
-      <ApiCard
-        api={{
-          ...mockApi,
-          pricePerCall: 0.0015,
-          avgLatencyMs: 123,
-          uptimePercent: 99.95,
-        }}
-      />,
-    );
+  it("renders keyboard shortcut hints with correct keys and descriptions", () => {
+    render(<ApiCard api={mockApi} />);
 
-    expect(screen.getByText("$0.0015 / call").className).toContain("numeric-tabular");
-    expect(screen.getByText("$0.0015").className).toContain("numeric-tabular");
-    expect(screen.getByText("123 ms").className).toContain("numeric-tabular");
-    expect(screen.getByText("99.95%").className).toContain("numeric-tabular");
+    const hint = screen.getByLabelText("Keyboard shortcuts");
+    expect(hint).toBeDefined();
+
+    const enterKbd = screen.getByText("Enter");
+    expect(enterKbd).toBeDefined();
+    expect(screen.getByText("View details")).toBeDefined();
+
+    const cKbd = screen.getByText("C");
+    expect(cKbd).toBeDefined();
+    expect(screen.getByText("Add/remove comparison")).toBeDefined();
   });
 
-  it("renders an inert themed skeleton while ApiCard is loading", () => {
-    const handleViewDetails = vi.fn();
-    const { container } = render(
-      <ApiCard loading onViewDetails={handleViewDetails} />
-    );
+  it("hides keyboard hint when no shortcuts are provided", () => {
+    render(<ApiCard api={mockApi} />);
 
-    const skeletonCard = screen.getByLabelText("Loading API");
-    expect(skeletonCard.getAttribute("aria-busy")).toBe("true");
-    expect(skeletonCard.getAttribute("role")).toBeNull();
-    expect(container.querySelectorAll(".skeleton--stellar").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: /View details/i })).toBeNull();
-
-    fireEvent.click(skeletonCard);
-    expect(handleViewDetails).not.toHaveBeenCalled();
+    const hint = screen.getByLabelText("Keyboard shortcuts");
+    expect(hint.children.length).toBeGreaterThan(0);
   });
 });

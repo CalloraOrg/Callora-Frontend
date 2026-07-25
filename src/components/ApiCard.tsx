@@ -18,6 +18,8 @@ import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import { usePinnedApis, pinnedApisStore } from "../state/pinnedApis";
 import Sparkline from "./Sparkline";
+import type { Shortcut } from "../hooks/useGlobalShortcuts";
+import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
 import { TagIcon, ClockIcon, BoltIcon } from "./icons";
 
@@ -459,6 +461,11 @@ function PinButton({ apiId }: { apiId: string }) {
 
 const EM_DASH = "—";
 
+const CARD_SHORTCUTS: readonly Shortcut[] = [
+  { key: "Enter", description: "View details", category: "Marketplace" },
+  { key: "C", description: "Add/remove comparison", category: "Marketplace" },
+];
+
 function renderStatValue(value: string | undefined) {
   if (!value) {
     return <span className="api-card__stat-value api-card__stat-value--empty">{EM_DASH}</span>;
@@ -778,6 +785,8 @@ export default function ApiCard({
           </div>
         </div>
       </div>
+
+      <KbdHint shortcuts={CARD_SHORTCUTS} />
     </article>
   );
 }
