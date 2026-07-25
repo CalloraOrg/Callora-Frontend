@@ -64,6 +64,7 @@ export default function CallHistoryRow({ call, expanded, onToggleExpand }: Props
         {/* Status cell — icon + label; icon color driven by CSS custom properties */}
         <span
           className={`status-cell ${call.status}`}
+          data-pattern={call.status === 'success' ? 'baseline' : 'stripes'}
           aria-label={call.status === 'success' ? 'Success' : 'Error'}
         >
           <StatusIcon status={call.status} />
