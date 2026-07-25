@@ -2796,10 +2796,15 @@ code,
 
 .status-cell.success {
   color: var(--success);
+  /* Success: solid baseline — no supplemental pattern needed. */
 }
 
 .status-cell.error {
   color: var(--danger);
+  /* Error: diagonal stripes so status is distinguishable without color alone (WCAG 1.4.1). */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='3' y1='0' x2='6' y2='3' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='0' y1='3' x2='3' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3C/svg%3E");
+  background-size: 6px 6px;
+  background-repeat: repeat;
 }
 
 .expanded-details {
