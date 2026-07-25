@@ -1,0 +1,60 @@
+/* ── FiltersSidebar focus-visible styles (v7) ───────────────────────
+   All keyboard-focus styling for the FiltersSidebar is placed in the
+   `focus` cascade layer so it participates in the same layering order
+   as the global focus rules in src/index.css.  Layered rules rank below
+   unlayered ones regardless of specificity, but within the same layer
+   later rules win, so these sidebar-specific rules can refine the
+   generic *:focus-visible behaviour.
+
+   WCAG 2.1 AA – Focus Visible (2.4.7 / 1.4.11):
+   Every interactive element inside the sidebar must show a visible
+   focus indicator when navigated by keyboard.  The outline uses the
+   theme-aware --accent token so the ring clears the 3:1 contrast
+   requirement against both dark and light backgrounds.
+   ──────────────────────────────────────────────────────────────────────── */
+
+@layer focus {
+  .filters-sidebar {
+    outline: none;
+  }
+
+  .filters-sidebar :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .mobile-filters-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: var(--focus-ring);
+  }
+
+  .filter-dropdown:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: var(--focus-ring);
+  }
+
+  .filter-group__header:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    box-shadow: var(--focus-ring);
+  }
+
+  .filter-checkbox:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    box-shadow: var(--focus-ring);
+  }
+
+  .filter-input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    box-shadow: var(--focus-ring);
+  }
+
+  .ghost-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+}

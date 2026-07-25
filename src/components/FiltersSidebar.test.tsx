@@ -406,4 +406,41 @@ describe("FiltersSidebar", () => {
       expect(block.style.borderTop).toMatch(/var\(--line\)/);
     });
   });
+
+  describe("focus-visible accessibility", () => {
+    it("mobile-filters-toggle button is focusable", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const toggle = screen.getByRole(
+        "button",
+        { name: "Filters" },
+        { hidden: true },
+      );
+      toggle.style.display = "inline-block";
+      expect(toggle).toBeInstanceOf(HTMLButtonElement);
+    });
+
+    it("filter group headers are focusable and have focus-visible CSS rule", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const header = screen.getByRole("button", { name: "Categories" });
+      expect(header).toBeInstanceOf(HTMLButtonElement);
+      header.focus();
+      expect(document.activeElement).toBe(header);
+    });
+
+    it("Clear filters button is focusable", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const clearBtn = screen.getByText("Clear filters");
+      expect(clearBtn).toBeInstanceOf(HTMLButtonElement);
+      clearBtn.focus();
+      expect(document.activeElement).toBe(clearBtn);
+    });
+
+    it("category checkboxes are focusable", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const checkbox = screen.getByLabelText("Data & Analytics") as HTMLInputElement;
+      expect(checkbox).toBeInstanceOf(HTMLInputElement);
+      checkbox.focus();
+      expect(document.activeElement).toBe(checkbox);
+    });
+  });
 });
