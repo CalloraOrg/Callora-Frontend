@@ -658,34 +658,7 @@ export default function ApiCard({
         prefersReducedMotion={prefersReducedMotion}
       />
 
-       {/* Pin button - absolutely positioned, top-left */}
-       <button
-         onClick={handleCompareClick}
-         disabled={!canCompare}
-         className="api-card__compare-btn"
-         style={{
-           position: "absolute",
-           top: "8px",
-           left: "48px",
-           zIndex: 10,
-           background: isCompared ? "var(--accent)" : "rgba(0,0,0,0.5)",
-           color: "white",
-           border: "none",
-           borderRadius: "8px",
-           padding: "4px 8px",
-           fontSize: "0.75rem",
-           fontWeight: 600,
-           cursor: canCompare ? "pointer" : "not-allowed",
-           opacity: isCompared ? 1 : 0.6,
-           transition: prefersReducedMotion ? "none" : "opacity 0.2s, background 0.2s"
-         }}
-         aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
-         aria-pressed={isCompared}
-       >
-         {isCompared ? "Compared" : "Compare"}
-       </button>
-
-      {/* Pin button - absolutely positioned, top-left */}
+      {/* Compare button - absolutely positioned, top-left */}
       <button
         onClick={handleCompareClick}
         disabled={!canCompare}
@@ -704,7 +677,10 @@ export default function ApiCard({
           fontWeight: 600,
           cursor: canCompare ? "pointer" : "not-allowed",
           opacity: isCompared ? 1 : 0.6,
-          transition: "opacity 0.2s, background 0.2s",
+          transition: prefersReducedMotion ? "none" : "opacity 0.2s, background 0.2s",
+          minWidth: 44,
+          minHeight: 44,
+          whiteSpace: "nowrap",
         }}
         aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
         aria-pressed={isCompared}
@@ -712,7 +688,7 @@ export default function ApiCard({
         {isCompared ? "Compared" : "Compare"}
       </button>
 
-      <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div
           className="api-marketplace-card-icon"
           style={{
@@ -731,7 +707,7 @@ export default function ApiCard({
         </div>
 
         <div className="api-marketplace-card-body" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
             <strong>{api.name}</strong>
             <div style={{ color: "var(--muted)", fontSize: 12 }}>{api.provider?.name}</div>
           </div>
@@ -787,6 +763,7 @@ export default function ApiCard({
           alignItems: "center",
           justifyContent: "space-between",
           gap: 12,
+          flexWrap: "wrap",
         }}
       >
         <span
@@ -839,6 +816,7 @@ export default function ApiCard({
             justifyContent: "space-between",
             alignItems: "center",
             gap: 12,
+            flexWrap: "wrap",
           }}
         >
           <span className="ghost-button" aria-hidden="true" style={{ display: "inline-flex", alignItems: "center" }}>
