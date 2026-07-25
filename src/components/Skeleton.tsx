@@ -6,6 +6,7 @@ interface SkeletonProps {
   borderRadius?: string | number;
   style?: CSSProperties;
   className?: string;
+  tone?: "neutral" | "stellar";
 }
 
 export default function Skeleton({
@@ -14,10 +15,11 @@ export default function Skeleton({
   borderRadius,
   style,
   className = "",
+  tone = "neutral",
 }: SkeletonProps) {
   return (
     <div
-      className={`skeleton ${className}`}
+      className={`skeleton${tone === "stellar" ? " skeleton--stellar" : ""} ${className}`.trim()}
       aria-hidden="true"
       role="presentation"
       style={{

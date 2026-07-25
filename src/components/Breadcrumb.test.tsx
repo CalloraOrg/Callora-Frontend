@@ -44,6 +44,7 @@ describe("Breadcrumb", () => {
     expect(button?.getAttribute("aria-label")).toBe(
       "Show collapsed breadcrumb items",
     );
+    expect(button.getAttribute("aria-haspopup")).toBe("menu");
     expect(button.getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.click(button);
@@ -56,6 +57,9 @@ describe("Breadcrumb", () => {
     );
 
     expect(popover).toBeTruthy();
+    expect(popover?.getAttribute("aria-label")).toBe(
+      "Collapsed breadcrumb items",
+    );
     expect(menuItems.map((item) => item.textContent)).toEqual([
       "Developer Tools",
       "Very Long Machine Learning API Name",
@@ -89,20 +93,48 @@ describe("Breadcrumb", () => {
 
     fireEvent.click(button);
 
-    const menuItems = screen.getAllByRole("menuitem");
+    const menu = container.querySelector<HTMLElement>('[role="menu"]');
+    const menuItems = Array.from(
+      container.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]'),
+    );
+
+    if (!menu) throw new Error("Expected breadcrumb popover menu");
+
     expect(document.activeElement).toBe(menuItems[0]);
 
-    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowDown" });
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
     expect(document.activeElement).toBe(menuItems[1]);
 
-    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowDown" });
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
     expect(document.activeElement).toBe(menuItems[0]);
 
-    fireEvent.keyDown(screen.getByRole("menu"), { key: "End" });
+    fireEvent.keyDown(menu, { key: "End" });
     expect(document.activeElement).toBe(menuItems[1]);
 
-    fireEvent.keyDown(screen.getByRole("menu"), { key: "Home" });
+    fireEvent.keyDown(menu, { key: "Home" });
     expect(document.activeElement).toBe(menuItems[0]);
+  });
+
+  it("wraps focus to the last collapsed crumb on ArrowUp", () => {
+    const { container } = render(<Breadcrumb items={longBreadcrumb} />);
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+
+    if (!button) throw new Error("Expected breadcrumb ellipsis button");
+
+    fireEvent.click(button);
+
+    const menu = container.querySelector<HTMLElement>('[role="menu"]');
+    const menuItems = Array.from(
+      container.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]'),
+    );
+
+    if (!menu) throw new Error("Expected breadcrumb popover menu");
+
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(menuItems[1]);
   });
 
   it("returns focus to the ellipsis button when closing the popover with Escape", () => {
@@ -115,10 +147,14 @@ describe("Breadcrumb", () => {
     if (!button) throw new Error("Expected breadcrumb ellipsis button");
 
     fireEvent.click(button);
-    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    const menu = container.querySelector<HTMLElement>('[role="menu"]');
+
+    if (!menu) throw new Error("Expected breadcrumb popover menu");
+
+    fireEvent.keyDown(menu, { key: "Escape" });
 
     expect(button.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByRole("menu")).toBeNull();
+    expect(container.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement).toBe(button);
   });
 

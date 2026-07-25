@@ -33,7 +33,7 @@ const SNAP_HEIGHT: Record<Snap, string> = {
 interface FiltersBottomSheetProps {
   open: boolean;
   onClose: () => void;
-  /** Live result count shown in the footer CTA */
+  /** Live result count shown in the footer CTA and used for empty-state illustration */
   resultCount: number;
   selectedCategories: Set<string>;
   toggleCategory: (c: string) => void;
@@ -230,7 +230,7 @@ export default function FiltersBottomSheet({
             clearFilters={clearFilters}
             favoritesOnly={favoritesOnly}
             toggleFavoritesOnly={toggleFavoritesOnly}
-            isLoading={false}
+            resultCount={resultCount}
           />
         </div>
 

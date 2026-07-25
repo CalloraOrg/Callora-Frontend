@@ -5,24 +5,25 @@ import { formatPrice } from './utils/format';
 import type { JsonSchema } from './components/RequestBodyEditor';
 import CallHistoryRow from './components/CallHistoryRow';
 import Breadcrumb from './components/Breadcrumb';
+import RequestHistoryPanel from './components/RequestHistoryPanel';
 import ParamsBuilder from './components/ParamsBuilder';
 import { useFetchTracker } from './hooks/useFetchTracker';
 import { useQuota } from './hooks/useQuota';
 import PlanNudge from './components/PlanNudge';
 import CallsHeatmap from './components/CallsHeatmap';
 import Tabs from './components/Tabs';
+import { Icons } from './utils/icons';
+import { LinkIcon } from './components/icons';
+import {
+  clearHistory,
+  loadHistory,
+  saveEntry,
+  type HistoryEntry,
+} from './state/testCallHistory';
+import { copySnapshotUrl, parseSnapshotUrl } from './utils/snapshotUrl';
 
 const MOCK_USAGE_PERCENT = 80;
 const LOADING_DELAY_MS = 500;
-const Icons = { History: () => null };
-const LinkIcon = () => null;
-type HistoryEntry = any;
-const saveEntry = (entry: any) => {};
-const loadHistory = () => [];
-const clearHistory = () => {};
-const parseSnapshotUrl = (url: string) => ({} as any);
-const copySnapshotUrl = async (path: string, params: any) => true;
-
 
 type ApiEndpoint = {
   id: string;
@@ -674,8 +675,8 @@ export default function ApiUsage() {
             ) : (
               <div className="response-content">
                 <div className="response-meta">
-                  <span className="response-time">Response time: {formatTime(responseTime || 0)}</span>
-                  <span className="response-cost">Cost: {formatPrice(callCost || 0)} USDC</span>
+                  <span className="response-time tabular-nums">Response time: {formatTime(responseTime || 0)}</span>
+                  <span className="response-cost tabular-nums">Cost: {formatPrice(callCost || 0)} USDC</span>
                 </div>
                 <pre className="response-json">
                   {JSON.stringify(apiResponse, null, 2)}
@@ -692,23 +693,23 @@ export default function ApiUsage() {
         <div className="stats-grid">
           <div className="stat-card">
             <span className="stat-label">Calls Today</span>
-            <strong className="stat-value">{usageStats.callsToday}</strong>
+            <strong className="stat-value tabular-nums">{usageStats.callsToday}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Calls This Week</span>
-            <strong className="stat-value">{usageStats.callsWeek}</strong>
+            <strong className="stat-value tabular-nums">{usageStats.callsWeek}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Total Spent</span>
-            <strong className="stat-value">{formatPrice(usageStats.totalSpent)} USDC</strong>
+            <strong className="stat-value tabular-nums">{formatPrice(usageStats.totalSpent)} USDC</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Avg Response Time</span>
-            <strong className="stat-value">{formatTime(usageStats.avgResponseTime)}</strong>
+            <strong className="stat-value tabular-nums">{formatTime(usageStats.avgResponseTime)}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Success Rate</span>
-            <strong className="stat-value">{usageStats.successRate}%</strong>
+            <strong className="stat-value tabular-nums">{usageStats.successRate}%</strong>
           </div>
         </div>
 

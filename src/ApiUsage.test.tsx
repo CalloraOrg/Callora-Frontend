@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ApiUsage from './ApiUsage';
 
@@ -21,7 +21,6 @@ vi.mock('./components/CallsHeatmap', () => ({
 
 describe('ApiUsage - Filter Reset', () => {
   beforeEach(() => {
-    // Reset window.location
     Object.defineProperty(window, 'location', {
       value: {
         search: '',
@@ -29,29 +28,74 @@ describe('ApiUsage - Filter Reset', () => {
       },
       writable: true,
     });
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
     vi.clearAllMocks();
   });
 
   it('should enable reset button when filters are active and announce reset to screen readers', async () => {
     render(<ApiUsage />);
-    
     const resetButton = screen.getByRole('button', { name: /Reset Filters/i });
-    expect(resetButton).toBeDisabled();
-
-    // Change a filter to activate the reset button
-    const successTab = screen.getByRole('button', { name: /Success/i });
+    expect(resetButton.disabled).toBe(true);
+    const successTab = screen.getByRole('tab', { name: /Success/i });
     fireEvent.click(successTab);
-
-    expect(resetButton).not.toBeDisabled();
-
-    // Reset filters
+    expect(resetButton.disabled).toBe(false);
     fireEvent.click(resetButton);
-
-    // Verify filters are reset
-    expect(resetButton).toBeDisabled();
-    
-    // Verify screen reader announcement
+    expect(resetButton.disabled).toBe(true);
     const srAnnouncement = screen.getByRole('status');
     expect(srAnnouncement.textContent).toBe('Filters reset. Showing all calls from the last 24 hours.');
   });
+
+  it('renders an accessible breadcrumb with the current page announced', () => {
+    render(<ApiUsage />);
+    const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i });
+    expect(breadcrumb).toBeTruthy();
+    const marketplaceLink = screen.getByRole('link', { name: 'Marketplace' });
+    expect(marketplaceLink.getAttribute('href')).toBe('/marketplace');
+    const currentCrumb = screen.getByText('User Profile API usage');
+    expect(currentCrumb.getAttribute('aria-current')).toBe('page');
+  });
+});
+
+describe('ApiUsage - Tabular Numerals', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'location', {
+      value: { search: '', pathname: '/api-usage' },
+      writable: true,
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: false, media: query, onchange: null,
+        addListener: vi.fn(), removeListener: vi.fn(),
+        addEventListener: vi.fn(), removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    vi.clearAllMocks();
+  });
+
+  it('applies tabular-nums to all stat-value elements', () => {
+    render(<ApiUsage />);
+    const statValues = document.querySelectorAll('.stat-value.tabular-nums');
+    expect(statValues.length).toBe(5);
+    const labels = ['Calls Today', 'Calls This Week', 'Total Spent', 'Avg Response Time', 'Success Rate'];
+    statValues.forEach((el, i) => {
+      expect(el.classList.contains('tabular-nums')).toBe(true);
+      const card = el.closest('.stat-card');
+      expect(card.querySelector('.stat-label').textContent).toBe(labels[i]);
+    });
+  });
+
 });
