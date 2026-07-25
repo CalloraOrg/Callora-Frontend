@@ -8,12 +8,13 @@
    as inline SVG data URIs so no external assets are required.
 
    Pattern key:
-     success   — no pattern  (solid fill, the baseline reference state)
-     error     — diagonal stripes ╲╲╲  (heavy cross, clearly "blocked")
-     warning   — diagonal stripes ╱╱╱  (lighter, opposite diagonal)
-     pending   — small dots  (…  neutral / in-progress feel)
-     degraded  — same as warning (alias)
-     down      — same as error (alias)
+     success     — no pattern  (solid fill, the baseline reference state)
+     error       — diagonal stripes ╲╲╲  (heavy cross, clearly "blocked")
+     warning     — diagonal stripes ╱╱╱  (lighter, opposite diagonal)
+     pending     — small dots  (…  neutral / in-progress feel)
+     degraded    — same as warning (alias)
+     down        — same as error (alias)
+     maintenance — crosshatch ╳  (both diagonals, distinct from error/warning)
    ──────────────────────────────────────────────────────────────────────── */
 
 /* Success: no supplemental pattern — solid color is unambiguous baseline */
@@ -43,5 +44,13 @@
 .sb-pattern-pending {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1' fill='currentColor' fill-opacity='0.3'/%3E%3C/svg%3E");
   background-size: 8px 8px;
+  background-repeat: repeat;
+}
+
+/* Maintenance: crosshatch (╳) — both diagonals so it reads as "scheduled
+   work" distinct from the single-direction stripes of error/degraded. */
+.sb-pattern-maintenance {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='0.8' stroke-opacity='0.2'/%3E%3Cline x1='6' y1='0' x2='0' y2='6' stroke='currentColor' stroke-width='0.8' stroke-opacity='0.2'/%3E%3C/svg%3E");
+  background-size: 6px 6px;
   background-repeat: repeat;
 }
