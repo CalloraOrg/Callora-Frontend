@@ -127,4 +127,55 @@ describe("MarketplacePage", () => {
     const grid = document.querySelector(".marketplace-grid");
     expect(grid).toBeTruthy();
   });
+
+  // ── tabular-nums (#476) ────────────────────────────────────────────────────
+
+  it("wraps page-count numbers in .numeric-tabular spans for tabular-nums alignment", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    // All numeric spans inside the count label must carry the utility class.
+    const count = document.querySelector(".marketplace-count");
+    expect(count).toBeTruthy();
+
+    const numericSpans = count!.querySelectorAll("span.numeric-tabular");
+    // Expects at least 3 spans: startItem, endItem, filtered.length
+    expect(numericSpans.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("numeric-tabular spans contain only digit characters", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    const count = document.querySelector(".marketplace-count");
+    const numericSpans = count!.querySelectorAll("span.numeric-tabular");
+
+    numericSpans.forEach((span) => {
+      expect(span.textContent?.trim()).toMatch(/^\d+$/);
+    });
+  });
+
+  it("renders two .numeric-tabular spans showing '0' when no APIs match the search", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    // Type a search term that matches nothing
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "zzz_no_match_zzz" } });
+
+    // Advance debounce (300 ms) + any remaining timers
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const count = document.querySelector(".marketplace-count");
+    expect(count).toBeTruthy();
+
+    const numericSpans = count!.querySelectorAll("span.numeric-tabular");
+    // When 0 results: two spans showing "0" and "0"
+    expect(numericSpans.length).toBe(2);
+    numericSpans.forEach((span) => {
+      expect(span.textContent?.trim()).toBe("0");
+    });
+  });
 });

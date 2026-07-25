@@ -453,12 +453,26 @@ export default function MarketplacePage(): JSX.Element {
           }
         >
           <div className="marketplace-toolbar">
+            {/* numeric-tabular keeps page/count digits fixed-width so the
+                label doesn't shift as the user pages through results. */}
             <div className="marketplace-count">
               {filtered.length === 0 ? (
-                <>Showing 0 of 0 APIs</>
+                <>
+                  Showing{" "}
+                  <span className="numeric-tabular">0</span>
+                  {" "}of{" "}
+                  <span className="numeric-tabular">0</span>
+                  {" "}APIs
+                </>
               ) : (
                 <>
-                  Showing {startItem}-{endItem} of {filtered.length} APIs
+                  Showing{" "}
+                  <span className="numeric-tabular">{startItem}</span>
+                  {"–"}
+                  <span className="numeric-tabular">{endItem}</span>
+                  {" "}of{" "}
+                  <span className="numeric-tabular">{filtered.length}</span>
+                  {" "}APIs
                 </>
               )}
               {selectedTag && (
