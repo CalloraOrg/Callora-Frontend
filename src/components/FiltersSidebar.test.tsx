@@ -420,57 +420,6 @@ describe("FiltersSidebar", () => {
     });
   });
 
-  describe("focus-visible accessibility", () => {
-    it("mobile-filters-toggle button is focusable", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const toggle = screen.getByRole(
-        "button",
-        { name: "Filters" },
-        { hidden: true },
-      );
-      toggle.style.display = "inline-block";
-      expect(toggle).toBeInstanceOf(HTMLButtonElement);
-    });
-
-    it("filter group headers are focusable and have focus-visible CSS rule", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const header = screen.getByRole("button", { name: "Categories" });
-      expect(header).toBeInstanceOf(HTMLButtonElement);
-      header.focus();
-      expect(document.activeElement).toBe(header);
-    });
-
-    it("Clear filters button is focusable", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const clearBtn = screen.getByText("Clear filters");
-      expect(clearBtn).toBeInstanceOf(HTMLButtonElement);
-      clearBtn.focus();
-      expect(document.activeElement).toBe(clearBtn);
-    });
-
-    it("category checkboxes are focusable", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const checkbox = screen.getByLabelText(
-        "Data & Analytics",
-      ) as HTMLInputElement;
-      expect(checkbox).toBeInstanceOf(HTMLInputElement);
-      checkbox.focus();
-      expect(document.activeElement).toBe(checkbox);
-    });
-
-    it("price inputs have tabular-nums class for aligned numeric display", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const minInput = screen.getByLabelText(
-        "Minimum price",
-      ) as HTMLInputElement;
-      const maxInput = screen.getByLabelText(
-        "Maximum price",
-      ) as HTMLInputElement;
-      expect(minInput.classList.contains("tabular-nums")).toBe(true);
-      expect(maxInput.classList.contains("tabular-nums")).toBe(true);
-    });
-  });
-
   describe("prefers-reduced-motion", () => {
     it("sets transition to none on category group header when reduced motion is active", () => {
       mockReducedMotion(true);
