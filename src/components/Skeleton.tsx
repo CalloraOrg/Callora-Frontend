@@ -74,3 +74,19 @@ export function FiltersSidebarSkeleton() {
   );
 }
 
+export function ApiTagFilterSkeleton({ pills = 6 }: { pills?: number }) {
+  return (
+    <div className="api-tag-filter" aria-hidden="true" role="presentation">
+      {Array.from({ length: pills }).map((_, i) => (
+        <Skeleton
+          key={i}
+          width={70 + (i % 3) * 20}
+          height={32}
+          borderRadius={16}
+          className="api-tag-filter__pill"
+          style={{ padding: 0, border: "none" }}
+        />
+      ))}
+    </div>
+  );
+}
