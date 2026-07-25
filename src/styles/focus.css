@@ -1,0 +1,5 @@
+/* src/styles/focus.css */
+.api-marketplace-card:focus-visible {
+  outline: 2px solid var(--accent, #4e85ff);
+  outline-offset: 4px;
+}

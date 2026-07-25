@@ -7,6 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import '../styles/focus.css';
 import { ContextMenu } from './ContextMenu';
 import Skeleton from "./Skeleton";
 import TagChip from "./TagChip";

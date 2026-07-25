@@ -124,4 +124,11 @@ describe("ApiCard Accessibility and Context Layouts", () => {
     expect(pinButton.getAttribute("aria-pressed")).toBe("true");
     expect(pinButton.getAttribute("aria-label")).toBe("Unpin api-1 from dashboard");
   });
-});
+
+  it("can receive keyboard focus", () => {
+    render(<ApiCard api={mockApi} />);
+    const card = screen.getByRole("button", { name: /View details for Stellar Metering API/i });
+    card.focus();
+    expect(document.activeElement).toBe(card);
+  });
+});
