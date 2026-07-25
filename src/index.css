@@ -1290,7 +1290,7 @@ code,
   background: var(--surface-soft);
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1024px) {
   .topbar,
   .section-heading,
   .hero-grid,
@@ -1713,7 +1713,6 @@ code,
   color: var(--text);
   font-size: 1rem;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
   line-height: 1.3;
   white-space: nowrap;
 }
@@ -1959,10 +1958,41 @@ code,
   position: sticky;
   top: 0;
   z-index: 20;
+  /* Small bottom padding prevents the first line of content below from
+     being obscured by the sticky bar at top:0. */
+  padding-bottom: 4px;
   /* The Tabs component (.tabs-nav) provides border-bottom, overflow-x,
      display:flex, and background. We only need to ensure the sticky
      background matches the page background here. */
   background: var(--page-bg);
+}
+
+.kbd-hint {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 8px 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.kbd-hint__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kbd-hint__key {
+  min-width: 24px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
 }
 
 /* The .api-detail-tabs button rule is now handled by .tabs-tab inside Tabs.tsx */
@@ -2906,7 +2936,7 @@ code,
 }
 
 /* Responsive Design */
-@media (max-width: 980px) {
+@media (max-width: 1024px) {
   .marketplace-layout {
     grid-template-columns: 1fr;
     gap: 16px;
@@ -2999,13 +3029,14 @@ code,
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .marketplace-page,
   .api-detail-page {
     padding: 14px;
   }
 
   .marketplace-header,
+  .marketplace-search-row,
   .marketplace-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -3108,6 +3139,17 @@ code,
 
   .api-detail-tabs {
     margin-bottom: 22px;
+  }
+
+  .kbd-hint {
+    justify-content: flex-start;
+    gap: 12px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .kbd-hint__item {
+    flex: 0 0 auto;
   }
 
   /* Tighten tab button spacing on narrow viewports */
@@ -3219,7 +3261,7 @@ code,
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .app-shell {
     padding: 20px 14px 32px;
   }
@@ -3524,8 +3566,13 @@ code,
 }
 
 @keyframes route-progress-glow-pulse {
-    0%, 100% { opacity: 0.6; }
-    50%      { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .route-progress-bar {
@@ -3580,8 +3627,26 @@ code,
   border-radius: 4px;
 }
 
+.skeleton--stellar {
+  background:
+    linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 20%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
+  background-size: 200% 100%;
+}
+
+.api-card-skeleton {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 44%),
+    var(--surface-soft);
+}
+
 [data-theme="light"] .skeleton {
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.04) 25%, rgba(0, 0, 0, 0.08) 50%, rgba(0, 0, 0, 0.04) 75%);
+  background-size: 200% 100%;
+}
+
+[data-theme="light"] .skeleton--stellar {
+  background:
+    linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 16%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
   background-size: 200% 100%;
 }
 /* Filters Sidebar accessibility styles */
@@ -4102,6 +4167,73 @@ code,
   color: var(--text);
 }
 
+/* ── ApiDetailPage CTA row (below hero, above tabs) ────────────────────────
+   The .api-hero__cta--detail modifier is scoped to the detail-page CTA row
+   so the same base class can be reused in other contexts without side-effects.
+   Uses only design tokens — no hardcoded hex values.
+   ─────────────────────────────────────────────────────────────────────────── */
+.api-hero__cta--detail {
+  /* Row layout with a bottom gutter matching the token-based spacing used
+     elsewhere on the page (same 16px as the old inline padding-bottom). */
+  display: flex;
+  gap: 0.75rem;
+  padding-bottom: 16px;
+  flex-wrap: wrap; /* buttons can wrap before stacking on mid-range widths */
+  align-items: center;
+}
+
+/* Stack CTA buttons vertically on narrow screens (≤ 640 px). */
+@media (max-width: 640px) {
+  .api-hero__cta--detail {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Ensure every button in the row spans the full available width. */
+  .api-hero__cta--detail > * {
+    width: 100%;
+  }
+}
+
+/* ── api-detail-metrics: 2-column at 640 px before collapsing to 1 ─────────
+   The existing rule in the ≤720px breakpoint collapses .api-detail-metrics
+   all the way to 1 column. This intermediate 640px rule gives a 2-column
+   layout in the 641px–720px range so cards aren't over-large on those sizes.
+   Below 481px the 1-column rule from the ≤720px breakpoint applies.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 720px) and (min-width: 481px) {
+  .api-detail-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── api-detail-two-column: auto-wrap at mid range (721px–980px) ────────────
+   Between 720px and 980px, the main content column is full-width (sidebar has
+   moved below). The two-column grid still tries to put two items side by side
+   in a potentially narrow container. Switch to auto-fill so the columns wrap
+   naturally when each item would be narrower than 260px.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 980px) and (min-width: 721px) {
+  .api-detail-two-column {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+/* ── api-detail-hero mid-range: align brand row on 768px ───────────────────
+   Between 720px and 980px the hero is 1-column (collapses above). At 768px
+   the brand row (logo + title) needs breathing room so the heading doesn't
+   crowd the logo, and the heading font clamp is tighter on these widths.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) and (min-width: 721px) {
+  .api-detail-brand {
+    gap: 14px;
+  }
+
+  .api-detail-title h1 {
+    font-size: 1.55rem;
+  }
+}
+
 /* 1024px */
 @media (max-width: 1024px) {
   .api-hero__content {
@@ -4185,8 +4317,26 @@ code,
   border-radius: 4px;
 }
 
+.skeleton--stellar {
+  background:
+    linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 20%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
+  background-size: 200% 100%;
+}
+
+.api-card-skeleton {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 44%),
+    var(--surface-soft);
+}
+
 [data-theme="light"] .skeleton {
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.04) 25%, rgba(0, 0, 0, 0.08) 50%, rgba(0, 0, 0, 0.04) 75%);
+  background-size: 200% 100%;
+}
+
+[data-theme="light"] .skeleton--stellar {
+  background:
+    linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 16%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
   background-size: 200% 100%;
 }
 
@@ -4243,7 +4393,9 @@ code,
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: background 180ms ease, border-color 180ms ease;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease;
 }
 
 .filter-group__header:hover,
@@ -4785,4 +4937,188 @@ code,
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
   border-color: var(--accent);
+}
+
+/* ============================================================
+   WhyApi — "Why this API?" disclosure widget
+   BEM block: .why-api
+   Placed inside the marketplace ApiCard (non-compact variant).
+   Design tokens: --accent, --accent-strong, --muted,
+                  --surface-soft, --border-subtle, --transition-speed
+   WCAG 2.1 AA: focus-visible ring, colour-contrast safe colours.
+   ============================================================ */
+
+/**
+ * Container block.
+ * Provides top margin to separate it from the card body content above,
+ * and sets the stacking context for the animated list.
+ */
+.why-api {
+  margin-top: 4px;
+  /* Establish a local stacking context so z-index on children is contained. */
+  position: relative;
+}
+
+/**
+ * Toggle button element.
+ * Stripped of native button chrome and styled as a small accent link-like
+ * affordance. The focus-visible ring uses the global token so it's
+ * consistent with every other interactive element in the app.
+ */
+.why-api__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem; /* 12 px */
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+  /* Smooth colour transition on hover/focus so the change isn't jarring. */
+  transition:
+    color var(--transition-speed, 240ms) ease,
+    opacity var(--transition-speed, 240ms) ease;
+}
+
+.why-api__toggle:hover {
+  /* Slightly brighten on hover to signal interactivity. */
+  opacity: 0.8;
+}
+
+/* Keyboard-focus ring — 2px solid accent at 3 px offset (matches app-wide
+   focus style defined in the :focus-visible section above). */
+.why-api__toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/** Open-state modifier — rotate chevron handled via content swap in JSX,
+    but the class can be used for additional styling if needed. */
+.why-api__toggle--open {
+  /* Slightly muted colour in the open state so "close" feels natural. */
+  color: var(--accent-strong, var(--accent));
+}
+
+/**
+ * Decorative chevron icon (aria-hidden in JSX).
+ * `user-select: none` prevents the symbol being included in copy-paste.
+ */
+.why-api__chevron {
+  user-select: none;
+  font-size: 0.625rem; /* 10 px — smaller than the label */
+  line-height: 1;
+}
+
+/**
+ * Reasons list element.
+ * Uses flex-column with a gap instead of list padding so spacing is
+ * predictable across all breakpoints.
+ */
+.why-api__reasons {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Subtle fade-in for the list appearance. */
+  animation: why-api-appear 180ms ease forwards;
+}
+
+@keyframes why-api-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/**
+ * Individual reason list item.
+ * Flex row so the check icon and text align on the same baseline.
+ */
+.why-api__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.75rem; /* 12 px */
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/**
+ * Decorative check mark (aria-hidden in JSX).
+ * Uses --accent-strong for a distinct but on-theme green tick.
+ */
+.why-api__check {
+  flex-shrink: 0;
+  color: var(--accent-strong, var(--accent));
+  user-select: none;
+  margin-top: 1px; /* optical alignment with the first line of text */
+}
+
+/**
+ * Readable reason text.
+ * `min-width: 0` allows long strings to wrap correctly inside the flex row.
+ */
+.why-api__text {
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ── Responsive adjustments ─────────────────────────────────────────────── */
+
+/* On narrow screens (< 400 px) reduce font slightly to stay within card. */
+@media (max-width: 400px) {
+  .why-api__toggle,
+  .why-api__item {
+    font-size: 0.6875rem; /* 11 px */
+  }
+}
+
+/* ── ContextMenu ────────────────────────────────────────────────────────────
+   Token-based styles for the ApiCard right-click / long-press menu.
+   The animation is suppressed for users who prefer reduced motion.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@keyframes contextmenu-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes contextmenu-appear {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+.context-menu__item:hover,
+.context-menu__item:focus-visible {
+  background: var(--surface-soft);
+  outline: none;
+}
+
+/* Restore the global focus ring for keyboard users inside the menu. */
+.context-menu__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }

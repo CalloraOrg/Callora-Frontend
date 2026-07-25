@@ -1,5 +1,6 @@
 import { WarningIcon, ChevronIcon } from "./icons";
 import Dropdown from "./Dropdown";
+import EmptyState from "./EmptyState";
 import { useState, useRef, useEffect } from "react";
 import { usePersistedState } from "../hooks/usePersistedState";
 
@@ -76,6 +77,7 @@ export default function FiltersSidebar({
   clearFilters,
   favoritesOnly = false,
   toggleFavoritesOnly = () => {},
+  resultCount,
 }: {
   selectedCategories: Set<string>;
   toggleCategory: (c: string) => void;
@@ -88,16 +90,19 @@ export default function FiltersSidebar({
   clearFilters: () => void;
   favoritesOnly?: boolean;
   toggleFavoritesOnly?: () => void;
+  resultCount?: number;
 }) {
-<<<<<<< HEAD
   // Inverted price range — show a warning without silently discarding filters.
   const hasPriceRangeError =
     minPrice !== null && maxPrice !== null && minPrice > maxPrice;
 
-  return (
-    <aside className="filters-sidebar">
-      {/* ── Categories ──────────────────────────────────────────────────── */}
-=======
+  const hasActiveFilters =
+    selectedCategories.size > 0 ||
+    minPrice !== null ||
+    maxPrice !== null ||
+    popularity !== "any" ||
+    favoritesOnly;
+
   const [sheetOpen, setSheetOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -108,29 +113,15 @@ export default function FiltersSidebar({
       const onKey = (e: KeyboardEvent) => {
         if (e.key === "Escape") setSheetOpen(false);
       };
-        // Inverted price range — show a warning without silently discarding filters.
-        const hasPriceRangeError = minPrice !== null && maxPrice !== null && minPrice > maxPrice;
+      document.addEventListener("keydown", onKey);
+      return () => document.removeEventListener("keydown", onKey);
+    }
+  }, [sheetOpen]);
 
-        const [sheetOpen, setSheetOpen] = useState(false);
-        const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-
-        useEffect(() => {
-          if (sheetOpen) {
-            // set focus to close button for basic accessibility
-            closeButtonRef.current?.focus();
-            const onKey = (e: KeyboardEvent) => {
-              if (e.key === "Escape") setSheetOpen(false);
-            };
-            document.addEventListener("keydown", onKey);
-            return () => document.removeEventListener("keydown", onKey);
-          }
-        }, [sheetOpen]);
-
-        // For responsive styling, `.mobile-filters-toggle` is hidden by desktop CSS
-        const content = (
-          <>
-            {/* ── Categories */}
-      >>>>>>> 0a57646 (feat: FiltersSidebar bottom-sheet)
+  // For responsive styling, `.mobile-filters-toggle` is hidden by desktop CSS
+  const content = (
+    <>
+      {/* ── Categories ────────────────────────────────────────────────── */}
       <FilterGroup title="Categories" storageKey="categories">
         <div className="filter-options" style={{ display: "grid", gap: 8 }}>
           {ALL_CATEGORIES.map((c) => {
@@ -161,12 +152,15 @@ export default function FiltersSidebar({
         </div>
       </FilterGroup>
 
-<<<<<<< HEAD
-      {/* ── Price range ─────────────────────────────────────────────────── */}
+      {/* ── Price range ────────────────────────────────────────────────── */}
       <FilterGroup title="Price range" storageKey="price">
         <div style={{ display: "grid", gap: 8 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <label htmlFor="filter-min-price" className="filter-label" style={{ minWidth: 28 }}>
+            <label
+              htmlFor="filter-min-price"
+              className="filter-label"
+              style={{ minWidth: 28 }}
+            >
               Min
             </label>
             <input
@@ -177,7 +171,9 @@ export default function FiltersSidebar({
               min={0}
               placeholder="0"
               onChange={(e) =>
-                setMinPrice(e.target.value === "" ? null : Number(e.target.value))
+                setMinPrice(
+                  e.target.value === "" ? null : Number(e.target.value),
+                )
               }
               aria-label="Minimum price"
               aria-invalid={hasPriceRangeError}
@@ -185,7 +181,11 @@ export default function FiltersSidebar({
             />
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <label htmlFor="filter-max-price" className="filter-label" style={{ minWidth: 28 }}>
+            <label
+              htmlFor="filter-max-price"
+              className="filter-label"
+              style={{ minWidth: 28 }}
+            >
               Max
             </label>
             <input
@@ -196,97 +196,64 @@ export default function FiltersSidebar({
               min={0}
               placeholder="∞"
               onChange={(e) =>
-                setMaxPrice(e.target.value === "" ? null : Number(e.target.value))
+                setMaxPrice(
+                  e.target.value === "" ? null : Number(e.target.value),
+                )
               }
               aria-label="Maximum price"
               aria-invalid={hasPriceRangeError}
               style={{ flex: 1, minWidth: 0 }}
             />
-          </FilterGroup>
+          </div>
+          {hasPriceRangeError && (
+            <p
+              className="error-text"
+              role="alert"
+              style={{
+                display: "flex",
+                gap: 6,
+                alignItems: "center",
+                margin: 0,
+              }}
+            >
+              <WarningIcon size={16} aria-hidden="true" />
+              Min price cannot exceed max price
+            </p>
+          )}
+        </div>
+      </FilterGroup>
 
-          {/* ── Price range */}
-          <FilterGroup title="Price range" storageKey="price">
-            <div style={{ display: "grid", gap: 8 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <label htmlFor="filter-min-price" className="filter-label" style={{ minWidth: 28 }}>
-                  Min
-                </label>
-                <input
-                  id="filter-min-price"
-                  type="number"
-                  className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""}`}
-                  value={minPrice ?? ""}
-                  min={0}
-                  placeholder="0"
-                  onChange={(e) =>
-                    setMinPrice(e.target.value === "" ? null : Number(e.target.value))
-                  }
-                  aria-label="Minimum price"
-                  aria-invalid={hasPriceRangeError}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <label htmlFor="filter-max-price" className="filter-label" style={{ minWidth: 28 }}>
-                  Max
-                </label>
-                <input
-                  id="filter-max-price"
-                  type="number"
-                  className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""}`}
-                  value={maxPrice ?? ""}
-                  min={0}
-                  placeholder="∞"
-                  onChange={(e) =>
-                    setMaxPrice(e.target.value === "" ? null : Number(e.target.value))
-                  }
-                  aria-label="Maximum price"
-                  aria-invalid={hasPriceRangeError}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-              </div>
-              {hasPriceRangeError && (
-                <p
-                  className="error-text"
-                  role="alert"
-                  style={{ display: "flex", gap: 6, alignItems: "center", margin: 0 }}
-                >
-                  <WarningIcon size={16} aria-hidden="true" />
-                  Min price cannot exceed max price
-                </p>
-              )}
-            </div>
-          </FilterGroup>
+      {/* ── Popularity ─────────────────────────────────────────────────── */}
+      <FilterGroup title="Popularity" storageKey="popularity">
+        <div className="filter-popularity" style={{ marginTop: 8 }}>
+          <Dropdown<PopularityValue>
+            id="filters-popularity"
+            value={popularity as PopularityValue}
+            options={
+              POPULARITY_OPTIONS as unknown as {
+                value: PopularityValue;
+                label: string;
+              }[]
+            }
+            onChange={(v) => setPopularity(v)}
+            label="Filter by popularity"
+            visibleLabel={null}
+            className="filter-dropdown"
+          />
+        </div>
+      </FilterGroup>
 
-          {/* ── Popularity */}
-          <FilterGroup title="Popularity" storageKey="popularity">
-            <div className="filter-popularity" style={{ marginTop: 8 }}>
-              <Dropdown<PopularityValue>
-                id="filters-popularity"
-                value={popularity as PopularityValue}
-                options={POPULARITY_OPTIONS as unknown as { value: PopularityValue; label: string }[]}
-                onChange={(v) => setPopularity(v)}
-                label="Filter by popularity"
-                visibleLabel={null}
-                className="filter-dropdown"
-              />
-            </div>
-          </FilterGroup>
-
-          <FilterGroup title="Favorites" storageKey="favorites">
-            <div className="filter-option" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-              <input
-                id="favorites-only-checkbox"
-                type="checkbox"
-                className="filter-checkbox"
-                checked={favoritesOnly}
-                onChange={toggleFavoritesOnly}
-              />
-              <label htmlFor="favorites-only-checkbox" className="filter-label" style={{ color: "var(--text)" }}>
-                Favorites only
-              </label>
-            </div>
-          </FilterGroup>
+      {/* ── Favorites ──────────────────────────────────────────────────── */}
+      <FilterGroup title="Favorites" storageKey="favorites">
+        <div
+          className="filter-option"
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            marginTop: 8,
+          }}
+        >
           <input
             id="favorites-only-checkbox"
             type="checkbox"
@@ -294,14 +261,44 @@ export default function FiltersSidebar({
             checked={favoritesOnly}
             onChange={toggleFavoritesOnly}
           />
-          <label htmlFor="favorites-only-checkbox" className="filter-label" style={{ color: "var(--text)" }}>
+          <label
+            htmlFor="favorites-only-checkbox"
+            className="filter-label"
+            style={{ color: "var(--text)" }}
+          >
             Favorites only
           </label>
         </div>
       </FilterGroup>
->>>>>>> 0a57646 (feat: FiltersSidebar bottom-sheet)
 
-      {/* ── Clear ───────────────────────────────────────────────────────── */}
+      {/* ── Zero-results illustration (v7) ───────────────────────────────
+         Visually separates from the filter groups above with a soft token-
+         based top border so the call-to-action feels grouped with the
+         result-count feedback rather than with the Favorites section.
+         The wrapper is aria-live="polite" so screen readers announce the
+         zero-results state when filters narrow the count to 0. */}
+      {typeof resultCount === "number" &&
+        resultCount === 0 &&
+        hasActiveFilters && (
+          <div
+            data-testid="filters-zero-results"
+            style={{
+              margin: "12px 0 12px",
+              paddingTop: "12px",
+              borderTop: "1px solid var(--line)",
+            }}
+            role="status"
+            aria-live="polite"
+          >
+            <EmptyState
+              variant="filtered"
+              size="compact"
+              onClearFilters={hasActiveFilters ? clearFilters : undefined}
+            />
+          </div>
+        )}
+
+      {/* ── Clear ──────────────────────────────────────────────────────── */}
       <div style={{ marginTop: 8 }}>
         <button className="ghost-button" onClick={clearFilters}>
           Clear filters
@@ -351,7 +348,13 @@ export default function FiltersSidebar({
               overflow: "auto",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <h2 style={{ margin: 0 }}>Filters</h2>
               <button
                 ref={closeButtonRef}

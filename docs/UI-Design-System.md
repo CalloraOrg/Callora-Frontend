@@ -139,7 +139,7 @@ Displays API information in a card format for marketplace listings.
 **Variants:**
 
 - `ApiCard` - Standard card with hover effects
-- `ApiCardSkeleton` - Loading state with skeleton placeholders
+- `ApiCardSkeleton` - Loading state with themed skeleton placeholders
 
 **Visual Spec:**
 
@@ -150,7 +150,7 @@ Displays API information in a card format for marketplace listings.
 - Background: Uses `--surface-soft` token
 - Tags: Reusable clickable chips with pill styling, token-based colors, and active-state highlighting
 - Footer: Three-column micro-stat row with a muted label above a prominent value for price, latency, and uptime
-- Numeric values: Use tabular numerals for easier comparison across marketplace rows
+- Numeric values: Use the shared `numeric-tabular` utility for easier comparison across marketplace rows and ApiCard amount displays
 - Missing stats: Render a muted em dash so card heights remain consistent
 
 **States:**
@@ -173,6 +173,7 @@ Displays API information in a card format for marketplace listings.
 
 ```tsx
 <ApiCard api={apiData} onViewDetails={(api) => navigate(`/api/${api.id}`)} />
+<ApiCard loading />
 ```
 
 ---
@@ -233,7 +234,7 @@ Navigation breadcrumb showing page hierarchy.
 
 - `aria-label="breadcrumb"` on nav
 - `aria-current="page"` on current item
-- Collapsed middle crumbs open from a real button with `aria-expanded` and `aria-controls`
+- Collapsed middle crumbs open from a real button with `aria-haspopup="menu"`, `aria-expanded`, and `aria-controls`
 - Keyboard navigation supports Enter/Space on links and buttons, Arrow Up/Down, Home, End, and Escape in the collapsed crumbs menu
 - Focus moves into the collapsed menu when opened and returns to the trigger when closed with Escape
 
@@ -299,33 +300,96 @@ Tabbed code snippet display with copy-to-clipboard functionality.
 
 ### EmptyState
 
-Displayed when no results are found (e.g., empty search results).
+Displayed when no results are found (e.g., empty search results, filtered marketplace, network errors).
+Enhanced in v7 with custom line-art SVG illustrations per variant, design-token theming, and a compact
+size tailored specifically for inline use inside FiltersSidebar.
 
 **Props:**
 
-- `title?: string` - Heading text (default: "No APIs found")
-- `message?: string` - Subtitle text (default: "Try adjusting your filters")
+| Prop              | Type                                     | Default     | Description                                                               |
+| ----------------- | ---------------------------------------- | ----------- | ------------------------------------------------------------------------- |
+| `variant?`        | `"empty" \| "filtered" \| "error"`       | `"empty"`   | Which semantic state to render.                                           |
+| `size?`           | `"default" \| "compact"`                 | `"default"` | Full-size (marketplace results) vs condensed (FiltersSidebar inline).     |
+| `title?`          | `string`                                 | per variant | Override the default heading.                                             |
+| `message?`        | `string`                                 | per variant | Override the default subtitle.                                            |
+| `onClearFilters?` | `() => void`                             | —           | Shown only when `variant === "filtered"`. Renders the Clear CTA.          |
+| `onRetry?`        | `() => void \| Promise<void>`            | —           | Shown only when `variant === "error"`. Handles async loading + aria-busy. |
+| `action?`         | `{ label: string; onClick: () => void }` | —           | Optional custom CTA button rendered before any variant-specific actions.  |
 
-**Visual Spec:**
+**Visual Spec (v7):**
 
-- Layout: Centered, 32px padding
-- Icon: 160px width, SVG illustration with low opacity
-- Heading: `h3` element, no margin
-- Message: `--muted` color, 8px top margin
+- **Illustrations** are custom line-art SVGs, one per variant:
+  - `empty`: Open crate/box with subtle accent sparkles → "nothing to show yet"
+  - `filtered`: Funnel shape + magnifier-with-slash focal motif, accent tag pills → "filters exclude everything"
+  - `error`: Warning triangle with accent-marked exclamation caret, dashed baseline → "something went wrong"
+- All strokes use `var(--muted)` (primary) and `var(--accent)` (subordinate accents). **No hardcoded hex.**
+- Stroke caps/joins are `round` for a modern, friendly feel.
+- Illustrations are wrapped in a circular container:
+  - `default`: 80px circle, `--surface-soft` bg, `--line` border
+  - `compact`: 56px circle, `--surface` bg, `--line` border
+- Layout:
+  - `default`: 48px/32px padding, min-height 300px, flex column centered
+  - `compact`: 16px/12px padding, `--surface-soft` bg, 10px radius, `--line` border
+- Type scale:
+  - `default`: `h2` heading, clamp(1.375rem, 2vw, 1.625rem), body 0.9375rem
+  - `compact`: `h3` heading, 0.9375rem semibold, body 0.8125rem, max-width 240px
+- CTAs:
+  - `default`: Primary button, min-height 44px, min-width 160px
+  - `compact`: Ghost button, min-height 36px, label "Clear filters" vs "Clear all filters"
+
+**Default copy per variant:**
+
+| Variant  | Default title         | Default message (default)                           | Default message (compact)                 |
+| -------- | --------------------- | --------------------------------------------------- | ----------------------------------------- |
+| empty    | "No APIs available"   | "Check back soon for new integrations."             | same (compact not typical)                |
+| filtered | "No results found"    | "Your filters are too narrow. Try adjusting them."  | "Adjust filters or clear to see results." |
+| error    | "Failed to load APIs" | "We encountered an error fetching the marketplace…" | "Error loading results. Please retry."    |
 
 **States:**
 
-- Static (no interactive states)
+- Static illustration, interactive CTAs only.
+- Error retry is async: button disables + `aria-busy="true"` + label "Retrying…" while the promise is pending.
+- Default-size error additionally renders an ExternalLink to `https://status.callora.io`.
 
-**Accessibility:**
+**Accessibility (WCAG 2.1 AA):**
 
-- Semantic heading structure
-- Uses `--muted` token for secondary text
+- **1.1.1 Non-text Content:** Illustration wrapper and nested SVG both carry `aria-hidden="true"`. Meaning is conveyed exclusively by the heading + message text.
+- **1.3.1 Info and Relationships:** Semantic `h2` (default) / `h3` (compact) heading above a paragraph.
+- **1.4.1 Use of Color:** `var(--accent)` strokes are decorative only; the variant meaning is unambiguous from the title/message even if accent color is invisible.
+- **1.4.3 Contrast (Minimum):** All text uses `--text` / `--muted` tokens, which are calibrated to meet 4.5:1 in both light and dark themes.
+- **1.4.12 Text Spacing:** Uses `line-height` ≥ 1.3; no height constraints on text blocks.
+- **2.5.5 Target Size:** Buttons are minimum 36px (compact) / 44px (default) tall.
+- **4.1.3 Status Messages:** Filtered variant in FiltersSidebar is wrapped in `role="status"` `aria-live="polite"` so zero-results events are announced when the count transitions from ≥1 to 0.
+- **Design-token & dark-mode consistency:** Zero hardcoded hex colors anywhere — every stroke, fill, bg, and border references a `var(--token)` so zero visual regressions on theme toggle.
+
+**Responsive Behavior:**
+
+- `size="default"` is used in result-area containers (MarketplacePage main grid, Dashboard wide panels). Illustration scales with the flex container; heading uses `clamp()` for viewport-aware sizing.
+- `size="compact"` is used inline in FiltersSidebar (both desktop sidebar and mobile bottom sheet). The 56px illustration fits comfortably inside a ~280px column without crowding the chip-style filter controls.
+- Both sizes maintain locked dimensions for illustration wrapper so switching variants never causes layout shift.
 
 **Usage Example:**
 
 ```tsx
-<EmptyState title="No results found" message="Try different search terms" />
+{
+  /* Marketplace results area */
+}
+{
+  filteredApis.length === 0 && Object.keys(activeFilters).length === 0 && <EmptyState variant="empty" />;
+}
+{
+  filteredApis.length === 0 && Object.keys(activeFilters).length > 0 && <EmptyState variant="filtered" onClearFilters={resetFilters} />;
+}
+{
+  fetchError && <EmptyState variant="error" onRetry={refetch} />;
+}
+
+{
+  /* FiltersSidebar inline zero-results notice */
+}
+{
+  resultCount === 0 && hasActiveFilters && <EmptyState variant="filtered" size="compact" onClearFilters={clearFilters} />;
+}
 ```
 
 ---
@@ -389,40 +453,59 @@ Interactive documentation helper that previews endpoint groups on hover and keyb
 
 Sidebar for filtering marketplace results. Rendered inside the desktop layout and also embedded inside the `FiltersBottomSheet` on mobile.
 
+Enhanced in v7 with an inline, context-aware **zero-results EmptyState** that appears between the Favorites section and the Clear button whenever the active filters narrow the result set to 0.
+
 **Props:**
 
-- `selectedCategories: Set<string>` - Currently selected categories
-- `toggleCategory: (c: string) => void` - Toggle category selection
-- `minPrice: number | null` - Minimum price filter
-- `maxPrice: number | null` - Maximum price filter
-- `setMinPrice: (v: number | null) => void` - Set minimum price
-- `setMaxPrice: (v: number | null) => void` - Set maximum price
-- `popularity: string` - Popularity sort option (`"any"` | `"mostUsed"` | `"newest"`)
-- `setPopularity: (p: string) => void` - Set popularity sort
-- `clearFilters: () => void` - Reset all filters
-- `favoritesOnly: boolean` - Whether the Favorites Only filter is active
-- `toggleFavoritesOnly: () => void` - Toggle favorites-only filter
+| Prop                   | Type                          | Default | Description                                                                                               |
+| ---------------------- | ----------------------------- | ------- | --------------------------------------------------------------------------------------------------------- |
+| `selectedCategories`   | `Set<string>`                 | (req)   | Currently selected category checkboxes.                                                                   |
+| `toggleCategory`       | `(c: string) => void`         | (req)   | Toggle a category checkbox.                                                                               |
+| `minPrice`             | `number \| null`              | (req)   | Minimum price filter value.                                                                               |
+| `maxPrice`             | `number \| null`              | (req)   | Maximum price filter value.                                                                               |
+| `setMinPrice`          | `(v: number \| null) => void` | (req)   | Update minimum price (pass `null` to clear).                                                              |
+| `setMaxPrice`          | `(v: number \| null) => void` | (req)   | Update maximum price (pass `null` to clear).                                                              |
+| `popularity`           | `string`                      | (req)   | Popularity sort: `"any"` \| `"mostUsed"` \| `"newest"`.                                                   |
+| `setPopularity`        | `(p: string) => void`         | (req)   | Update popularity sort.                                                                                   |
+| `clearFilters`         | `() => void`                  | (req)   | Reset every filter to its default/empty state.                                                            |
+| `favoritesOnly?`       | `boolean`                     | `false` | Whether the "Favorites only" toggle is checked.                                                           |
+| `toggleFavoritesOnly?` | `() => void`                  | no-op   | Toggle the `favoritesOnly` state.                                                                         |
+| `resultCount?`         | `number`                      | —       | **(v7)** Live count of results after filtering. When `0` + active filters, renders the inline EmptyState. |
 
 **Visual Spec:**
-- Layout: Three collapsible `FilterGroup` sections (Categories, Price range, Popularity) plus a Favorites fieldset and a Clear button
-- Each `FilterGroup` persists its collapsed state to `localStorage` via `usePersistedState`
-- Price range: Two `<input type="number">` fields with a `WarningIcon` + error message when min > max
-- Popularity: Accessible `Dropdown` component
-- Clear button: Ghost button style
+
+- Layout: Three collapsible `FilterGroup` sections (Categories, Price range, Popularity) plus a Favorites fieldset, the **inline zero-results EmptyState (v7)**, and a Clear button.
+- Each `FilterGroup` persists its collapsed state to `localStorage` via `usePersistedState`.
+- Price range: Two `<input type="number">` fields with a `WarningIcon` + error message when `min > max`.
+- Popularity: Accessible `Dropdown` component.
+- **Zero-results inline block (v7):** Wrapped in a `12px` padding-top + `1px solid var(--line)` top-border separator so it visually groups with "results feedback" rather than the Favorites controls above. Contains:
+  - `<EmptyState variant="filtered" size="compact" onClearFilters={clearFilters} />`
+  - Wrapper carries `role="status"` + `aria-live="polite"` for assistive-tech announcements.
+- Clear button: Ghost button style, always present at the bottom.
 
 **States:**
-- Default: All filter sections expanded
-- Collapsed: Section header shows rotated chevron; panel is `hidden`
-- Price error: Both price inputs gain `filter-input--invalid` class; alert paragraph appears with `role="alert"`
-- Focused: Standard focus ring on all inputs and buttons
 
-**Accessibility:**
+- Default: All filter sections expanded.
+- Collapsed: Section header shows rotated chevron; panel is `hidden`.
+- Price error: Both price inputs gain `filter-input--invalid` class; alert paragraph appears with `role="alert"`.
+- **Zero-results (v7):** When `resultCount === 0` AND at least one filter is active (categories, price bounds, non-any popularity, or favorites-only), the inline EmptyState mounts with a token-based top-border separator above it.
+- Focused: Standard focus ring on all inputs and buttons.
 
-- Semantic `<aside>` element
-- All form controls have associated `<label>` elements
-- `FilterGroup` uses `aria-expanded` and `aria-controls` on the toggle button
-- Price validation error uses `role="alert"` and `aria-invalid` on the affected inputs
-- Keyboard navigation through checkboxes and inputs
+**Responsive Behavior:**
+
+- **Desktop:** Rendered inside `<aside class="filters-sidebar">` as a persistent left rail. Zero-results separator and EmptyState render inline.
+- **Mobile (≤ 980px):** The `<aside>` is still in the DOM (for CSS-driven hidden toggle visibility). Separately, `.mobile-filters-toggle` opens `role="dialog"` bottom sheet containing `{content}` — the same JSX, so the zero-results block and its separator render identically inside the sheet. Tests verify both paths.
+
+**Accessibility (WCAG 2.1 AA):**
+
+- Semantic `<aside>` element.
+- All form controls have associated `<label>` elements.
+- `FilterGroup` uses `aria-expanded` and `aria-controls` on the toggle button; `id`/`aria-controls` pairs link headers to panels.
+- Price validation error uses `role="alert"` and `aria-invalid` on the affected inputs.
+- **Zero-results announcement (v7):** Wrapper `role="status" aria-live="polite"` ensures screen readers announce the narrowing-to-zero event when it happens during filter editing, without stealing focus.
+- Keyboard navigation through checkboxes and inputs; ESC closes the mobile sheet.
+- Nested `EmptyState` illustration is fully `aria-hidden` per WCAG 1.1.1 — title + message + CTA carry all meaning.
+- All colors reference `var(--token)` (no hardcoded hex) for consistent light/dark theming.
 
 **Usage Example:**
 
@@ -439,6 +522,7 @@ Sidebar for filtering marketplace results. Rendered inside the desktop layout an
   clearFilters={clearFilters}
   favoritesOnly={favoritesOnly}
   toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+  resultCount={filteredApis.length}  {/* v7: enables inline zero-results illustration */}
 />
 ```
 
@@ -449,6 +533,7 @@ Sidebar for filtering marketplace results. Rendered inside the desktop layout an
 Mobile-only bottom-sheet that wraps `FiltersSidebar`. Shown when the user taps the "Filters" trigger button on viewports ≤ 980 px. Rendered by `MarketplacePage` and controlled via `showFiltersMobile` state.
 
 **Props:**
+
 - `open: boolean` - Whether the sheet is visible
 - `onClose: () => void` - Callback to close the sheet
 - `resultCount: number` - Live count displayed in the footer CTA ("Show N results")
@@ -462,6 +547,7 @@ Mobile-only bottom-sheet that wraps `FiltersSidebar`. Shown when the user taps t
 - `triggerRef: React.RefObject<HTMLButtonElement>` - Ref to the trigger button; focus is restored to it when the sheet closes
 
 **Snap points:**
+
 - `"half"` (default on open) → `50vh`
 - `"full"` → `92vh`
 - Drag the handle area down > 60 px from `"full"` → snaps to `"half"`; drag down from `"half"` → dismisses
@@ -469,6 +555,7 @@ Mobile-only bottom-sheet that wraps `FiltersSidebar`. Shown when the user taps t
 - Spring transition: `280ms cubic-bezier(0.32, 0.72, 0, 1)`; disabled when `prefers-reduced-motion: reduce`
 
 **CSS classes (index.css):**
+
 - `.bottom-sheet__backdrop` — fixed overlay; click to close
 - `.bottom-sheet` — the sheet panel; height driven by snap state
 - `.bottom-sheet--half` / `.bottom-sheet--full` — semantic modifier classes
@@ -480,6 +567,7 @@ Mobile-only bottom-sheet that wraps `FiltersSidebar`. Shown when the user taps t
 - `@keyframes bottom-sheet-in` — slide-up entry animation (no-preference motion only)
 
 **Accessibility:**
+
 - `role="dialog"` with `aria-modal="true"` and `aria-label="Filters"`
 - Focus trap: Tab/Shift+Tab cycle is contained inside the sheet while open
 - ESC key closes the sheet
@@ -488,6 +576,7 @@ Mobile-only bottom-sheet that wraps `FiltersSidebar`. Shown when the user taps t
 - Handle area is `aria-hidden`; close button has `aria-label="Close filters"`
 
 **Usage Example:**
+
 ```tsx
 <FiltersBottomSheet
   open={showFiltersMobile}
@@ -583,6 +672,50 @@ Displays a tooltip with a 5-star rating distribution breakdown upon hovering or 
 <RatingHistogram rating={4.5} distribution={{ 5: 100, 4: 50, 3: 10, 2: 5, 1: 0 }}>
   <span>⭐ 4.5</span>
 </RatingHistogram>
+```
+
+### ContextMenu
+
+Accessible context menu for `ApiCard`. Triggered by right-click on desktop or a 600 ms long-press on touch devices.
+
+**Props:**
+
+- `x: number` — Viewport X coordinate to anchor the menu
+- `y: number` — Viewport Y coordinate to anchor the menu
+- `onClose: () => void` — Called when the menu should close
+- `actions: ContextMenuAction[]` — Array of `{ label, action, isCritical? }`
+
+**Visual Spec:**
+
+- Background: `var(--surface-strong)` with `backdrop-filter: blur(20px)`
+- Border: `1px solid var(--line-strong)`
+- Border radius: `var(--radius-md)`
+- Shadow: `var(--shadow)`
+- Item height: ~40px, `0.875rem` font, `var(--text)` color
+- Critical items: `var(--danger)` color
+- Hover/focus: `var(--surface-soft)` background
+
+**Behavior:**
+
+- Viewport-edge clamped: never renders off-screen
+- Auto-focuses the first `menuitem` on mount
+- Closes on: Escape, outside click/touch, or after any action is selected
+- Does not open when the right-click/touch target is a `<button>` or `<a>` inside the card
+
+**Accessibility (WCAG 2.1 AA):**
+
+- `role="menu"` with `aria-label="API Card Options"` on the container
+- `role="menuitem"` on each action button
+- Auto-focuses first item on open (2.4.3 Focus Order)
+- Keyboard dismiss via Escape (2.1.1 Keyboard)
+- All colors use design tokens; no hardcoded hex
+
+**Usage:**
+
+```tsx
+{
+  menuPos && <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)} actions={contextActions} />;
+}
 ```
 
 ---
@@ -726,6 +859,7 @@ Loading placeholder for content.
 - `width?: string | number` - Skeleton width
 - `height?: string | number` - Skeleton height
 - `borderRadius?: string | number` - Border radius
+- `tone?: "neutral" | "stellar"` - Optional GrantFox/Stellar Wave themed shimmer
 - `style?: CSSProperties` - Additional inline styles
 - `className?: string` - Additional CSS classes
 
@@ -786,6 +920,72 @@ The following utility classes are defined in `src/index.css` and should be used 
 - `.not-found` - 404 page container
 - `.server-error` - Error page container
 - `.placeholder-card` - Generic placeholder container
+
+---
+
+---
+
+## Theme Transition System
+
+Callora's light/dark switch is polished with a smooth color transition so the
+switch feels intentional rather than jarring.
+
+### How it works
+
+1. **`src/styles/theme-transition.css`** — Applies `transition: background-color,
+   border-color, color, fill, stroke, outline-color` to every semantic HTML element
+   and SVG shape.  The transition is guarded by the `.theme-transitions-ready` class
+   on `<html>`, which `ThemeProvider` adds via `requestAnimationFrame` after the
+   very first paint.  This prevents the initial page load from animating into the
+   user's saved theme (which would look like a flash).
+
+2. **`ThemeProvider`** (`src/ThemeContext.tsx`) — Sets `.theme-transitions-ready`
+   after the first paint and exposes two helpers to consumers:
+   - `THEME_TRANSITION_MS` (number, `240`) — matches the `--transition-speed` CSS
+     token.  Import it when you need to delay or coordinate JS-side changes with
+     the CSS animation.
+   - `isTransitioning` (boolean) — `true` from the moment `data-theme` changes
+     until `THEME_TRANSITION_MS` has elapsed.  Useful for suppressing or
+     coordinating secondary UI updates during the switch.
+
+3. **`ThemeToggle`** (`src/ThemeToggle.tsx`) — Adds
+   `.theme-toggle-icon--swapping` to the icon `<span>` for the first half of the
+   transition (`THEME_TRANSITION_MS / 2` ms), hiding the outgoing SVG with an
+   opacity fade so the icon swap feels deliberate (fade-out → swap → fade-in).
+
+### Opting out
+
+Any element (or its subtree) that must not participate in the theme transition —
+for example, elements controlled by `animation` keyframes — should use the
+`.no-theme-transition` class:
+
+```html
+<!-- Toast wrapper: opacity/transform are already animated by keyframes -->
+<div class="toast-queue no-theme-transition">…</div>
+```
+
+The stylesheet also automatically excludes the following known animated
+components so you do not need to add the class to them manually:
+`.toast-queue`, `.skeleton`, `.button-spinner`, `.status-dot`,
+`.route-progress-bar`, `.bottom-sheet`, `.history-panel`,
+`.history-bottom-sheet`.
+
+### Reduced motion
+
+All color transitions are disabled when `prefers-reduced-motion: reduce` is set.
+The `@media (prefers-reduced-motion: reduce)` block in `theme-transition.css`
+overrides every transition with `none !important`, so users who prefer instant
+switches always get them.
+
+### Adding new UI
+
+- Color-bearing elements receive the transition automatically — no opt-in needed.
+- If you add a component with its own `animation` keyframes that animate
+  `background-color`, `color`, or `border-color`, add `.no-theme-transition` to
+  that component's root element or add its class to the exclusion list in
+  `theme-transition.css`.
+- Never hardcode the 240 ms duration in JS.  Use the exported
+  `THEME_TRANSITION_MS` constant from `ThemeContext` instead.
 
 ---
 
