@@ -26,11 +26,11 @@ export default function LowBalanceBanner({ balance, openDeposit }: LowBalanceBan
   }
 
   return (
-    <div className="low-balance-banner" role="status">
+    <div className="low-balance-banner" role="status" aria-live="polite">
       <div className="low-balance-banner__content">
         <span className="low-balance-banner__icon" aria-hidden="true">⚠️</span>
         <div className="low-balance-banner__text">
-          <strong>Low balance warning:</strong> Your vault balance is below {LOW_BALANCE_USD} USDC. Add funds to prevent API disruption.
+          <strong>Low balance warning:</strong> Your vault balance is below <span className="tabular-nums">{LOW_BALANCE_USD} USDC</span>. Add funds to prevent API disruption.
         </div>
       </div>
       <div className="low-balance-banner__actions">
