@@ -21,7 +21,7 @@ import Sparkline from "./Sparkline";
 import type { Shortcut } from "../hooks/useGlobalShortcuts";
 import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
-import { TagIcon, ClockIcon, BoltIcon } from "./icons";
+import { ClockIcon, BoltIcon } from "./icons";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -523,6 +523,22 @@ export default function ApiCard({
   const isCompared = comparedApis.some((item) => item.id === api.id);
   const canCompare = isCompared || comparedApis.length < 3;
 
+  const sparklineValues = useMemo(() => {
+    if (api.sparklineValues && api.sparklineValues.length > 0) {
+      return api.sparklineValues;
+    }
+    // Generate deterministic values based on API properties/id so every API has a unique visually appealing trend
+    const seed = api.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const vals = [];
+    let current = 20 + (seed % 30);
+    for (let i = 0; i < 12; i++) {
+      const step = Math.sin(seed + i) * 10;
+      current = Math.max(5, Math.min(100, current + step));
+      vals.push(Math.round(current));
+    }
+    return vals;
+  }, [api.id, api.sparklineValues]);
+
   const handleCompareClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isCompared) {
@@ -783,7 +799,7 @@ export default function ApiCard({
           Last 24h
         </span>
 
-        <Sparkline values={[18, 22, 20, 24, 26, 25, 30, 32, 31, 34, 36, 35]} width={90} height={28} />
+        <Sparkline values={sparklineValues} width={90} height={28} />
       </div>
 
       <div
