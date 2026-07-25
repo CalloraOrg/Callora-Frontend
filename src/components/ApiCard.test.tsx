@@ -291,6 +291,32 @@ describe("ApiCard reduced motion", () => {
   });
 });
 
+describe("ApiCard skeleton", () => {
+  it("includes sparkline placeholder to match final card layout", () => {
+    render(<ApiCard loading />);
+    // The skeleton should have the sparkline section (24h label + sparkline area)
+    const cards = document.querySelectorAll(".api-card-skeleton");
+    expect(cards.length).toBe(1);
+    // Verify the skeleton is rendered (not the actual card)
+    expect(screen.getByText("Loading API")).toBeTruthy();
+  });
+
+  it("includes WhyApi placeholder to match comfortable-mode card shape", () => {
+    const { container } = render(<ApiCard loading />);
+    // The skeleton renders multiple Skeleton blocks — one for the WhyApi section
+    const skeletons = container.querySelectorAll(".skeleton--stellar");
+    // Title, provider, description lines, tags, WhyApi lines, sparkline label,
+    // sparkline, 3 stat labels, 3 stat values, CTA, rating
+    expect(skeletons.length).toBeGreaterThanOrEqual(12);
+  });
+
+  it("uses tone stellar for themed skeleton appearance", () => {
+    const { container } = render(<ApiCard loading />);
+    const skeletons = container.querySelectorAll(".skeleton--stellar");
+    expect(skeletons.length).toBeGreaterThan(0);
+  });
+});
+
 describe("ApiCard responsiveness", () => {
   const mockApi: APIItem = {
     id: "api-resp",

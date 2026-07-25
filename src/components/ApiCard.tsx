@@ -71,10 +71,32 @@ export function ApiCardSkeleton() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <Skeleton tone="stellar" width={45} height={24} borderRadius={8} />
         <Skeleton tone="stellar" width={55} height={24} borderRadius={8} />
         <Skeleton tone="stellar" width={40} height={24} borderRadius={8} />
+      </div>
+
+      {/* WhyApi placeholder — matches the real card's rationale section
+          that appears in comfortable mode. */}
+      <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 4 }}>
+        <Skeleton tone="stellar" width="35%" height={12} />
+        <Skeleton tone="stellar" width="80%" height={12} />
+      </div>
+
+      {/* Sparkline section — matches the real card's 24h sparkline
+          that appears between tags and stats. */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginTop: 2,
+        }}
+      >
+        <Skeleton tone="stellar" width={52} height={12} />
+        <Skeleton tone="stellar" width={90} height={28} />
       </div>
 
       <div
