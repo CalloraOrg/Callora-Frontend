@@ -30,6 +30,18 @@ vi.mock("../state/compareStore", () => ({
   },
 }));
 
+/* ── Shared fixture ─────────────────────────────────────────────────────── */
+
+const mockApi: APIItem = {
+  id: "api-1",
+  name: "Stellar Metering API",
+  description: "A mock API for testing.",
+  tags: ["weather", "forecast", "geo"],
+  pricePerRequest: 0.01,
+  provider: { name: "Acme Labs" },
+  endpoints: [{ id: "meter", url: "/api/v1/meter", method: "GET", title: "Meter" }],
+};
+
 /* ── Test suites ─────────────────────────────────────────────────────────── */
 
 describe("ApiCard — Context Menu", () => {
