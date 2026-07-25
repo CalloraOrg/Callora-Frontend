@@ -374,14 +374,10 @@ size tailored specifically for inline use inside FiltersSidebar.
   /* Marketplace results area */
 }
 {
-  filteredApis.length === 0 && Object.keys(activeFilters).length === 0 && (
-    <EmptyState variant="empty" />
-  );
+  filteredApis.length === 0 && Object.keys(activeFilters).length === 0 && <EmptyState variant="empty" />;
 }
 {
-  filteredApis.length === 0 && Object.keys(activeFilters).length > 0 && (
-    <EmptyState variant="filtered" onClearFilters={resetFilters} />
-  );
+  filteredApis.length === 0 && Object.keys(activeFilters).length > 0 && <EmptyState variant="filtered" onClearFilters={resetFilters} />;
 }
 {
   fetchError && <EmptyState variant="error" onRetry={refetch} />;
@@ -391,13 +387,7 @@ size tailored specifically for inline use inside FiltersSidebar.
   /* FiltersSidebar inline zero-results notice */
 }
 {
-  resultCount === 0 && hasActiveFilters && (
-    <EmptyState
-      variant="filtered"
-      size="compact"
-      onClearFilters={clearFilters}
-    />
-  );
+  resultCount === 0 && hasActiveFilters && <EmptyState variant="filtered" size="compact" onClearFilters={clearFilters} />;
 }
 ```
 
@@ -678,12 +668,53 @@ Displays a tooltip with a 5-star rating distribution breakdown upon hovering or 
 **Usage Example:**
 
 ```tsx
-<RatingHistogram
-  rating={4.5}
-  distribution={{ 5: 100, 4: 50, 3: 10, 2: 5, 1: 0 }}
->
+<RatingHistogram rating={4.5} distribution={{ 5: 100, 4: 50, 3: 10, 2: 5, 1: 0 }}>
   <span>⭐ 4.5</span>
 </RatingHistogram>
+```
+
+### ContextMenu
+
+Accessible context menu for `ApiCard`. Triggered by right-click on desktop or a 600 ms long-press on touch devices.
+
+**Props:**
+
+- `x: number` — Viewport X coordinate to anchor the menu
+- `y: number` — Viewport Y coordinate to anchor the menu
+- `onClose: () => void` — Called when the menu should close
+- `actions: ContextMenuAction[]` — Array of `{ label, action, isCritical? }`
+
+**Visual Spec:**
+
+- Background: `var(--surface-strong)` with `backdrop-filter: blur(20px)`
+- Border: `1px solid var(--line-strong)`
+- Border radius: `var(--radius-md)`
+- Shadow: `var(--shadow)`
+- Item height: ~40px, `0.875rem` font, `var(--text)` color
+- Critical items: `var(--danger)` color
+- Hover/focus: `var(--surface-soft)` background
+
+**Behavior:**
+
+- Viewport-edge clamped: never renders off-screen
+- Auto-focuses the first `menuitem` on mount
+- Closes on: Escape, outside click/touch, or after any action is selected
+- Does not open when the right-click/touch target is a `<button>` or `<a>` inside the card
+
+**Accessibility (WCAG 2.1 AA):**
+
+- `role="menu"` with `aria-label="API Card Options"` on the container
+- `role="menuitem"` on each action button
+- Auto-focuses first item on open (2.4.3 Focus Order)
+- Keyboard dismiss via Escape (2.1.1 Keyboard)
+- All colors use design tokens; no hardcoded hex
+
+**Usage:**
+
+```tsx
+{
+  menuPos && <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)} actions={contextActions} />;
+}
 ```
 
 ---
@@ -771,11 +802,7 @@ Search input with clear button and keyboard shortcuts.
 **Usage Example:**
 
 ```tsx
-<SearchBar
-  value={searchQuery}
-  onChange={setSearchQuery}
-  onSearch={handleSearch}
-/>
+<SearchBar value={searchQuery} onChange={setSearchQuery} onSearch={handleSearch} />
 ```
 
 ---
@@ -817,12 +844,7 @@ Server error display with retry functionality.
 **Usage Example:**
 
 ```tsx
-<ServerError
-  onRetry={fetchData}
-  requestId="req_abc123"
-  title="Connection failed"
-  description="Unable to reach the server. Please check your connection."
-/>
+<ServerError onRetry={fetchData} requestId="req_abc123" title="Connection failed" description="Unable to reach the server. Please check your connection." />
 ```
 
 ---
