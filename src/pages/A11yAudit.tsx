@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import manifest from '../data/a11y-manifest.json';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 type Status = 'all' | 'audited' | 'needs-work' | 'n/a';
 
 export default function A11yAudit() {
+  useDocumentTitle('Accessibility Audit');
   const [filter, setFilter] = useState<Status>('all');
   
   const filteredComponents = manifest.components.filter(c => filter === 'all' || c.status === filter);
