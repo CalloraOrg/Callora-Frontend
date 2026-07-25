@@ -20,7 +20,6 @@ import {
   persistDensityPreference,
   type DensityPreference,
 } from "../utils/density";
-import CompareDrawer from "../components/CompareDrawer";
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
 import { useCompareStore } from "../state/compareStore";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
