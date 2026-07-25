@@ -34,6 +34,7 @@ const mockApi: APIItem = {
   id: "api-1",
   name: "Stellar Metering API",
   endpoint: "/api/v1/meter",
+  endpoints: [{ url: "/api/v1/meter" }],
   description: "A mock API for testing.",
   tags: ["weather", "forecast", "geo"],
   pricePerRequest: 0.01,
