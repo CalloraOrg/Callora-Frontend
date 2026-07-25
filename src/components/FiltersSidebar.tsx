@@ -1,7 +1,7 @@
 import { WarningIcon, ChevronIcon } from "./icons";
 import Dropdown from "./Dropdown";
 import EmptyState from "./EmptyState";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { usePersistedState } from "../hooks/usePersistedState";
 
 const POPULARITY_OPTIONS = [
@@ -23,10 +23,16 @@ export const ALL_CATEGORIES = [
 interface FilterGroupProps {
   title: string;
   storageKey: "categories" | "price" | "popularity" | "favorites";
+  prefersReducedMotion: boolean;
   children: React.ReactNode;
 }
 
-function FilterGroup({ title, storageKey, children }: FilterGroupProps) {
+function FilterGroup({
+  title,
+  storageKey,
+  children,
+  prefersReducedMotion,
+}: FilterGroupProps) {
   const [collapsed, setCollapsed] = usePersistedState<boolean>(
     `callora.filters.${storageKey}.collapsed`,
     false,
@@ -45,11 +51,13 @@ function FilterGroup({ title, storageKey, children }: FilterGroupProps) {
         onClick={handleToggle}
         aria-expanded={!collapsed}
         aria-controls={`filter-panel-${storageKey}`}
+        style={{ transition: prefersReducedMotion ? "none" : undefined }}
       >
         <span className="filter-group__title">{title}</span>
         <ChevronIcon
           size={20}
           className={`filter-group__chevron ${collapsed ? "filter-group__chevron--collapsed" : ""}`}
+          style={{ transition: prefersReducedMotion ? "none" : undefined }}
         />
       </button>
       <div
@@ -92,6 +100,14 @@ export default function FiltersSidebar({
   toggleFavoritesOnly?: () => void;
   resultCount?: number;
 }) {
+  const prefersReducedMotion = useMemo(() => {
+    return (
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+  }, []);
+
   // Inverted price range — show a warning without silently discarding filters.
   const hasPriceRangeError =
     minPrice !== null && maxPrice !== null && minPrice > maxPrice;
@@ -122,7 +138,11 @@ export default function FiltersSidebar({
   const content = (
     <>
       {/* ── Categories ────────────────────────────────────────────────── */}
-      <FilterGroup title="Categories" storageKey="categories">
+      <FilterGroup
+        title="Categories"
+        storageKey="categories"
+        prefersReducedMotion={prefersReducedMotion}
+      >
         <div className="filter-options" style={{ display: "grid", gap: 8 }}>
           {ALL_CATEGORIES.map((c) => {
             const id = `category-${c.replace(/\s+/g, "-").toLowerCase()}`;
@@ -153,7 +173,11 @@ export default function FiltersSidebar({
       </FilterGroup>
 
       {/* ── Price range ────────────────────────────────────────────────── */}
-      <FilterGroup title="Price range" storageKey="price">
+      <FilterGroup
+        title="Price range"
+        storageKey="price"
+        prefersReducedMotion={prefersReducedMotion}
+      >
         <div style={{ display: "grid", gap: 8 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <label
@@ -164,10 +188,10 @@ export default function FiltersSidebar({
               Min
             </label>
             <input
-               id="filter-min-price"
-               type="number"
-               className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""} tabular-nums`}
-               value={minPrice ?? ""}
+              id="filter-min-price"
+              type="number"
+              className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""} tabular-nums`}
+              value={minPrice ?? ""}
               min={0}
               placeholder="0"
               onChange={(e) =>
@@ -189,10 +213,10 @@ export default function FiltersSidebar({
               Max
             </label>
             <input
-               id="filter-max-price"
-               type="number"
-               className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""} tabular-nums`}
-               value={maxPrice ?? ""}
+              id="filter-max-price"
+              type="number"
+              className={`filter-input${hasPriceRangeError ? " filter-input--invalid" : ""} tabular-nums`}
+              value={maxPrice ?? ""}
               min={0}
               placeholder="∞"
               onChange={(e) =>
@@ -224,7 +248,11 @@ export default function FiltersSidebar({
       </FilterGroup>
 
       {/* ── Popularity ─────────────────────────────────────────────────── */}
-      <FilterGroup title="Popularity" storageKey="popularity">
+      <FilterGroup
+        title="Popularity"
+        storageKey="popularity"
+        prefersReducedMotion={prefersReducedMotion}
+      >
         <div className="filter-popularity" style={{ marginTop: 8 }}>
           <Dropdown<PopularityValue>
             id="filters-popularity"
@@ -244,7 +272,11 @@ export default function FiltersSidebar({
       </FilterGroup>
 
       {/* ── Favorites ──────────────────────────────────────────────────── */}
-      <FilterGroup title="Favorites" storageKey="favorites">
+      <FilterGroup
+        title="Favorites"
+        storageKey="favorites"
+        prefersReducedMotion={prefersReducedMotion}
+      >
         <div
           className="filter-option"
           style={{

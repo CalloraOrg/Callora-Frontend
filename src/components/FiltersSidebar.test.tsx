@@ -10,6 +10,19 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import FiltersSidebar from "./FiltersSidebar";
 
+function mockReducedMotion(enabled: boolean) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: enabled,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(() => false),
+  }));
+}
+
 const baseProps = {
   selectedCategories: new Set<string>(),
   toggleCategory: vi.fn(),
@@ -437,7 +450,9 @@ describe("FiltersSidebar", () => {
 
     it("category checkboxes are focusable", () => {
       render(<FiltersSidebar {...baseProps} />);
-      const checkbox = screen.getByLabelText("Data & Analytics") as HTMLInputElement;
+      const checkbox = screen.getByLabelText(
+        "Data & Analytics",
+      ) as HTMLInputElement;
       expect(checkbox).toBeInstanceOf(HTMLInputElement);
       checkbox.focus();
       expect(document.activeElement).toBe(checkbox);
@@ -445,10 +460,64 @@ describe("FiltersSidebar", () => {
 
     it("price inputs have tabular-nums class for aligned numeric display", () => {
       render(<FiltersSidebar {...baseProps} />);
-      const minInput = screen.getByLabelText("Minimum price") as HTMLInputElement;
-      const maxInput = screen.getByLabelText("Maximum price") as HTMLInputElement;
+      const minInput = screen.getByLabelText(
+        "Minimum price",
+      ) as HTMLInputElement;
+      const maxInput = screen.getByLabelText(
+        "Maximum price",
+      ) as HTMLInputElement;
       expect(minInput.classList.contains("tabular-nums")).toBe(true);
       expect(maxInput.classList.contains("tabular-nums")).toBe(true);
+    });
+  });
+
+  describe("prefers-reduced-motion", () => {
+    it("sets transition to none on category group header when reduced motion is active", () => {
+      mockReducedMotion(true);
+      render(<FiltersSidebar {...baseProps} />);
+      const header = screen.getByRole("button", { name: "Categories" });
+      expect(header.style.transition).toBe("none");
+    });
+
+    it("sets transition to none on category group chevron when reduced motion is active", () => {
+      mockReducedMotion(true);
+      render(<FiltersSidebar {...baseProps} />);
+      const header = screen.getByRole("button", { name: "Categories" });
+      const chevron = header.querySelector(".filter-group__chevron");
+      expect(chevron?.getAttribute("style")).toContain("transition: none");
+    });
+
+    it("sets transition to none on all filter group headers when reduced motion is active", () => {
+      mockReducedMotion(true);
+      render(<FiltersSidebar {...baseProps} />);
+      expect(
+        screen.getByRole("button", { name: "Categories" }).style.transition,
+      ).toBe("none");
+      expect(
+        screen.getByRole("button", { name: "Price range" }).style.transition,
+      ).toBe("none");
+      expect(
+        screen.getByRole("button", { name: "Popularity" }).style.transition,
+      ).toBe("none");
+      expect(
+        screen.getByRole("button", { name: "Favorites" }).style.transition,
+      ).toBe("none");
+    });
+
+    it("preserves normal transitions when reduced motion is not active", () => {
+      mockReducedMotion(false);
+      render(<FiltersSidebar {...baseProps} />);
+      const header = screen.getByRole("button", { name: "Categories" });
+      expect(header.style.transition).not.toBe("none");
+    });
+
+    it("gracefully handles missing matchMedia (SSR environment)", () => {
+      const origMatchMedia = window.matchMedia;
+      delete (window as any).matchMedia;
+      render(<FiltersSidebar {...baseProps} />);
+      const header = screen.getByRole("button", { name: "Categories" });
+      expect(header.style.transition).not.toBe("none");
+      (window as any).matchMedia = origMatchMedia;
     });
   });
 });
