@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import EmptyState from './components/EmptyState';
 import Skeleton, { SkeletonRow } from './components/Skeleton';
 import { formatPrice } from './utils/format';
@@ -230,12 +230,19 @@ export default function ApiUsage() {
   const toggleHistory = useCallback(() => setIsHistoryOpen(prev => !prev), []);
   const [historyEntries, setHistoryEntries] = useState<any[]>([]);
 
+  const prefersReducedMotion = useMemo(() => {
+    return typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+
   useEffect(() => {
+    const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
     const timer = setTimeout(() => {
       setIsTableLoading(false);
-    }, LOADING_DELAY_MS);
+    }, delay);
     return () => clearTimeout(timer);
-  }, []);
+  }, [prefersReducedMotion]);
 
   const [selectedRange, setSelectedRange] = useState<DateRange>({ preset: '24h' });
   const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
