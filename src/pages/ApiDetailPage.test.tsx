@@ -467,5 +467,18 @@ describe("ApiDetailPage", () => {
       // "Try API", "View Pricing", and SubscribeButton
       expect((buttons?.length ?? 0)).toBeGreaterThanOrEqual(2);
     });
+
+    it("injects responsive styles for mobile viewports", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      
+      // Look for the style tag we injected
+      const styles = Array.from(document.querySelectorAll("style"));
+      const hasMobileStyle = styles.some(style => style.textContent?.includes("@media (max-width: 768px)"));
+      expect(hasMobileStyle).toBe(true);
+
+      const hasPopoverOverride = styles.some(style => style.textContent?.includes(".endpoint-save-popover"));
+      expect(hasPopoverOverride).toBe(true);
+    });
   });
 });

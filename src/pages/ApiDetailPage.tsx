@@ -212,6 +212,7 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
         <div
           ref={panelRef}
           role="dialog"
+          className="endpoint-save-popover"
           aria-modal="true"
           aria-label="Save endpoint to collection"
           onClick={(e) => e.stopPropagation()}
@@ -505,9 +506,9 @@ export default function ApiDetailPage({ onBack }: Props) {
 
             <div className="api-detail-content-grid">
               <div className="content-left">
-                <nav className="api-detail-tabs no-print">
+                <nav className="api-detail-tabs no-print" style={{ display: "flex", overflowX: "auto", scrollbarWidth: "none" }}>
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} width={80} height={20} style={{ marginRight: 24 }} />
+                    <Skeleton key={i} width={80} height={20} style={{ marginRight: 24, flexShrink: 0 }} />
                   ))}
                 </nav>
                 <div className="api-detail-metrics">
@@ -599,6 +600,17 @@ print(response.json())`;
 
   return (
     <div className="api-detail-page">
+      <style>{`
+        @media (max-width: 768px) {
+          .endpoint-save-popover {
+            right: auto !important;
+            left: 0 !important;
+          }
+          .api-hero__cta--detail > * {
+            width: 100% !important;
+          }
+        }
+      `}</style>
       <div className="api-detail-container">
         <Breadcrumb
           items={[
@@ -728,7 +740,7 @@ print(response.json())`;
                     role="tabpanel"
                     aria-labelledby="tab-documentation"
                     tabIndex={0}
-                    style={{ display: "flex", gap: 32, alignItems: "flex-start" }}
+                    style={{ display: "flex", gap: 32, alignItems: "flex-start", flexWrap: "wrap" }}
                   >
                     {/* Main documentation content */}
                     <div style={{ flex: 1, minWidth: 0 }}>
