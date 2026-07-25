@@ -23,6 +23,7 @@ import RelatedApisRail from "../components/RelatedApisRail";
 import MOCK_APIS from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
+import PlanBadge from "../components/PlanBadge";
 
 /**
  * ApiDetailPage
@@ -640,7 +641,8 @@ print(response.json())`;
           </div>
 
           {/* ── CTA row (below hero, above tabs) ──────────────────────────── */}
-          <div className="api-hero__cta no-print" style={{ display: "flex", gap: "0.75rem", padding: "0 0 16px" }}>
+          {/* Responsive class handles flex→column stacking on narrow viewports */}
+          <div className="api-hero__cta api-hero__cta--detail no-print">
             <button className="primary-button">Try API</button>
             <button className="secondary-button" onClick={() => setTab("pricing")}>
               View Pricing

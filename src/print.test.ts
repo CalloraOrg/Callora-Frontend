@@ -52,7 +52,8 @@ describe("no-print markup", () => {
     const page = read("src/pages/ApiDetailPage.tsx");
     expect(page).toMatch(/className="api-detail-tabs no-print"/);
     expect(page).toMatch(/className="api-detail-sidebar no-print"/);
-    expect(page).toMatch(/className="api-hero__cta no-print"/);
+    // CTA row uses api-hero__cta--detail modifier; all three classes must be present
+    expect(page).toMatch(/className="api-hero__cta api-hero__cta--detail no-print"/);
   });
 
   it("marks CodeExample header controls as no-print", () => {
