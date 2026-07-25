@@ -484,4 +484,136 @@ describe("ApiDetailPage", () => {
       expect(docPanel.tabIndex).toBe(0);
     });
   });
+
+  // ── #412: tabular-nums on numeric displays ──────────────────────────────────
+
+  describe("tabular-nums on numeric displays", () => {
+    it("applies tabular-nums to the hero price", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const heroPrice = document.querySelector(".api-detail-price.tabular-nums");
+      expect(heroPrice).toBeTruthy();
+    });
+
+    it("applies tabular-nums to the meta price in the hero heading", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const metaPrice = document.querySelector(".api-detail-meta .tabular-nums");
+      expect(metaPrice).toBeTruthy();
+    });
+
+    it("applies tabular-nums to performance metric values", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const metricValues = document.querySelectorAll(".stat-card .tabular-nums");
+      expect(metricValues.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("applies tabular-nums to pricing plan price on the pricing tab", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const planPrice = document.querySelector(".api-detail-plan-price.tabular-nums");
+      expect(planPrice).toBeTruthy();
+    });
+
+    it("applies tabular-nums to cost calculator inputs on the pricing tab", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const volumeDisplay = document.querySelector(".api-detail-calculator-total .tabular-nums");
+      expect(volumeDisplay).toBeTruthy();
+
+      const rangeInput = screen.getByRole("slider", { name: "Monthly request volume" });
+      expect(rangeInput).toBeTruthy();
+    });
+  });
+
+  // ── #415: aria-live region for status changes ───────────────────────────────
+
+  describe("aria-live region for status changes", () => {
+    it("renders an aria-live region for API health status", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const liveRegion = document.querySelector('[aria-live="polite"][aria-atomic="true"]');
+      expect(liveRegion).toBeTruthy();
+    });
+
+    it("announces loading state via aria-live region", () => {
+      renderWithProviders(<ApiDetailPage />);
+
+      // During loading, assertive region should be present
+      const assertiveRegion = document.querySelector('.api-detail-page .sr-only[aria-live="assertive"]');
+      expect(assertiveRegion).toBeTruthy();
+      expect(assertiveRegion?.textContent).toContain("Loading");
+    });
+
+    it("announces loaded state via polite aria-live region", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const politeRegion = document.querySelector('.api-detail-page .sr-only[aria-live="polite"]');
+      expect(politeRegion).toBeTruthy();
+      expect(politeRegion?.textContent).toContain("Loaded");
+    });
+
+    it("includes proper aria attributes on the status grid", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The API Health card contains the status grid with aria-live
+      const healthHeading = screen.getByText("API Health");
+      const healthCard = healthHeading.closest(".stat-card");
+      const statusGrid = healthCard?.querySelector('[aria-live="polite"][aria-atomic="true"]');
+      expect(statusGrid).toBeTruthy();
+      expect(statusGrid?.textContent).toContain("Operational");
+    });
+  });
+
+  // ── #536: UI/UX polish ─────────────────────────────────────────────────────
+
+  describe("UI/UX polish", () => {
+    it("separates the status dot from the status text for better semantics", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Find the status dot inside the API Health section's aria-live region
+      const healthHeading = screen.getByText("API Health");
+      const healthCard = healthHeading.closest(".stat-card");
+      const statusGrid = healthCard?.querySelector('[aria-live="polite"][aria-atomic="true"]');
+      const statusDot = statusGrid?.querySelector('[aria-hidden="true"]');
+      expect(statusDot).toBeTruthy();
+      expect(statusDot?.textContent).toBe("●");
+    });
+
+    it("provides aria-valuetext on the cost calculator range input", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+      expect(slider.getAttribute("aria-valuetext")).toContain("requests");
+    });
+
+    it("cost calculator range input has proper aria attributes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+      expect(slider.getAttribute("aria-valuemin")).toBe("100");
+      expect(slider.getAttribute("aria-valuemax")).toBe("1000000");
+      expect(slider.getAttribute("aria-valuenow")).toBeTruthy();
+    });
+  });
 });

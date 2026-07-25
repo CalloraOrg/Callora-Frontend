@@ -285,7 +285,7 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
                   <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {collection.name}
                   </span>
-                  <span style={{ color: "var(--muted)", fontSize: 11 }}>
+                  <span className="tabular-nums" style={{ color: "var(--muted)", fontSize: 11 }}>
                     {collection.endpointIds.length}
                   </span>
                 </label>
@@ -475,6 +475,9 @@ export default function ApiDetailPage({ onBack }: Props) {
   if (isLoading) {
     return (
       <div className="api-detail-page">
+        <div className="sr-only" aria-live="assertive" aria-atomic="true">
+          Loading API details…
+        </div>
         <div className="api-detail-container">
           <Breadcrumb
             items={[
@@ -599,6 +602,9 @@ print(response.json())`;
 
   return (
     <div className="api-detail-page">
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {isLoading ? "Loading API details…" : `Loaded ${api.name}`}
+      </div>
       <div className="api-detail-container">
         <Breadcrumb
           items={[
@@ -620,7 +626,7 @@ print(response.json())`;
                   <h1>{api.name}</h1>
                   <div className="api-detail-meta">
                     <a href={api.provider?.url}>{api.provider?.name}</a> ·{" "}
-                    <strong style={{ color: "var(--accent-strong)" }}>{`$${formatPrice(api.pricePerRequest ?? 0)}`}</strong> per request
+                    <strong className="tabular-nums" style={{ color: "var(--accent-strong)" }}>{`$${formatPrice(api.pricePerRequest ?? 0)}`}</strong> per request
                   </div>
                 </div>
                 <div className="api-detail-provider">
@@ -633,7 +639,7 @@ print(response.json())`;
             </div>
 
             <div className="api-detail-price-panel">
-              <div className="api-detail-price">{`$${formatPrice(api.pricePerRequest ?? 0)}`}</div>
+              <div className="api-detail-price tabular-nums">{`$${formatPrice(api.pricePerRequest ?? 0)}`}</div>
               <div className="api-detail-price-label">per successful request</div>
               <button className="primary-button" style={{ marginTop: 16 }}>
                 Connect API
@@ -714,7 +720,7 @@ print(response.json())`;
                       ].map(({ label, value, color }) => (
                         <div key={label} className="stat-card" style={{ padding: 20, background: "var(--surface-soft)", borderRadius: 12 }}>
                           <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
-                          <div style={{ fontSize: 24, fontWeight: 700, marginTop: 8, color }}>{value}</div>
+                          <div className="tabular-nums" style={{ fontSize: 24, fontWeight: 700, marginTop: 8, color }}>{value}</div>
                         </div>
                       ))}
                     </div>
@@ -846,7 +852,7 @@ print(response.json())`;
                       {/* Standard plan */}
                       <div className="preview-card" style={{ padding: 24, border: "2px solid var(--accent)" }}>
                         <PlanBadge tier="pro" />
-                        <div className="api-detail-plan-price">
+                        <div className="api-detail-plan-price tabular-nums">
                           {`$${formatPrice(api.pricePerRequest ?? 0)}`} <span style={{ fontSize: 14, color: "var(--muted)" }}>/ call</span>
                         </div>
                         <p style={{ fontSize: 14, color: "var(--muted)" }}>Perfect for startups and scaling applications. Pay only for what you use.</p>
@@ -884,7 +890,7 @@ print(response.json())`;
                       <div style={{ marginTop: 32 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
                           <span style={{ fontWeight: 600 }}>Monthly Volume</span>
-                          <span style={{ color: "var(--accent)", fontWeight: 700 }}>{requests.toLocaleString()} Requests</span>
+                          <span className="tabular-nums" style={{ color: "var(--accent)", fontWeight: 700 }}>{requests.toLocaleString()} Requests</span>
                         </div>
                         <input
                           type="range"
@@ -893,12 +899,17 @@ print(response.json())`;
                           step={100}
                           value={requests}
                           onChange={(e) => setRequests(Number(e.target.value))}
+                          aria-label="Monthly request volume"
+                          aria-valuemin={100}
+                          aria-valuemax={1000000}
+                          aria-valuenow={requests}
+                          aria-valuetext={`${requests.toLocaleString()} requests`}
                           style={{ width: "100%", height: 6, borderRadius: 3, appearance: "none", background: "var(--line)" }}
                         />
                         <div className="api-detail-calculator-total">
                           <div>
                             <div style={{ fontSize: 12, color: "var(--muted)" }}>Estimated Monthly Total</div>
-                            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--text)" }}>{estimatedCost(requests)}</div>
+                            <div className="tabular-nums" style={{ fontSize: 28, fontWeight: 800, color: "var(--text)" }}>{estimatedCost(requests)}</div>
                           </div>
                           <div style={{ textAlign: "right", fontSize: 13, color: "var(--muted)" }}>
                             * Volume discounts apply automatically
@@ -1069,15 +1080,18 @@ print(response.json())`;
               <div className="api-detail-sidebar-inner">
                 <div className="stat-card" style={{ padding: 24, marginBottom: 20 }}>
                   <h4 style={{ marginTop: 0 }}>API Health</h4>
-                  <div style={{ display: "grid", gap: 16, marginTop: 20 }}>
+                  <div aria-live="polite" aria-atomic="true" style={{ display: "grid", gap: 16, marginTop: 20 }}>
                     {[
-                      { label: "Status", value: "● Operational", color: "var(--success)" },
-                      { label: "Region", value: "Global (Edge)", color: "var(--text)" },
-                      { label: "CORS", value: "Supported", color: "var(--success)" },
-                    ].map(({ label, value, color }) => (
+                      { label: "Status", value: "Operational", color: "var(--success)", dot: true },
+                      { label: "Region", value: "Global (Edge)", color: "var(--text)", dot: false },
+                      { label: "CORS", value: "Supported", color: "var(--success)", dot: false },
+                    ].map(({ label, value, color, dot }) => (
                       <div key={label} style={{ display: "flex", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 14, color: "var(--muted)" }}>{label}</span>
-                        <span style={{ fontSize: 14, color, fontWeight: label !== "Region" ? 600 : undefined }}>{value}</span>
+                        <span style={{ fontSize: 14, color, fontWeight: label !== "Region" ? 600 : undefined }}>
+                          {dot && <span aria-hidden="true" style={{ marginRight: 6 }}>●</span>}
+                          {value}
+                        </span>
                       </div>
                     ))}
                   </div>
