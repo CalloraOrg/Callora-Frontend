@@ -107,6 +107,32 @@ describe('StatusBadge', () => {
     const badge = screen.getByRole('img', { name: 'Error' }) as HTMLElement;
     expect(badge.getAttribute('data-status')).toBe('error');
     expect(badge.getAttribute('data-pattern')).toBe('stripes');
+    expect(badge.getAttribute('data-pattern-enabled')).toBe('true');
+    expect(badge.getAttribute('data-pattern-style')).toBe('default');
     expect(badge.getAttribute('aria-description')).toContain('diagonal stripes');
+  });
+
+  // ── showPattern & patternStyle props ──────────────────────────────────────
+
+  it('supports disabling pattern overlay via showPattern={false}', () => {
+    render(<StatusBadge status="error" showPattern={false} />);
+    const badge = screen.getByRole('img', { name: 'Error' });
+    expect(badge.classList.contains('sb-pattern--disabled')).toBe(true);
+    expect(badge.getAttribute('data-pattern-enabled')).toBe('false');
+    expect(badge.getAttribute('aria-description')).toContain('no pattern');
+  });
+
+  it('applies dense pattern modifier class when patternStyle="dense"', () => {
+    render(<StatusBadge status="error" patternStyle="dense" />);
+    const badge = screen.getByRole('img', { name: 'Error' });
+    expect(badge.classList.contains('sb-pattern--dense')).toBe(true);
+    expect(badge.getAttribute('data-pattern-style')).toBe('dense');
+  });
+
+  it('applies high-contrast pattern modifier class when patternStyle="high-contrast"', () => {
+    render(<StatusBadge status="warning" patternStyle="high-contrast" />);
+    const badge = screen.getByRole('img', { name: 'Degraded' });
+    expect(badge.classList.contains('sb-pattern--high-contrast')).toBe(true);
+    expect(badge.getAttribute('data-pattern-style')).toBe('high-contrast');
   });
 });

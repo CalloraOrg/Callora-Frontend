@@ -76,24 +76,52 @@ function Dot({ status }: { status: StatusVariant }) {
   );
 }
 
+export type PatternStyle = 'default' | 'dense' | 'high-contrast';
+
 type Props = {
   status: StatusVariant;
   /** Override the visible label; defaults to a human-readable status name. */
   label?: string;
   className?: string;
+  /** Whether to show texture patterns for color-blind safety. Defaults to true. */
+  showPattern?: boolean;
+  /** Pattern style modifier. Defaults to 'default'. */
+  patternStyle?: PatternStyle;
 };
 
-export function StatusBadge({ status, label, className }: Props) {
+export function StatusBadge({
+  status,
+  label,
+  className,
+  showPattern = true,
+  patternStyle = 'default',
+}: Props) {
   const visibleLabel = label ?? DEFAULT_LABELS[status];
   const patternDescription = PATTERN_DESCRIPTIONS[status];
   const patternKey = PATTERN_KEYS[status];
 
+  const patternModifierClass = !showPattern
+    ? 'sb-pattern--disabled'
+    : patternStyle !== 'default'
+      ? `sb-pattern--${patternStyle}`
+      : '';
+
+  const rootClassNames = [
+    `sb-pattern-${status}`,
+    patternModifierClass,
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <span
       // Pattern class from patterns.css provides the texture overlay
-      className={[`sb-pattern-${status}`, className].filter(Boolean).join(' ')}
+      className={rootClassNames}
       data-status={status}
       data-pattern={patternKey}
+      data-pattern-enabled={showPattern}
+      data-pattern-style={patternStyle}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -115,7 +143,7 @@ export function StatusBadge({ status, label, className }: Props) {
       // role="status" would be too assertive for a static badge.
       role="img"
       aria-label={visibleLabel}
-      aria-description={`Pattern-based status badge: ${visibleLabel} with ${patternDescription}`}
+      aria-description={`Pattern-based status badge: ${visibleLabel} with ${showPattern ? patternDescription : 'no pattern'}`}
     >
       <Dot status={status} />
       {visibleLabel}

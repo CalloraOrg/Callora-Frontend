@@ -45,3 +45,41 @@
   background-size: 8px 8px;
   background-repeat: repeat;
 }
+
+/* ── Pattern Modifiers & Accessibility Customizations ───────────────────── */
+
+/* Disabled / hidden pattern */
+.sb-pattern--disabled {
+  background-image: none !important;
+}
+
+/* Dense modifier — tighter pattern repeating for enhanced visibility */
+.sb-pattern--dense.sb-pattern-error,
+.sb-pattern--dense.sb-pattern-down {
+  background-size: 4px 4px;
+}
+
+.sb-pattern--dense.sb-pattern-warning,
+.sb-pattern--dense.sb-pattern-degraded {
+  background-size: 5px 5px;
+}
+
+.sb-pattern--dense.sb-pattern-pending {
+  background-size: 5px 5px;
+}
+
+/* High-contrast modifier — increased stroke/fill opacity for low-vision environments */
+.sb-pattern--high-contrast.sb-pattern-error,
+.sb-pattern--high-contrast.sb-pattern-down {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1.5' stroke-opacity='0.45'/%3E%3Cline x1='3' y1='0' x2='6' y2='3' stroke='currentColor' stroke-width='1.5' stroke-opacity='0.45'/%3E%3Cline x1='0' y1='3' x2='3' y2='6' stroke='currentColor' stroke-width='1.5' stroke-opacity='0.45'/%3E%3C/svg%3E");
+}
+
+.sb-pattern--high-contrast.sb-pattern-warning,
+.sb-pattern--high-contrast.sb-pattern-degraded {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cline x1='0' y1='8' x2='8' y2='0' stroke='currentColor' stroke-width='1.5' stroke-opacity='0.4'/%3E%3Cline x1='4' y1='8' x2='8' y2='4' stroke='currentColor' stroke-width='1.5' stroke-opacity='0.4'/%3E%3Cline x1='0' y1='4' x2='4' y2='0' stroke='currentColor' stroke-width='1.5' stroke-opacity='0.4'/%3E%3C/svg%3E");
+}
+
+.sb-pattern--high-contrast.sb-pattern-pending {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1.5' fill='currentColor' fill-opacity='0.5'/%3E%3C/svg%3E");
+}
+
