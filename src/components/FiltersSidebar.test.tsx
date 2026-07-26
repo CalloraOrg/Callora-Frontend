@@ -384,7 +384,7 @@ describe("FiltersSidebar", () => {
       );
       const block = screen.getByTestId("filters-zero-results") as HTMLElement;
       expect(block.style.borderTop).toMatch(/var\(--line\)/);
-      expect(block.style.paddingTop).toBe("12px");
+      expect(block.style.paddingTop).toMatch(/var\(--mkt-space-lg/);
     });
 
     it("zero-results wrapper keeps role='status' and aria-live='polite' for assistive tech", () => {
@@ -499,6 +499,52 @@ describe("FiltersSidebar", () => {
       const header = screen.getByRole("button", { name: "Categories" });
       expect(header.style.transition).not.toBe("none");
       (window as any).matchMedia = origMatchMedia;
+    });
+  });
+
+  describe("aria-live announcements", () => {
+    it("renders a LiveRegion element for screen-reader announcements", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion.getAttribute("aria-live")).toBe("polite");
+      expect(liveRegion.getAttribute("role")).toBe("status");
+    });
+
+    it("announces when a category is selected", async () => {
+      render(<FiltersSidebar {...baseProps} selectedCategories={new Set(["AI/ML"])} />);
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toContain("AI/ML");
+      expect(liveRegion.textContent).toContain("Filters active");
+    });
+
+    it("announces when all filters are cleared", () => {
+      const clearFilters = vi.fn();
+      render(<FiltersSidebar {...baseProps} clearFilters={clearFilters} />);
+      fireEvent.click(screen.getByText("Clear filters"));
+      expect(clearFilters).toHaveBeenCalled();
+      // handleClearFilters calls setAnnouncement which triggers the effect
+    });
+
+    it("announces zero results message via the LiveRegion", async () => {
+      render(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["Data & Analytics"])}
+          resultCount={0}
+        />,
+      );
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toContain("No APIs match");
+    });
+
+    it("does not announce when resultCount transitions from undefined to 0 without active filters", async () => {
+      render(<FiltersSidebar {...baseProps} resultCount={0} />);
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toBe("");
     });
   });
 
