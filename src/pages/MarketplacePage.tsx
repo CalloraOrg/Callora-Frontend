@@ -25,6 +25,7 @@ import {
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
 import { useCompareStore } from "../state/compareStore";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
+import { MarketplacePageSkeleton } from "../components/Skeleton";
 
 export default function MarketplacePage(): JSX.Element {
   const { apis } = useCompareStore();
@@ -519,11 +520,7 @@ export default function MarketplacePage(): JSX.Element {
           {fetchError ? (
             <EmptyState variant="error" onRetry={handleRetryFetch} />
           ) : isLoading ? (
-            <div className="marketplace-grid" aria-label="Loading APIs">
-              {Array.from({ length: pageSize }).map((_, index) => (
-                <ApiCard key={index} loading />
-              ))}
-            </div>
+            <MarketplacePageSkeleton />
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}
