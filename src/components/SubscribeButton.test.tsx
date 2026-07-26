@@ -55,4 +55,23 @@ describe("SubscribeButton", () => {
     expect(screen.getByRole("button", { name: "Subscribe to Weather API" })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("applies correct focus outline classes to interactive elements for focus-visible styles", () => {
+    render(<SubscribeButton apiName="Weather API" />);
+
+    // Idle state: Subscribe button should have 'subscribe-button' class
+    const subscribeBtn = screen.getByRole("button", { name: "Subscribe to Weather API" });
+    expect(subscribeBtn.className).toContain("subscribe-button");
+
+    // Click to enter confirmation state
+    fireEvent.click(subscribeBtn);
+
+    // Confirmation state: Confirm button should have 'subscribe-button-confirm' class
+    const confirmBtn = screen.getByRole("button", { name: "Confirm" });
+    expect(confirmBtn.className).toContain("subscribe-button-confirm");
+
+    // Confirmation state: Cancel button should have 'subscribe-button-cancel' class
+    const cancelBtn = screen.getByRole("button", { name: "Cancel subscription" });
+    expect(cancelBtn.className).toContain("subscribe-button-cancel");
+  });
 });
