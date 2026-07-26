@@ -4,9 +4,7 @@ export type DensityPreference = "comfortable" | "compact";
 
 const VALID: DensityPreference[] = ["comfortable", "compact"];
 
-export const DENSITY_STORAGE_KEY = "callora.density";
-
-export function readDensityPreference(): DensityPreference {
+export const readDensityPreference = (): DensityPreference => {
   try {
     const stored = localStorage.getItem(DENSITY_STORAGE_KEY);
     if (stored && (VALID as string[]).includes(stored)) {
