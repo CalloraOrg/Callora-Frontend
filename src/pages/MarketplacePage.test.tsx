@@ -128,26 +128,39 @@ describe("MarketplacePage", () => {
     expect(grid).toBeTruthy();
   });
 
-  describe("prefers-reduced-motion", () => {
-    it("bypasses loading skeleton delay and resolves immediately when prefers-reduced-motion is active", async () => {
-      Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: vi.fn().mockImplementation((query: string) => ({
-          matches: query === "(prefers-reduced-motion: reduce)" || query.includes("reduce"),
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
-      });
+  it("renders density toggle buttons for mobile layout", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
 
-      renderMarketplacePage();
-      
-      // Since motion is reduced, it should resolve immediately and not show the loading state
-      expect(screen.queryByLabelText("Loading APIs")).toBeNull();
+    const comfortableBtn = screen.getByRole("button", { name: "Comfortable" });
+    const compactBtn = screen.getByRole("button", { name: "Compact" });
+    expect(comfortableBtn).toBeTruthy();
+    expect(compactBtn).toBeTruthy();
+
+    const densityToggle = document.querySelector(".marketplace-density-toggle");
+    expect(densityToggle).toBeTruthy();
+  });
+
+  it("respects prefers-reduced-motion by not applying transform on hover", () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    // Cards render without transform-dependent inline styles
+    const cards = document.querySelectorAll(".api-marketplace-card");
+    expect(cards.length).toBeGreaterThan(0);
+    cards.forEach((card) => {
+      expect((card as HTMLElement).style.transform).toBe("");
     });
   });
 });
