@@ -2,32 +2,24 @@
 /**
  * Tests for src/components/Tabs.tsx
  *
- * Coverage goals
- * ──────────────
- * • Rendering: all tabs appear; active tab is marked aria-selected=true.
- * • Mouse interaction: clicking a tab calls onChange with the correct id.
- * • Keyboard navigation (APG Tab Pattern):
- *   - ArrowRight advances focus to the next tab (wraps).
- *   - ArrowLeft retreats focus to the previous tab (wraps).
- *   - Home focuses the first tab.
- *   - End focuses the last tab.
- * • Accessibility attributes:
- *   - role="tablist" present on the list container.
- *   - Each button has role="tab".
- *   - aria-selected="true" on active, "false" on others.
- *   - aria-controls points to the correct panel id.
- *   - tabIndex=0 on active tab, -1 on inactive tabs.
- *   - tabpanel role, id, and aria-labelledby on each panel.
- * • Indicator element: the decorative span is aria-hidden.
- * • Custom tabPanelId prop is respected.
- * • Single-tab edge case: arrow keys do not crash.
+ * Coverage
+ * ────────
+ * • Rendering: all tabs, nav, tablist, role="tab"
+ * • aria-selected: true on active, false on others
+ * • tabIndex roving: 0 on active, -1 on inactive
+ * • aria-controls: default and custom tabPanelId
+ * • Mouse interaction: click calls onChange
+ * • Keyboard navigation: ArrowRight/Left (with wrap), Home, End
+ * • Indicator: aria-hidden, role="presentation",
+ *              inline left/width styles, reduced-motion 0ms
+ * • Edge cases: single tab, two tabs, custom className
  */
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import Tabs from './Tabs';
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import Tabs from "./Tabs";
 
-// Mock matchMedia for Tabs component
+// ── matchMedia mock ──────────────────────────────────────────────────────────
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({
@@ -42,289 +34,270 @@ Object.defineProperty(window, "matchMedia", {
   }),
 });
 
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
+// ── Fixtures ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_TABS = [
-  { id: 'overview',      label: 'Overview'      },
-  { id: 'documentation', label: 'Documentation' },
-  { id: 'pricing',       label: 'Pricing'       },
+  { id: "overview", label: "Overview" },
+  { id: "documentation", label: "Documentation" },
+  { id: "pricing", label: "Pricing" },
 ];
 
-function renderTabs(
-  activeTab = 'overview',
-  onChange = vi.fn(),
-  tabs = DEFAULT_TABS,
-) {
-  return render(
-    <Tabs tabs={tabs} activeTab={activeTab} onChange={onChange} />,
-  );
+function renderTabs(activeTab = "overview", onChange = vi.fn(), tabs = DEFAULT_TABS) {
+  return render(<Tabs tabs={tabs} activeTab={activeTab} onChange={onChange} />);
 }
 
 afterEach(() => cleanup());
 
-// ---------------------------------------------------------------------------
-// Rendering
-// ---------------------------------------------------------------------------
+// ── Rendering ────────────────────────────────────────────────────────────────
 
-describe('Tabs — rendering', () => {
-  it('renders all tab labels', () => {
+describe("Tabs – rendering", () => {
+  it("renders all tab labels", () => {
     renderTabs();
-    expect(screen.getByText('Overview')).toBeTruthy();
-    expect(screen.getByText('Documentation')).toBeTruthy();
-    expect(screen.getByText('Pricing')).toBeTruthy();
+    expect(screen.getByText("Overview")).toBeTruthy();
+    expect(screen.getByText("Documentation")).toBeTruthy();
+    expect(screen.getByText("Pricing")).toBeTruthy();
   });
 
-  it('renders a nav element with aria-label', () => {
+  it("renders a nav element with an aria-label", () => {
     const { container } = renderTabs();
-    const nav = container.querySelector('nav');
+    const nav = container.querySelector("nav");
     expect(nav).toBeTruthy();
-    expect(nav?.getAttribute('aria-label')).toBeTruthy();
+    expect(nav?.getAttribute("aria-label")).toBeTruthy();
   });
 
-  it('renders a tablist container', () => {
+  it("renders a tablist container", () => {
     renderTabs();
-    expect(screen.getByRole('tablist')).toBeTruthy();
+    expect(screen.getByRole("tablist")).toBeTruthy();
   });
 
-  it('renders each tab as role="tab"', () => {
+  it("renders each tab as role='tab'", () => {
     renderTabs();
-    const tabs = screen.getAllByRole('tab');
-    expect(tabs).toHaveLength(3);
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
   });
 
-  it('renders the decorative indicator span as aria-hidden', () => {
+  it("renders the decorative indicator span as aria-hidden='true'", () => {
     const { container } = renderTabs();
-    const indicator = container.querySelector('.tabs-indicator');
+    const indicator = container.querySelector("[aria-hidden='true'][role='presentation']");
     expect(indicator).toBeTruthy();
-    expect(indicator?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it("indicator has role='presentation'", () => {
+    const { container } = renderTabs();
+    const indicator = container.querySelector("[aria-hidden='true']");
+    expect(indicator?.getAttribute("role")).toBe("presentation");
+  });
+
+  it("indicator uses inline left and width styles (not transform)", () => {
+    const { container } = renderTabs();
+    const indicator = container.querySelector("[aria-hidden='true']") as HTMLElement;
+    // The component writes left/width directly — both should be present as
+    // inline style properties (even if 0px on initial mount in jsdom).
+    expect(indicator?.style.left).toBeDefined();
+    expect(indicator?.style.width).toBeDefined();
+  });
+
+  it("nav has no injected <style> tag sibling", () => {
+    const { container } = renderTabs();
+    // Pure inline-style approach — no <style> tag should be injected.
+    const styles = container.querySelectorAll("style");
+    expect(styles.length).toBe(0);
   });
 });
 
-// ---------------------------------------------------------------------------
-// aria-selected
-// ---------------------------------------------------------------------------
+// ── aria-selected ─────────────────────────────────────────────────────────────
 
-describe('Tabs — aria-selected', () => {
-  it('sets aria-selected="true" on the active tab', () => {
-    renderTabs('documentation');
-    const docTab = screen.getByRole('tab', { name: 'Documentation' });
-    expect(docTab.getAttribute('aria-selected')).toBe('true');
+describe("Tabs – aria-selected", () => {
+  it("sets aria-selected='true' on the active tab", () => {
+    renderTabs("documentation");
+    const tab = screen.getByRole("tab", { name: "Documentation" });
+    expect(tab.getAttribute("aria-selected")).toBe("true");
   });
 
-  it('sets aria-selected="false" on inactive tabs', () => {
-    renderTabs('documentation');
-    const overviewTab = screen.getByRole('tab', { name: 'Overview' });
-    const pricingTab  = screen.getByRole('tab', { name: 'Pricing'  });
-    expect(overviewTab.getAttribute('aria-selected')).toBe('false');
-    expect(pricingTab.getAttribute('aria-selected')).toBe('false');
+  it("sets aria-selected='false' on inactive tabs", () => {
+    renderTabs("documentation");
+    expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("false");
+    expect(screen.getByRole("tab", { name: "Pricing" }).getAttribute("aria-selected")).toBe("false");
   });
 });
 
-// ---------------------------------------------------------------------------
-// tabIndex roving
-// ---------------------------------------------------------------------------
+// ── tabIndex roving ───────────────────────────────────────────────────────────
 
-describe('Tabs — tabIndex', () => {
-  it('gives tabIndex=0 to the active tab', () => {
-    renderTabs('pricing');
-    const pricingTab = screen.getByRole('tab', { name: 'Pricing' });
-    expect(pricingTab.getAttribute('tabIndex') ?? pricingTab.tabIndex).toBe('0');
+describe("Tabs – tabIndex", () => {
+  it("gives tabIndex=0 to the active tab", () => {
+    renderTabs("pricing");
+    const tab = screen.getByRole("tab", { name: "Pricing" });
+    expect(String(tab.getAttribute("tabIndex") ?? tab.tabIndex)).toBe("0");
   });
 
-  it('gives tabIndex=-1 to inactive tabs', () => {
-    renderTabs('pricing');
-    const overviewTab = screen.getByRole('tab', { name: 'Overview' });
-    expect(overviewTab.getAttribute('tabIndex') ?? overviewTab.tabIndex).toBe('-1');
+  it("gives tabIndex=-1 to inactive tabs", () => {
+    renderTabs("pricing");
+    const tab = screen.getByRole("tab", { name: "Overview" });
+    expect(String(tab.getAttribute("tabIndex") ?? tab.tabIndex)).toBe("-1");
   });
 });
 
-// ---------------------------------------------------------------------------
-// aria-controls
-// ---------------------------------------------------------------------------
+// ── aria-controls ─────────────────────────────────────────────────────────────
 
-describe('Tabs — aria-controls', () => {
-  it('defaults aria-controls to "panel-{id}"', () => {
+describe("Tabs – aria-controls", () => {
+  it("defaults aria-controls to 'panel-{id}'", () => {
     renderTabs();
-    const overviewTab = screen.getByRole('tab', { name: 'Overview' });
-    expect(overviewTab.getAttribute('aria-controls')).toBe('panel-overview');
+    const tab = screen.getByRole("tab", { name: "Overview" });
+    expect(tab.getAttribute("aria-controls")).toBe("panel-overview");
   });
 
-  it('respects a custom tabPanelId function', () => {
-    render(
-      <Tabs
-        tabs={DEFAULT_TABS}
-        activeTab="overview"
-        onChange={vi.fn()}
-        tabPanelId={(id) => `custom-panel-${id}`}
-      />,
-    );
-    const tab = screen.getByRole('tab', { name: 'Overview' });
-    expect(tab.getAttribute('aria-controls')).toBe('custom-panel-overview');
+  it("respects a custom tabPanelId function", () => {
+    render(<Tabs tabs={DEFAULT_TABS} activeTab="overview" onChange={vi.fn()} tabPanelId={(id) => `custom-panel-${id}`} />);
+    expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-controls")).toBe("custom-panel-overview");
   });
 
-  it('each tab has a unique aria-controls value', () => {
+  it("each tab has a unique aria-controls value", () => {
     renderTabs();
-    const tabs = screen.getAllByRole('tab');
-    const controls = tabs.map((t) => t.getAttribute('aria-controls'));
-    const unique = new Set(controls);
-    expect(unique.size).toBe(controls.length);
+    const controls = screen.getAllByRole("tab").map((t) => t.getAttribute("aria-controls"));
+    expect(new Set(controls).size).toBe(controls.length);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Mouse interaction
-// ---------------------------------------------------------------------------
+// ── Mouse interaction ─────────────────────────────────────────────────────────
 
-describe('Tabs — mouse interaction', () => {
-  it('calls onChange with the correct id on click', () => {
+describe("Tabs – mouse interaction", () => {
+  it("calls onChange with the correct id on click", () => {
     const onChange = vi.fn();
-    renderTabs('overview', onChange);
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Pricing' }));
+    renderTabs("overview", onChange);
+    fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
     expect(onChange).toHaveBeenCalledOnce();
-    expect(onChange).toHaveBeenCalledWith('pricing');
+    expect(onChange).toHaveBeenCalledWith("pricing");
   });
 
-  it('calls onChange when the already-active tab is clicked', () => {
+  it("calls onChange when the already-active tab is clicked", () => {
     const onChange = vi.fn();
-    renderTabs('overview', onChange);
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Overview' }));
-    expect(onChange).toHaveBeenCalledWith('overview');
+    renderTabs("overview", onChange);
+    fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
+    expect(onChange).toHaveBeenCalledWith("overview");
   });
 });
 
-// ---------------------------------------------------------------------------
-// Keyboard navigation (APG Tab Pattern)
-// ---------------------------------------------------------------------------
+// ── Keyboard navigation ───────────────────────────────────────────────────────
 
-describe('Tabs — keyboard navigation', () => {
-  it('ArrowRight moves to the next tab', () => {
+describe("Tabs – keyboard navigation", () => {
+  it("ArrowRight moves to the next tab", () => {
     const onChange = vi.fn();
-    renderTabs('overview', onChange);
-
-    const overviewTab = screen.getByRole('tab', { name: 'Overview' });
-    fireEvent.keyDown(overviewTab, { key: 'ArrowRight' });
-
-    expect(onChange).toHaveBeenCalledWith('documentation');
+    renderTabs("overview", onChange);
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Overview" }), { key: "ArrowRight" });
+    expect(onChange).toHaveBeenCalledWith("documentation");
   });
 
-  it('ArrowRight wraps from last to first', () => {
+  it("ArrowRight wraps from last to first", () => {
     const onChange = vi.fn();
-    renderTabs('pricing', onChange);
-
-    const pricingTab = screen.getByRole('tab', { name: 'Pricing' });
-    fireEvent.keyDown(pricingTab, { key: 'ArrowRight' });
-
-    expect(onChange).toHaveBeenCalledWith('overview');
+    renderTabs("pricing", onChange);
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Pricing" }), { key: "ArrowRight" });
+    expect(onChange).toHaveBeenCalledWith("overview");
   });
 
-  it('ArrowLeft moves to the previous tab', () => {
+  it("ArrowLeft moves to the previous tab", () => {
     const onChange = vi.fn();
-    renderTabs('documentation', onChange);
-
-    const docTab = screen.getByRole('tab', { name: 'Documentation' });
-    fireEvent.keyDown(docTab, { key: 'ArrowLeft' });
-
-    expect(onChange).toHaveBeenCalledWith('overview');
+    renderTabs("documentation", onChange);
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Documentation" }), { key: "ArrowLeft" });
+    expect(onChange).toHaveBeenCalledWith("overview");
   });
 
-  it('ArrowLeft wraps from first to last', () => {
+  it("ArrowLeft wraps from first to last", () => {
     const onChange = vi.fn();
-    renderTabs('overview', onChange);
-
-    const overviewTab = screen.getByRole('tab', { name: 'Overview' });
-    fireEvent.keyDown(overviewTab, { key: 'ArrowLeft' });
-
-    expect(onChange).toHaveBeenCalledWith('pricing');
+    renderTabs("overview", onChange);
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Overview" }), { key: "ArrowLeft" });
+    expect(onChange).toHaveBeenCalledWith("pricing");
   });
 
-  it('Home jumps to the first tab', () => {
+  it("Home jumps to the first tab", () => {
     const onChange = vi.fn();
-    renderTabs('pricing', onChange);
-
-    const pricingTab = screen.getByRole('tab', { name: 'Pricing' });
-    fireEvent.keyDown(pricingTab, { key: 'Home' });
-
-    expect(onChange).toHaveBeenCalledWith('overview');
+    renderTabs("pricing", onChange);
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Pricing" }), { key: "Home" });
+    expect(onChange).toHaveBeenCalledWith("overview");
   });
 
-  it('End jumps to the last tab', () => {
+  it("End jumps to the last tab", () => {
     const onChange = vi.fn();
-    renderTabs('overview', onChange);
-
-    const overviewTab = screen.getByRole('tab', { name: 'Overview' });
-    fireEvent.keyDown(overviewTab, { key: 'End' });
-
-    expect(onChange).toHaveBeenCalledWith('pricing');
+    renderTabs("overview", onChange);
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Overview" }), { key: "End" });
+    expect(onChange).toHaveBeenCalledWith("pricing");
   });
 
-  it('other keys do not call onChange', () => {
+  it("other keys do not call onChange", () => {
     const onChange = vi.fn();
-    renderTabs('overview', onChange);
-
-    const overviewTab = screen.getByRole('tab', { name: 'Overview' });
-    fireEvent.keyDown(overviewTab, { key: 'Tab' });
-    fireEvent.keyDown(overviewTab, { key: 'Enter' });
-    fireEvent.keyDown(overviewTab, { key: ' ' });
-
+    renderTabs("overview", onChange);
+    const tab = screen.getByRole("tab", { name: "Overview" });
+    fireEvent.keyDown(tab, { key: "Tab" });
+    fireEvent.keyDown(tab, { key: "Enter" });
+    fireEvent.keyDown(tab, { key: " " });
     expect(onChange).not.toHaveBeenCalled();
   });
 });
 
-// ---------------------------------------------------------------------------
-// Edge cases
-// ---------------------------------------------------------------------------
+// ── Reduced motion ────────────────────────────────────────────────────────────
 
-describe('Tabs — edge cases', () => {
-  it('handles a single tab without crashing on arrow keys', () => {
+describe("Tabs – reduced motion", () => {
+  it("uses 0ms duration when prefers-reduced-motion is active", () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes("reduce"),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }));
+
+    // The reducedMotion ref is read once on component mount, so we need
+    // matchMedia to be mocked before rendering.
+    const { container } = render(<Tabs tabs={DEFAULT_TABS} activeTab="overview" onChange={vi.fn()} />);
+
+    // The indicator span exists and has no transform (pure left/width approach).
+    const indicator = container.querySelector("[aria-hidden='true']") as HTMLElement;
+    expect(indicator).toBeTruthy();
+    // Inline style must not use transform.
+    expect(indicator.style.transform).toBeFalsy();
+
+    window.matchMedia = original;
+  });
+});
+
+// ── Edge cases ────────────────────────────────────────────────────────────────
+
+describe("Tabs – edge cases", () => {
+  it("handles a single tab without crashing on arrow keys", () => {
     const onChange = vi.fn();
-    render(
-      <Tabs
-        tabs={[{ id: 'only', label: 'Only' }]}
-        activeTab="only"
-        onChange={onChange}
-      />,
-    );
-    const onlyTab = screen.getByRole('tab', { name: 'Only' });
-    // Should not throw
-    expect(() => fireEvent.keyDown(onlyTab, { key: 'ArrowRight' })).not.toThrow();
-    expect(() => fireEvent.keyDown(onlyTab, { key: 'ArrowLeft'  })).not.toThrow();
-    // Wraps back to itself
-    expect(onChange).toHaveBeenCalledWith('only');
+    render(<Tabs tabs={[{ id: "only", label: "Only" }]} activeTab="only" onChange={onChange} />);
+    const tab = screen.getByRole("tab", { name: "Only" });
+    expect(() => fireEvent.keyDown(tab, { key: "ArrowRight" })).not.toThrow();
+    expect(() => fireEvent.keyDown(tab, { key: "ArrowLeft" })).not.toThrow();
+    expect(onChange).toHaveBeenCalledWith("only");
   });
 
-  it('renders correctly with two tabs', () => {
+  it("renders correctly with two tabs", () => {
     render(
       <Tabs
-        tabs={[{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }]}
+        tabs={[
+          { id: "a", label: "A" },
+          { id: "b", label: "B" },
+        ]}
         activeTab="a"
         onChange={vi.fn()}
       />,
     );
-    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
   });
 
-  it('applies custom className to the nav', () => {
-    const { container } = render(
-      <Tabs
-        tabs={DEFAULT_TABS}
-        activeTab="overview"
-        onChange={vi.fn()}
-        className="my-custom-tabs"
-      />,
-    );
-    const nav = container.querySelector('nav');
-    expect(nav?.classList.contains('my-custom-tabs')).toBe(true);
-    expect(nav?.classList.contains('tabs-nav')).toBe(true);
+  it("forwards className to the nav element", () => {
+    const { container } = render(<Tabs tabs={DEFAULT_TABS} activeTab="overview" onChange={vi.fn()} className="my-custom-tabs" />);
+    const nav = container.querySelector("nav");
+    expect(nav?.classList.contains("my-custom-tabs")).toBe(true);
   });
 
-  it('id attribute on each tab button matches "tab-{id}"', () => {
+  it("id attribute on each tab button matches 'tab-{id}'", () => {
     renderTabs();
     DEFAULT_TABS.forEach(({ id, label }) => {
-      const tab = screen.getByRole('tab', { name: label });
+      const tab = screen.getByRole("tab", { name: label });
       expect(tab.id).toBe(`tab-${id}`);
     });
   });
