@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import Tooltip from "./Tooltip";
 
 type BreadcrumbItem = {
   label: string;
@@ -282,18 +283,28 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
               {isFirst && shouldCollapseMiddle && (
                 <span className="breadcrumb-collapsed">
                   <BreadcrumbSeparator />
-                  <button
-                    ref={ellipsisButtonRef}
-                    type="button"
-                    className="breadcrumb-ellipsis"
-                    aria-label="Show collapsed breadcrumb items"
-                    aria-haspopup="menu"
-                    aria-expanded={isPopoverOpen}
-                    aria-controls={popoverId}
-                    onClick={() => setIsPopoverOpen((open) => !open)}
+                  {/* Tooltip wraps the icon-only ellipsis button so
+                      keyboard/mouse/touch users all get a visible label.
+                      hoverDelayMs prevents accidental flashes during fast
+                      cursor movement; longPressMs satisfies touch UX. */}
+                  <Tooltip
+                    content="Show hidden pages"
+                    hoverDelayMs={300}
+                    longPressMs={500}
                   >
-                    ...
-                  </button>
+                    <button
+                      ref={ellipsisButtonRef}
+                      type="button"
+                      className="breadcrumb-ellipsis"
+                      aria-label="Show collapsed breadcrumb items"
+                      aria-haspopup="menu"
+                      aria-expanded={isPopoverOpen}
+                      aria-controls={popoverId}
+                      onClick={() => setIsPopoverOpen((open) => !open)}
+                    >
+                      ...
+                    </button>
+                  </Tooltip>
                   {isPopoverOpen && (
                     <div
                       ref={popoverRef}

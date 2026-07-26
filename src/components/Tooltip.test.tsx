@@ -16,7 +16,8 @@ describe("Tooltip", () => {
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
-  it("shows on hover and hides on leave", () => {
+  it("shows on hover (after hover delay) and hides on leave", () => {
+    vi.useFakeTimers();
     render(
       <Tooltip content="Helpful text">
         <button>Trigger</button>
@@ -24,9 +25,15 @@ describe("Tooltip", () => {
     );
     const trigger = screen.getByText("Trigger");
     fireEvent.mouseEnter(trigger);
+    // Not visible before delay elapses.
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     expect(screen.getByRole("tooltip")).toBeTruthy();
     fireEvent.mouseLeave(trigger);
     expect(screen.queryByRole("tooltip")).toBeNull();
+    vi.useRealTimers();
   });
 
   it("shows on keyboard focus and links via aria-describedby", () => {
@@ -42,15 +49,20 @@ describe("Tooltip", () => {
   });
 
   it("dismisses on Escape", () => {
+    vi.useFakeTimers();
     render(
       <Tooltip content="Helpful text">
         <button>Trigger</button>
       </Tooltip>,
     );
     fireEvent.mouseEnter(screen.getByText("Trigger"));
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     expect(screen.getByRole("tooltip")).toBeTruthy();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("tooltip")).toBeNull();
+    vi.useRealTimers();
   });
 
   it("respects hoverDelayMs before showing tooltip on hover", () => {
