@@ -201,6 +201,7 @@ Summarizes consumed API budget or request allowance on the dashboard with both a
 **Accessibility:**
 
 - Uses `role="progressbar"` with `aria-valuemin`, `aria-valuemax`, `aria-valuenow`, and `aria-valuetext`
+- Both the `<section>` and progressbar carry an explicit `aria-label` matching the `label` prop (defaults to "Usage") for self-contained accessible naming
 - `aria-valuetext` includes the usage state, consumed amount, limit, remaining allowance, and percentage used
 - A visually hidden description mirrors the announced status for screen readers
 - Color is not the only indicator; visible state text is always rendered
