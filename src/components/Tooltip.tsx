@@ -5,15 +5,16 @@ import {
   useId,
   useRef,
   useState,
+  type FocusEvent,
+  type MouseEvent,
   type ReactElement,
   type ReactNode,
+  type TouchEvent,
 } from "react";
 
 /**
- * Tooltip — an accessible tooltip that opens on hover (with optional delay),
- * keyboard focus, and touch long-press (issue #283).
- *
- * Wired to Breadcrumb icon-only buttons per issue #578.
+ * Tooltip — an accessible tooltip that opens on hover (optional delay),
+ * keyboard focus, and touch long-press (issues #283, #533).
  *
  * Accessibility (WCAG 2.1 AA):
  * - The trigger gets `aria-describedby` pointing at the tooltip content.
@@ -45,6 +46,16 @@ type TooltipProps = {
   hoverDelayMs?: number;
 };
 
+type ChildHandlers = {
+  onMouseEnter?: (e: MouseEvent) => void;
+  onMouseLeave?: (e: MouseEvent) => void;
+  onFocus?: (e: FocusEvent) => void;
+  onBlur?: (e: FocusEvent) => void;
+  onTouchStart?: (e: TouchEvent) => void;
+  onTouchEnd?: (e: TouchEvent) => void;
+  onTouchCancel?: (e: TouchEvent) => void;
+};
+
 export default function Tooltip({
   content,
   children,
@@ -61,13 +72,6 @@ export default function Tooltip({
   const pressTimer = useRef<number | null>(null);
   const hoverTimer = useRef<number | null>(null);
 
-  const clearHoverTimer = () => {
-    if (hoverTimer.current !== null) {
-      window.clearTimeout(hoverTimer.current);
-      hoverTimer.current = null;
-    }
-  };
-
   const clearPressTimer = () => {
     if (pressTimer.current !== null) {
       window.clearTimeout(pressTimer.current);
@@ -75,14 +79,19 @@ export default function Tooltip({
     }
   };
 
-  // Clean up both timers on unmount.
-  useEffect(
-    () => () => {
-      clearHoverTimer();
+  const clearHoverTimer = () => {
+    if (hoverTimer.current !== null) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
       clearPressTimer();
-    },
-    [],
-  );
+      clearHoverTimer();
+    };
+  }, []);
 
   // Dismiss on Escape while open.
   useEffect(() => {
@@ -118,14 +127,22 @@ export default function Tooltip({
     setOpen(false);
   };
 
-  // Keyboard focus shows instantly (no delay needed — user is already there).
-  const handleFocus = () => {
+  const childProps = (
+    isValidElement(children) ? (children.props as ChildHandlers) : {}
+  ) as ChildHandlers;
+
+  const handleMouseEnter = (e: MouseEvent) => {
+    childProps.onMouseEnter?.(e);
     clearHoverTimer();
-    setOpen(true);
+    if (hoverDelayMs > 0) {
+      hoverTimer.current = window.setTimeout(() => setOpen(true), hoverDelayMs);
+    } else {
+      setOpen(true);
+    }
   };
 
-  // Touch: start long-press timer.
-  const handleTouchStart = () => {
+  const handleTouchStart = (e: TouchEvent) => {
+    childProps.onTouchStart?.(e);
     clearPressTimer();
     pressTimer.current = window.setTimeout(() => setOpen(true), longPressMs);
   };
@@ -134,20 +151,25 @@ export default function Tooltip({
     cloneElement(children, {
       "aria-describedby": open ? tooltipId : undefined,
       onMouseEnter: handleMouseEnter,
-      onMouseLeave: hide,
-      onFocus: handleFocus,
-      onBlur: hide,
+      onMouseLeave: (e: MouseEvent) => {
+        childProps.onMouseLeave?.(e);
+        hide();
+      },
+      onFocus: (e: FocusEvent) => {
+        childProps.onFocus?.(e);
+        show();
+      },
+      onBlur: (e: FocusEvent) => {
+        childProps.onBlur?.(e);
+        hide();
+      },
       onTouchStart: handleTouchStart,
-      onTouchEnd: (e: React.TouchEvent) => {
-        if (typeof (children.props as any).onTouchEnd === "function") {
-          (children.props as any).onTouchEnd(e);
-        }
+      onTouchEnd: (e: TouchEvent) => {
+        childProps.onTouchEnd?.(e);
         clearPressTimer();
       },
-      onTouchCancel: (e: React.TouchEvent) => {
-        if (typeof (children.props as any).onTouchCancel === "function") {
-          (children.props as any).onTouchCancel(e);
-        }
+      onTouchCancel: (e: TouchEvent) => {
+        childProps.onTouchCancel?.(e);
         clearPressTimer();
       },
     } as Record<string, unknown>)

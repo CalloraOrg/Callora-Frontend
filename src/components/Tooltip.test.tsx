@@ -128,4 +128,66 @@ describe("Tooltip", () => {
 
     vi.useRealTimers();
   });
+
+  it("respects hoverDelayMs before showing tooltip on hover", () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="Helpful text" hoverDelayMs={300}>
+        <button>Trigger</button>
+      </Tooltip>,
+    );
+    const trigger = screen.getByText("Trigger");
+    fireEvent.mouseEnter(trigger);
+
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.getByRole("tooltip")).toBeTruthy();
+
+    vi.useRealTimers();
+  });
+
+  it("cancels hover delay if mouse leaves before timer finishes", () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="Helpful text" hoverDelayMs={300}>
+        <button>Trigger</button>
+      </Tooltip>,
+    );
+    const trigger = screen.getByText("Trigger");
+    fireEvent.mouseEnter(trigger);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    fireEvent.mouseLeave(trigger);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    vi.useRealTimers();
+  });
+
+  it("opens on touch long-press after longPressMs", () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="Helpful text" longPressMs={400}>
+        <button>Trigger</button>
+      </Tooltip>,
+    );
+    const trigger = screen.getByText("Trigger");
+    fireEvent.touchStart(trigger);
+
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(screen.getByRole("tooltip")).toBeTruthy();
+
+    vi.useRealTimers();
+  });
 });

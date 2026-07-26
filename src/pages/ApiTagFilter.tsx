@@ -26,7 +26,7 @@ export interface ApiTagFilterProps {
   selectedTag: string | null;
   /** Called when a tag is toggled. Pass null to clear. */
   onTagChange: (tag: string | null) => void;
-  /** Optional hover delay in ms for tooltips. Defaults to 0. */
+  /** Optional hover delay in ms for tooltips on tag icon buttons. Defaults to 0. */
   hoverDelayMs?: number;
   /** Optional touch long-press duration in ms for tooltips. Defaults to 500. */
   longPressMs?: number;
@@ -48,6 +48,9 @@ export interface ApiTagFilterProps {
  * **Keyboard & screen-reader:**
  * - `role="group"` with `aria-label` groups the controls.
  * - Each pill is a `<button>` with `aria-pressed`.
+ * - Tag icon buttons are wrapped in the shared {@link Tooltip} primitive
+ *   (hover-delay + long-press) so the filter label is discoverable on
+ *   touch and when the visible label is truncated.
  * - Focus-visible styling is inherited from the app-wide focus layer.
  *
  * **Design tokens:** Surface fills, borders, and colours all use CSS
@@ -115,9 +118,7 @@ export default function ApiTagFilter({
               className={`api-tag-filter__pill${isActive ? " api-tag-filter__pill--active" : ""}`}
               aria-pressed={isActive}
               aria-label={tooltipLabel}
-              onClick={() =>
-                onTagChange(isActive ? null : tag)
-              }
+              onClick={() => onTagChange(isActive ? null : tag)}
             >
               <TagIcon size={16} />
               <span>{tag}</span>
