@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
 
@@ -231,6 +231,76 @@ describe("ApiTagFilter", () => {
     const buttons = screen.getAllByRole("button");
     expect(buttons.length).toBe(1);
     expect(buttons[0].textContent).toBe("All");
+  });
+
+  // ── Tooltip primitive integration (issue #533) ───────────────────────────
+
+  describe("Tooltip primitive integration", () => {
+    it("wraps tag icon buttons in Tooltip and displays tooltip on hover", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      const weatherBtn = screen.getByRole("button", { name: /weather/i });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      fireEvent.mouseEnter(weatherBtn);
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip).toBeTruthy();
+      expect(tooltip.textContent).toMatch(/weather/i);
+
+      fireEvent.mouseLeave(weatherBtn);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("respects hoverDelayMs when passed to ApiTagFilter", () => {
+      vi.useFakeTimers();
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+          hoverDelayMs={250}
+        />,
+      );
+      const weatherBtn = screen.getByRole("button", { name: /weather/i });
+
+      fireEvent.mouseEnter(weatherBtn);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+
+      vi.useRealTimers();
+    });
+
+    it("opens tooltip on touch long-press with longPressMs", () => {
+      vi.useFakeTimers();
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+          longPressMs={300}
+        />,
+      );
+      const geoBtn = screen.getByRole("button", { name: /geo/i });
+
+      fireEvent.touchStart(geoBtn);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+
+      vi.useRealTimers();
+    });
   });
 });
 

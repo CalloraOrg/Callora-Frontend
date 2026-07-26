@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import MOCK_APIS from "../data/mockApis";
 import { TagIcon } from "../components/icons";
+import Tooltip from "../components/Tooltip";
 
 /**
  * Extracts all unique tags from the mock API data, sorted alphabetically.
@@ -25,6 +26,10 @@ export interface ApiTagFilterProps {
   selectedTag: string | null;
   /** Called when a tag is toggled. Pass null to clear. */
   onTagChange: (tag: string | null) => void;
+  /** Optional hover delay in ms for tooltips on tag icon buttons. Defaults to 0. */
+  hoverDelayMs?: number;
+  /** Optional touch long-press duration in ms for tooltips. Defaults to 500. */
+  longPressMs?: number;
 }
 
 /**
@@ -43,6 +48,9 @@ export interface ApiTagFilterProps {
  * **Keyboard & screen-reader:**
  * - `role="group"` with `aria-label` groups the controls.
  * - Each pill is a `<button>` with `aria-pressed`.
+ * - Tag icon buttons are wrapped in the shared {@link Tooltip} primitive
+ *   (hover-delay + long-press) so the filter label is discoverable on
+ *   touch and when the visible label is truncated.
  * - Focus-visible styling is inherited from the app-wide focus layer.
  *
  * **Design tokens:** Surface fills, borders, and colours all use CSS
@@ -53,6 +61,8 @@ export default function ApiTagFilter({
   tags,
   selectedTag,
   onTagChange,
+  hoverDelayMs = 0,
+  longPressMs = 500,
 }: ApiTagFilterProps) {
   const isAllSelected = selectedTag === null;
 
@@ -90,24 +100,29 @@ export default function ApiTagFilter({
       {tags.map((tag) => {
         const isActive = selectedTag?.toLowerCase() === tag.toLowerCase();
         const count = tagCounts.get(tag.toLowerCase());
+        const tooltipLabel = `Filter by tag ${tag}${count != null ? ` (${count} APIs)` : ""}`;
 
         return (
-          <button
+          <Tooltip
             key={tag}
-            type="button"
-            className={`api-tag-filter__pill${isActive ? " api-tag-filter__pill--active" : ""}`}
-            aria-pressed={isActive}
-            aria-label={`Filter by tag ${tag}${count != null ? ` (${count} APIs)` : ""}`}
-            onClick={() =>
-              onTagChange(isActive ? null : tag)
-            }
+            content={tooltipLabel}
+            hoverDelayMs={hoverDelayMs}
+            longPressMs={longPressMs}
           >
-            <TagIcon size={16} />
-            <span>{tag}</span>
-            {count != null && (
-              <span className="api-tag-filter__count">{count}</span>
-            )}
-          </button>
+            <button
+              type="button"
+              className={`api-tag-filter__pill${isActive ? " api-tag-filter__pill--active" : ""}`}
+              aria-pressed={isActive}
+              aria-label={tooltipLabel}
+              onClick={() => onTagChange(isActive ? null : tag)}
+            >
+              <TagIcon size={16} />
+              <span>{tag}</span>
+              {count != null && (
+                <span className="api-tag-filter__count">{count}</span>
+              )}
+            </button>
+          </Tooltip>
         );
       })}
     </div>
