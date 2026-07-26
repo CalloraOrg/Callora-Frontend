@@ -24,6 +24,7 @@ import MOCK_APIS from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import PlanBadge from "../components/PlanBadge";
+import ReviewsTab from "./ReviewsTab";
 
 /**
  * ApiDetailPage
@@ -368,6 +369,9 @@ export default function ApiDetailPage({ onBack }: Props) {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   }, [rawReviews, reviewSort]);
+
+  // ReviewsTab receives the raw (unsorted) reviews; sorting is managed inside
+  // the component so the parent no longer needs sortedReviews for that panel.
 
   const documentationEndpoints = useMemo(() => (api?.endpoints || []) as ApiEndpoint[], [api]);
 
@@ -936,107 +940,20 @@ print(response.json())`;
                 )}
 
                 {/* ── REVIEWS ─────────────────────────────────────────────── */}
+                {/*
+                 * ReviewsTab is a standalone component (src/pages/ReviewsTab.tsx)
+                 * that owns its own sort state and carries all necessary
+                 * print-safe class names (reviews-tab, reviews-tab__card,
+                 * reviews-tab__sort-row, no-print) so the @media print block
+                 * in index.css can hide chrome and expand collapsibles without
+                 * any runtime JS.  See issue #580 and src/styles/print.css.
+                 */}
                 {tab === "reviews" && (
-                  <section id="panel-reviews" role="tabpanel" aria-labelledby="tab-reviews" tabIndex={0}>
-                    <div className="api-detail-reviews-header">
-                      <h3 style={{ margin: 0 }}>Developer Feedback</h3>
-                      <button className="secondary-button">Write a Review</button>
-                    </div>
-
-                    {rawReviews.length === 0 ? (
-                      <div className="preview-card" style={{ padding: 40, textAlign: "center", borderStyle: "dashed", marginTop: 16 }}>
-                        <div style={{ fontSize: 40, marginBottom: 16 }}>💬</div>
-                        <h4>No public reviews yet</h4>
-                        <p style={{ color: "var(--muted)", maxWidth: 400, margin: "0 auto" }}>Be the first to share your experience with this API.</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ marginTop: 16 }}>
-                          <RatingHistogram rating={averageRating} distribution={ratingDistribution} />
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-                          <label htmlFor="review-sort" style={{ fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap" }}>
-                            Sort by
-                          </label>
-                          <select
-                            id="review-sort"
-                            value={reviewSort}
-                            onChange={(e) => setReviewSort(e.target.value as ReviewSort)}
-                            style={{
-                              fontSize: 13,
-                              padding: "5px 10px",
-                              borderRadius: 6,
-                              border: "1px solid var(--line)",
-                              background: "var(--surface-soft)",
-                              color: "var(--text)",
-                              cursor: "pointer",
-                            }}
-                          >
-                            <option value="newest">Newest</option>
-                            <option value="highest">Highest rated</option>
-                            <option value="lowest">Lowest rated</option>
-                          </select>
-                        </div>
-
-                        <div style={{ display: "grid", gap: 16 }}>
-                          {sortedReviews.map((review) => (
-                            <div key={review.id} className="preview-card" style={{ padding: 20 }}>
-                              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
-                                  <span style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", whiteSpace: "nowrap" }}>{review.author}</span>
-                                  {review.verified && (
-                                    <span
-                                      title="Has called this API in the last 30 days"
-                                      aria-label="Verified Developer – has called this API in the last 30 days"
-                                      style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: 4,
-                                        padding: "2px 8px",
-                                        borderRadius: 999,
-                                        fontSize: 11,
-                                        fontWeight: 600,
-                                        lineHeight: "18px",
-                                        background: "rgba(16, 185, 129, 0.12)",
-                                        color: "var(--success)",
-                                        border: "1px solid rgba(16, 185, 129, 0.3)",
-                                        cursor: "default",
-                                        whiteSpace: "nowrap",
-                                        flexShrink: 0,
-                                        userSelect: "none",
-                                      }}
-                                    >
-                                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">
-                                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                      </svg>
-                                      Verified Developer
-                                    </span>
-                                  )}
-                                </div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                                  <span role="img" aria-label={`${review.rating} out of 5 stars`} style={{ display: "flex", gap: 1 }}>
-                                    {Array.from({ length: 5 }, (_, i) => (
-                                      <svg key={i} width="13" height="13" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                                        <path
-                                          d="M10 1.5l2.39 4.84 5.34.78-3.87 3.77.91 5.32L10 13.77l-4.77 2.44.91-5.32L2.27 7.12l5.34-.78L10 1.5z"
-                                          fill={i < review.rating ? "var(--accent)" : "var(--line)"}
-                                        />
-                                      </svg>
-                                    ))}
-                                  </span>
-                                  <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
-                                    {new Date(review.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-                                  </span>
-                                </div>
-                              </div>
-                              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--muted)" }}>{review.body}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </section>
+                  <ReviewsTab
+                    reviews={rawReviews}
+                    averageRating={averageRating}
+                    onWriteReview={() => showToast("Review form coming soon!", "info")}
+                  />
                 )}
 
                 {/* ── EMBED ───────────────────────────────────────────────── */}

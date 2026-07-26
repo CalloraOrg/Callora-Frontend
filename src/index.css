@@ -5050,6 +5050,86 @@ code,
     font-size: 0.85em;
     color: #444;
   }
+
+  /* ── ReviewsTab print rules (issue #580 – GrantFox FWC26 / Stellar Wave) ── */
+  /*
+   * Source of truth: src/styles/print.css (not imported by main.tsx;
+   * mirrored here so the rules ship inside the single index.css bundle).
+   *
+   * Goals:
+   *   1. Hide chrome  – sort control, CTA button, interactive header.
+   *   2. Expand collapsibles – the full review list is always visible.
+   *   3. Inject a section heading via ::before (no DOM change).
+   *   4. Card readability – visible border, white bg, no page-split.
+   */
+
+  /* 1. Hide sort / action chrome */
+  .reviews-tab__sort-row,
+  .reviews-tab .api-detail-reviews-header {
+    display: none !important;
+  }
+
+  /* 2. Expand the container */
+  .reviews-tab {
+    overflow: visible !important;
+    max-height: none !important;
+    padding-top: 0 !important;
+  }
+
+  /* 3. Print-only section heading injected before the list */
+  .reviews-tab::before {
+    content: "Developer Reviews";
+    display: block;
+    font-size: 1.15rem;
+    font-weight: 700;
+    font-family: Georgia, "Times New Roman", serif;
+    color: #1a2332;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 0.35rem;
+  }
+
+  /* 4a. Rating histogram – always expanded */
+  .reviews-tab .rating-histogram,
+  .reviews-tab [class*="rating-histogram"] {
+    overflow: visible !important;
+    max-height: none !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 1rem;
+  }
+
+  /* 4b. Review cards – readable, never split across pages */
+  .reviews-tab__card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    border: 1px solid #ccc !important;
+    background: #ffffff !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    margin-bottom: 0.75rem;
+    padding: 12px !important;
+  }
+
+  /* 4c. Remove grid gap; rhythm handled by card margin-bottom */
+  .reviews-tab__list {
+    display: block !important;
+    gap: 0 !important;
+  }
+
+  /* 4d. Verified badge – greyscale-printer safe */
+  .reviews-tab__card [aria-label*="Verified Developer"] {
+    background: transparent !important;
+    border: 1px solid #555 !important;
+    color: #1a2332 !important;
+  }
+
+  /* 4e. Review body text – orphan / widow control */
+  .reviews-tab__card p {
+    color: #333 !important;
+    orphans: 3;
+    widows: 3;
+  }
 }
 
 /* Share Snapshot Button */
