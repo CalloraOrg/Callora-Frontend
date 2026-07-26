@@ -295,10 +295,15 @@ describe("ApiCard responsiveness", () => {
   const mockApi: APIItem = {
     id: "api-resp",
     name: "Responsive API",
-    endpoint: "/api/resp",
+    endpoints: ["/api/resp"],
     description: "Responsive test API.",
     tags: ["test"],
     pricePerRequest: 0,
+    provider: {
+      name: "",
+      url: undefined,
+      avatar: undefined
+    }
   };
 
   function mockViewportWidth(isMobile: boolean) {
@@ -350,3 +355,53 @@ describe("ApiCard responsiveness", () => {
   });
 });
 
+describe("ApiCard — Focus Accessibility", () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(query => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(), // deprecated
+        removeListener: vi.fn(), // deprecated
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+  });
+
+  it("renders interactive elements that can receive focus", () => {
+    // Need a mock API for this scope
+    const testApi = {
+      id: "api-focus",
+      name: "Focus API",
+      endpoints: [],
+      description: "Focus test API.",
+      tags: ["tag1"],
+      pricePerRequest: 0,
+      provider: {
+        name: "",
+        url: undefined,
+        avatar: undefined
+      }
+    };
+    render(<ApiCard api={testApi as any} />);
+    
+    // Test that the card itself can receive focus
+    const card = screen.getByRole("button", { name: /View details for Focus API/i });
+    expect(card.getAttribute("tabindex") || card.getAttribute("tabIndex")).toBe("0");
+    
+    // Check inner buttons
+    const favButton = screen.getByLabelText("Add to favorites");
+    expect(favButton.tagName.toLowerCase()).toBe("button");
+    
+    const pinButton = screen.getByRole("button", { name: /Pin api-focus to dashboard/i });
+    expect(pinButton.tagName.toLowerCase()).toBe("button");
+    
+    const tags = screen.getAllByRole("button", { name: /Filter marketplace by tag/i });
+    expect(tags.length).toBeGreaterThan(0);
+    tags.forEach(tag => expect(tag.tagName.toLowerCase()).toBe("button"));
+  });
+});
