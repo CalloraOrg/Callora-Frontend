@@ -321,4 +321,151 @@ describe("EmptyState", () => {
       });
     });
   });
+
+  // ── plan-badge variant (issue #529) ───────────────────────────────────────
+  describe("plan-badge variant", () => {
+    it("renders the plan-badge variant illustration", () => {
+      render(<EmptyState variant="plan-badge" />);
+      const wrapper = screen.getByTestId("empty-state-plan-badge");
+      expect(wrapper).toBeTruthy();
+      expect(wrapper.querySelector("svg")).toBeTruthy();
+    });
+
+    it("uses the default 'No plan selected' title", () => {
+      render(<EmptyState variant="plan-badge" />);
+      expect(screen.getByText(/No plan selected/i)).toBeTruthy();
+    });
+
+    it("uses the full default message for default size", () => {
+      render(<EmptyState variant="plan-badge" size="default" />);
+      // The default message includes the phrase about plan tier not being attached.
+      // Use a custom text matcher to handle the text regardless of element boundaries.
+      expect(
+        screen.getByText((content) =>
+          content.includes("plan tier attached yet") ||
+          content.includes("Select a plan tier")
+        )
+      ).toBeTruthy();
+    });
+
+    it("uses the shorter compact message", () => {
+      render(<EmptyState variant="plan-badge" size="compact" />);
+      expect(screen.getByText(/Choose a plan to unlock API access/i)).toBeTruthy();
+    });
+
+    it("accepts custom title and message overrides", () => {
+      render(
+        <EmptyState
+          variant="plan-badge"
+          title="Upgrade required"
+          message="Select a Pro or Enterprise tier to continue."
+        />
+      );
+      expect(screen.getByText("Upgrade required")).toBeTruthy();
+      expect(
+        screen.getByText("Select a Pro or Enterprise tier to continue.")
+      ).toBeTruthy();
+    });
+
+    it("renders a custom action button when action prop is provided", () => {
+      const onClick = vi.fn();
+      render(
+        <EmptyState
+          variant="plan-badge"
+          action={{ label: "Choose a plan", onClick }}
+        />
+      );
+      const btn = screen.getByRole("button", { name: /Choose a plan/i });
+      expect(btn).toBeTruthy();
+      fireEvent.click(btn);
+      expect(onClick).toHaveBeenCalledTimes(1);
+    });
+
+    it("illustration is aria-hidden (WCAG 1.1.1 Non-text Content)", () => {
+      const { container } = render(<EmptyState variant="plan-badge" />);
+      const hiddenWrapper = container.querySelector('[aria-hidden="true"]');
+      expect(hiddenWrapper).toBeTruthy();
+      expect(hiddenWrapper?.querySelector("svg")).toBeTruthy();
+    });
+
+    it("SVG has strokeLinecap='round' consistent with v7 line-art style", () => {
+      const { container } = render(<EmptyState variant="plan-badge" />);
+      const svg = container.querySelector("svg");
+      expect(svg).toBeTruthy();
+      expect(svg?.getAttribute("stroke-linecap")).toBe("round");
+      expect(svg?.getAttribute("stroke-linejoin")).toBe("round");
+    });
+
+    it("uses var(--muted) for primary strokes and var(--accent) for accent marks", () => {
+      const { container } = render(
+        <EmptyState variant="plan-badge" size="default" />
+      );
+      const svg = container.querySelector("svg");
+      expect(svg).toBeTruthy();
+      const mutedStrokes = svg?.querySelectorAll('[stroke="var(--muted)"]');
+      const accentStrokes = svg?.querySelectorAll('[stroke="var(--accent)"]');
+      const accentFills = svg?.querySelectorAll('[fill="var(--accent)"]');
+      expect((mutedStrokes?.length ?? 0) >= 1).toBe(true);
+      expect(
+        (accentStrokes?.length ?? 0) + (accentFills?.length ?? 0) >= 1
+      ).toBe(true);
+    });
+
+    it("illustration contains the medal circle motif (the plan-tier metaphor)", () => {
+      const { container } = render(<EmptyState variant="plan-badge" />);
+      const svg = container.querySelector("svg");
+      expect(svg).toBeTruthy();
+      // Medal is represented by two nested circles.
+      const circles = svg?.querySelectorAll("circle");
+      expect((circles?.length ?? 0) >= 2).toBe(true);
+    });
+
+    it("illustration contains decorative sparkle dots with var(--accent) fill", () => {
+      const { container } = render(
+        <EmptyState variant="plan-badge" size="default" />
+      );
+      const svg = container.querySelector("svg");
+      const accentFills = svg?.querySelectorAll('[fill="var(--accent)"]');
+      expect((accentFills?.length ?? 0) >= 2).toBe(true);
+    });
+
+    it("no hardcoded hex colors in plan-badge illustration SVG", () => {
+      const { container } = render(<EmptyState variant="plan-badge" />);
+      const svg = container.querySelector("svg");
+      const hexRe = /#[0-9a-f]{3,8}/i;
+      expect(hexRe.test(svg?.outerHTML ?? "")).toBe(false);
+    });
+
+    it("compact size uses 28px illustration box", () => {
+      const { container } = render(
+        <EmptyState variant="plan-badge" size="compact" />
+      );
+      const svg = container.querySelector("svg");
+      expect(svg?.getAttribute("width")).toBe("28");
+      expect(svg?.getAttribute("height")).toBe("28");
+    });
+
+    it("default size uses 40px illustration box", () => {
+      const { container } = render(
+        <EmptyState variant="plan-badge" size="default" />
+      );
+      const svg = container.querySelector("svg");
+      expect(svg?.getAttribute("width")).toBe("40");
+      expect(svg?.getAttribute("height")).toBe("40");
+    });
+
+    it("uses h2 heading for default size", () => {
+      const { container } = render(
+        <EmptyState variant="plan-badge" size="default" />
+      );
+      expect(container.querySelector("h2")).toBeTruthy();
+    });
+
+    it("uses h3 heading for compact size", () => {
+      const { container } = render(
+        <EmptyState variant="plan-badge" size="compact" />
+      );
+      expect(container.querySelector("h3")).toBeTruthy();
+    });
+  });
 });
