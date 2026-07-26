@@ -52,6 +52,13 @@ describe("@layer focus contract", () => {
     expect(focusCss).toMatch(/\.filter-input:focus-visible/);
   });
 
+  it("focus.css defines focus-visible rules for SubscribeButton interactive elements", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.subscribe-button:focus-visible/);
+    expect(focusCss).toMatch(/\.subscribe-button-confirm:focus-visible/);
+    expect(focusCss).toMatch(/\.subscribe-button-cancel:focus-visible/);
+  });
+
   it("Dropdown trigger no longer overrides :focus-visible with inline outline:none", () => {
     const dropdown = read("src/components/Dropdown.tsx");
     expect(dropdown).not.toMatch(/outline:\s*open\s*\?[^:]*:\s*["']none["']/);

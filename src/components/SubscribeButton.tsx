@@ -120,7 +120,7 @@ export default function SubscribeButton({ apiName, onSubscribe, className }: Pro
         <div style={{ display: "flex", gap: 8 }}>
           <button
             ref={confirmRef}
-            className="primary-button"
+            className="primary-button subscribe-button-confirm"
             aria-describedby="subscribe-confirm-desc"
             aria-busy={isLoading}
             disabled={isLoading}
@@ -131,7 +131,7 @@ export default function SubscribeButton({ apiName, onSubscribe, className }: Pro
           </button>
 
           <button
-            className="ghost-button"
+            className="ghost-button subscribe-button-cancel"
             onClick={handleCancel}
             disabled={isLoading}
             aria-label="Cancel subscription"
@@ -146,7 +146,7 @@ export default function SubscribeButton({ apiName, onSubscribe, className }: Pro
   // idle state
   return (
     <button
-      className={`secondary-button${className ? ` ${className}` : ""}`}
+      className={`secondary-button subscribe-button${className ? ` ${className}` : ""}`}
       aria-label={`Subscribe to ${apiName}`}
       onClick={handleSubscribeClick}
     >
