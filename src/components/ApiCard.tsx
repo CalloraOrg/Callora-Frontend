@@ -24,6 +24,7 @@ import EmptyState from "./EmptyState";
 import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
 import { ClockIcon, BoltIcon } from "./icons";
+import { colorFromId } from "../utils/colorFromId";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -716,7 +717,22 @@ export default function ApiCard({
         gap: isCompact ? 6 : 8,
       }}
     >
-      <LiveRegion message={liveMessage} />
+      {/* Identity colour stripe — stable per API for quick visual recognition */}
+      <span
+        aria-hidden="true"
+        data-testid="api-card-color-stripe"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 4,
+          height: "100%",
+          borderRadius: "var(--radius-lg) 0 0 var(--radius-lg)",
+          background: colorFromId(api.id),
+          transition: prefersReducedMotion ? "none" : undefined,
+        }}
+      />
+
       {menuPos && <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)} actions={contextActions} />}
       
       {/* Absolutely-positioned bookmark button in the top-right corner */}

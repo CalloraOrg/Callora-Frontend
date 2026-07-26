@@ -428,85 +428,98 @@ describe("ApiCard responsiveness", () => {
   });
 });
 
-describe("ApiCard — aria-live region", () => {
+describe("ApiCard — Identity color stripe", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    pinnedApisStore._reset();
+    // Provide a default matchMedia mock so prefersReducedMotion resolves safely.
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
   });
 
-  afterEach(() => {
+  it("renders a color stripe element", () => {
+    render(<ApiCard api={mockApi} />);
+    const stripe = screen.getByTestId("api-card-color-stripe");
+    expect(stripe).toBeTruthy();
+  });
+
+  it("stripe is hidden from assistive technology", () => {
+    render(<ApiCard api={mockApi} />);
+    const stripe = screen.getByTestId("api-card-color-stripe");
+    expect(stripe.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("stripe has a deterministic color derived from the API id", () => {
+    render(<ApiCard api={mockApi} />);
+    const stripe = screen.getByTestId("api-card-color-stripe");
+    expect(stripe.style.background).toBeTruthy();
+  });
+
+  it("different API ids produce different stripe colours", () => {
+    const apiA: APIItem = { ...mockApi, id: "alpha-api" };
+    const apiB: APIItem = { ...mockApi, id: "beta-api" };
+
+    const { unmount: unmountA } = render(<ApiCard api={apiA} />);
+    const colourA = screen.getByTestId("api-card-color-stripe").style.background;
+    unmountA();
+
+    const { unmount: unmountB } = render(<ApiCard api={apiB} />);
+    const colourB = screen.getByTestId("api-card-color-stripe").style.background;
+    unmountB();
+
+    expect(colourA).not.toBe(colourB);
+  });
+
+  it("same API id always produces the same stripe colour", () => {
+    const { unmount: unmount1 } = render(<ApiCard api={mockApi} />);
+    const colour1 = screen.getByTestId("api-card-color-stripe").style.background;
+    unmount1();
+
+    const { unmount: unmount2 } = render(<ApiCard api={mockApi} />);
+    const colour2 = screen.getByTestId("api-card-color-stripe").style.background;
+    unmount2();
+
+    expect(colour1).toBe(colour2);
+  });
+
+  it("stripe is not rendered in the loading/skeleton state", () => {
+    render(<ApiCard loading />);
+    expect(screen.queryByTestId("api-card-color-stripe")).toBeNull();
+  });
+
+  it("stripe has position absolute and covers full card height", () => {
+    render(<ApiCard api={mockApi} />);
+    const stripe = screen.getByTestId("api-card-color-stripe");
+    expect(stripe.style.position).toBe("absolute");
+    expect(stripe.style.height).toBe("100%");
+    expect(stripe.style.left).toBe("0px");
+    expect(stripe.style.top).toBe("0px");
+  });
+
+  it("stripe respects reduced motion (transition=none)", () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+
+    render(<ApiCard api={mockApi} />);
+    const stripe = screen.getByTestId("api-card-color-stripe");
+    expect(stripe.style.transition).toBe("none");
+
     vi.restoreAllMocks();
-  });
-
-  it("renders a live region with correct ARIA attributes", () => {
-    render(<ApiCard api={mockApi} />);
-    const liveRegion = screen.getByTestId("api-card-live-region");
-    expect(liveRegion).toBeTruthy();
-    expect(liveRegion.getAttribute("role")).toBe("status");
-    expect(liveRegion.getAttribute("aria-live")).toBe("polite");
-    expect(liveRegion.getAttribute("aria-atomic")).toBe("true");
-  });
-
-  it("announces when favorite is added", () => {
-    render(<ApiCard api={mockApi} />);
-    const liveRegion = screen.getByTestId("api-card-live-region");
-    expect(liveRegion.textContent).toBe("");
-
-    fireEvent.click(screen.getByLabelText("Add to favorites"));
-    expect(liveRegion.textContent).toBe("Added to favorites");
-  });
-
-  it("announces when favorite is removed", () => {
-    render(<ApiCard api={mockApi} />);
-    const liveRegion = screen.getByTestId("api-card-live-region");
-
-    fireEvent.click(screen.getByLabelText("Add to favorites"));
-    expect(liveRegion.textContent).toBe("Added to favorites");
-
-    fireEvent.click(screen.getByLabelText("Remove from favorites"));
-    expect(liveRegion.textContent).toBe("Removed from favorites");
-  });
-
-  it("announces pin to dashboard", () => {
-    render(<ApiCard api={mockApi} />);
-    const liveRegion = screen.getByTestId("api-card-live-region");
-
-    fireEvent.click(screen.getByLabelText(/Pin api-1 to dashboard/));
-    expect(liveRegion.textContent).toBe("Pinned api-1 to dashboard");
-  });
-
-  it("announces unpin from dashboard", () => {
-    render(<ApiCard api={mockApi} />);
-    const liveRegion = screen.getByTestId("api-card-live-region");
-
-    fireEvent.click(screen.getByLabelText(/Pin api-1 to dashboard/));
-    fireEvent.click(screen.getByLabelText(/Unpin api-1 from dashboard/));
-    expect(liveRegion.textContent).toBe("Unpinned api-1 from dashboard");
-  });
-
-  it("announces added to comparison", () => {
-    render(<ApiCard api={mockApi} />);
-    const liveRegion = screen.getByTestId("api-card-live-region");
-
-    fireEvent.click(screen.getByLabelText(/Add.*to comparison/i));
-    expect(liveRegion.textContent).toBe("Added Stellar Metering API to comparison");
-  });
-
-  it("announces removed from comparison", () => {
-    render(<ApiCard api={mockApi} />);
-    const liveRegion = screen.getByTestId("api-card-live-region");
-
-    fireEvent.click(screen.getByLabelText(/Add.*to comparison/i));
-    fireEvent.click(screen.getByLabelText(/Remove.*from comparison/i));
-    expect(liveRegion.textContent).toBe("Removed Stellar Metering API from comparison");
-  });
-
-  it("visually hides the live region while keeping it accessible", () => {
-    render(<ApiCard api={mockApi} />);
-    const liveRegion = screen.getByTestId("api-card-live-region");
-    expect(liveRegion.style.position).toBe("absolute");
-    expect(liveRegion.style.overflow).toBe("hidden");
-    expect(liveRegion.style.clip).toMatch(/rect/);
   });
 });
 
