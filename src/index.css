@@ -2381,6 +2381,91 @@ code,
   white-space: nowrap;
 }
 
+/* Subtle shortcut hint chip variant */
+.kbd-hint--chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl, 20px);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.kbd-hint--chip .kbd-hint__key {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  background: var(--surface-strong);
+  border-color: var(--line-strong);
+}
+
+/* Subtle contextual hint variant */
+.kbd-hint--subtle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  opacity: 0.85;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.kbd-hint--subtle .kbd-hint__key {
+  min-width: 16px;
+  padding: 1px 4px;
+  font-size: 0.68rem;
+  border-color: var(--line);
+  background: transparent;
+}
+
+/* QuotaBanner layout and styles */
+.quota-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 16px);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  transition: border-color var(--transition-speed, 240ms) ease;
+}
+
+.quota-banner h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.quota-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.quota-banner__primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.quota-banner__status-message {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--success);
+}
+
+
 /* The .api-detail-tabs button rule is now handled by .tabs-tab inside Tabs.tsx */
 
 .api-detail-two-column,

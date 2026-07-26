@@ -1,18 +1,52 @@
-import { render, screen } from '@testing-library/react';
-import QuotaBanner from '../pages/QuotaBanner';
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import QuotaBanner from './QuotaBanner';
 
 describe('QuotaBanner', () => {
   it('renders quota details and shortcut hint', () => {
     render(<QuotaBanner />);
-    // Check main heading
-    expect(screen.getByRole('heading', { name: /quota details/i })).toBeInTheDocument();
-    // Check input field
-    const input = screen.getByLabelText(/quota/i);
-    expect(input).toBeInTheDocument();
-    // Check KbdHint displays the Enter key
-    const kbd = screen.getByText('Enter');
-    expect(kbd).toBeInTheDocument();
-    // Ensure description is present (optional)
-    expect(screen.getByText('Submit quota')).toBeInTheDocument();
+    const input = screen.getByRole('textbox');
+
+    const describedBy = input.getAttribute('aria-describedby');
+    expect(describedBy).toContain('quota-input-hint');
+    expect(describedBy).toContain('quota-extra-info');
+  });
+
+  it('renders primary action button with KbdHint shortcut chip', () => {
+    render(<QuotaBanner primaryActionLabel="Save Quota" shortcutKey="Ctrl+Enter" />);
+
+    const button = screen.getByRole('button', { name: /Save Quota/i });
+    expect(button).toBeTruthy();
+    expect(button.classList.contains('primary-button')).toBe(true);
+
+    const kbd = screen.getByText('Ctrl+Enter');
+    expect(kbd).toBeTruthy();
+    expect(kbd.tagName.toLowerCase()).toBe('kbd');
+  });
+
+  it('triggers onSave callback when primary action button is clicked', () => {
+    const handleSave = vi.fn();
+    render(<QuotaBanner initialQuota="100" onSave={handleSave} />);
+
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '250' } });
+
+    const button = screen.getByRole('button', { name: /Save Quota/i });
+    fireEvent.click(button);
+
+    expect(handleSave).toHaveBeenCalledTimes(1);
+    expect(handleSave).toHaveBeenCalledWith('250');
+  });
+
+  it('triggers onSave callback when Ctrl+Enter keyboard shortcut is pressed', () => {
+    const handleSave = vi.fn();
+    render(<QuotaBanner initialQuota="500" onSave={handleSave} />);
+
+    fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
+
+    expect(handleSave).toHaveBeenCalledTimes(1);
+    expect(handleSave).toHaveBeenCalledWith('500');
   });
 });
+
