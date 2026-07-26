@@ -182,6 +182,79 @@
     outline: 2px solid var(--accent);
     outline-offset: 3px;
   }
+
+  /* ── MarketplacePage interactive elements ───────────────────────────────── */
+  /*
+   * These rules reinforce the global *:focus-visible ring with border-color
+   * and --focus-ring box-shadow for extra contrast on MarketplacePage
+   * components. They mirror the FiltersSidebar pattern and make coverage
+   * explicit for accessibility audits.
+   */
+
+  /* Category pills (CategoryPills component) */
+  .pill-bar__item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: var(--focus-ring);
+  }
+
+  /* Tag filter pills (ApiTagFilter component) */
+  .api-tag-filter__pill:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: var(--focus-ring);
+  }
+
+  /* Density toggle buttons */
+  .density-toggle-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: var(--focus-ring);
+  }
+
+  /* Mobile filter trigger button */
+  .marketplace-filter-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: var(--focus-ring);
+  }
+
+  /* Pagination buttons */
+  .pagination-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: var(--focus-ring);
+  }
+
+  /* Pagination page size select */
+  .page-size-select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring);
+  }
+
+  /* Recently active rail buttons */
+  .recently-active-rail button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: var(--focus-ring);
+  }
+
+  /* EmptyState buttons */
+  .empty-state button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: var(--focus-ring);
+  }
+
+  /* FiltersBottomSheet buttons */
+  .bottom-sheet__close:focus-visible,
+  .bottom-sheet__show-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: var(--focus-ring);
+  }
 }
 
 .marketplace-page *:focus-visible,
