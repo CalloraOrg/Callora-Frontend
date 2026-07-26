@@ -56,4 +56,41 @@ describe("@layer focus contract", () => {
     const dropdown = read("src/components/Dropdown.tsx");
     expect(dropdown).not.toMatch(/outline:\s*open\s*\?[^:]*:\s*["']none["']/);
   });
+
+  it("focus.css defines focus-visible rules for MarketplacePage interactive elements", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.pill-bar__item:focus-visible/);
+    expect(focusCss).toMatch(/\.api-tag-filter__pill:focus-visible/);
+    expect(focusCss).toMatch(/\.density-toggle-button:focus-visible/);
+    expect(focusCss).toMatch(/\.marketplace-filter-button:focus-visible/);
+    expect(focusCss).toMatch(/\.pagination-button:focus-visible/);
+    expect(focusCss).toMatch(/\.page-size-select:focus-visible/);
+    expect(focusCss).toMatch(/\.recently-active-rail button:focus-visible/);
+    expect(focusCss).toMatch(/\.empty-state button:focus-visible/);
+    expect(focusCss).toMatch(/\.bottom-sheet__close:focus-visible/);
+    expect(focusCss).toMatch(/\.bottom-sheet__show-btn:focus-visible/);
+  });
+
+  it("focus.css uses accent token and 3px offset for MarketplacePage rules", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.pill-bar__item:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)/);
+    expect(focusCss).toMatch(/\.pill-bar__item:focus-visible[\s\S]*?outline-offset:\s*3px/);
+    expect(focusCss).toMatch(/\.api-tag-filter__pill:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)/);
+    expect(focusCss).toMatch(/\.api-tag-filter__pill:focus-visible[\s\S]*?outline-offset:\s*3px/);
+    expect(focusCss).toMatch(/\.density-toggle-button:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)/);
+    expect(focusCss).toMatch(/\.density-toggle-button:focus-visible[\s\S]*?outline-offset:\s*3px/);
+  });
+
+  it("MarketplacePage components use :focus-visible, not bare :focus", () => {
+    const categoryPills = read("src/components/CategoryPills.tsx");
+    const apiTagFilter = read("src/pages/ApiTagFilter.tsx");
+    const marketplacePage = read("src/pages/MarketplacePage.tsx");
+    const recentlyActiveRail = read("src/components/RecentlyActiveRail.tsx");
+
+    expect(categoryPills).not.toMatch(/\.pill-bar__item:focus\s*\{/);
+    expect(apiTagFilter).not.toMatch(/\.api-tag-filter__pill:focus\s*\{/);
+    expect(marketplacePage).not.toMatch(/\.density-toggle-button:focus\s*\{/);
+    expect(marketplacePage).not.toMatch(/\.marketplace-filter-button:focus\s*\{/);
+    expect(recentlyActiveRail).not.toMatch(/button:focus\s*\{/);
+  });
 });
