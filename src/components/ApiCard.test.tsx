@@ -350,3 +350,23 @@ describe("ApiCard responsiveness", () => {
   });
 });
 
+describe("ApiCard — Empty state", () => {
+  it("renders themed empty state when no api is provided and not loading", () => {
+    const onBrowse = vi.fn();
+    render(<ApiCard onBrowse={onBrowse} /> as any);
+
+    // Region should be present with the title
+    expect(screen.getByRole("region", { name: /No API selected/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Browse marketplace/i })).toBeTruthy();
+  });
+
+  it("calls onBrowse when CTA is clicked", () => {
+    const onBrowse = vi.fn();
+    render(<ApiCard onBrowse={onBrowse} /> as any);
+
+    const btn = screen.getByRole("button", { name: /Browse marketplace/i });
+    fireEvent.click(btn);
+    expect(onBrowse).toHaveBeenCalled();
+  });
+});
+

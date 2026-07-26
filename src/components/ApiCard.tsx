@@ -19,6 +19,7 @@ import { useCompareStore, compareStore } from "../state/compareStore";
 import { usePinnedApis, pinnedApisStore } from "../state/pinnedApis";
 import Sparkline from "./Sparkline";
 import type { Shortcut } from "../hooks/useGlobalShortcuts";
+import EmptyState from "./EmptyState";
 import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
 import { ClockIcon, BoltIcon } from "./icons";
@@ -508,6 +509,7 @@ export default function ApiCard({
   onViewDetails,
   onTagClick,
   activeTag,
+  onBrowse,
 }: {
   api?: APIItem;
   loading?: boolean;
@@ -515,9 +517,18 @@ export default function ApiCard({
   onViewDetails?: (api: APIItem) => void;
   onTagClick?: (tag: string) => void;
   activeTag?: string | null;
+  onBrowse?: () => void;
 }) {
-  if (loading || !api) {
-    return <ApiCardSkeleton />;
+  if (loading) return <ApiCardSkeleton />;
+  if (!api) {
+    return (
+      <EmptyState
+        title="No API selected"
+        description="Select an API from the marketplace or browse featured APIs to get started."
+        ctaLabel="Browse marketplace"
+        onCta={onBrowse}
+      />
+    );
   }
 
   const isMobile = useMediaQuery("(max-width: 768px)");
