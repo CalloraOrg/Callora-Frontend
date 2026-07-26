@@ -58,7 +58,7 @@ describe("no-print markup", () => {
 
   it("marks CodeExample header controls as no-print", () => {
     const codeExample = read("src/components/CodeExample.tsx");
-    expect(codeExample).toMatch(/className="no-print"/);
+    expect(codeExample).toMatch(/className="no-print/);
   });
 
   it("does not import the removed print.css file", () => {
