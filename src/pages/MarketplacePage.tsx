@@ -9,6 +9,8 @@ import SortDropdown, { type SortValue } from "../components/SortDropdown";
 import CategoryPills from "../components/CategoryPills";
 import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
 import FiltersSidebar, { ALL_CATEGORIES } from "../components/FiltersSidebar";
+import KbdHint from "../components/KbdHint";
+import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
@@ -577,6 +579,11 @@ export default function MarketplacePage(): JSX.Element {
         favoritesOnly={favoritesOnly}
         toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
         triggerRef={filtersTriggerRef}
+      />
+
+      {/* Keyboard shortcuts hint */}
+      <KbdHint
+        shortcuts={SHORTCUTS.filter((s) => s.category === "Marketplace")}
       />
     </div>
   );

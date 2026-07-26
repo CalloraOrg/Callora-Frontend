@@ -127,4 +127,14 @@ describe("MarketplacePage", () => {
     const grid = document.querySelector(".marketplace-grid");
     expect(grid).toBeTruthy();
   });
+
+  it("renders keyboard shortcuts hint", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
+
+    const hint = screen.getByRole("complementary", { name: "Keyboard shortcuts" });
+    expect(hint).toBeTruthy();
+    expect(screen.getByText("Focus search bar")).toBeTruthy();
+    expect(screen.getByText("Add/remove focused API card to comparison")).toBeTruthy();
+  });
 });
