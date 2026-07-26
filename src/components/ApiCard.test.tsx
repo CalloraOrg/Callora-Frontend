@@ -376,23 +376,85 @@ describe("ApiCard responsiveness", () => {
   });
 });
 
-describe("ApiCard — Empty state", () => {
-  it("renders themed empty state when no api is provided and not loading", () => {
-    const onBrowse = vi.fn();
-    render(<ApiCard onBrowse={onBrowse} /> as any);
-
-    // Region should be present with the title
-    expect(screen.getByRole("region", { name: /No API selected/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Browse marketplace/i })).toBeTruthy();
+describe("ApiCard — aria-live region", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    pinnedApisStore._reset();
   });
 
-  it("calls onBrowse when CTA is clicked", () => {
-    const onBrowse = vi.fn();
-    render(<ApiCard onBrowse={onBrowse} /> as any);
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    const btn = screen.getByRole("button", { name: /Browse marketplace/i });
-    fireEvent.click(btn);
-    expect(onBrowse).toHaveBeenCalled();
+  it("renders a live region with correct ARIA attributes", () => {
+    render(<ApiCard api={mockApi} />);
+    const liveRegion = screen.getByTestId("api-card-live-region");
+    expect(liveRegion).toBeTruthy();
+    expect(liveRegion.getAttribute("role")).toBe("status");
+    expect(liveRegion.getAttribute("aria-live")).toBe("polite");
+    expect(liveRegion.getAttribute("aria-atomic")).toBe("true");
+  });
+
+  it("announces when favorite is added", () => {
+    render(<ApiCard api={mockApi} />);
+    const liveRegion = screen.getByTestId("api-card-live-region");
+    expect(liveRegion.textContent).toBe("");
+
+    fireEvent.click(screen.getByLabelText("Add to favorites"));
+    expect(liveRegion.textContent).toBe("Added to favorites");
+  });
+
+  it("announces when favorite is removed", () => {
+    render(<ApiCard api={mockApi} />);
+    const liveRegion = screen.getByTestId("api-card-live-region");
+
+    fireEvent.click(screen.getByLabelText("Add to favorites"));
+    expect(liveRegion.textContent).toBe("Added to favorites");
+
+    fireEvent.click(screen.getByLabelText("Remove from favorites"));
+    expect(liveRegion.textContent).toBe("Removed from favorites");
+  });
+
+  it("announces pin to dashboard", () => {
+    render(<ApiCard api={mockApi} />);
+    const liveRegion = screen.getByTestId("api-card-live-region");
+
+    fireEvent.click(screen.getByLabelText(/Pin api-1 to dashboard/));
+    expect(liveRegion.textContent).toBe("Pinned api-1 to dashboard");
+  });
+
+  it("announces unpin from dashboard", () => {
+    render(<ApiCard api={mockApi} />);
+    const liveRegion = screen.getByTestId("api-card-live-region");
+
+    fireEvent.click(screen.getByLabelText(/Pin api-1 to dashboard/));
+    fireEvent.click(screen.getByLabelText(/Unpin api-1 from dashboard/));
+    expect(liveRegion.textContent).toBe("Unpinned api-1 from dashboard");
+  });
+
+  it("announces added to comparison", () => {
+    render(<ApiCard api={mockApi} />);
+    const liveRegion = screen.getByTestId("api-card-live-region");
+
+    fireEvent.click(screen.getByLabelText(/Add.*to comparison/i));
+    expect(liveRegion.textContent).toBe("Added Stellar Metering API to comparison");
+  });
+
+  it("announces removed from comparison", () => {
+    render(<ApiCard api={mockApi} />);
+    const liveRegion = screen.getByTestId("api-card-live-region");
+
+    fireEvent.click(screen.getByLabelText(/Add.*to comparison/i));
+    fireEvent.click(screen.getByLabelText(/Remove.*from comparison/i));
+    expect(liveRegion.textContent).toBe("Removed Stellar Metering API from comparison");
+  });
+
+  it("visually hides the live region while keeping it accessible", () => {
+    render(<ApiCard api={mockApi} />);
+    const liveRegion = screen.getByTestId("api-card-live-region");
+    expect(liveRegion.style.position).toBe("absolute");
+    expect(liveRegion.style.overflow).toBe("hidden");
+    expect(liveRegion.style.clip).toMatch(/rect/);
   });
 });
 

@@ -143,10 +143,10 @@ interface FavoriteButtonProps {
   isFavorite: boolean;
   onToggle: (id: string) => void;
   prefersReducedMotion?: boolean;
-  onAnnounce?: (msg: string) => void;
+  onStatusChange?: (message: string) => void;
 }
 
-function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion = false, onAnnounce }: FavoriteButtonProps) {
+function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion = false, onStatusChange }: FavoriteButtonProps) {
   const btnRef = useRef<HTMLButtonElement>(null);
 
   const handleMouseEnter = prefersReducedMotion
@@ -163,7 +163,7 @@ function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion
       onClick={(e) => {
         e.stopPropagation();
         onToggle(endpointId);
-        onAnnounce?.(!isFavorite ? "Added to favorites" : "Removed from favorites");
+        onStatusChange?.(!isFavorite ? "Added to favorites" : "Removed from favorites");
       }}
       style={{
         position: "absolute",
@@ -209,10 +209,10 @@ function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion
 interface BookmarkButtonProps {
   endpointId: string;
   prefersReducedMotion?: boolean;
-  onAnnounce?: (msg: string) => void;
+  onStatusChange?: (message: string) => void;
 }
 
-function BookmarkButton({ endpointId, prefersReducedMotion = false, onAnnounce }: BookmarkButtonProps) {
+function BookmarkButton({ endpointId, prefersReducedMotion = false, onStatusChange }: BookmarkButtonProps) {
   const {
     collections,
     isEndpointSaved,
@@ -257,10 +257,10 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false, onAnnounce }
     const colName = collections.find(c => c.id === colId)?.name || "collection";
     if (savedIn.has(colId)) {
       removeEndpointFromCollection(colId, endpointId);
-      onAnnounce?.(`Removed from ${colName}`);
+      onStatusChange?.("Removed from collection");
     } else {
       addEndpointToCollection(colId, endpointId);
-      onAnnounce?.(`Saved to ${colName}`);
+      onStatusChange?.("Saved to collection");
     }
   };
 
@@ -276,10 +276,10 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false, onAnnounce }
     const trimmed = newName.trim();
     if (!trimmed) return;
     createCollectionWithEndpoint(trimmed, endpointId);
-    onAnnounce?.(`Created and saved to ${trimmed}`);
+    onStatusChange?.(`Created collection "${trimmed}" and saved endpoint`);
     setNewName("");
     setShowNew(false);
-  }, [newName, createCollectionWithEndpoint, endpointId, onAnnounce]);
+  }, [newName, createCollectionWithEndpoint, endpointId, onStatusChange]);
 
   const handleNewKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -453,7 +453,7 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false, onAnnounce }
 // ─── Pin button ───────────────────────────────────────────────────────────────
 
 /** Quick-menu button that pins/unpins an API to the dashboard. */
-function PinButton({ apiId, prefersReducedMotion = false, onAnnounce }: { apiId: string; prefersReducedMotion?: boolean; onAnnounce?: (msg: string) => void }) {
+function PinButton({ apiId, prefersReducedMotion = false, onStatusChange }: { apiId: string; prefersReducedMotion?: boolean; onStatusChange?: (message: string) => void }) {
   const pinned = usePinnedApis();
   const isPinned = pinned.has(apiId);
 
@@ -462,7 +462,7 @@ function PinButton({ apiId, prefersReducedMotion = false, onAnnounce }: { apiId:
       onClick={(e) => {
         e.stopPropagation();
         pinnedApisStore.toggle(apiId);
-        onAnnounce?.(!isPinned ? "Pinned to dashboard" : "Unpinned from dashboard");
+        onStatusChange?.(!isPinned ? `Pinned ${apiId} to dashboard` : `Unpinned ${apiId} from dashboard`);
       }}
       style={{
         position: "absolute",
@@ -567,6 +567,9 @@ export default function ApiCard({
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
+  const [liveMessage, setLiveMessage] = useState("");
+  const announce = useCallback((msg: string) => setLiveMessage(msg), []);
+
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
   const avgLatencyMs = api.avgLatencyMs;
   const uptimePercent = api.uptimePercent;
@@ -603,10 +606,10 @@ export default function ApiCard({
     e.stopPropagation();
     if (isCompared) {
       compareStore.removeApi(api.id);
-      setLiveMessage(`${api.name} removed from comparison`);
+      announce(`Removed ${api.name} from comparison`);
     } else if (canCompare) {
       compareStore.addApi(api);
-      setLiveMessage(`${api.name} added to comparison`);
+      announce(`Added ${api.name} to comparison`);
     }
   };
 
@@ -709,17 +712,17 @@ export default function ApiCard({
       <LiveRegion message={liveMessage} />
       {menuPos && <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)} actions={contextActions} />}
       {/* Absolutely-positioned bookmark button in the top-right corner */}
-      <BookmarkButton endpointId={api.id} prefersReducedMotion={prefersReducedMotion} onAnnounce={setLiveMessage} />
+      <BookmarkButton endpointId={api.id} prefersReducedMotion={prefersReducedMotion} onStatusChange={announce} />
 
       {/* Pin/unpin button — below bookmark, top-right */}
-      <PinButton apiId={api.id} prefersReducedMotion={prefersReducedMotion} onAnnounce={setLiveMessage} />
+      <PinButton apiId={api.id} prefersReducedMotion={prefersReducedMotion} onStatusChange={announce} />
       
       <FavoriteButton
         endpointId={api.id}
         isFavorite={isFavorite(api.id)}
         onToggle={toggleFavorite}
         prefersReducedMotion={prefersReducedMotion}
-        onAnnounce={setLiveMessage}
+        onStatusChange={announce}
       />
 
        {/* Compare button - absolutely positioned, top-left */}
@@ -896,6 +899,16 @@ export default function ApiCard({
       </div>
 
       <KbdHint shortcuts={CARD_SHORTCUTS} />
+
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="api-card-live-region"
+        style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap", border: 0 }}
+      >
+        {liveMessage}
+      </div>
     </article>
   );
 }
