@@ -99,7 +99,7 @@ statValues.forEach((el, i) => {
    });
  });
 
-describe('ApiUsage - Responsive Breakpoints', () => {
+describe('ApiUsage - Keyboard Shortcut Hints', () => {
   beforeEach(() => {
     Object.defineProperty(window, 'location', {
       value: { search: '', pathname: '/api-usage' },
@@ -117,40 +117,32 @@ describe('ApiUsage - Responsive Breakpoints', () => {
     vi.clearAllMocks();
   });
 
-  it('renders stats grid with stat-card elements for responsive layout', () => {
+  it('renders the KbdHint component with ApiUsage shortcuts', () => {
     render(<ApiUsage />);
-    const statsGrid = document.querySelector('.stats-grid');
-    expect(statsGrid).toBeTruthy();
-    const statCards = statsGrid?.querySelectorAll('.stat-card');
-    expect(statCards?.length).toBe(5);
+    const kbdHint = document.querySelector('.kbd-hint');
+    expect(kbdHint).toBeTruthy();
+    expect(kbdHint?.getAttribute('aria-label')).toBe('Keyboard shortcuts');
   });
 
-  it('renders chart bars with responsive-friendly markup', () => {
+  it('displays the make test call shortcut key', () => {
     render(<ApiUsage />);
-    const chartBars = document.querySelectorAll('.chart-bar');
-    expect(chartBars.length).toBe(7);
-    const chartLabels = document.querySelectorAll('.chart-labels span');
-    expect(chartLabels.length).toBe(7);
+    const kbdHint = document.querySelector('.kbd-hint');
+    expect(kbdHint?.textContent).toContain('m');
+    expect(kbdHint?.textContent).toContain('Make test call');
   });
 
-  it('renders language tabs with tab-button elements', () => {
+  it('displays the toggle history shortcut key', () => {
     render(<ApiUsage />);
-    const tabButtons = document.querySelectorAll('.tab-button');
-    expect(tabButtons.length).toBe(3);
+    const kbdHint = document.querySelector('.kbd-hint');
+    expect(kbdHint?.textContent).toContain('h');
+    expect(kbdHint?.textContent).toContain('Toggle request history');
   });
 
-  it('renders code-block with code content', () => {
+  it('displays the reset filters shortcut key', () => {
     render(<ApiUsage />);
-    const codeBlock = document.querySelector('.code-block');
-    expect(codeBlock).toBeTruthy();
-    const codeElement = codeBlock?.querySelector('code');
-    expect(codeElement?.textContent).toBeTruthy();
-  });
-
-  it('renders surface sections that stack vertically', () => {
-    render(<ApiUsage />);
-    const surfaces = document.querySelectorAll('.api-usage-page > .surface');
-    expect(surfaces.length).toBeGreaterThanOrEqual(4);
+    const kbdHint = document.querySelector('.kbd-hint');
+    expect(kbdHint?.textContent).toContain('r');
+    expect(kbdHint?.textContent).toContain('Reset call history filters');
   });
 });
 
