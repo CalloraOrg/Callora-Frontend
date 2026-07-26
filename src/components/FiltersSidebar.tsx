@@ -1,11 +1,10 @@
 import { WarningIcon, ChevronIcon } from "./icons";
 import Dropdown from "./Dropdown";
 import EmptyState from "./EmptyState";
-import KbdHint from "./KbdHint";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { usePersistedState } from "../hooks/usePersistedState";
 import { FiltersSidebarSkeleton } from "./Skeleton";
-import type { Shortcut } from "../hooks/useGlobalShortcuts";
+import LiveRegion from "./LiveRegion";
 
 const POPULARITY_OPTIONS = [
   { value: "any", label: "Any" },
@@ -53,7 +52,7 @@ function FilterGroup({
   return (
     <div
       className={`filter-group ${collapsed ? "filter-group--collapsed" : ""}`}
-      style={{ marginBottom: 12 }}
+      style={{ marginBottom: "var(--mkt-space-lg, 12px)" }}
     >
       <button
         type="button"
@@ -74,13 +73,45 @@ function FilterGroup({
         id={`filter-panel-${storageKey}`}
         className="filter-group__panel"
         hidden={collapsed}
-        style={{ marginTop: 8 }}
+        style={{ marginTop: "var(--mkt-space-md, 8px)" }}
         data-testid={`filter-panel-${storageKey}`}
       >
         {children}
       </div>
     </div>
   );
+}
+
+/** Build a human-readable summary of active filters for assistive-tech announcements. */
+function buildFilterSummary(params: {
+  selectedCategories: Set<string>;
+  minPrice: number | null;
+  maxPrice: number | null;
+  popularity: string;
+  favoritesOnly: boolean;
+}): string {
+  const parts: string[] = [];
+  const { selectedCategories, minPrice, maxPrice, popularity, favoritesOnly } = params;
+
+  if (selectedCategories.size > 0) {
+    const cats = [...selectedCategories].join(", ");
+    parts.push(`${selectedCategories.size} categor${selectedCategories.size === 1 ? "y" : "ies"}: ${cats}`);
+  }
+  if (minPrice !== null) {
+    parts.push(`min price $${minPrice}`);
+  }
+  if (maxPrice !== null) {
+    parts.push(`max price $${maxPrice}`);
+  }
+  if (popularity !== "any") {
+    const label = POPULARITY_OPTIONS.find((o) => o.value === popularity)?.label ?? popularity;
+    parts.push(`popularity: ${label}`);
+  }
+  if (favoritesOnly) {
+    parts.push("favorites only");
+  }
+
+  return parts.length > 0 ? `Filters active: ${parts.join("; ")}.` : "";
 }
 
 export default function FiltersSidebar({
@@ -148,6 +179,74 @@ export default function FiltersSidebar({
     }
   }, [sheetOpen]);
 
+  // ── Aria-live announcements ─────────────────────────────────────────────
+  // Track filter state to build descriptive announcements for screen readers.
+  // Initialize refs with neutral defaults so the first effect run detects the
+  // initial filter values and announces them.
+  const prevCategoriesRef = useRef<Set<string>>(new Set());
+  const prevMinRef = useRef<number | null>(null);
+  const prevMaxRef = useRef<number | null>(null);
+  const prevPopularityRef = useRef<string>("any");
+  const prevFavoritesRef = useRef<boolean>(false);
+
+  const [announcement, setAnnouncement] = useState("");
+
+  // Announce filter changes when any filter value changes.
+  useEffect(() => {
+    const catChanged = selectedCategories.size !== prevCategoriesRef.current.size ||
+      ![...selectedCategories].every((c) => prevCategoriesRef.current.has(c));
+    const minChanged = minPrice !== prevMinRef.current;
+    const maxChanged = maxPrice !== prevMaxRef.current;
+    const popChanged = popularity !== prevPopularityRef.current;
+    const favChanged = favoritesOnly !== prevFavoritesRef.current;
+
+    if (!catChanged && !minChanged && !maxChanged && !popChanged && !favChanged) return;
+
+    // Determine what changed for a specific announcement.
+    if (catChanged) {
+      const added = [...selectedCategories].filter((c) => !prevCategoriesRef.current.has(c));
+      const removed = [...prevCategoriesRef.current].filter((c) => !selectedCategories.has(c));
+      if (added.length === 1) {
+        setAnnouncement(`Category "${added[0]}" selected. ${buildFilterSummary({ selectedCategories, minPrice, maxPrice, popularity, favoritesOnly })}`);
+      } else if (removed.length === 1) {
+        setAnnouncement(`Category "${removed[0]}" deselected. ${buildFilterSummary({ selectedCategories, minPrice, maxPrice, popularity, favoritesOnly })}`);
+      } else {
+        setAnnouncement(buildFilterSummary({ selectedCategories, minPrice, maxPrice, popularity, favoritesOnly }));
+      }
+    } else if (minChanged || maxChanged) {
+      const summary = buildFilterSummary({ selectedCategories, minPrice, maxPrice, popularity, favoritesOnly });
+      setAnnouncement(summary || "Price range cleared.");
+    } else if (popChanged) {
+      const label = POPULARITY_OPTIONS.find((o) => o.value === popularity)?.label ?? popularity;
+      setAnnouncement(`Popularity filter set to ${label}. ${buildFilterSummary({ selectedCategories, minPrice, maxPrice, popularity, favoritesOnly })}`);
+    } else if (favChanged) {
+      setAnnouncement(favoritesOnly ? "Favorites only filter enabled." : "Favorites only filter disabled.");
+    }
+
+    prevCategoriesRef.current = new Set(selectedCategories);
+    prevMinRef.current = minPrice;
+    prevMaxRef.current = maxPrice;
+    prevPopularityRef.current = popularity;
+    prevFavoritesRef.current = favoritesOnly;
+  }, [selectedCategories, minPrice, maxPrice, popularity, favoritesOnly]);
+
+  /** Wrapped clear-filters handler that announces the action. */
+  const handleClearFilters = useCallback(() => {
+    clearFilters();
+    setAnnouncement("All filters cleared. Showing all APIs.");
+  }, [clearFilters]);
+
+
+
+  // Announce zero results separately from filter changes.
+  const prevResultCountRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (resultCount === 0 && prevResultCountRef.current !== 0 && hasActiveFilters) {
+      setAnnouncement("No APIs match the current filters. Try adjusting or clearing filters.");
+    }
+    prevResultCountRef.current = resultCount;
+  }, [resultCount, hasActiveFilters]);
+
   // For responsive styling, `.mobile-filters-toggle` is hidden by desktop CSS
   const content = (
     <>
@@ -157,14 +256,14 @@ export default function FiltersSidebar({
         storageKey="categories"
         prefersReducedMotion={prefersReducedMotion}
       >
-        <div className="filter-options" style={{ display: "grid", gap: 8 }}>
+        <div className="filter-options" style={{ display: "grid", gap: "var(--mkt-space-md, 8px)" }}>
           {ALL_CATEGORIES.map((c) => {
             const id = `category-${c.replace(/\s+/g, "-").toLowerCase()}`;
             return (
               <div
                 key={c}
                 className="filter-option"
-                style={{ display: "flex", gap: 8, alignItems: "center" }}
+                style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", alignItems: "center" }}
               >
                 <input
                   id={id}
@@ -192,8 +291,8 @@ export default function FiltersSidebar({
         storageKey="price"
         prefersReducedMotion={prefersReducedMotion}
       >
-        <div style={{ display: "grid", gap: 8 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "grid", gap: "var(--mkt-space-md, 8px)" }}>
+          <div style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", alignItems: "center" }}>
             <label
               htmlFor="filter-min-price"
               className="filter-label"
@@ -219,7 +318,7 @@ export default function FiltersSidebar({
               style={{ flex: 1, minWidth: 0 }}
             />
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", alignItems: "center" }}>
             <label
               htmlFor="filter-max-price"
               className="filter-label"
@@ -270,7 +369,7 @@ export default function FiltersSidebar({
         storageKey="popularity"
         prefersReducedMotion={prefersReducedMotion}
       >
-        <div className="filter-popularity" style={{ marginTop: 8 }}>
+        <div className="filter-popularity" style={{ marginTop: "var(--mkt-space-md, 8px)" }}>
           <Dropdown<PopularityValue>
             id="filters-popularity"
             value={popularity as PopularityValue}
@@ -298,9 +397,9 @@ export default function FiltersSidebar({
           className="filter-option"
           style={{
             display: "flex",
-            gap: 8,
+            gap: "var(--mkt-space-md, 8px)",
             alignItems: "center",
-            marginTop: 8,
+            marginTop: "var(--mkt-space-md, 8px)",
           }}
         >
           <input
@@ -320,43 +419,40 @@ export default function FiltersSidebar({
         </div>
       </FilterGroup>
 
-      {/* ── Zero-results / Empty-state illustration (v7) ─────────────────
-         Two distinct cases:
-         1. Active filters + zero results → "filtered" variant with a
-            Clear-filters CTA so users can broaden their search.
-         2. No filters active + zero results → "empty" variant telling
-            users no APIs are available yet.
-
-         Both are wrapped in role="status" aria-live="polite" so screen
-         readers announce the state change. */}
-      {typeof resultCount === "number" && resultCount === 0 && (
-        <div
-          data-testid="filters-zero-results"
-          style={{
-            margin: "12px 0 12px",
-            paddingTop: "12px",
-            borderTop: "1px solid var(--line)",
-          }}
-          role="status"
-          aria-live="polite"
-        >
-          <EmptyState
-            variant={hasActiveFilters ? "filtered" : "empty"}
-            size="compact"
-            onClearFilters={hasActiveFilters ? clearFilters : undefined}
-          />
-        </div>
-      )}
-
-      {/* ── Keyboard shortcuts ──────────────────────────────────────── */}
-      <KbdHint shortcuts={FILTER_SHORTCUTS} label="Filter keyboard shortcuts" />
+      {/* ── Zero-results illustration (v7) ───────────────────────────────
+         Visually separates from the filter groups above with a soft token-
+         based top border so the call-to-action feels grouped with the
+         result-count feedback rather than with the Favorites section.
+         The wrapper is aria-live="polite" so screen readers announce the
+         zero-results state when filters narrow the count to 0. */}
+      {typeof resultCount === "number" &&
+        resultCount === 0 &&
+        hasActiveFilters && (
+          <div
+            data-testid="filters-zero-results"
+            style={{
+              margin: "var(--mkt-space-lg, 12px) 0",
+              paddingTop: "var(--mkt-space-lg, 12px)",
+              borderTop: "1px solid var(--line)",
+            }}
+            role="status"
+            aria-live="polite"
+          >
+            <EmptyState
+              variant="filtered"
+              size="compact"
+              onClearFilters={hasActiveFilters ? handleClearFilters : undefined}
+            />
+          </div>
+        )}
 
       {/* ── Clear ──────────────────────────────────────────────────────── */}
-      <div style={{ marginTop: 8 }}>
-        <button className="ghost-button" onClick={clearFilters}>
+      <div style={{ marginTop: "var(--mkt-space-md, 8px)" }}>
+        <button className="ghost-button" onClick={handleClearFilters}>
           Clear filters
         </button>
       </div>
+
     </>
   );
 
@@ -397,7 +493,7 @@ export default function FiltersSidebar({
               background: "var(--surface, #fff)",
               borderTopLeftRadius: 12,
               borderTopRightRadius: 12,
-              padding: 16,
+              padding: "var(--mkt-space-xl, 16px)",
               overflow: "auto",
             }}
           >
@@ -423,6 +519,14 @@ export default function FiltersSidebar({
       )}
 
       {content}
+
+      {/* Hidden aria-live region for screen-reader announcements —
+          rendered once outside the content variable to avoid duplicate
+          ids when content appears both inline and inside the sheet. */}
+      <LiveRegion
+        regionId="filters-sidebar-announcements"
+        message={announcement}
+      />
     </aside>
   );
 }

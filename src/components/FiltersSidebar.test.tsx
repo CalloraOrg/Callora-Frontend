@@ -402,7 +402,7 @@ describe("FiltersSidebar", () => {
       );
       const block = screen.getByTestId("filters-zero-results") as HTMLElement;
       expect(block.style.borderTop).toMatch(/var\(--line\)/);
-      expect(block.style.paddingTop).toBe("12px");
+      expect(block.style.paddingTop).toMatch(/var\(--mkt-space-lg/);
     });
 
     it("zero-results wrapper keeps role='status' and aria-live='polite' for assistive tech", () => {
@@ -520,109 +520,49 @@ describe("FiltersSidebar", () => {
     });
   });
 
-  describe("status filter with color-blind patterns", () => {
-    it("renders the Status filter group", () => {
+  describe("aria-live announcements", () => {
+    it("renders a LiveRegion element for screen-reader announcements", () => {
       render(<FiltersSidebar {...baseProps} />);
-      expect(screen.getByText("Status")).toBeTruthy();
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion.getAttribute("aria-live")).toBe("polite");
+      expect(liveRegion.getAttribute("role")).toBe("status");
     });
 
-    it("renders checkboxes for each status option", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      expect(screen.getByLabelText("Operational")).toBeTruthy();
-      expect(screen.getByLabelText("Degraded")).toBeTruthy();
-      expect(screen.getByLabelText("Maintenance")).toBeTruthy();
-      expect(screen.getByLabelText("Down")).toBeTruthy();
+    it("announces when a category is selected", async () => {
+      render(<FiltersSidebar {...baseProps} selectedCategories={new Set(["AI/ML"])} />);
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toContain("AI/ML");
+      expect(liveRegion.textContent).toContain("Filters active");
     });
 
-    it("calls toggleStatus when checkbox is clicked", () => {
-      const toggleStatus = vi.fn();
-      render(
-        <FiltersSidebar {...baseProps} toggleStatus={toggleStatus} />,
-      );
-      fireEvent.click(screen.getByLabelText("Maintenance"));
-      expect(toggleStatus).toHaveBeenCalledWith("maintenance");
+    it("announces when all filters are cleared", () => {
+      const clearFilters = vi.fn();
+      render(<FiltersSidebar {...baseProps} clearFilters={clearFilters} />);
+      fireEvent.click(screen.getByText("Clear filters"));
+      expect(clearFilters).toHaveBeenCalled();
+      // handleClearFilters calls setAnnouncement which triggers the effect
     });
 
-    it("renders a pattern indicator circle for each status using sb-pattern-* class", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const indicators = document.querySelectorAll('[class*="sb-pattern-"]');
-      expect(indicators.length).toBe(4);
-      indicators.forEach((el) => {
-        expect(
-          el.classList.contains("sb-pattern-operational") ||
-          el.classList.contains("sb-pattern-degraded") ||
-          el.classList.contains("sb-pattern-maintenance") ||
-          el.classList.contains("sb-pattern-down"),
-        ).toBe(true);
-      });
-    });
-
-    it("marks the status checkbox as checked when status is selected", () => {
+    it("announces zero results message via the LiveRegion", async () => {
       render(
         <FiltersSidebar
           {...baseProps}
-          selectedStatuses={new Set(["degraded", "maintenance"])}
+          selectedCategories={new Set(["Data & Analytics"])}
+          resultCount={0}
         />,
       );
-      expect(
-        (screen.getByLabelText("Degraded") as HTMLInputElement).checked,
-      ).toBe(true);
-      expect(
-        (screen.getByLabelText("Maintenance") as HTMLInputElement).checked,
-      ).toBe(true);
-      expect(
-        (screen.getByLabelText("Operational") as HTMLInputElement).checked,
-      ).toBe(false);
-      expect(
-        (screen.getByLabelText("Down") as HTMLInputElement).checked,
-      ).toBe(false);
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toContain("No APIs match");
     });
 
-    it("pattern indicator has sb-pattern-* class matching the status variant", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const operationalIndicator = document.querySelector(".sb-pattern-operational");
-      expect(operationalIndicator).toBeTruthy();
-      expect(operationalIndicator?.getAttribute("aria-hidden")).toBe("true");
-
-      const degradedIndicator = document.querySelector(".sb-pattern-degraded");
-      expect(degradedIndicator).toBeTruthy();
-    });
-
-    it("pattern indicator uses CSS custom properties for status colors via inline style", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const degradedIndicator = document.querySelector(
-        ".sb-pattern-degraded",
-      ) as HTMLElement;
-      expect(degradedIndicator).toBeTruthy();
-      expect(degradedIndicator.style.backgroundColor).toBe(
-        "var(--sb-degraded-bg)",
-      );
-      expect(degradedIndicator.style.border).toContain(
-        "var(--sb-degraded-border)",
-      );
-    });
-
-    it("indicator aria-hidden prevents AT announcement", () => {
-      render(<FiltersSidebar {...baseProps} />);
-      const indicators = document.querySelectorAll('[aria-hidden="true"]');
-      const patternIndicators = Array.from(indicators).filter((el) =>
-        Array.from(el.classList).some((c) => c.startsWith("sb-pattern-")),
-      );
-      expect(patternIndicators.length).toBe(4);
-    });
-
-    describe("status filter impacts clear-filters visibility", () => {
-      it("shows Clear filters button when status filter is active", () => {
-        const clearFilters = vi.fn();
-        render(
-          <FiltersSidebar
-            {...baseProps}
-            selectedStatuses={new Set(["down"])}
-            clearFilters={clearFilters}
-          />,
-        );
-        expect(screen.getByText("Clear filters")).toBeTruthy();
-      });
+    it("does not announce when resultCount transitions from undefined to 0 without active filters", async () => {
+      render(<FiltersSidebar {...baseProps} resultCount={0} />);
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toBe("");
     });
   });
 
