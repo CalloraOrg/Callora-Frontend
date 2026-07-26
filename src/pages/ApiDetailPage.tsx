@@ -24,6 +24,7 @@ import MOCK_APIS from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import PlanBadge from "../components/PlanBadge";
+import { StatusBadge, apiStatusToVariant } from "../components/StatusBadge";
 
 /**
  * ApiDetailPage
@@ -622,6 +623,11 @@ print(response.json())`;
                     <a href={api.provider?.url}>{api.provider?.name}</a> ·{" "}
                     <strong style={{ color: "var(--accent-strong)" }}>{`$${formatPrice(api.pricePerRequest ?? 0)}`}</strong> per request
                   </div>
+                  {api.status && (
+                    <div style={{ marginTop: 8 }}>
+                      <StatusBadge status={apiStatusToVariant(api.status)} />
+                    </div>
+                  )}
                 </div>
                 <div className="api-detail-provider">
                   Published by{" "}
@@ -1071,7 +1077,6 @@ print(response.json())`;
                   <h4 style={{ marginTop: 0 }}>API Health</h4>
                   <div style={{ display: "grid", gap: 16, marginTop: 20 }}>
                     {[
-                      { label: "Status", value: "● Operational", color: "var(--success)" },
                       { label: "Region", value: "Global (Edge)", color: "var(--text)" },
                       { label: "CORS", value: "Supported", color: "var(--success)" },
                     ].map(({ label, value, color }) => (
@@ -1080,6 +1085,10 @@ print(response.json())`;
                         <span style={{ fontSize: 14, color, fontWeight: label !== "Region" ? 600 : undefined }}>{value}</span>
                       </div>
                     ))}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 14, color: "var(--muted)" }}>Status</span>
+                      <StatusBadge status={apiStatusToVariant(api.status)} />
+                    </div>
                   </div>
                 </div>
 

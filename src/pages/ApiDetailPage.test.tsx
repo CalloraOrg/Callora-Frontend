@@ -484,4 +484,142 @@ describe("ApiDetailPage", () => {
       expect(docPanel.tabIndex).toBe(0);
     });
   });
+
+  // ── StatusBadge integration ───────────────────────────────────────────────
+  //
+  // These tests verify that ApiDetailPage renders pattern-fill color-blind-safe
+  // StatusBadge components instead of plain-text status strings wherever the
+  // API health status is displayed.  All three APIItem.status values
+  // ("operational", "degraded", "maintenance") must map to the correct badge.
+
+  describe("StatusBadge integration (color-blind pattern fills)", () => {
+    it("renders a StatusBadge in the sidebar API Health section for an operational API", () => {
+      // weather-001 has status="operational"
+      window.history.pushState({}, "", "/details/weather-001");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The page renders two badges (hero + sidebar). Both must be correct.
+      const badges = screen.getAllByRole("img", { name: "Operational" });
+      expect(badges.length).toBeGreaterThanOrEqual(2);
+
+      // Every badge must carry the pattern class
+      badges.forEach((badge) => {
+        expect(badge.classList.contains("sb-pattern-operational")).toBe(true);
+        expect(badge.getAttribute("data-status")).toBe("operational");
+        expect(badge.getAttribute("data-pattern")).toBe("baseline");
+      });
+    });
+
+    it("renders a StatusBadge in the hero title area for an operational API", () => {
+      window.history.pushState({}, "", "/details/weather-001");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The hero badge is in .api-detail-title
+      const titleArea = document.querySelector(".api-detail-title");
+      expect(titleArea).toBeTruthy();
+      const heroBadge = titleArea?.querySelector('[role="img"]');
+      expect(heroBadge).toBeTruthy();
+      expect(heroBadge?.getAttribute("data-status")).toBe("operational");
+    });
+
+    it("renders a StatusBadge with degraded variant for a degraded API", () => {
+      // pay-qr has status="degraded"
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const badges = screen.getAllByRole("img", { name: "Degraded" });
+      expect(badges.length).toBeGreaterThanOrEqual(2);
+      badges.forEach((badge) => {
+        expect(badge.classList.contains("sb-pattern-degraded")).toBe(true);
+        expect(badge.getAttribute("data-status")).toBe("degraded");
+        expect(badge.getAttribute("data-pattern")).toBe("opposite-stripes");
+      });
+    });
+
+    it("renders a StatusBadge with maintenance variant for a maintenance API", () => {
+      // msg-01 has status="maintenance"
+      window.history.pushState({}, "", "/details/msg-01");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const badges = screen.getAllByRole("img", { name: "Maintenance" });
+      expect(badges.length).toBeGreaterThanOrEqual(2);
+      badges.forEach((badge) => {
+        expect(badge.classList.contains("sb-pattern-maintenance")).toBe(true);
+        expect(badge.getAttribute("data-status")).toBe("maintenance");
+        expect(badge.getAttribute("data-pattern")).toBe("crosshatch");
+      });
+    });
+
+    it("StatusBadge exposes pattern semantics in aria-description for non-color status cues", () => {
+      window.history.pushState({}, "", "/details/msg-01");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const badges = screen.getAllByRole("img", { name: "Maintenance" });
+      badges.forEach((badge) => {
+        expect(badge.getAttribute("aria-description")).toContain("crosshatch pattern");
+      });
+    });
+
+    it("StatusBadge for degraded API exposes opposite diagonal stripes in aria-description", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const badges = screen.getAllByRole("img", { name: "Degraded" });
+      badges.forEach((badge) => {
+        expect(badge.getAttribute("aria-description")).toContain("opposite diagonal stripes");
+      });
+    });
+
+    it("does NOT render the raw '● Operational' text string in the sidebar", () => {
+      window.history.pushState({}, "", "/details/weather-001");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The old plain-text sentinel must be gone; the badge provides semantics via aria-label
+      expect(screen.queryByText("● Operational")).toBeNull();
+    });
+
+    it("StatusBadge dot indicator is hidden from assistive technology", () => {
+      window.history.pushState({}, "", "/details/weather-001");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Check the sidebar badge specifically (inside .api-detail-sidebar)
+      const sidebar = document.querySelector(".api-detail-sidebar") as HTMLElement;
+      expect(sidebar).toBeTruthy();
+      const badge = sidebar.querySelector('[role="img"][data-status="operational"]') as HTMLElement;
+      expect(badge).toBeTruthy();
+      const dot = badge.querySelector('span[aria-hidden="true"]');
+      expect(dot).not.toBeNull();
+    });
+
+    it("applies correct CSS token background to the maintenance badge", () => {
+      window.history.pushState({}, "", "/details/msg-01");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const badges = screen.getAllByRole("img", { name: "Maintenance" }) as HTMLElement[];
+      badges.forEach((badge) => {
+        expect(badge.style.backgroundColor).toBe("var(--sb-maintenance-bg)");
+        expect(badge.style.color).toBe("var(--sb-maintenance-fg)");
+      });
+    });
+
+    it("applies correct CSS token background to the degraded badge", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const badges = screen.getAllByRole("img", { name: "Degraded" }) as HTMLElement[];
+      badges.forEach((badge) => {
+        expect(badge.style.backgroundColor).toBe("var(--sb-degraded-bg)");
+      });
+    });
+  });
 });

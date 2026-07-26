@@ -104,6 +104,11 @@
   --sb-pending-bg: rgba(78, 133, 255, 0.14);
   --sb-pending-fg: #4e85ff;
   --sb-pending-border: rgba(78, 133, 255, 0.35);
+
+  /* maintenance — purple/violet tint (distinct from blue-pending and amber-degraded) */
+  --sb-maintenance-bg: rgba(167, 139, 250, 0.14);
+  --sb-maintenance-fg: #a78bfa;
+  --sb-maintenance-border: rgba(167, 139, 250, 0.35);
 }
 
 [data-theme="light"] {
@@ -134,4 +139,9 @@
   --sb-pending-bg: rgba(37, 99, 235, 0.1);
   --sb-pending-fg: #1e40af;
   --sb-pending-border: rgba(37, 99, 235, 0.25);
+
+  /* maintenance — lighter purple for light theme */
+  --sb-maintenance-bg: rgba(124, 58, 237, 0.1);
+  --sb-maintenance-fg: #5b21b6;
+  --sb-maintenance-border: rgba(124, 58, 237, 0.25);
 }

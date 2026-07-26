@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { StatusBadge } from './StatusBadge';
+import { StatusBadge, apiStatusToVariant } from './StatusBadge';
 import type { StatusVariant } from './StatusBadge';
 
 afterEach(cleanup);
@@ -108,5 +108,54 @@ describe('StatusBadge', () => {
     expect(badge.getAttribute('data-status')).toBe('error');
     expect(badge.getAttribute('data-pattern')).toBe('stripes');
     expect(badge.getAttribute('aria-description')).toContain('diagonal stripes');
+  });
+
+  // ── maintenance variant ───────────────────────────────────────────────────
+
+  it('renders with default label "Maintenance" for the maintenance variant', () => {
+    render(<StatusBadge status="maintenance" />);
+    expect(screen.getByRole('img', { name: 'Maintenance' })).toBeTruthy();
+  });
+
+  it('applies the sb-pattern-maintenance CSS class for the crosshatch pattern', () => {
+    render(<StatusBadge status="maintenance" />);
+    const badge = screen.getByRole('img', { name: 'Maintenance' });
+    expect(badge.classList.contains('sb-pattern-maintenance')).toBe(true);
+  });
+
+  it('exposes crosshatch pattern semantics in data-pattern and aria-description', () => {
+    render(<StatusBadge status="maintenance" />);
+    const badge = screen.getByRole('img', { name: 'Maintenance' }) as HTMLElement;
+    expect(badge.getAttribute('data-status')).toBe('maintenance');
+    expect(badge.getAttribute('data-pattern')).toBe('crosshatch');
+    expect(badge.getAttribute('aria-description')).toContain('crosshatch pattern');
+  });
+
+  it('applies the maintenance design-token colors', () => {
+    render(<StatusBadge status="maintenance" />);
+    const badge = screen.getByRole('img', { name: 'Maintenance' }) as HTMLElement;
+    expect(badge.style.backgroundColor).toBe('var(--sb-maintenance-bg)');
+    expect(badge.style.color).toBe('var(--sb-maintenance-fg)');
+    expect(badge.style.border).toContain('var(--sb-maintenance-border)');
+  });
+
+  // ── apiStatusToVariant helper ─────────────────────────────────────────────
+
+  describe('apiStatusToVariant', () => {
+    it('maps "operational" → "operational"', () => {
+      expect(apiStatusToVariant('operational')).toBe('operational');
+    });
+
+    it('maps "degraded" → "degraded"', () => {
+      expect(apiStatusToVariant('degraded')).toBe('degraded');
+    });
+
+    it('maps "maintenance" → "maintenance"', () => {
+      expect(apiStatusToVariant('maintenance')).toBe('maintenance');
+    });
+
+    it('maps undefined → "pending" (safe fallback)', () => {
+      expect(apiStatusToVariant(undefined)).toBe('pending');
+    });
   });
 });

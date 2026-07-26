@@ -769,6 +769,155 @@ const TOC: TocSection[] = [
 
 ---
 
+### StatusBadge
+
+Color-blind-safe status indicator used wherever an API or system health state
+must be communicated visually. Each variant combines a **color token** with a
+**unique SVG background pattern** so the badge is distinguishable by texture
+alone — satisfying WCAG 1.4.1 (Use of Color) for deuteranopia, protanopia, and
+tritanopia users.
+
+**Source:** `src/components/StatusBadge.tsx`
+**Styles (patterns):** `src/styles/patterns.css`
+**Tokens:** `src/styles/tokens.css`
+
+**Props:**
+
+| Prop         | Type            | Default             | Description                                                          |
+| ------------ | --------------- | ------------------- | -------------------------------------------------------------------- |
+| `status`     | `StatusVariant` | (required)          | Which status variant to render (see table below).                    |
+| `label?`     | `string`        | per-variant default | Override the visible text. Defaults to a human-readable status name. |
+| `className?` | `string`        | —                   | Extra CSS class(es) forwarded to the root `<span>`.                  |
+
+**`StatusVariant` values:**
+
+| Variant       | Default label | Pattern            | CSS class                | Token prefix         |
+| ------------- | ------------- | ------------------ | ------------------------ | -------------------- |
+| `operational` | Operational   | None (solid)       | `sb-pattern-operational` | `--sb-operational-*` |
+| `success`     | Operational   | None (solid)       | `sb-pattern-success`     | `--sb-success-*`     |
+| `degraded`    | Degraded      | ╱ opposite stripes | `sb-pattern-degraded`    | `--sb-degraded-*`    |
+| `warning`     | Degraded      | ╱ opposite stripes | `sb-pattern-warning`     | `--sb-warning-*`     |
+| `maintenance` | Maintenance   | ╳ crosshatch       | `sb-pattern-maintenance` | `--sb-maintenance-*` |
+| `down`        | Down          | ╲ diagonal stripes | `sb-pattern-down`        | `--sb-down-*`        |
+| `error`       | Error         | ╲ diagonal stripes | `sb-pattern-error`       | `--sb-error-*`       |
+| `pending`     | Pending       | • dot grid         | `sb-pattern-pending`     | `--sb-pending-*`     |
+
+**`apiStatusToVariant` helper:**
+
+When consuming an `APIItem` from the data layer, its `status` field is one of
+`"operational" | "degraded" | "maintenance"`. Use the exported helper to convert
+it to a `StatusVariant` before passing it to `<StatusBadge>`:
+
+```tsx
+import { StatusBadge, apiStatusToVariant } from '../components/StatusBadge';
+
+// api.status: "operational" | "degraded" | "maintenance" | undefined
+<StatusBadge status={apiStatusToVariant(api.status)} />
+```
+
+Mapping table:
+
+| `APIItem.status` | `StatusVariant` |
+| ---------------- | --------------- |
+| `"operational"`  | `"operational"` |
+| `"degraded"`     | `"degraded"`    |
+| `"maintenance"`  | `"maintenance"` |
+| `undefined`      | `"pending"`     |
+
+**Design tokens (all three per-variant properties must be defined for both themes):**
+
+```css
+/* dark theme — maintenance variant (purple) */
+[data-theme="dark"] {
+  --sb-maintenance-bg:     rgba(167, 139, 250, 0.14);
+  --sb-maintenance-fg:     #a78bfa;
+  --sb-maintenance-border: rgba(167, 139, 250, 0.35);
+}
+
+/* light theme */
+[data-theme="light"] {
+  --sb-maintenance-bg:     rgba(124, 58, 237, 0.1);
+  --sb-maintenance-fg:     #5b21b6;
+  --sb-maintenance-border: rgba(124, 58, 237, 0.25);
+}
+```
+
+**Pattern CSS (crosshatch example — `src/styles/patterns.css`):**
+
+The crosshatch (╳) is rendered as two overlaid SVG line sets via
+`background-image` multi-layer syntax:
+
+```css
+.sb-pattern-maintenance {
+  background-image:
+    url("data:image/svg+xml,…"),  /* ╲ diagonal pass */
+    url("data:image/svg+xml,…");  /* ╱ diagonal pass */
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+```
+
+The pattern layers on top of the solid `background-color` set by the token,
+using `stroke-opacity: 0.2` to stay subtle at badge scale.
+
+**Visual Spec:**
+
+- Display: `inline-flex`, `align-items: center`, `gap: 0.375em`
+- Padding: `0.2em 0.6em`, border-radius: `0.375em`
+- Font: 0.75 rem, weight 600, letter-spacing 0.02em
+- Dot indicator: 0.5em circle using `--sb-<status>-fg`, `aria-hidden`
+- Background: token `--sb-<status>-bg` + SVG pattern overlay (patterns.css)
+- Border: `1px solid var(--sb-<status>-border)`
+
+**Accessibility:**
+
+- `role="img"` — treats the badge as a non-interactive image rather than live text.
+- `aria-label` — the visible text label (defaults to variant name, overridable via `label` prop).
+- `aria-description` — includes the pattern name, e.g.  
+  `"Pattern-based status badge: Maintenance with crosshatch pattern"`.  
+  This ensures screen readers convey the texture-based cue even when the SVG is invisible.
+- `data-status` / `data-pattern` — data attributes for E2E selectors and QA tooling.
+- Dot indicator carries `aria-hidden="true"` so it is not double-announced.
+
+**Where it is used — ApiDetailPage:**
+
+`ApiDetailPage` renders `<StatusBadge>` in two places:
+
+1. **Hero title area** (`.api-detail-title`) — shown immediately below the API
+   name and provider/price meta line for at-a-glance visibility.
+2. **Sidebar "API Health" section** — replaces the previous plain-text
+   `"● Operational"` string, surfacing both pattern and color cues with full
+   accessibility semantics.
+
+Both placements read from `api.status` via `apiStatusToVariant()`.
+
+**Usage Examples:**
+
+```tsx
+// Direct variant
+<StatusBadge status="operational" />
+<StatusBadge status="maintenance" />
+<StatusBadge status="degraded" label="Partial outage" />
+
+// From APIItem data (preferred pattern in ApiDetailPage)
+import { StatusBadge, apiStatusToVariant } from '../components/StatusBadge';
+
+<StatusBadge status={apiStatusToVariant(api.status)} />
+```
+
+**Adding a new variant:**
+
+1. Add the variant string to the `StatusVariant` union in `StatusBadge.tsx`.
+2. Add entries to `DEFAULT_LABELS`, `PATTERN_DESCRIPTIONS`, and `PATTERN_KEYS`.
+3. Add a `.sb-pattern-<variant>` CSS rule in `src/styles/patterns.css` using an
+   SVG data URI pattern distinct from all existing ones.
+4. Add `--sb-<variant>-bg`, `--sb-<variant>-fg`, and `--sb-<variant>-border`
+   tokens to both `[data-theme="dark"]` and `[data-theme="light"]` blocks in
+   `src/styles/tokens.css`.
+5. Update this documentation section.
+
+---
+
 ### SearchBar
 
 Search input with clear button and keyboard shortcuts.
