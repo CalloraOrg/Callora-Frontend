@@ -1,7 +1,6 @@
 import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import ApiCard from "./ApiCard";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import React from "react";
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import type { APIItem } from "../data/mockApis";
 import { pinnedApisStore } from "../state/pinnedApis";
 
@@ -43,6 +42,59 @@ const mockApi: APIItem = {
 };
 
 /* ── Test suites ─────────────────────────────────────────────────────────── */
+
+describe('ApiCard Reduced Motion Accessibility', () => {
+  const mockApi = {
+    id: 'test-1',
+    name: 'Test API',
+    description: 'A test description',
+    endpoints: [{ url: '/api/v1/test' }],
+    tags: []
+  };
+
+  const setupMatchMedia = (matches: boolean) => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(query => ({
+        matches: query === '(prefers-reduced-motion: reduce)' ? matches : false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+  };
+
+  afterAll(() => {
+    Object.defineProperty(window, 'matchMedia', { writable: true, value: undefined });
+  });
+
+  it('renders standard layout without reduced motion', () => {
+    setupMatchMedia(false);
+    render(<ApiCard api={mockApi as any} />);
+    
+    const favButton = screen.getByLabelText('Add to favorites');
+    expect(favButton.style.transition).toContain('transform');
+  });
+
+  it('respects prefers-reduced-motion and provides a static outline/color fallback on hover', () => {
+    setupMatchMedia(true);
+    render(<ApiCard api={mockApi as any} />);
+    
+    const favButton = screen.getByLabelText('Add to favorites');
+    
+    expect(favButton).toBeInTheDocument();
+    
+    expect(favButton.style.transition).toContain('background 100ms');
+    expect(favButton.style.transition).not.toContain('transform');
+    
+    fireEvent.focus(favButton);
+    expect(favButton.style.outline).toContain('solid');
+  });
+});
 
 describe("ApiCard — Context Menu", () => {
   beforeEach(() => {
