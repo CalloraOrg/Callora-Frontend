@@ -134,17 +134,7 @@ export default function CodeExample({
   return (
     <div className="code-sample">
       {/* Header Section: Contains Language Tabs and Copy Button */}
-      <div
-        className="no-print"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 12px",
-          background: "var(--bg-subtle, #f9f9f9)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
+      <div className="no-print code-sample__header">
         {/* Navigation Tabs List with Roving Tabindex */}
         <div 
           ref={tablistRef}

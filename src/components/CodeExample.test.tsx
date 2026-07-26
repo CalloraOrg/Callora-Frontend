@@ -271,4 +271,64 @@ describe('CodeExample', () => {
       });
     });
   });
+
+  describe('mobile layout', () => {
+    it('header uses CSS class instead of inline styles', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const header = document.querySelector('.code-sample__header');
+      expect(header).toBeTruthy();
+      expect(header).not.toHaveAttribute('style');
+    });
+
+    it('tab strip has code-sample__tabs class for scroll behavior', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const tablist = screen.getByRole('tablist');
+      expect(tablist.classList.contains('code-sample__tabs')).toBe(true);
+    });
+
+    it('each tab has code-sample__tab class for mobile styles', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const tabs = screen.getAllByRole('tab');
+      tabs.forEach(tab => {
+        expect(tab.classList.contains('code-sample__tab')).toBe(true);
+      });
+    });
+
+    it('copy button has code-sample__copy class for mobile styles', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const copyBtn = screen.getByLabelText(/copy code/i);
+      expect(copyBtn.classList.contains('code-sample__copy')).toBe(true);
+    });
+
+    it('all tabs remain interactive in narrow viewport', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const tabs = screen.getAllByRole('tab');
+      expect(tabs.length).toBe(3);
+
+      tabs.forEach(tab => {
+        expect(tab).toBeEnabled();
+      });
+
+      fireEvent.click(tabs[2]);
+      expect(tabs[2].getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('copy button remains accessible in narrow viewport', () => {
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+      });
+
+      render(<CodeExample snippets={mockSnippets} />);
+      const copyBtn = screen.getByLabelText(/copy code/i);
+      expect(copyBtn).toBeEnabled();
+
+      fireEvent.click(copyBtn);
+
+      return waitFor(() => {
+        expect(copyBtn.textContent).toContain('Copied');
+      });
+    });
+  });
 });
