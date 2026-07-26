@@ -1,9 +1,11 @@
 import { WarningIcon, ChevronIcon } from "./icons";
 import Dropdown from "./Dropdown";
 import EmptyState from "./EmptyState";
+import KbdHint from "./KbdHint";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { usePersistedState } from "../hooks/usePersistedState";
 import { FiltersSidebarSkeleton } from "./Skeleton";
+import type { Shortcut } from "../hooks/useGlobalShortcuts";
 
 const POPULARITY_OPTIONS = [
   { value: "any", label: "Any" },
@@ -19,6 +21,12 @@ export const ALL_CATEGORIES = [
   "Communication",
   "AI/ML",
   "Other",
+];
+
+/** Keyboard shortcuts shown in the FiltersSidebar footer. */
+const FILTER_SHORTCUTS: readonly Shortcut[] = [
+  { key: "/", description: "Focus search", category: "Marketplace" },
+  { key: "Esc", description: "Close filters", category: "Marketplace" },
 ];
 
 interface FilterGroupProps {
@@ -332,6 +340,9 @@ export default function FiltersSidebar({
             />
           </div>
         )}
+
+      {/* ── Keyboard shortcuts ──────────────────────────────────────── */}
+      <KbdHint shortcuts={FILTER_SHORTCUTS} label="Filter keyboard shortcuts" />
 
       {/* ── Clear ──────────────────────────────────────────────────────── */}
       <div style={{ marginTop: 8 }}>

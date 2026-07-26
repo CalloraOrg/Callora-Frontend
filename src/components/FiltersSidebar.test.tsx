@@ -528,4 +528,31 @@ describe("FiltersSidebar", () => {
       expect(screen.getByRole("dialog", { name: /Filters/i })).toBeTruthy();
     });
   });
+
+  describe("keyboard shortcut hints", () => {
+    it("renders kbd-hint with filter shortcuts", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const kbdHint = screen.getByRole("complementary", { name: "Filter keyboard shortcuts" });
+      expect(kbdHint).toBeTruthy();
+      expect(kbdHint.querySelector(".kbd-hint__key")).toBeTruthy();
+    });
+
+    it("shows slash shortcut for focusing search", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      expect(screen.getByText("/")).toBeTruthy();
+      expect(screen.getByText("Focus search")).toBeTruthy();
+    });
+
+    it("shows Escape shortcut for closing filters", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      expect(screen.getByText("Esc")).toBeTruthy();
+      expect(screen.getByText("Close filters")).toBeTruthy();
+    });
+
+    it("has proper aria-label on kbd-hint", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const kbdHint = screen.getByRole("complementary", { name: "Filter keyboard shortcuts" });
+      expect(kbdHint.getAttribute("aria-label")).toBe("Filter keyboard shortcuts");
+    });
+  });
 });
