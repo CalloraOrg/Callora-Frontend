@@ -912,6 +912,7 @@ The following utility classes are defined in `src/index.css` and should be used 
 - `.brand` - Large brand heading
 - `.eyebrow` - Small uppercase label
 - `.helper-text` - Secondary/muted text
+- `.numeric-tabular` - Apply `font-variant-numeric: tabular-nums` to any numeric display (prices, counts, stats, pagination). Use this wherever digits must stay fixed-width so values don't cause layout shift as they change. Defined in `src/styles/typography.css`. `.tabular-nums` is kept as a backwards-compatible alias but `.numeric-tabular` is the canonical name.
 
 ### Link Classes
 

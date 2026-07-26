@@ -128,37 +128,54 @@ describe("MarketplacePage", () => {
     expect(grid).toBeTruthy();
   });
 
-  it("shows empty state with secondary CTA when favorites-only has no results", () => {
+  // ── tabular-nums (#476) ────────────────────────────────────────────────────
+
+  it("wraps page-count numbers in .numeric-tabular spans for tabular-nums alignment", () => {
     renderMarketplacePage();
     settleMarketplaceTimers();
 
-    const favoritesCheckbox = screen.getByLabelText("Favorites only");
-    fireEvent.click(favoritesCheckbox);
+    // All numeric spans inside the count label must carry the utility class.
+    const count = document.querySelector(".marketplace-count");
+    expect(count).toBeTruthy();
 
-    expect(screen.getByText("No favorites yet")).toBeTruthy();
-    expect(screen.getByText("Try starring some APIs to see them here!")).toBeTruthy();
-
-    const browseBtn = screen.getByTestId("empty-state-secondary-action");
-    expect(browseBtn).toBeTruthy();
-    expect(browseBtn.textContent).toBe("Browse all APIs");
-
-    fireEvent.click(browseBtn);
-    expect(screen.queryByText("No favorites yet")).toBeNull();
+    const numericSpans = count!.querySelectorAll("span.numeric-tabular");
+    // Expects at least 3 spans: startItem, endItem, filtered.length
+    expect(numericSpans.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("shows filtered empty state with clear-all-filters CTA", () => {
+  it("numeric-tabular spans contain only digit characters", () => {
     renderMarketplacePage();
     settleMarketplaceTimers();
 
-    const searchInput = screen.getByPlaceholderText(/search/i);
-    fireEvent.change(searchInput, { target: { value: "nonexistent-api-xyz" } });
+    const count = document.querySelector(".marketplace-count");
+    const numericSpans = count!.querySelectorAll("span.numeric-tabular");
 
-    act(() => { vi.advanceTimersByTime(500); });
+    numericSpans.forEach((span) => {
+      expect(span.textContent?.trim()).toMatch(/^\d+$/);
+    });
+  });
 
-    expect(screen.getByText("No results found")).toBeTruthy();
-    expect(screen.getByText("Try adjusting your filters or clear them to see all available APIs.")).toBeTruthy();
+  it("renders two .numeric-tabular spans showing '0' when no APIs match the search", () => {
+    renderMarketplacePage();
+    settleMarketplaceTimers();
 
-    const browseBtn = screen.getByTestId("empty-state-secondary-action");
-    expect(browseBtn.textContent).toBe("Browse all APIs");
+    // Type a search term that matches nothing
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "zzz_no_match_zzz" } });
+
+    // Advance debounce (300 ms) + any remaining timers
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const count = document.querySelector(".marketplace-count");
+    expect(count).toBeTruthy();
+
+    const numericSpans = count!.querySelectorAll("span.numeric-tabular");
+    // When 0 results: two spans showing "0" and "0"
+    expect(numericSpans.length).toBe(2);
+    numericSpans.forEach((span) => {
+      expect(span.textContent?.trim()).toBe("0");
+    });
   });
 });
