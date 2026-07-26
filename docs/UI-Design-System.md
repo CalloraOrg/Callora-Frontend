@@ -786,6 +786,8 @@ Highlights the active section as the user scrolls using IntersectionObserver.
 - `aria-current="location"` on the active link
 - All links are keyboard-navigable anchor links
 - Hidden from print output via `.no-print`
+- Under `prefers-reduced-motion: reduce`, link color transitions are disabled
+  (static instant state change via CSS + inline `transition: none`)
 
 **Usage Example:**
 
