@@ -71,95 +71,104 @@ export function FiltersSidebarSkeleton() {
   );
 }
 
-export function MarketplacePageSkeleton() {
+export function EmptyStateSkeleton({
+  size = "default",
+  hasAction = false,
+}: {
+  size?: "default" | "compact";
+  hasAction?: boolean;
+}) {
+  const isCompact = size === "compact";
+
+  const wrapperStyle: CSSProperties = isCompact
+    ? {
+        textAlign: "center",
+        padding: "16px 12px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "12px",
+        background: "var(--surface-soft)",
+        border: "1px solid var(--line)",
+        borderRadius: "10px",
+        width: "100%",
+        boxSizing: "border-box",
+      }
+    : {
+        textAlign: "center",
+        padding: "48px 32px",
+        minHeight: "300px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        boxSizing: "border-box",
+      };
+
+  const illustrationSize = isCompact ? 56 : 80;
+  const illustrationMargin = isCompact ? "0" : "0 auto 24px";
+
   return (
-    <div className="marketplace-page marketplace-skeleton" aria-busy="true" aria-label="Loading marketplace">
-      <div className="marketplace-header">
-        <Skeleton width="220px" height={36} borderRadius={8} />
-        <div className="marketplace-search-row">
-          <div className="marketplace-search">
-            <Skeleton width="100%" height={44} borderRadius={12} />
-          </div>
-          <div className="marketplace-density-toggle" aria-hidden="true" style={{ display: "flex", gap: 8 }}>
-            <Skeleton width={90} height={44} borderRadius={999} />
-            <Skeleton width={90} height={44} borderRadius={999} />
-          </div>
+    <div
+      style={wrapperStyle}
+      className={`empty-state-skeleton${isCompact ? " empty-state-skeleton--compact" : ""}`}
+      aria-busy="true"
+      aria-label="Loading empty state"
+    >
+      <Skeleton
+        width={illustrationSize}
+        height={illustrationSize}
+        borderRadius="50%"
+        style={{
+          margin: illustrationMargin,
+          flexShrink: 0,
+          border: "1px solid var(--line)",
+        }}
+        tone="stellar"
+      />
+
+      {isCompact ? (
+        <Skeleton width="50%" height={14} tone="stellar" borderRadius={4} />
+      ) : (
+        <Skeleton
+          width="40%"
+          height={22}
+          borderRadius={6}
+          style={{ marginBottom: 12 }}
+          tone="stellar"
+        />
+      )}
+
+      {isCompact ? (
+        <Skeleton width="70%" height={12} tone="stellar" borderRadius={4} />
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: hasAction ? 24 : 0,
+            width: "100%",
+          }}
+        >
+          <Skeleton width="55%" height={14} tone="stellar" borderRadius={4} />
+          <Skeleton width="35%" height={14} tone="stellar" borderRadius={4} />
         </div>
-        <Skeleton width={160} height={44} borderRadius={8} />
-      </div>
+      )}
 
-      <div className="marketplace-layout">
-        <aside className="marketplace-sidebar" aria-hidden="true">
-          <Skeleton width="100%" height={20} />
-          <Skeleton width="80%" height={48} borderRadius={10} />
-          <Skeleton width="60%" height={14} />
-          <Skeleton width="100%" height={48} borderRadius={10} />
-          <Skeleton width="70%" height={14} />
-          <Skeleton width="100%" height={48} borderRadius={10} />
-          <Skeleton width="50%" height={14} />
-          <Skeleton width="100%" height={48} borderRadius={10} />
-          <Skeleton width="100%" height={44} borderRadius={12} />
-        </aside>
-
-        <main className="marketplace-results">
-          <div className="marketplace-toolbar">
-            <div className="marketplace-count">
-              <Skeleton width={120} height={18} />
-            </div>
-            <div className="marketplace-actions">
-              <Skeleton width={140} height={44} borderRadius={8} />
-              <Skeleton width={80} height={44} borderRadius={8} />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} width={70 + i * 15} height={32} borderRadius={999} />
-            ))}
-          </div>
-
-          <div
-            className="marketplace-grid"
-            aria-label="Loading APIs"
-            style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
-          >
-            {Array.from({ length: 12 }).map((_, index) => (
-              <article key={index} className="api-marketplace-card api-card-skeleton" aria-hidden="true" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, minHeight: 220, border: "1px solid rgba(255,255,255,0.03)" }}>
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  <Skeleton tone="stellar" width={56} height={56} borderRadius={10} />
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-                      <Skeleton tone="stellar" width="60%" height={18} />
-                      <Skeleton tone="stellar" width="20%" height={12} />
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <Skeleton tone="stellar" width="90%" height={14} />
-                      <Skeleton tone="stellar" width="70%" height={14} />
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                    <Skeleton tone="stellar" width={50} height={12} />
-                    <Skeleton tone="stellar" width={40} height={16} />
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
-                  <Skeleton tone="stellar" width={45} height={24} borderRadius={8} />
-                  <Skeleton tone="stellar" width={55} height={24} borderRadius={8} />
-                  <Skeleton tone="stellar" width={40} height={24} borderRadius={8} />
-                </div>
-                <div style={{ display: "flex", gap: 8, paddingTop: 8, marginTop: "auto" }}>
-                  <Skeleton width="33%" height={14} />
-                  <Skeleton width="33%" height={14} />
-                  <Skeleton width="33%" height={14} />
-                </div>
-              </article>
-            ))}
-          </div>
-        </main>
-      </div>
-
-      <span className="sr-only">Loading marketplace content</span>
+      {hasAction && (
+        <Skeleton
+          width={isCompact ? 120 : 160}
+          height={isCompact ? 36 : 44}
+          borderRadius={14}
+          tone="stellar"
+        />
+      )}
     </div>
   );
 }
+
 

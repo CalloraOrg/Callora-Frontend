@@ -75,6 +75,7 @@ export default function EmptyState({
 }
 import React from "react";
 import ExternalLink from "./ExternalLink";
+import { EmptyStateSkeleton } from "./Skeleton";
 
 export type EmptyStateVariant =
   | "empty"
@@ -95,11 +96,7 @@ export interface EmptyStateProps {
     label: string;
     onClick: () => void;
   };
-  /** Secondary CTA shown below the primary action — helpful for marketplace empty states. */
-  secondaryAction?: {
-    label: string;
-    onClick: () => void;
-  };
+  loading?: boolean;
 }
 
 /**
@@ -408,8 +405,16 @@ export default function EmptyState({
   onClearFilters,
   onRetry,
   action,
-  secondaryAction,
+  loading = false,
 }: EmptyStateProps) {
+  if (loading) {
+    return (
+      <EmptyStateSkeleton
+        size={size}
+        hasAction={!!action || (variant === "filtered" && !!onClearFilters) || (variant === "error" && !!onRetry)}
+      />
+    );
+  }
   const defaults = {
     empty: {
       title: "No APIs available",
