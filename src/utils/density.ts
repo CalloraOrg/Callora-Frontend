@@ -4,7 +4,7 @@ export type DensityPreference = "comfortable" | "compact";
 
 const VALID: DensityPreference[] = ["comfortable", "compact"];
 
-export const readDensityPreference = (): DensityPreference => {
+export function readDensityPreference(): DensityPreference {
   try {
     const stored = localStorage.getItem(DENSITY_STORAGE_KEY);
     if (stored && (VALID as string[]).includes(stored)) {
