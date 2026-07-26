@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import EmptyState from './components/EmptyState';
-import Skeleton, { SkeletonRow } from './components/Skeleton';
+import Skeleton from './components/Skeleton';
+import CallHistoryRow from './pages/CallHistoryRow';
 import { formatPrice } from './utils/format';
 import type { JsonSchema } from './components/RequestBodyEditor';
 import CallHistoryRow from './components/CallHistoryRow';
@@ -784,50 +785,30 @@ export default function ApiUsage() {
             </button>
           </div>
         </div>
-
-        {/* Screen-reader announcement for filter reset (WCAG 2.1 AA) */}
-        <p className="sr-only" role="status" aria-live="polite">
-          {filterResetMessage}
-        </p>
-
-        <div className="call-history-table" aria-busy={isLoading}>
-           <div className="table-header">
-             <span>Timestamp</span>
-             <span>Endpoint</span>
-             <span>Status</span>
-             <span>Response Time</span>
-             <span>Cost</span>
-             <span>Actions</span>
-           </div>
-
-           {isTableLoading ? (
-             <SkeletonRow rows={5} />
-           ) : filteredCallHistory.length === 0 ? (
-             filtersAreActive ? (
-               <EmptyState
-                 variant="filtered"
-                 title="No matching calls"
-                 message="No call records match the selected filter. Try adjusting the filters."
-                 onClearFilters={handleResetFilters}
-               />
-             ) : (
-               <EmptyState
-                 variant="empty"
-                 title="No calls yet"
-                 message="Make your first test call above to see it appear in history."
-               />
-             )
-           ) : (
-             filteredCallHistory.map(call => (
-               <CallHistoryRow
-                 key={call.id}
-                 call={call}
-                 expanded={expandedCall === call.id}
-                 onToggleExpand={id => setExpandedCall(expandedCall === id ? null : id)}
-               />
-             ))
-           )}
-         </div>
+        
+        <div className="call-history-table">
+          <div className="table-header">
+            <span>Timestamp</span>
+            <span>Endpoint</span>
+            <span>Status</span>
+            <span>Response Time</span>
+            <span>Cost</span>
+            <span>Actions</span>
+          </div>
+          
+        {filteredCallHistory.length === 0 ? (
+                <EmptyState message="No call records match the selected filter." />
+              ) : (
+                filteredCallHistory.map(call => (
+                  <CallHistoryRow
+                    key={call.id}
+                    call={call}
+                    isExpanded={expandedCall === call.id}
+                    onToggle={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
+                  />
+                ))
+              )}
+        </div>
       </div>
 
       {/* Integration Guide */}
