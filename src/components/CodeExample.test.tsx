@@ -272,61 +272,62 @@ describe('CodeExample', () => {
     });
   });
 
-  describe('narrow viewport layout (≤375px)', () => {
-    it('tab buttons have minimum tap-target height of 36px', () => {
+  describe('mobile layout', () => {
+    it('header uses CSS class instead of inline styles', () => {
       render(<CodeExample snippets={mockSnippets} />);
-      const tabs = screen.getAllByRole('tab');
-      tabs.forEach(tab => {
-        expect(tab.style.minHeight).toBe('36px');
-      });
-    });
-
-    it('tab buttons have minimum width of 44px for touch accessibility', () => {
-      render(<CodeExample snippets={mockSnippets} />);
-      const tabs = screen.getAllByRole('tab');
-      tabs.forEach(tab => {
-        expect(tab.style.minWidth).toBe('44px');
-      });
-    });
-
-    it('copy button has minimum tap-target height of 36px', () => {
-      render(<CodeExample snippets={mockSnippets} />);
-      const copyBtn = screen.getByLabelText(/copy code/i);
-      expect(copyBtn.style.minHeight).toBe('36px');
-    });
-
-    it('header wraps on narrow viewports via flexWrap', () => {
-      render(<CodeExample snippets={mockSnippets} />);
-      const header = document.querySelector('.code-sample__header') as HTMLElement;
+      const header = document.querySelector('.code-sample__header');
       expect(header).toBeTruthy();
-      expect(header.style.flexWrap).toBe('wrap');
+      expect(header).not.toHaveAttribute('style');
     });
 
-    it('tablist scrolls horizontally on narrow viewports', () => {
+    it('tab strip has code-sample__tabs class for scroll behavior', () => {
       render(<CodeExample snippets={mockSnippets} />);
       const tablist = screen.getByRole('tablist');
-      expect(tablist.style.overflowX).toBe('auto');
+      expect(tablist.classList.contains('code-sample__tabs')).toBe(true);
     });
 
-    it('tab buttons do not shrink on narrow viewports', () => {
+    it('each tab has code-sample__tab class for mobile styles', () => {
       render(<CodeExample snippets={mockSnippets} />);
       const tabs = screen.getAllByRole('tab');
       tabs.forEach(tab => {
-        expect(tab.style.flexShrink).toBe('0');
+        expect(tab.classList.contains('code-sample__tab')).toBe(true);
       });
     });
 
-    it('code panel is horizontally scrollable on narrow viewports', () => {
+    it('copy button has code-sample__copy class for mobile styles', () => {
       render(<CodeExample snippets={mockSnippets} />);
-      const panel = screen.getByRole('tabpanel');
-      expect(panel.style.overflowX).toBe('auto');
+      const copyBtn = screen.getByLabelText(/copy code/i);
+      expect(copyBtn.classList.contains('code-sample__copy')).toBe(true);
     });
 
-    it('tabs have whitespace nowrap to prevent text breaking', () => {
+    it('all tabs remain interactive in narrow viewport', () => {
       render(<CodeExample snippets={mockSnippets} />);
       const tabs = screen.getAllByRole('tab');
+      expect(tabs.length).toBe(3);
+
       tabs.forEach(tab => {
-        expect(tab.style.whiteSpace).toBe('nowrap');
+        expect(tab).toBeEnabled();
+      });
+
+      fireEvent.click(tabs[2]);
+      expect(tabs[2].getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('copy button remains accessible in narrow viewport', () => {
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+      });
+
+      render(<CodeExample snippets={mockSnippets} />);
+      const copyBtn = screen.getByLabelText(/copy code/i);
+      expect(copyBtn).toBeEnabled();
+
+      fireEvent.click(copyBtn);
+
+      return waitFor(() => {
+        expect(copyBtn.textContent).toContain('Copied');
       });
     });
   });

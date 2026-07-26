@@ -37,6 +37,13 @@
 .code-sample__tabs {
   display: flex;
   gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.code-sample__tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .code-sample__tab {
@@ -49,6 +56,7 @@
   border-radius: 4px;
   cursor: pointer;
   text-transform: uppercase;
+  white-space: nowrap;
   transition: all 180ms ease;
 }
 
@@ -68,6 +76,7 @@
   padding: 5px 12px;
   font-size: 11px;
   min-width: 75px;
+  flex-shrink: 0;
 }
 
 .code-sample__copy--success {
@@ -102,5 +111,72 @@
 @media (prefers-reduced-motion: reduce) {
   .code-sample__tab {
     transition: none;
+  }
+}
+
+/* -------------------------------------------------------
+   Mobile: <=375px – tighten spacing, enlarge tap targets,
+   stack header vertically so tabs and copy don't fight
+   ------------------------------------------------------- */
+@media (max-width: 375px) {
+  .code-sample__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .code-sample__tabs {
+    width: 100%;
+    padding-bottom: 4px;
+  }
+
+  .code-sample__tab {
+    padding: 10px 12px;
+    font-size: 12px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 6px;
+  }
+
+  .code-sample__copy {
+    align-self: flex-end;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .code-sample__panel {
+    padding: 12px 8px;
+  }
+
+  .code-sample__pre {
+    font-size: 12px;
+  }
+}
+
+/* -------------------------------------------------------
+   Small tablets / large phones: 376px–480px – keep tabs
+   horizontal but enlarge tap targets
+   ------------------------------------------------------- */
+@media (min-width: 376px) and (max-width: 480px) {
+  .code-sample__tab {
+    padding: 8px 10px;
+    font-size: 11px;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .code-sample__copy {
+    min-height: 40px;
+    padding: 8px 12px;
+    display: inline-flex;
+    align-items: center;
   }
 }

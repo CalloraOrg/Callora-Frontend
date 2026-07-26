@@ -133,26 +133,9 @@ export default function CodeExample({
 
   return (
     <div className="code-sample">
-      {/* Header Section: Contains Language Tabs and Copy Button
-           On narrow viewports (≤375px) the header wraps into two rows:
-           tabs scroll horizontally on the first row, copy button sits
-           below with a full-width tap target. */}
-      <div
-        className="no-print code-sample__header"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "6px",
-          padding: "8px 12px",
-          background: "var(--bg-subtle, #f9f9f9)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
-        {/* Navigation Tabs List with Roving Tabindex.
-             On narrow viewports tabs scroll horizontally so the container
-             never forces the page to overflow. */}
+      {/* Header Section: Contains Language Tabs and Copy Button */}
+      <div className="no-print code-sample__header">
+        {/* Navigation Tabs List with Roving Tabindex */}
         <div 
           ref={tablistRef}
           className="code-sample__tabs" 
