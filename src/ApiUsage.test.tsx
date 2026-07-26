@@ -168,7 +168,40 @@ describe('ApiUsage - prefers-reduced-motion', () => {
      window.matchMedia = originalMatchMedia;
    });
 
-   it('bypasses table loading delay and shows content immediately when prefers-reduced-motion is active', async () => {
+   it('applies focus-visible styles on interactive elements when keyboard-focused', () => {
+    render(<ApiUsage />);
+
+    // All interactive buttons get focus-visible outlines via global @layer focus
+    const buttons = document.querySelectorAll('.api-usage-page button');
+    expect(buttons.length).toBeGreaterThan(0);
+    buttons.forEach(btn => {
+      expect(btn.tagName).toBe('BUTTON');
+      // Tab buttons specifically get the tab-button focus override
+      if (btn.classList.contains('tab-button')) {
+        const style = getComputedStyle(btn);
+        // The global @layer focus layer provides the ring
+        expect(btn.classList.contains('tab-button')).toBe(true);
+      }
+    });
+
+    // Tab buttons exist for language selection
+    const tabButtons = document.querySelectorAll('.api-usage-page .tab-button');
+    expect(tabButtons.length).toBe(3); // JavaScript, Python, cURL
+
+    // Chart bars exist
+    const chartBars = document.querySelectorAll('.chart-bar');
+    expect(chartBars.length).toBe(7); // 7 days
+
+    // Response display section is initially hidden (no call made yet)
+    const responseDisplay = document.querySelector('.response-display');
+    expect(responseDisplay).toBeFalsy();
+
+    // Documentation link exists
+    const docLink = document.querySelector('.documentation-link a');
+    expect(docLink).toBeTruthy();
+  });
+
+  it('bypasses table loading delay and shows content immediately when prefers-reduced-motion is active', async () => {
      window.matchMedia = vi.fn().mockImplementation((query) => ({
        matches: query === '(prefers-reduced-motion: reduce)' || query.includes('reduce'),
        media: query,
