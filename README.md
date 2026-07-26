@@ -24,6 +24,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - Dev proxy to backend at `http://localhost:3000` for `/api`
 - **Global Command Palette**: Instantly jump to views, search APIs by name, cycle/toggle light & dark themes, or trigger vault deposits. Use `Cmd+K` on macOS or `Ctrl+K` on Windows/Linux to open.
 - **Pattern-based status badges**: Status indicators now use distinct textures in addition to color so they remain understandable for color-blind users and in grayscale displays.
+- **Response diff highlighting**: Pass a `compareWith` prop to `CallHistoryRow` to show a line-by-line diff between two call responses, with added (green), removed (red), and unchanged context lines. Includes a Diff/Raw toggle, before/after call labels, and full WCAG 2.1 AA accessibility. See [docs/ResponseDiff.md](docs/ResponseDiff.md).
 - **Smooth theme transition**: Light/dark switches animate color tokens (background, text, border) over 240 ms instead of snapping. The transition is gated behind a `theme-transitions-ready` class that ThemeProvider adds after the first paint, preventing any flash on load. Animated elements (toasts, skeletons, spinners) are automatically excluded. Use the `.no-theme-transition` escape hatch on any element that must opt out.
 
 ## Keyboard shortcuts
@@ -121,10 +122,12 @@ callora-frontend/
 │   ├── data/                # Static and mock data
 │   │   └── mockApis.ts
 │   ├── utils/               # Utility functions
+│   │   ├── diff.ts          # Line-level diff engine (computeDiff, diffJson, hasDifferences)
 │   │   └── format.ts        # Currency formatters (formatUsdc, formatUsdShortcut, formatPrice)
 │   └── vite-env.d.ts
 ├── docs/
-│   └── UI-Design-System.md
+│   ├── UI-Design-System.md
+│   └── ResponseDiff.md      # Response diff highlighting (CallHistoryRow)
 ├── index.html
 ├── package.json
 ├── tsconfig.json
