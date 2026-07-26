@@ -1,5 +1,6 @@
 import React from "react";
 import ExternalLink from "./ExternalLink";
+import { EmptyStateSkeleton } from "./Skeleton";
 
 export type EmptyStateVariant = "empty" | "api-detail" | "filtered" | "error";
 export type EmptyStateSize = "default" | "compact";
@@ -15,6 +16,7 @@ export interface EmptyStateProps {
     label: string;
     onClick: () => void;
   };
+  loading?: boolean;
 }
 
 /**
@@ -252,7 +254,16 @@ export default function EmptyState({
   onClearFilters,
   onRetry,
   action,
+  loading = false,
 }: EmptyStateProps) {
+  if (loading) {
+    return (
+      <EmptyStateSkeleton
+        size={size}
+        hasAction={!!action || (variant === "filtered" && !!onClearFilters) || (variant === "error" && !!onRetry)}
+      />
+    );
+  }
   const defaults = {
     empty: {
       title: "No APIs available",

@@ -321,4 +321,43 @@ describe("EmptyState", () => {
       });
     });
   });
+
+  describe("loading skeleton", () => {
+    it("renders EmptyStateSkeleton when loading prop is true", () => {
+      const { container } = render(<EmptyState loading />);
+      const skeleton = container.querySelector(".empty-state-skeleton");
+      expect(skeleton).toBeTruthy();
+      expect(skeleton?.getAttribute("aria-busy")).toBe("true");
+      expect(skeleton?.getAttribute("aria-label")).toBe("Loading empty state");
+      
+      const shimmerElements = skeleton?.querySelectorAll(".skeleton");
+      expect(shimmerElements?.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("applies compact classes/styles for compact size skeleton", () => {
+      const { container } = render(<EmptyState loading size="compact" />);
+      const skeleton = container.querySelector(".empty-state-skeleton");
+      expect(skeleton?.classList.contains("empty-state-skeleton--compact")).toBe(true);
+      expect((skeleton as HTMLElement).style.padding).toBe("16px 12px");
+    });
+
+    it("applies default styles and min-height for default size skeleton", () => {
+      const { container } = render(<EmptyState loading size="default" />);
+      const skeleton = container.querySelector(".empty-state-skeleton");
+      expect(skeleton?.classList.contains("empty-state-skeleton--compact")).toBe(false);
+      expect((skeleton as HTMLElement).style.minHeight).toBe("300px");
+      expect((skeleton as HTMLElement).style.padding).toBe("48px 32px");
+    });
+
+    it("renders action button placeholder only when hasAction is determined", () => {
+      const { container: noAction } = render(<EmptyState loading />);
+      const initialSkeletonsCount = noAction.querySelectorAll(".skeleton").length;
+
+      const { container: withAction } = render(
+        <EmptyState loading action={{ label: "Go", onClick: () => {} }} />
+      );
+      const withActionSkeletonsCount = withAction.querySelectorAll(".skeleton").length;
+      expect(withActionSkeletonsCount).toBe(initialSkeletonsCount + 1);
+    });
+  });
 });

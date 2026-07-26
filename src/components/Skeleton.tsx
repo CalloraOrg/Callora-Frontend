@@ -74,3 +74,104 @@ export function FiltersSidebarSkeleton() {
   );
 }
 
+export function EmptyStateSkeleton({
+  size = "default",
+  hasAction = false,
+}: {
+  size?: "default" | "compact";
+  hasAction?: boolean;
+}) {
+  const isCompact = size === "compact";
+
+  const wrapperStyle: CSSProperties = isCompact
+    ? {
+        textAlign: "center",
+        padding: "16px 12px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "12px",
+        background: "var(--surface-soft)",
+        border: "1px solid var(--line)",
+        borderRadius: "10px",
+        width: "100%",
+        boxSizing: "border-box",
+      }
+    : {
+        textAlign: "center",
+        padding: "48px 32px",
+        minHeight: "300px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        boxSizing: "border-box",
+      };
+
+  const illustrationSize = isCompact ? 56 : 80;
+  const illustrationMargin = isCompact ? "0" : "0 auto 24px";
+
+  return (
+    <div
+      style={wrapperStyle}
+      className={`empty-state-skeleton${isCompact ? " empty-state-skeleton--compact" : ""}`}
+      aria-busy="true"
+      aria-label="Loading empty state"
+    >
+      <Skeleton
+        width={illustrationSize}
+        height={illustrationSize}
+        borderRadius="50%"
+        style={{
+          margin: illustrationMargin,
+          flexShrink: 0,
+          border: "1px solid var(--line)",
+        }}
+        tone="stellar"
+      />
+
+      {isCompact ? (
+        <Skeleton width="50%" height={14} tone="stellar" borderRadius={4} />
+      ) : (
+        <Skeleton
+          width="40%"
+          height={22}
+          borderRadius={6}
+          style={{ marginBottom: 12 }}
+          tone="stellar"
+        />
+      )}
+
+      {isCompact ? (
+        <Skeleton width="70%" height={12} tone="stellar" borderRadius={4} />
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: hasAction ? 24 : 0,
+            width: "100%",
+          }}
+        >
+          <Skeleton width="55%" height={14} tone="stellar" borderRadius={4} />
+          <Skeleton width="35%" height={14} tone="stellar" borderRadius={4} />
+        </div>
+      )}
+
+      {hasAction && (
+        <Skeleton
+          width={isCompact ? 120 : 160}
+          height={isCompact ? 36 : 44}
+          borderRadius={14}
+          tone="stellar"
+        />
+      )}
+    </div>
+  );
+}
+
+
