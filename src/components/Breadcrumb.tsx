@@ -8,25 +8,81 @@ type BreadcrumbItem = {
 };
 
 type BreadcrumbProps = {
-  items: BreadcrumbItem[];
+  items: ReadonlyArray<BreadcrumbItem>;
+  /**
+   * When greater than 0 any individual crumb label that exceeds this character
+   * count will be visually shortened using a middle-ellipsis (e.g.
+   * "Very Long … Label Here").  The full text is always preserved in the
+   * element's `title` attribute and, for non-current links, as the accessible
+   * name via `aria-label`, so screen-reader and hover users always see the
+   * complete value.
+   *
+   * Must be ≥ 8 to leave room for at least one character on each side of the
+   * ellipsis.  Values below 8 are silently clamped to 0 (no truncation).
+   *
+   * @default 0 (no truncation)
+   */
+  maxLabelLength?: number;
 };
 
-function BreadcrumbLink({ item }: { item: BreadcrumbItem }) {
+/**
+ * Shorten `label` to `max` characters using a middle-ellipsis strategy.
+ *
+ * Characters are split roughly half-and-half around the "…" character so that
+ * both the start and end of the label remain visible — useful for long API
+ * path segments where the terminal identifier is just as meaningful as the
+ * root namespace.
+ *
+ * Returns the original string unchanged when:
+ * - `max` is 0 (feature disabled)
+ * - `max` < 8 (not enough room to produce a meaningful result)
+ * - `label.length` ≤ `max`
+ */
+export function truncateMiddle(label: string, max: number): string {
+  if (max < 8 || label.length <= max) return label;
+
+  // Reserve one character for the ellipsis itself.
+  const budget = max - 1; // characters available for actual content
+  const endLen = Math.floor(budget / 2);
+  const startLen = budget - endLen;
+
+  return `${label.slice(0, startLen)}\u2026${label.slice(label.length - endLen)}`;
+}
+
+function BreadcrumbLink({
+  item,
+  displayLabel,
+}: {
+  item: BreadcrumbItem;
+  /** Visually displayed text; may be a middle-truncated version of item.label. */
+  displayLabel: string;
+}) {
+  const isTruncated = displayLabel !== item.label;
+
   if (item.isCurrent) {
     return (
       <span
         className="breadcrumb-current"
         aria-current="page"
+        // Always expose the full label to assistive technology and on hover.
         title={item.label}
+        // When truncated, override the accessible name so screen readers
+        // announce the complete string rather than the ellipsis variant.
+        {...(isTruncated ? { "aria-label": item.label } : {})}
       >
-        {item.label}
+        {displayLabel}
       </span>
     );
   }
 
   return (
-    <a className="breadcrumb-link link-nav" href={item.href} title={item.label}>
-      {item.label}
+    <a
+      className="breadcrumb-link link-nav"
+      href={item.href}
+      title={item.label}
+      {...(isTruncated ? { "aria-label": item.label } : {})}
+    >
+      {displayLabel}
     </a>
   );
 }
@@ -39,7 +95,7 @@ function BreadcrumbSeparator() {
   );
 }
 
-export default function Breadcrumb({ items }: BreadcrumbProps) {
+export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const ellipsisButtonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -263,11 +319,12 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
           const isFirst = index === 0;
           const isLast = index === items.length - 1;
           const isMiddle = !isFirst && !isLast;
+          const displayLabel = truncateMiddle(item.label, maxLabelLength);
 
           if (isMiddle) {
             return (
               <li className="breadcrumb-item breadcrumb-middle" key={item.href}>
-                <BreadcrumbLink item={item} />
+                <BreadcrumbLink item={item} displayLabel={displayLabel} />
                 <BreadcrumbSeparator />
               </li>
             );
@@ -278,7 +335,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
               className={`breadcrumb-item ${isFirst ? "breadcrumb-first" : ""}`}
               key={item.href}
             >
-              <BreadcrumbLink item={item} />
+              <BreadcrumbLink item={item} displayLabel={displayLabel} />
               {isFirst && shouldCollapseMiddle && (
                 <span className="breadcrumb-collapsed">
                   <BreadcrumbSeparator />
@@ -304,17 +361,29 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
                       onKeyDown={handlePopoverKeyDown}
                     >
                       <ol className="breadcrumb-popover-list">
-                        {middleItems.map((middleItem) => (
-                          <li key={middleItem.href} role="none">
-                            <a
-                              className="breadcrumb-popover-link link-nav"
-                              href={middleItem.href}
-                              role="menuitem"
-                            >
-                              {middleItem.label}
-                            </a>
-                          </li>
-                        ))}
+                        {middleItems.map((middleItem) => {
+                          const middleDisplayLabel = truncateMiddle(
+                            middleItem.label,
+                            maxLabelLength,
+                          );
+                          const isTruncated =
+                            middleDisplayLabel !== middleItem.label;
+                          return (
+                            <li key={middleItem.href} role="none">
+                              <a
+                                className="breadcrumb-popover-link link-nav"
+                                href={middleItem.href}
+                                role="menuitem"
+                                title={middleItem.label}
+                                {...(isTruncated
+                                  ? { "aria-label": middleItem.label }
+                                  : {})}
+                              >
+                                {middleDisplayLabel}
+                              </a>
+                            </li>
+                          );
+                        })}
                       </ol>
                     </div>
                   )}
