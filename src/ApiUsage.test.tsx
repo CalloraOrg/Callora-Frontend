@@ -2,6 +2,13 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ApiUsage from './ApiUsage';
 
+const writeTextMock = vi.fn();
+Object.assign(navigator, {
+  clipboard: {
+    writeText: writeTextMock,
+  },
+});
+
 // Mock dependencies
 vi.mock('./hooks/useFetchTracker', () => ({
   useFetchTracker: () => ({ trackFetch: vi.fn(async (promise) => promise) })
@@ -21,6 +28,8 @@ vi.mock('./components/CallsHeatmap', () => ({
 
 describe('ApiUsage - Filter Reset', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    writeTextMock.mockResolvedValue(undefined);
     Object.defineProperty(window, 'location', {
       value: {
         search: '',
@@ -50,8 +59,14 @@ describe('ApiUsage - Filter Reset', () => {
     expect(resetButton.disabled).toBe(true);
     const successTab = screen.getByRole('tab', { name: /Success/i });
     fireEvent.click(successTab);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(resetButton.disabled).toBe(false);
     fireEvent.click(resetButton);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(resetButton.disabled).toBe(true);
     const srAnnouncement = screen.getByRole('status');
     expect(srAnnouncement.textContent).toBe('Filters reset. Showing all calls from the last 24 hours.');
@@ -65,6 +80,26 @@ describe('ApiUsage - Filter Reset', () => {
     expect(marketplaceLink.getAttribute('href')).toBe('/marketplace');
     const currentCrumb = screen.getByText('User Profile API usage');
     expect(currentCrumb.getAttribute('aria-current')).toBe('page');
+  });
+
+  it('announces status filter changes to screen readers', async () => {
+    render(<ApiUsage />);
+    fireEvent.click(screen.getByRole('tab', { name: /Error/i }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByRole('status').textContent).toBe('Showing error calls.');
+  });
+
+  it('announces copy actions to screen readers', async () => {
+    render(<ApiUsage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    await act(async () => {
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(writeTextMock).toHaveBeenCalled();
+    expect(screen.getByRole('status').textContent).toBe('API key copied to clipboard.');
   });
 });
 
@@ -83,6 +118,7 @@ describe('ApiUsage - Tabular Numerals', () => {
         dispatchEvent: vi.fn(),
       })),
     });
+    writeTextMock.mockResolvedValue(undefined);
     vi.clearAllMocks();
   });
 

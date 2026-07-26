@@ -18,6 +18,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - Pinned APIs on the dashboard for fast access to saved marketplace APIs
 - Billing (USDC deposit, Stellar settlement, transaction tracking)
 - API Usage analytics view
+- `ApiUsage` screen-reader status announcements for endpoint, filter, and copy actions via a centralized `aria-live` region
 - 500 error page with retry flow
 - 404 catch-all page
 - Theme playground for previewing primary/accent/surface tokens live
