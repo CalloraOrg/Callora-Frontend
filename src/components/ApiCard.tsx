@@ -110,9 +110,82 @@ export function ApiCardSkeleton() {
   );
 }
 
-// ─── Save-to-collection popover ───────────────────────────────────────────────
+interface CardActionButtonProps {
+  isActive: boolean;
+  onClick: (e: React.MouseEvent) => void;
+  activeLabel: string;
+  inactiveLabel: string;
+  prefersReducedMotion: boolean;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+  ariaHasPopup?: boolean | "dialog" | "menu" | "listbox" | "tree" | "grid";
+  ariaExpanded?: boolean;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+}
 
-// ─── Favorite button ─────────────────────────────────────────────────────────
+/**
+ * Standardized button for Favorite, Bookmark, and Pin actions.
+ * Provides a static visual fallback (color/outline shift) when reduced motion is enabled,
+ * ensuring clear hover and focus states for accessibility without layout-altering transforms.
+ */
+function CardActionButton({
+  isActive,
+  onClick,
+  activeLabel,
+  inactiveLabel,
+  prefersReducedMotion,
+  children,
+  style,
+  ariaHasPopup,
+  ariaExpanded,
+  buttonRef
+}: CardActionButtonProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const baseBg = isActive ? "var(--accent, rgba(78,133,255,0.9))" : "rgba(0,0,0,0.5)";
+  const hoverBg = isActive ? "var(--accent-hover, rgba(78,133,255,1))" : "rgba(0,0,0,0.8)";
+
+  const transform = prefersReducedMotion ? "none" : (isHovered ? "scale(1.1)" : "scale(1)");
+  const background = isHovered ? hoverBg : baseBg;
+  const outline = isHovered ? "2px solid rgba(255,255,255,0.6)" : "2px solid transparent";
+
+  return (
+    <button
+      ref={buttonRef}
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => setIsHovered(true)}
+      onBlur={() => setIsHovered(false)}
+      aria-label={isActive ? activeLabel : inactiveLabel}
+      aria-pressed={isActive}
+      aria-haspopup={ariaHasPopup}
+      aria-expanded={ariaExpanded}
+      style={{
+        ...style,
+        background,
+        transform,
+        outline,
+        outlineOffset: "2px",
+        border: "none",
+        borderRadius: "50%",
+        width: "32px",
+        height: "32px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        transition: prefersReducedMotion
+          ? "background 100ms ease, outline 100ms ease"
+          : "background 160ms ease, transform 160ms ease, outline 160ms ease",
+        flexShrink: 0,
+        zIndex: 10,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
 
 interface FavoriteButtonProps {
   endpointId: string;
@@ -122,44 +195,17 @@ interface FavoriteButtonProps {
 }
 
 function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion = false }: FavoriteButtonProps) {
-  const btnRef = useRef<HTMLButtonElement>(null);
-
-  const handleMouseEnter = prefersReducedMotion
-    ? undefined
-    : ((e: React.MouseEvent) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)"));
-
-  const handleMouseLeave = prefersReducedMotion
-    ? undefined
-    : ((e: React.MouseEvent) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)"));
-
   return (
-    <button
-      ref={btnRef}
+    <CardActionButton
+      isActive={isFavorite}
       onClick={(e) => {
         e.stopPropagation();
         onToggle(endpointId);
       }}
-      style={{
-        position: "absolute",
-        top: "8px",
-        left: "8px",
-        zIndex: 10,
-        background: isFavorite ? "var(--accent, rgba(78,133,255,0.9))" : "rgba(0,0,0,0.5)",
-        border: "none",
-        borderRadius: "50%",
-        width: "32px",
-        height: "32px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        transition: prefersReducedMotion ? "none" : "background 160ms ease, transform 160ms ease",
-        flexShrink: 0,
-      }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-      aria-pressed={isFavorite}
+      activeLabel="Remove from favorites"
+      inactiveLabel="Add to favorites"
+      prefersReducedMotion={prefersReducedMotion}
+      style={{ position: "absolute", top: "8px", left: "8px" }}
     >
       <svg
         width="16"
@@ -174,7 +220,7 @@ function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion
       >
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
       </svg>
-    </button>
+    </CardActionButton>
   );
 }
 
@@ -264,35 +310,19 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false }: BookmarkBu
   return (
     <>
       {/* SVG bookmark button — absolutely positioned in card top-right */}
-      <button
-        ref={btnRef}
+      <CardActionButton
+        buttonRef={btnRef}
+        isActive={isSaved}
         onClick={(e) => {
           e.stopPropagation();
           toggleSave();
         }}
-        style={{
-          position: "absolute",
-          top: "8px",
-          right: "8px",
-          background: isSaved ? "var(--accent, rgba(78,133,255,0.9))" : "rgba(0,0,0,0.5)",
-          border: "none",
-          borderRadius: "50%",
-          width: "32px",
-          height: "32px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          zIndex: 10,
-          transition: prefersReducedMotion ? "none" : "background 160ms ease, transform 160ms ease",
-          flexShrink: 0,
-        }}
-        onMouseEnter={prefersReducedMotion ? undefined : (e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)")}
-        onMouseLeave={prefersReducedMotion ? undefined : (e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
-        aria-label={isSaved ? "Remove from collection" : "Save to collection"}
-        aria-pressed={isSaved}
-        aria-haspopup="dialog"
-        aria-expanded={popoverOpen}
+        activeLabel="Remove from collection"
+        inactiveLabel="Save to collection"
+        prefersReducedMotion={prefersReducedMotion}
+        ariaHasPopup="dialog"
+        ariaExpanded={popoverOpen}
+        style={{ position: "absolute", top: "8px", right: "8px" }}
       >
         <svg
           width="16"
@@ -307,7 +337,7 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false }: BookmarkBu
         >
           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
         </svg>
-      </button>
+      </CardActionButton>
 
       {/* Save-to-collection popover */}
       {popoverOpen && (
@@ -427,34 +457,17 @@ function PinButton({ apiId, prefersReducedMotion = false }: { apiId: string; pre
   const isPinned = pinned.has(apiId);
 
   return (
-    <button
+    <CardActionButton
+      isActive={isPinned}
       onClick={(e) => {
         e.stopPropagation();
         pinnedApisStore.toggle(apiId);
       }}
-      style={{
-        position: "absolute",
-        top: "48px",
-        right: "8px",
-        background: isPinned ? "var(--accent, rgba(78,133,255,0.9))" : "rgba(0,0,0,0.5)",
-        border: "none",
-        borderRadius: "50%",
-        width: "32px",
-        height: "32px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        zIndex: 10,
-        transition: prefersReducedMotion ? "none" : "background 160ms ease, transform 160ms ease",
-        flexShrink: 0,
-      }}
-      onMouseEnter={prefersReducedMotion ? undefined : (e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1.1)")}
-      onMouseLeave={prefersReducedMotion ? undefined : (e) => ((e.currentTarget as HTMLElement).style.transform = "scale(1)")}
-      aria-label={isPinned ? `Unpin ${apiId} from dashboard` : `Pin ${apiId} to dashboard`}
-      aria-pressed={isPinned}
+      activeLabel={`Unpin ${apiId} from dashboard`}
+      inactiveLabel={`Pin ${apiId} to dashboard`}
+      prefersReducedMotion={prefersReducedMotion}
+      style={{ position: "absolute", top: "48px", right: "8px" }}
     >
-      {/* Pin icon */}
       <svg
         width="16"
         height="16"
@@ -469,7 +482,7 @@ function PinButton({ apiId, prefersReducedMotion = false }: { apiId: string; pre
         <line x1="12" y1="17" x2="12" y2="22" />
         <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
       </svg>
-    </button>
+    </CardActionButton>
   );
 }
 
@@ -488,6 +501,7 @@ function renderStatValue(value: string | undefined) {
   }
   return <span className="api-card__stat-value numeric-tabular">{value}</span>;
 }
+
 function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(false);
   useEffect(() => {
@@ -520,19 +534,13 @@ export default function ApiCard({
     return <ApiCardSkeleton />;
   }
 
-  const isMobile = useMediaQuery("(max-width: 768px)");
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const isMobile = useMediaQuery("(max-width: 768px)");  
+  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
   const avgLatencyMs = api.avgLatencyMs;
   const uptimePercent = api.uptimePercent;
   const isCompact = density === "compact" || isMobile;
-
-  const prefersReducedMotion = useMemo(() => {
-    return typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }, []);
 
   const { isFavorite, toggleFavorite } = useFavorites();
   const { apis: comparedApis } = useCompareStore();
@@ -592,6 +600,7 @@ export default function ApiCard({
   };
 
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [isCompareHovered, setIsCompareHovered] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleOpenMenu = (e: React.MouseEvent | React.TouchEvent, clientX: number, clientY: number) => {
@@ -661,6 +670,7 @@ export default function ApiCard({
       }}
     >
       {menuPos && <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)} actions={contextActions} />}
+      
       {/* Absolutely-positioned bookmark button in the top-right corner */}
       <BookmarkButton endpointId={api.id} prefersReducedMotion={prefersReducedMotion} />
 
@@ -677,6 +687,10 @@ export default function ApiCard({
        {/* Compare button - absolutely positioned, top-left */}
        <button
          onClick={handleCompareClick}
+         onMouseEnter={() => setIsCompareHovered(true)}
+         onMouseLeave={() => setIsCompareHovered(false)}
+         onFocus={() => setIsCompareHovered(true)}
+         onBlur={() => setIsCompareHovered(false)}
          disabled={!canCompare}
          className="api-card__compare-btn"
          style={{
@@ -684,7 +698,7 @@ export default function ApiCard({
            top: "8px",
            left: "48px",
            zIndex: 10,
-           background: isCompared ? "var(--accent)" : "rgba(0,0,0,0.5)",
+           background: isCompared ? "var(--accent)" : (isCompareHovered ? "rgba(0,0,0,0.8)" : "rgba(0,0,0,0.5)"),
            color: "white",
            border: "none",
            borderRadius: "8px",
@@ -692,8 +706,13 @@ export default function ApiCard({
            fontSize: "0.75rem",
            fontWeight: 600,
            cursor: canCompare ? "pointer" : "not-allowed",
-           opacity: isCompared ? 1 : 0.6,
-           transition: prefersReducedMotion ? "none" : "opacity 0.2s, background 0.2s"
+           opacity: isCompared ? 1 : (isCompareHovered ? 1 : 0.6),
+           outline: isCompareHovered ? "2px solid rgba(255,255,255,0.6)" : "2px solid transparent",
+           outlineOffset: "2px",
+           transform: prefersReducedMotion ? "none" : (isCompareHovered && !isCompared && canCompare ? "translateY(-2px)" : "none"),
+           transition: prefersReducedMotion
+              ? "opacity 0.1s, background 0.1s, outline 0.1s" 
+              : "opacity 0.2s, background 0.2s, transform 0.2s, outline 0.2s"
          }}
          aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
          aria-pressed={isCompared}

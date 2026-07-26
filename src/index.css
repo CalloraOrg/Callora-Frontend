@@ -1351,15 +1351,28 @@ code,
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.api-card:hover {
+.api-card:hover,
+.api-card:focus-visible {
   border-color: var(--accent);
   transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .api-card {
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .api-card:hover,
+  .api-card:focus-visible {
+    transform: none;
+    background-color: var(--surface-soft);
+  }
 }
 
 .api-card-header {
@@ -1628,6 +1641,7 @@ code,
   transition:
     box-shadow 160ms ease,
     transform 160ms ease,
+    background-color 160ms ease,
     border-color 160ms ease;
   border: 1px solid var(--mkt-card-border);
 }
@@ -1666,14 +1680,6 @@ code,
   padding-top: var(--mkt-space-md);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .api-marketplace-card,
-  .api-card--compact .api-marketplace-card-description,
-  .density-toggle-button {
-    transition: none;
-  }
-}
-
 .api-marketplace-card:hover {
   box-shadow: var(--mkt-card-hover-shadow);
   transform: translateY(-4px);
@@ -1687,6 +1693,21 @@ code,
   transform: translateY(-4px);
   border-color: var(--mkt-card-hover-border);
   border-radius: var(--radius-lg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .api-marketplace-card,
+  .api-card--compact .api-marketplace-card-description,
+  .density-toggle-button {
+    transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+  }
+
+  .api-marketplace-card:hover,
+  .api-marketplace-card:focus-visible {
+    transform: none;
+    box-shadow: none;
+    background-color: var(--surface-soft);
+  }
 }
 
 .api-marketplace-card-header,
@@ -5117,7 +5138,7 @@ code,
    Design tokens: --accent, --muted, --surface-soft, --line,
                   --transition-speed, --page-bg
    WCAG 2.1 AA: focus-visible ring (global layer), 44 px touch
-                 targets, accessible pressed state.
+                targets, accessible pressed state.
 
    Responsive strategy:
    - >= 768 px → flex-wrap row, tags flow naturally.
