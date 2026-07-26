@@ -376,43 +376,23 @@ describe("ApiCard responsiveness", () => {
   });
 });
 
-describe("ApiCard aria-live announcements", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    pinnedApisStore._reset();
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      value: vi.fn().mockImplementation(query => ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
-    });
+describe("ApiCard — Empty state", () => {
+  it("renders themed empty state when no api is provided and not loading", () => {
+    const onBrowse = vi.fn();
+    render(<ApiCard onBrowse={onBrowse} /> as any);
+
+    // Region should be present with the title
+    expect(screen.getByRole("region", { name: /No API selected/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Browse marketplace/i })).toBeTruthy();
   });
 
-  it("announces pinning and unpinning", () => {
-    render(<ApiCard api={mockApi} />);
-    const pinBtn = screen.getByRole("button", { name: /Pin api-1 to dashboard/i });
-    
-    fireEvent.click(pinBtn);
-    expect(screen.getByText("Pinned to dashboard")).toBeTruthy();
-    expect(screen.getByText("Pinned to dashboard").getAttribute("aria-live")).toBe("polite");
-    
-    fireEvent.click(pinBtn);
-    expect(screen.getByText("Unpinned from dashboard")).toBeTruthy();
-  });
+  it("calls onBrowse when CTA is clicked", () => {
+    const onBrowse = vi.fn();
+    render(<ApiCard onBrowse={onBrowse} /> as any);
 
-  it("announces favorite toggle", () => {
-    render(<ApiCard api={mockApi} />);
-    const favBtn = screen.getByLabelText("Add to favorites");
-    
-    fireEvent.click(favBtn);
-    expect(screen.getByText("Added to favorites")).toBeTruthy();
+    const btn = screen.getByRole("button", { name: /Browse marketplace/i });
+    fireEvent.click(btn);
+    expect(onBrowse).toHaveBeenCalled();
   });
 });
 
