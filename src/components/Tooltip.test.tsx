@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Tooltip from "./Tooltip";
 
 describe("Tooltip", () => {
@@ -51,5 +51,69 @@ describe("Tooltip", () => {
     expect(screen.getByRole("tooltip")).toBeTruthy();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("respects hoverDelayMs before showing tooltip on hover", () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="Helpful text" hoverDelayMs={300}>
+        <button>Trigger</button>
+      </Tooltip>,
+    );
+    const trigger = screen.getByText("Trigger");
+    fireEvent.mouseEnter(trigger);
+
+    // Should not be visible immediately
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    // Advance time by 300ms wrapped in act
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.getByRole("tooltip")).toBeTruthy();
+
+    vi.useRealTimers();
+  });
+
+  it("cancels hover delay if mouse leaves before timer finishes", () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="Helpful text" hoverDelayMs={300}>
+        <button>Trigger</button>
+      </Tooltip>,
+    );
+    const trigger = screen.getByText("Trigger");
+    fireEvent.mouseEnter(trigger);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    fireEvent.mouseLeave(trigger);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    vi.useRealTimers();
+  });
+
+  it("opens on touch long-press after longPressMs", () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="Touch tooltip" longPressMs={400}>
+        <button>Trigger</button>
+      </Tooltip>,
+    );
+    const trigger = screen.getByText("Trigger");
+    fireEvent.touchStart(trigger);
+
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(screen.getByRole("tooltip")).toBeTruthy();
+
+    vi.useRealTimers();
   });
 });

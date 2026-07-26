@@ -27,16 +27,20 @@ type TooltipProps = {
   children: ReactElement;
   /** Long-press duration in ms before the tooltip opens on touch. */
   longPressMs?: number;
+  /** Delay in ms before the tooltip opens on mouse hover. Defaults to 0. */
+  hoverDelayMs?: number;
 };
 
 export default function Tooltip({
   content,
   children,
   longPressMs = 500,
+  hoverDelayMs = 0,
 }: TooltipProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const tooltipId = useId();
   const pressTimer = useRef<number | null>(null);
+  const hoverTimer = useRef<number | null>(null);
 
   const clearPressTimer = () => {
     if (pressTimer.current !== null) {
@@ -45,7 +49,19 @@ export default function Tooltip({
     }
   };
 
-  useEffect(() => clearPressTimer, []);
+  const clearHoverTimer = () => {
+    if (hoverTimer.current !== null) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearPressTimer();
+      clearHoverTimer();
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -59,10 +75,26 @@ export default function Tooltip({
   const show = () => setOpen(true);
   const hide = () => {
     clearPressTimer();
+    clearHoverTimer();
     setOpen(false);
   };
 
-  const handleTouchStart = () => {
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    if (isValidElement(children) && typeof (children.props as any).onMouseEnter === "function") {
+      (children.props as any).onMouseEnter(e);
+    }
+    clearHoverTimer();
+    if (hoverDelayMs > 0) {
+      hoverTimer.current = window.setTimeout(() => setOpen(true), hoverDelayMs);
+    } else {
+      setOpen(true);
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (isValidElement(children) && typeof (children.props as any).onTouchStart === "function") {
+      (children.props as any).onTouchStart(e);
+    }
     clearPressTimer();
     pressTimer.current = window.setTimeout(() => setOpen(true), longPressMs);
   };
@@ -70,13 +102,38 @@ export default function Tooltip({
   const trigger = isValidElement(children) ? (
     cloneElement(children, {
       "aria-describedby": open ? tooltipId : undefined,
-      onMouseEnter: show,
-      onMouseLeave: hide,
-      onFocus: show,
-      onBlur: hide,
+      onMouseEnter: handleMouseEnter,
+      onMouseLeave: (e: React.MouseEvent) => {
+        if (typeof (children.props as any).onMouseLeave === "function") {
+          (children.props as any).onMouseLeave(e);
+        }
+        hide();
+      },
+      onFocus: (e: React.FocusEvent) => {
+        if (typeof (children.props as any).onFocus === "function") {
+          (children.props as any).onFocus(e);
+        }
+        show();
+      },
+      onBlur: (e: React.FocusEvent) => {
+        if (typeof (children.props as any).onBlur === "function") {
+          (children.props as any).onBlur(e);
+        }
+        hide();
+      },
       onTouchStart: handleTouchStart,
-      onTouchEnd: clearPressTimer,
-      onTouchCancel: clearPressTimer,
+      onTouchEnd: (e: React.TouchEvent) => {
+        if (typeof (children.props as any).onTouchEnd === "function") {
+          (children.props as any).onTouchEnd(e);
+        }
+        clearPressTimer();
+      },
+      onTouchCancel: (e: React.TouchEvent) => {
+        if (typeof (children.props as any).onTouchCancel === "function") {
+          (children.props as any).onTouchCancel(e);
+        }
+        clearPressTimer();
+      },
     } as Record<string, unknown>)
   ) : (
     children
