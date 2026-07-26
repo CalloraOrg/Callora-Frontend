@@ -10,6 +10,10 @@ export default function DashboardPage() {
     "Your Callora dashboard showing balances, recent activity and quick actions.",
   );
   return (
-    <Dashboard vaultBalance={0} walletBalance={0} openDeposit={() => {}} />
+    <Dashboard
+      vaultBalance={0}
+      walletBalance={0}
+      openDeposit={(_presetAmount?: number) => {}}
+    />
   );
 }
