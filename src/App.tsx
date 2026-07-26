@@ -21,7 +21,7 @@ import MarketplacePage from "./pages/MarketplacePage";
 import ThemePlayground from "./pages/ThemePlayground";
 import DesignSystemDocs from "./pages/DesignSystemDocs";
 import A11yAudit from "./pages/A11yAudit";
-import EndpointSummary from "./pages/EndpointSummary";
+import RateLimitCard from "./pages/RateLimitCard";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 
@@ -121,7 +121,7 @@ const APP_ROUTES = {
   themePlayground: "/theme-playground",
   designSystem: "/design-system/docs",
   serverError: "/500",
-  endpointSummary: "/endpoint-summary",
+  rateLimitCard: "/rate-limit",
 } as const;
 
 function createMockHash() {
@@ -680,7 +680,8 @@ function App() {
 
             <Route path="/a11y-audit" element={<A11yAudit />} />
 
-            <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
+            <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
+
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
           </Routes>
         </main>

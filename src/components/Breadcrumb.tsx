@@ -9,80 +9,67 @@ export type BreadcrumbItem = {
 };
 
 type BreadcrumbProps = {
-  items: BreadcrumbItem[];
+  items: ReadonlyArray<BreadcrumbItem>;
   /**
-   * When true, individual crumb labels that exceed `middleEllipsisMaxLen`
-   * characters are truncated with a middle-ellipsis pattern:
-   *   "VeryLongStartText…endText"
-   * This preserves both the beginning (which names the resource type) and the
-   * end (which often carries a unique identifier or slug), giving users enough
-   * context to understand the path even when space is tight.
+   * When greater than 0 any individual crumb label that exceeds this character
+   * count will be visually shortened using a middle-ellipsis (e.g.
+   * "Very Long … Label Here").  The full text is always preserved in the
+   * element's `title` attribute and, for non-current links, as the accessible
+   * name via `aria-label`, so screen-reader and hover users always see the
+   * complete value.
    *
-   * The full label is always accessible via the `title` tooltip and the
-   * aria-label on the link, so screen-reader users are unaffected.
+   * Must be ≥ 8 to leave room for at least one character on each side of the
+   * ellipsis.  Values below 8 are silently clamped to 0 (no truncation).
    *
-   * @default false
+   * @default 0 (no truncation)
    */
-  middleEllipsis?: boolean;
-  /**
-   * Maximum character length before the middle-ellipsis kicks in.
-   * Only relevant when `middleEllipsis` is true.
-   * @default 24
-   */
-  middleEllipsisMaxLen?: number;
+  maxLabelLength?: number;
 };
 
 /**
- * truncateMiddle
+ * Shorten `label` to `max` characters using a middle-ellipsis strategy.
  *
- * Truncates `text` to at most `maxLen` visible characters using a
- * middle-ellipsis pattern: the beginning and end of the string are
- * preserved, with "…" inserted in the middle.
+ * Characters are split roughly half-and-half around the "…" character so that
+ * both the start and end of the label remain visible — useful for long API
+ * path segments where the terminal identifier is just as meaningful as the
+ * root namespace.
  *
- * Examples:
- *   truncateMiddle("VeryLongMachineLearningAPIName", 24)
- *     → "VeryLongMachin…APIName"
- *   truncateMiddle("short", 24) → "short"   (unchanged)
- *
- * The split favours the start slightly (ceil) so the resource-type prefix
- * is more likely to remain legible.
- *
- * @param text   The full label string.
- * @param maxLen Maximum visible characters (excluding the ellipsis itself).
- *               Must be ≥ 4 to produce a meaningful result.
+ * Returns the original string unchanged when:
+ * - `max` is 0 (feature disabled)
+ * - `max` < 8 (not enough room to produce a meaningful result)
+ * - `label.length` ≤ `max`
  */
-export function truncateMiddle(text: string, maxLen: number): string {
-  if (maxLen < 4) return text;
-  if (text.length <= maxLen) return text;
+export function truncateMiddle(label: string, max: number): string {
+  if (max < 8 || label.length <= max) return label;
 
-  // Reserve one char for "…"; split the remaining budget between start/end.
-  const budget = maxLen - 1; // subtract 1 for the ellipsis character
+  // Reserve one character for the ellipsis itself.
+  const budget = max - 1; // characters available for actual content
   const endLen = Math.floor(budget / 2);
-  const startLen = budget - endLen; // start gets the extra char when budget is odd
+  const startLen = budget - endLen;
 
-  const start = text.slice(0, startLen);
-  const end = text.slice(text.length - endLen);
-  return `${start}\u2026${end}`; // U+2026 HORIZONTAL ELLIPSIS
+  return `${label.slice(0, startLen)}\u2026${label.slice(label.length - endLen)}`;
 }
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function BreadcrumbLink({
   item,
   displayLabel,
 }: {
   item: BreadcrumbItem;
-  /** Pre-computed visible label (may be truncated). Full label lives in title/aria-label. */
+  /** Visually displayed text; may be a middle-truncated version of item.label. */
   displayLabel: string;
 }) {
+  const isTruncated = displayLabel !== item.label;
+
   if (item.isCurrent) {
     return (
       <span
         className="breadcrumb-current"
         aria-current="page"
-        // Always expose the full label to assistive technology
-        aria-label={item.label}
+        // Always expose the full label to assistive technology and on hover.
         title={item.label}
+        // When truncated, override the accessible name so screen readers
+        // announce the complete string rather than the ellipsis variant.
+        {...(isTruncated ? { "aria-label": item.label } : {})}
       >
         {displayLabel}
       </span>
@@ -93,9 +80,8 @@ function BreadcrumbLink({
     <a
       className="breadcrumb-link link-nav"
       href={item.href}
-      // Always expose the full label to assistive technology
-      aria-label={item.label}
       title={item.label}
+      {...(isTruncated ? { "aria-label": item.label } : {})}
     >
       {displayLabel}
     </a>
@@ -110,13 +96,7 @@ function BreadcrumbSeparator() {
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-
-export default function Breadcrumb({
-  items,
-  middleEllipsis = false,
-  middleEllipsisMaxLen = 24,
-}: BreadcrumbProps) {
+export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const ellipsisButtonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -375,16 +355,12 @@ export default function Breadcrumb({
           const isFirst = index === 0;
           const isLast = index === items.length - 1;
           const isMiddle = !isFirst && !isLast;
-          const displayLabel = displayLabels[index];
-          const isTruncated = middleEllipsis && displayLabel !== item.label;
+          const displayLabel = truncateMiddle(item.label, maxLabelLength);
 
           if (isMiddle) {
             return (
               <li className="breadcrumb-item breadcrumb-middle" key={item.href}>
-                <BreadcrumbLink
-                  item={item}
-                  displayLabel={displayLabel}
-                />
+                <BreadcrumbLink item={item} displayLabel={displayLabel} />
                 <BreadcrumbSeparator />
               </li>
             );
@@ -395,27 +371,7 @@ export default function Breadcrumb({
               className={`breadcrumb-item ${isFirst ? "breadcrumb-first" : ""}`}
               key={item.href}
             >
-              {item.isCurrent ? (
-                <span
-                  className={`breadcrumb-current${isTruncated ? " breadcrumb-current--middle-ellipsis" : ""}`}
-                  aria-current="page"
-                  aria-label={item.label}
-                  title={item.label}
-                  data-truncated={isTruncated ? "true" : undefined}
-                >
-                  {displayLabel}
-                </span>
-              ) : (
-                <a
-                  className={`breadcrumb-link link-nav${isTruncated ? " breadcrumb-link--middle-ellipsis" : ""}`}
-                  href={item.href}
-                  aria-label={item.label}
-                  title={item.label}
-                  data-truncated={isTruncated ? "true" : undefined}
-                >
-                  {displayLabel}
-                </a>
-              )}
+              <BreadcrumbLink item={item} displayLabel={displayLabel} />
               {isFirst && shouldCollapseMiddle && (
                 <span className="breadcrumb-collapsed">
                   <BreadcrumbSeparator />
@@ -451,20 +407,29 @@ export default function Breadcrumb({
                       onKeyDown={handlePopoverKeyDown}
                     >
                       <ol className="breadcrumb-popover-list">
-                        {middleItems.map((middleItem) => (
-                          <li key={middleItem.href} role="none">
-                            <a
-                              className="breadcrumb-popover-link link-nav"
-                              href={middleItem.href}
-                              role="menuitem"
-                              // Always show full label inside the popover —
-                              // there is no space constraint here.
-                              title={middleItem.label}
-                            >
-                              {middleItem.label}
-                            </a>
-                          </li>
-                        ))}
+                        {middleItems.map((middleItem) => {
+                          const middleDisplayLabel = truncateMiddle(
+                            middleItem.label,
+                            maxLabelLength,
+                          );
+                          const isTruncated =
+                            middleDisplayLabel !== middleItem.label;
+                          return (
+                            <li key={middleItem.href} role="none">
+                              <a
+                                className="breadcrumb-popover-link link-nav"
+                                href={middleItem.href}
+                                role="menuitem"
+                                title={middleItem.label}
+                                {...(isTruncated
+                                  ? { "aria-label": middleItem.label }
+                                  : {})}
+                              >
+                                {middleDisplayLabel}
+                              </a>
+                            </li>
+                          );
+                        })}
                       </ol>
                     </div>
                   )}

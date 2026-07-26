@@ -165,190 +165,190 @@ describe("Breadcrumb", () => {
   });
 });
 
-// ─── truncateMiddle unit tests ────────────────────────────────────────────────
+// ── truncateMiddle unit tests ─────────────────────────────────────────────────
 
 describe("truncateMiddle", () => {
-  it("returns the original string when it is within the limit", () => {
-    expect(truncateMiddle("short", 24)).toBe("short");
-    expect(truncateMiddle("exactly24characters!!!!!!", 26)).toBe(
-      "exactly24characters!!!!!!",
-    );
+  it("returns the string unchanged when max is 0 (feature disabled)", () => {
+    expect(truncateMiddle("Hello World", 0)).toBe("Hello World");
   });
 
-  it("returns the original string when length equals maxLen exactly", () => {
-    const str = "a".repeat(24);
-    expect(truncateMiddle(str, 24)).toBe(str);
+  it("returns the string unchanged when max < 8 (not enough budget)", () => {
+    expect(truncateMiddle("Hello World", 7)).toBe("Hello World");
+    expect(truncateMiddle("Hello World", 1)).toBe("Hello World");
   });
 
-  it("truncates strings longer than maxLen with a middle ellipsis", () => {
-    // "VeryLongMachineLearningAPIName" (30 chars) with maxLen=24:
-    //   budget = 24 - 1 = 23
-    //   endLen = floor(23 / 2) = 11  → last 11 chars = "ningAPIName"
-    //   startLen = 23 - 11 = 12     → first 12 chars = "VeryLongMach"
-    //   result = "VeryLongMach…ningAPIName"  (24 chars total)
-    const result = truncateMiddle("VeryLongMachineLearningAPIName", 24);
-    expect(result).toContain("…");
-    expect(result.length).toBe(24);
-    expect(result.endsWith("Name")).toBe(true);
-    expect(result.startsWith("VeryLongMach")).toBe(true);
+  it("returns the string unchanged when it already fits", () => {
+    expect(truncateMiddle("Short", 10)).toBe("Short");
+    expect(truncateMiddle("Exactly10!", 10)).toBe("Exactly10!");
   });
 
-  it("favours the start in the budget split (start gets extra char on odd budget)", () => {
-    // maxLen=5: budget=4, endLen=2, startLen=2 → 2+1+2=5 chars
-    // "Hello World" → start="He", end="ld" → "He…ld"
-    expect(truncateMiddle("Hello World", 5)).toBe("He\u2026ld");
+  it("truncates long strings to exactly `max` characters (including the ellipsis)", () => {
+    const result = truncateMiddle("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 10);
+    // budget = 9 chars of content, endLen = 4, startLen = 5
+    // → "ABCDE…WXYZ" = 10 chars
+    expect([...result].length).toBe(10);
+    expect(result).toBe("ABCDE\u2026WXYZ");
   });
 
-  it("works with maxLen=4 (minimum)", () => {
-    const result = truncateMiddle("abcdefghij", 4);
-    // budget=3, endLen=1, startLen=2 → "ab…j"
-    expect(result).toBe("ab\u2026j");
-    expect(result.length).toBe(4);
-  });
-
-  it("returns the string unchanged for maxLen < 4", () => {
-    expect(truncateMiddle("abcdefghij", 3)).toBe("abcdefghij");
-    expect(truncateMiddle("abcdefghij", 0)).toBe("abcdefghij");
-  });
-
-  it("handles empty string", () => {
-    expect(truncateMiddle("", 24)).toBe("");
-  });
-
-  it("handles string equal to exactly one character over the limit", () => {
-    const str = "a".repeat(25);
-    const result = truncateMiddle(str, 24);
-    expect(result).toContain("…");
-    expect(result.length).toBe(24);
-  });
-
-  it("uses the Unicode ellipsis character (U+2026), not three dots", () => {
-    const result = truncateMiddle("VeryLongStringHereToTest", 10);
+  it("uses a real Unicode ellipsis character (U+2026), not three full stops", () => {
+    const result = truncateMiddle("A very long label that must be shortened", 12);
     expect(result).toContain("\u2026");
     expect(result).not.toContain("...");
   });
+
+  it("preserves the start and end of the label", () => {
+    const label = "GrantFox Wave Compute API – Stellar Edition";
+    const result = truncateMiddle(label, 28);
+    // label.length = 43 (includes em-dash), budget=27, endLen=13, startLen=14
+    // start → "GrantFox Wave " (14 chars), end → "ellar Edition" (13 chars)
+    expect(result.startsWith("GrantFox Wave ")).toBe(true);
+    expect(result.endsWith("ellar Edition")).toBe(true);
+    expect([...result].length).toBe(28);
+  });
+
+  it("handles odd budget by giving one extra character to the start", () => {
+    // label = "0123456789ABCDEF" (16 chars), max=10
+    // budget = 9, endLen = floor(9/2) = 4, startLen = 5
+    // start → label.slice(0, 5)  = "01234"
+    // end   → label.slice(16-4)  = "CDEF"   ← last 4 chars of the string
+    const result = truncateMiddle("0123456789ABCDEF", 10);
+    expect(result).toBe("01234\u2026CDEF");
+    expect([...result].length).toBe(10);
+  });
 });
 
-// ─── Breadcrumb middleEllipsis prop ──────────────────────────────────────────
+// ── Breadcrumb middle-ellipsis integration tests ──────────────────────────────
 
-describe("Breadcrumb – middleEllipsis prop", () => {
+const LONG_LABEL_1 = "GrantFox Wave Compute API – Stellar Edition";
+const LONG_LABEL_2 = "Rate Limits & Throttling Policies";
+
+const truncatedBreadcrumb = [
+  { label: "Marketplace", href: "/marketplace" },
+  { label: LONG_LABEL_1, href: "/marketplace/grantfox" },
+  { label: LONG_LABEL_2, href: "/marketplace/grantfox/rate-limits" },
+  {
+    label: "Current Plan Configuration",
+    href: "/marketplace/grantfox/rate-limits/config",
+    isCurrent: true,
+  },
+];
+
+describe("Breadcrumb – middle-ellipsis (maxLabelLength)", () => {
   afterEach(() => {
     cleanup();
   });
 
-  const longLabel = "Advanced Language Model Completions API v2";
-  // With maxLen=20: budget=19, endLen=9, startLen=10 → "Advanced L…ions API v2"
-  const items = [
-    { label: "Marketplace", href: "/marketplace" },
-    { label: longLabel, href: "/marketplace/api", isCurrent: true },
-  ];
-
-  it("does NOT truncate labels when middleEllipsis is false (default)", () => {
-    render(<Breadcrumb items={items} />);
-    // The current crumb should show the full label text
-    const current = screen.getByText(longLabel);
-    expect(current).toBeTruthy();
-    expect(current.getAttribute("data-truncated")).toBeNull();
+  it("renders full labels when maxLabelLength is omitted (default 0)", () => {
+    render(<Breadcrumb items={truncatedBreadcrumb} />);
+    // All middle crumbs are hidden on desktop (breadcrumb-middle) but still in DOM
+    const links = screen.getAllByRole("link");
+    const allText = links.map((l) => l.textContent);
+    // Marketplace is the first crumb link; rest are hidden/middle
+    expect(allText).toContain("Marketplace");
   });
 
-  it("truncates long labels when middleEllipsis is true", () => {
-    render(<Breadcrumb items={items} middleEllipsis middleEllipsisMaxLen={20} />);
-    // The visible text should be shortened (contains ellipsis character)
-    const current = document.querySelector("[aria-current='page']");
-    expect(current).toBeTruthy();
-    expect(current!.textContent).toContain("…");
-    expect(current!.textContent!.length).toBeLessThan(longLabel.length);
-  });
-
-  it("sets data-truncated='true' on truncated crumbs", () => {
-    render(<Breadcrumb items={items} middleEllipsis middleEllipsisMaxLen={20} />);
-    const current = document.querySelector("[aria-current='page']");
-    expect(current?.getAttribute("data-truncated")).toBe("true");
-  });
-
-  it("preserves the full label in aria-label for accessibility", () => {
-    render(<Breadcrumb items={items} middleEllipsis middleEllipsisMaxLen={20} />);
-    const current = document.querySelector("[aria-current='page']");
-    // aria-label must contain the complete original label
-    expect(current?.getAttribute("aria-label")).toBe(longLabel);
-  });
-
-  it("preserves the full label in the title attribute", () => {
-    render(<Breadcrumb items={items} middleEllipsis middleEllipsisMaxLen={20} />);
-    const current = document.querySelector("[aria-current='page']");
-    expect(current?.getAttribute("title")).toBe(longLabel);
-  });
-
-  it("does NOT set data-truncated on a short label that fits within maxLen", () => {
-    const shortItems = [
-      { label: "Marketplace", href: "/marketplace" },
-      { label: "Short API", href: "/marketplace/short", isCurrent: true },
-    ];
-    render(<Breadcrumb items={shortItems} middleEllipsis middleEllipsisMaxLen={20} />);
-    const current = document.querySelector("[aria-current='page']");
-    expect(current?.getAttribute("data-truncated")).toBeNull();
-    expect(current?.textContent).toBe("Short API");
-  });
-
-  it("applies the middle-ellipsis CSS modifier class to truncated links", () => {
-    const linkItems = [
-      { label: longLabel, href: "/marketplace" },
-      { label: "Current Page", href: "/marketplace/current", isCurrent: true },
-    ];
-    render(
-      <Breadcrumb items={linkItems} middleEllipsis middleEllipsisMaxLen={20} />,
-    );
-    const link = document.querySelector(".breadcrumb-link--middle-ellipsis");
-    expect(link).toBeTruthy();
-    expect(link?.getAttribute("data-truncated")).toBe("true");
-  });
-
-  it("applies the middle-ellipsis CSS modifier class to truncated current crumbs", () => {
-    render(<Breadcrumb items={items} middleEllipsis middleEllipsisMaxLen={20} />);
-    const current = document.querySelector(
-      ".breadcrumb-current--middle-ellipsis",
-    );
-    expect(current).toBeTruthy();
-  });
-
-  it("keeps full labels in the popover even when middleEllipsis is active", () => {
-    // Middle item should show full label inside the popover, not truncated.
-    const deepItems = [
-      { label: "Marketplace", href: "/marketplace" },
-      {
-        label: "Advanced Language Model Completions And More API",
-        href: "/marketplace/alm",
-      },
-      {
-        label: "Current Page",
-        href: "/marketplace/alm/current",
-        isCurrent: true,
-      },
-    ];
+  it("truncates long middle-item labels with a middle-ellipsis", () => {
     const { container } = render(
-      <Breadcrumb items={deepItems} middleEllipsis middleEllipsisMaxLen={20} />,
+      <Breadcrumb items={truncatedBreadcrumb} maxLabelLength={28} />,
     );
+
+    // Open the popover to expose middle items in the DOM
     const button = container.querySelector<HTMLButtonElement>(
       ".breadcrumb-ellipsis",
     );
-    if (!button) throw new Error("Expected breadcrumb ellipsis button");
-
+    if (!button) throw new Error("Expected ellipsis button");
     fireEvent.click(button);
 
     const menuItems = Array.from(
-      container.querySelectorAll('[role="menuitem"]'),
+      container.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]'),
     );
-    // The popover shows the full label, not a truncated version
-    expect(menuItems[0].textContent).toBe(
-      "Advanced Language Model Completions And More API",
+
+    // Both middle labels should be truncated (shorter than originals and contain …)
+    for (const menuItem of menuItems) {
+      const text = menuItem.textContent ?? "";
+      expect(text).toContain("\u2026");
+      expect([...text].length).toBe(28);
+    }
+  });
+
+  it("preserves full labels in title and aria-label on truncated popover items", () => {
+    const { container } = render(
+      <Breadcrumb items={truncatedBreadcrumb} maxLabelLength={28} />,
+    );
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+    if (!button) throw new Error("Expected ellipsis button");
+    fireEvent.click(button);
+
+    const menuItems = Array.from(
+      container.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]'),
+    );
+
+    expect(menuItems[0].getAttribute("title")).toBe(LONG_LABEL_1);
+    expect(menuItems[0].getAttribute("aria-label")).toBe(LONG_LABEL_1);
+    expect(menuItems[1].getAttribute("title")).toBe(LONG_LABEL_2);
+    expect(menuItems[1].getAttribute("aria-label")).toBe(LONG_LABEL_2);
+  });
+
+  it("does NOT add aria-label when the label fits without truncation", () => {
+    const shortItems = [
+      { label: "Home", href: "/" },
+      { label: "Settings", href: "/settings" },
+      { label: "Profile", href: "/settings/profile", isCurrent: true },
+    ];
+    const { container } = render(
+      <Breadcrumb items={shortItems} maxLabelLength={28} />,
+    );
+    // First item is a link and its label is short — should have no aria-label override
+    const homeLink = container.querySelector<HTMLAnchorElement>(
+      ".breadcrumb-link",
+    );
+    expect(homeLink).not.toBeNull();
+    expect(homeLink?.getAttribute("aria-label")).toBeNull();
+  });
+
+  it("truncates the current-page crumb label when it is too long", () => {
+    const items = [
+      { label: "Marketplace", href: "/marketplace" },
+      {
+        label: "A Very Long Current Page Title Indeed",
+        href: "/current",
+        isCurrent: true,
+      },
+    ];
+    render(<Breadcrumb items={items} maxLabelLength={20} />);
+
+    // The current crumb is a <span> with aria-current="page"
+    const current = document.querySelector<HTMLSpanElement>(
+      '[aria-current="page"]',
+    );
+    expect(current).not.toBeNull();
+    // Visual text should be truncated
+    expect(current?.textContent).toContain("\u2026");
+    expect([...(current?.textContent ?? "")].length).toBe(20);
+    // Full text preserved in title and aria-label
+    expect(current?.getAttribute("title")).toBe(
+      "A Very Long Current Page Title Indeed",
+    );
+    expect(current?.getAttribute("aria-label")).toBe(
+      "A Very Long Current Page Title Indeed",
     );
   });
 
-  it("uses custom middleEllipsisMaxLen when provided", () => {
-    render(<Breadcrumb items={items} middleEllipsis middleEllipsisMaxLen={10} />);
-    const current = document.querySelector("[aria-current='page']");
-    // With maxLen=10 the result should be at most 10 chars
-    expect(current!.textContent!.length).toBeLessThanOrEqual(10);
-    expect(current!.textContent).toContain("…");
+  it("short labels remain unchanged when maxLabelLength is set", () => {
+    const items = [
+      { label: "Home", href: "/" },
+      { label: "Short", href: "/short", isCurrent: true },
+    ];
+    render(<Breadcrumb items={items} maxLabelLength={28} />);
+
+    const current = document.querySelector<HTMLSpanElement>(
+      '[aria-current="page"]',
+    );
+    expect(current?.textContent).toBe("Short");
+    // No aria-label override needed
+    expect(current?.getAttribute("aria-label")).toBeNull();
   });
 });
