@@ -22,7 +22,9 @@ import {
   persistDensityPreference,
   type DensityPreference,
 } from "../utils/density";
+import CompareDrawer from "../components/CompareDrawer";
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
+import RecentlyActiveRail from "../components/RecentlyActiveRail";
 import { useCompareStore } from "../state/compareStore";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
 import { MarketplacePageSkeleton } from "../components/Skeleton";
@@ -37,7 +39,20 @@ export default function MarketplacePage(): JSX.Element {
     "Marketplace – Callora",
     "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
   );
-  const [search, setSearch] = useState("");
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [search, setSearchRaw] = useState(
+    () => searchParams.get("q") ?? "",
+  );
+  const setSearch = (v: string) => {
+    setSearchRaw(v);
+    setSearchParams((prev) => {
+      if (v) prev.set("q", v); else prev.delete("q");
+      return prev;
+    }, { replace: true });
+  };
+
   const [density, setDensity] = useState<DensityPreference>(() =>
     readDensityPreference(),
   );
@@ -131,9 +146,23 @@ export default function MarketplacePage(): JSX.Element {
       { replace: true },
     );
   };
-  const { favorites } = useFavorites();
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set());
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+
+  const [favoritesOnly, setFavoritesOnlyRaw] = useState(
+    () => searchParams.get("favorites") === "1",
+  );
+  const setFavoritesOnly = (v: boolean) => {
+    setFavoritesOnlyRaw(v);
+    setSearchParams((prev) => {
+      if (v) prev.set("favorites", "1"); else prev.delete("favorites");
+      return prev;
+    }, { replace: true });
+  };
+
+  /**
+   * Sort state persisted via URL query parameter ?sort=
+   * Default is "popularity" to match existing behaviour.
+   */
   const sortParam = (searchParams.get("sort") ?? "popularity") as SortValue;
   const setSortParam = (value: SortValue) => {
     setSearchParams(
@@ -144,12 +173,22 @@ export default function MarketplacePage(): JSX.Element {
       { replace: true },
     );
   };
+
+  const currentPage = Math.max(1, Number(searchParams.get("page")) || 1);
+  const [pageSize, setPageSizeRaw] = useState<number>(12);
+  const setPageSize = (v: number) => {
+    setPageSizeRaw(v);
+    setSearchParams((prev) => { prev.set("page", "1"); return prev; }, { replace: true });
+  };
+  const [shown, setShown] = useState<number>(12);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Ref used to restore focus to the Filters trigger after the sheet closes
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
+  const isInitialMount = useRef(true);
+  const { trackFetch } = useFetchTracker();
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -340,7 +379,7 @@ export default function MarketplacePage(): JSX.Element {
     if (copy.has(c)) copy.delete(c);
     else copy.add(c);
     setSelectedCategories(copy);
-    setSearchParams({ page: "1" });
+    setSearchParams((prev) => { prev.set("page", "1"); return prev; }, { replace: true });
   };
 
   const toggleStatus = (s: string) => {
@@ -366,17 +405,30 @@ export default function MarketplacePage(): JSX.Element {
     setSelectedStatuses(new Set());
     setSortParam("popularity");
     setSearch("");
+    setShown(12);
+    setSearchParams((prev) => {
+      prev.delete("categories");
+      prev.delete("tag");
+      prev.delete("minPrice");
+      prev.delete("maxPrice");
+      prev.delete("popularity");
+      prev.delete("favorites");
+      prev.delete("sort");
+      prev.delete("q");
+      prev.set("page", "1");
+      return prev;
+    }, { replace: true });
   };
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
-      setSearchParams({ page: page.toString() });
+      setSearchParams((prev) => { prev.set("page", page.toString()); return prev; }, { replace: true });
     }
   };
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
-    setSearchParams({ page: "1" });
+    setSearchParams((prev) => { prev.set("page", "1"); return prev; }, { replace: true });
   };
 
   const handleViewDetails = (api: APIItem) => {
@@ -389,25 +441,19 @@ export default function MarketplacePage(): JSX.Element {
   // If page is invalid, update URL
   useEffect(() => {
     if (validCurrentPage !== currentPage) {
-      setSearchParams({ page: validCurrentPage.toString() });
+      setSearchParams((prev) => { prev.set("page", validCurrentPage.toString()); return prev; }, { replace: true });
     }
   }, [validCurrentPage, currentPage, setSearchParams]);
 
-  // Reset page when filters change
+  // Reset page when filters change (skip initial mount so URL ?page= is preserved)
   useEffect(() => {
-    if (!isLoading) {
-      setSearchParams({ page: "1" });
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
     }
-  }, [
-    debouncedSearch,
-    selectedCategories,
-    minPrice,
-    maxPrice,
-    popularity,
-    sortParam,
-    setSearchParams,
-    isLoading,
-  ]);
+    setSearchParams((prev) => { prev.set("page", "1"); return prev; }, { replace: true });
+  }, [debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sortParam, setSearchParams]);
+
 
   const startItem = (validCurrentPage - 1) * pageSize + 1;
   const endItem = Math.min(validCurrentPage * pageSize, filtered.length);
