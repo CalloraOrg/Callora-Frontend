@@ -27,7 +27,8 @@ export type StatusVariant =
   | 'operational'
   | 'degraded'
   | 'down'
-  | 'pending';
+  | 'pending'
+  | 'maintenance';
 
 const DEFAULT_LABELS: Record<StatusVariant, string> = {
   success: 'Operational',
@@ -37,6 +38,7 @@ const DEFAULT_LABELS: Record<StatusVariant, string> = {
   warning: 'Degraded',
   degraded: 'Degraded',
   pending: 'Pending',
+  maintenance: 'Maintenance',
 };
 
 const PATTERN_DESCRIPTIONS: Record<StatusVariant, string> = {
@@ -47,6 +49,7 @@ const PATTERN_DESCRIPTIONS: Record<StatusVariant, string> = {
   warning: 'opposite diagonal stripes',
   degraded: 'opposite diagonal stripes',
   pending: 'dot pattern',
+  maintenance: 'crosshatch pattern',
 };
 
 const PATTERN_KEYS: Record<StatusVariant, string> = {
@@ -57,7 +60,29 @@ const PATTERN_KEYS: Record<StatusVariant, string> = {
   warning: 'opposite-stripes',
   degraded: 'opposite-stripes',
   pending: 'dots',
+  maintenance: 'crosshatch',
 };
+
+/**
+ * Map an APIItem.status value (from mockApis.ts) to the StatusBadge variant.
+ *
+ * APIItem.status uses "maintenance" which is a first-class variant that maps
+ * directly; the other two values share names with existing StatusVariants.
+ */
+export function apiStatusToVariant(
+  status: 'operational' | 'degraded' | 'maintenance' | undefined,
+): StatusVariant {
+  switch (status) {
+    case 'operational':
+      return 'operational';
+    case 'degraded':
+      return 'degraded';
+    case 'maintenance':
+      return 'maintenance';
+    default:
+      return 'pending';
+  }
+}
 
 /** Small circle indicator rendered before the text label. */
 function Dot({ status }: { status: StatusVariant }) {

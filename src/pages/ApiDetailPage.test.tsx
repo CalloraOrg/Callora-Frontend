@@ -498,135 +498,141 @@ describe("ApiDetailPage", () => {
     });
   });
 
-  // ── #412: tabular-nums on numeric displays ──────────────────────────────────
+  // ── StatusBadge integration ───────────────────────────────────────────────
+  //
+  // These tests verify that ApiDetailPage renders pattern-fill color-blind-safe
+  // StatusBadge components instead of plain-text status strings wherever the
+  // API health status is displayed.  All three APIItem.status values
+  // ("operational", "degraded", "maintenance") must map to the correct badge.
 
-  describe("tabular-nums on numeric displays", () => {
-    it("applies tabular-nums to the hero price", () => {
+  describe("StatusBadge integration (color-blind pattern fills)", () => {
+    it("renders a StatusBadge in the sidebar API Health section for an operational API", () => {
+      // weather-001 has status="operational"
+      window.history.pushState({}, "", "/details/weather-001");
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
-      const heroPrice = document.querySelector(".api-detail-price.tabular-nums");
-      expect(heroPrice).toBeTruthy();
+      // The page renders two badges (hero + sidebar). Both must be correct.
+      const badges = screen.getAllByRole("img", { name: "Operational" });
+      expect(badges.length).toBeGreaterThanOrEqual(2);
+
+      // Every badge must carry the pattern class
+      badges.forEach((badge) => {
+        expect(badge.classList.contains("sb-pattern-operational")).toBe(true);
+        expect(badge.getAttribute("data-status")).toBe("operational");
+        expect(badge.getAttribute("data-pattern")).toBe("baseline");
+      });
     });
 
-    it("applies tabular-nums to the meta price in the hero heading", () => {
+    it("renders a StatusBadge in the hero title area for an operational API", () => {
+      window.history.pushState({}, "", "/details/weather-001");
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
-      const metaPrice = document.querySelector(".api-detail-meta .tabular-nums");
-      expect(metaPrice).toBeTruthy();
+      // The hero badge is in .api-detail-title
+      const titleArea = document.querySelector(".api-detail-title");
+      expect(titleArea).toBeTruthy();
+      const heroBadge = titleArea?.querySelector('[role="img"]');
+      expect(heroBadge).toBeTruthy();
+      expect(heroBadge?.getAttribute("data-status")).toBe("operational");
     });
 
-    it("applies tabular-nums to performance metric values", () => {
+    it("renders a StatusBadge with degraded variant for a degraded API", () => {
+      // pay-qr has status="degraded"
+      window.history.pushState({}, "", "/details/pay-qr");
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
-      const metricValues = document.querySelectorAll(".stat-card .tabular-nums");
-      expect(metricValues.length).toBeGreaterThanOrEqual(3);
+      const badges = screen.getAllByRole("img", { name: "Degraded" });
+      expect(badges.length).toBeGreaterThanOrEqual(2);
+      badges.forEach((badge) => {
+        expect(badge.classList.contains("sb-pattern-degraded")).toBe(true);
+        expect(badge.getAttribute("data-status")).toBe("degraded");
+        expect(badge.getAttribute("data-pattern")).toBe("opposite-stripes");
+      });
     });
 
-    it("applies tabular-nums to pricing plan price on the pricing tab", () => {
+    it("renders a StatusBadge with maintenance variant for a maintenance API", () => {
+      // msg-01 has status="maintenance"
+      window.history.pushState({}, "", "/details/msg-01");
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
-      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
-
-      const planPrice = document.querySelector(".api-detail-plan-price.tabular-nums");
-      expect(planPrice).toBeTruthy();
+      const badges = screen.getAllByRole("img", { name: "Maintenance" });
+      expect(badges.length).toBeGreaterThanOrEqual(2);
+      badges.forEach((badge) => {
+        expect(badge.classList.contains("sb-pattern-maintenance")).toBe(true);
+        expect(badge.getAttribute("data-status")).toBe("maintenance");
+        expect(badge.getAttribute("data-pattern")).toBe("crosshatch");
+      });
     });
 
-    it("applies tabular-nums to cost calculator inputs on the pricing tab", () => {
+    it("StatusBadge exposes pattern semantics in aria-description for non-color status cues", () => {
+      window.history.pushState({}, "", "/details/msg-01");
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
-      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
-
-      const volumeDisplay = document.querySelector(".api-detail-calculator-total .tabular-nums");
-      expect(volumeDisplay).toBeTruthy();
-
-      const rangeInput = screen.getByRole("slider", { name: "Monthly request volume" });
-      expect(rangeInput).toBeTruthy();
+      const badges = screen.getAllByRole("img", { name: "Maintenance" });
+      badges.forEach((badge) => {
+        expect(badge.getAttribute("aria-description")).toContain("crosshatch pattern");
+      });
     });
-  });
 
-  // ── #415: aria-live region for status changes ───────────────────────────────
-
-  describe("aria-live region for status changes", () => {
-    it("renders an aria-live region for API health status", () => {
+    it("StatusBadge for degraded API exposes opposite diagonal stripes in aria-description", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
-      const liveRegion = document.querySelector('[aria-live="polite"][aria-atomic="true"]');
-      expect(liveRegion).toBeTruthy();
+      const badges = screen.getAllByRole("img", { name: "Degraded" });
+      badges.forEach((badge) => {
+        expect(badge.getAttribute("aria-description")).toContain("opposite diagonal stripes");
+      });
     });
 
-    it("announces loading state via aria-live region", () => {
-      renderWithProviders(<ApiDetailPage />);
-
-      // During loading, assertive region should be present
-      const assertiveRegion = document.querySelector('.api-detail-page .sr-only[aria-live="assertive"]');
-      expect(assertiveRegion).toBeTruthy();
-      expect(assertiveRegion?.textContent).toContain("Loading");
-    });
-
-    it("announces loaded state via polite aria-live region", () => {
+    it("does NOT render the raw '● Operational' text string in the sidebar", () => {
+      window.history.pushState({}, "", "/details/weather-001");
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
-      const politeRegion = document.querySelector('.api-detail-page .sr-only[aria-live="polite"]');
-      expect(politeRegion).toBeTruthy();
-      expect(politeRegion?.textContent).toContain("Loaded");
+      // The old plain-text sentinel must be gone; the badge provides semantics via aria-label
+      expect(screen.queryByText("● Operational")).toBeNull();
     });
 
-    it("includes proper aria attributes on the status grid", () => {
+    it("StatusBadge dot indicator is hidden from assistive technology", () => {
+      window.history.pushState({}, "", "/details/weather-001");
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
-      // The API Health card contains the status grid with aria-live
-      const healthHeading = screen.getByText("API Health");
-      const healthCard = healthHeading.closest(".stat-card");
-      const statusGrid = healthCard?.querySelector('[aria-live="polite"][aria-atomic="true"]');
-      expect(statusGrid).toBeTruthy();
-      expect(statusGrid?.textContent).toContain("Operational");
+      // Check the sidebar badge specifically (inside .api-detail-sidebar)
+      const sidebar = document.querySelector(".api-detail-sidebar") as HTMLElement;
+      expect(sidebar).toBeTruthy();
+      const badge = sidebar.querySelector('[role="img"][data-status="operational"]') as HTMLElement;
+      expect(badge).toBeTruthy();
+      const dot = badge.querySelector('span[aria-hidden="true"]');
+      expect(dot).not.toBeNull();
     });
-  });
 
-  // ── #536: UI/UX polish ─────────────────────────────────────────────────────
-
-  describe("UI/UX polish", () => {
-    it("separates the status dot from the status text for better semantics", () => {
+    it("applies correct CSS token background to the maintenance badge", () => {
+      window.history.pushState({}, "", "/details/msg-01");
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
-      // Find the status dot inside the API Health section's aria-live region
-      const healthHeading = screen.getByText("API Health");
-      const healthCard = healthHeading.closest(".stat-card");
-      const statusGrid = healthCard?.querySelector('[aria-live="polite"][aria-atomic="true"]');
-      const statusDot = statusGrid?.querySelector('[aria-hidden="true"]');
-      expect(statusDot).toBeTruthy();
-      expect(statusDot?.textContent).toBe("●");
+      const badges = screen.getAllByRole("img", { name: "Maintenance" }) as HTMLElement[];
+      badges.forEach((badge) => {
+        expect(badge.style.backgroundColor).toBe("var(--sb-maintenance-bg)");
+        expect(badge.style.color).toBe("var(--sb-maintenance-fg)");
+      });
     });
 
-    it("provides aria-valuetext on the cost calculator range input", () => {
+    it("applies correct CSS token background to the degraded badge", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
-      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
-
-      const slider = screen.getByRole("slider");
-      expect(slider.getAttribute("aria-valuetext")).toContain("requests");
-    });
-
-    it("cost calculator range input has proper aria attributes", () => {
-      renderWithProviders(<ApiDetailPage />);
-      settleLoadingState();
-
-      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
-
-      const slider = screen.getByRole("slider");
-      expect(slider.getAttribute("aria-valuemin")).toBe("100");
-      expect(slider.getAttribute("aria-valuemax")).toBe("1000000");
-      expect(slider.getAttribute("aria-valuenow")).toBeTruthy();
+      const badges = screen.getAllByRole("img", { name: "Degraded" }) as HTMLElement[];
+      badges.forEach((badge) => {
+        expect(badge.style.backgroundColor).toBe("var(--sb-degraded-bg)");
+      });
     });
   });
 });

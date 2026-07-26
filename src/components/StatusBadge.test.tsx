@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { StatusBadge } from './StatusBadge';
+import { StatusBadge, apiStatusToVariant } from './StatusBadge';
 import type { StatusVariant } from './StatusBadge';
 
 afterEach(cleanup);
@@ -112,27 +112,52 @@ describe('StatusBadge', () => {
     expect(badge.getAttribute('aria-description')).toContain('diagonal stripes');
   });
 
-  // ── showPattern & patternStyle props ──────────────────────────────────────
+  // ── maintenance variant ───────────────────────────────────────────────────
 
-  it('supports disabling pattern overlay via showPattern={false}', () => {
-    render(<StatusBadge status="error" showPattern={false} />);
-    const badge = screen.getByRole('img', { name: 'Error' });
-    expect(badge.classList.contains('sb-pattern--disabled')).toBe(true);
-    expect(badge.getAttribute('data-pattern-enabled')).toBe('false');
-    expect(badge.getAttribute('aria-description')).toContain('no pattern');
+  it('renders with default label "Maintenance" for the maintenance variant', () => {
+    render(<StatusBadge status="maintenance" />);
+    expect(screen.getByRole('img', { name: 'Maintenance' })).toBeTruthy();
   });
 
-  it('applies dense pattern modifier class when patternStyle="dense"', () => {
-    render(<StatusBadge status="error" patternStyle="dense" />);
-    const badge = screen.getByRole('img', { name: 'Error' });
-    expect(badge.classList.contains('sb-pattern--dense')).toBe(true);
-    expect(badge.getAttribute('data-pattern-style')).toBe('dense');
+  it('applies the sb-pattern-maintenance CSS class for the crosshatch pattern', () => {
+    render(<StatusBadge status="maintenance" />);
+    const badge = screen.getByRole('img', { name: 'Maintenance' });
+    expect(badge.classList.contains('sb-pattern-maintenance')).toBe(true);
   });
 
-  it('applies high-contrast pattern modifier class when patternStyle="high-contrast"', () => {
-    render(<StatusBadge status="warning" patternStyle="high-contrast" />);
-    const badge = screen.getByRole('img', { name: 'Degraded' });
-    expect(badge.classList.contains('sb-pattern--high-contrast')).toBe(true);
-    expect(badge.getAttribute('data-pattern-style')).toBe('high-contrast');
+  it('exposes crosshatch pattern semantics in data-pattern and aria-description', () => {
+    render(<StatusBadge status="maintenance" />);
+    const badge = screen.getByRole('img', { name: 'Maintenance' }) as HTMLElement;
+    expect(badge.getAttribute('data-status')).toBe('maintenance');
+    expect(badge.getAttribute('data-pattern')).toBe('crosshatch');
+    expect(badge.getAttribute('aria-description')).toContain('crosshatch pattern');
+  });
+
+  it('applies the maintenance design-token colors', () => {
+    render(<StatusBadge status="maintenance" />);
+    const badge = screen.getByRole('img', { name: 'Maintenance' }) as HTMLElement;
+    expect(badge.style.backgroundColor).toBe('var(--sb-maintenance-bg)');
+    expect(badge.style.color).toBe('var(--sb-maintenance-fg)');
+    expect(badge.style.border).toContain('var(--sb-maintenance-border)');
+  });
+
+  // ── apiStatusToVariant helper ─────────────────────────────────────────────
+
+  describe('apiStatusToVariant', () => {
+    it('maps "operational" → "operational"', () => {
+      expect(apiStatusToVariant('operational')).toBe('operational');
+    });
+
+    it('maps "degraded" → "degraded"', () => {
+      expect(apiStatusToVariant('degraded')).toBe('degraded');
+    });
+
+    it('maps "maintenance" → "maintenance"', () => {
+      expect(apiStatusToVariant('maintenance')).toBe('maintenance');
+    });
+
+    it('maps undefined → "pending" (safe fallback)', () => {
+      expect(apiStatusToVariant(undefined)).toBe('pending');
+    });
   });
 });

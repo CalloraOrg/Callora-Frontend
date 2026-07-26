@@ -24,7 +24,7 @@ import MOCK_APIS from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import PlanBadge from "../components/PlanBadge";
-import ReviewsTab from "./ReviewsTab";
+import { StatusBadge, apiStatusToVariant } from "../components/StatusBadge";
 
 /**
  * ApiDetailPage
@@ -633,6 +633,11 @@ print(response.json())`;
                     <a href={api.provider?.url}>{api.provider?.name}</a> ·{" "}
                     <strong className="tabular-nums" style={{ color: "var(--accent-strong)" }}>{`$${formatPrice(api.pricePerRequest ?? 0)}`}</strong> per request
                   </div>
+                  {api.status && (
+                    <div style={{ marginTop: 8 }}>
+                      <StatusBadge status={apiStatusToVariant(api.status)} />
+                    </div>
+                  )}
                 </div>
                 <div className="api-detail-provider">
                   Published by{" "}
@@ -1007,10 +1012,9 @@ print(response.json())`;
                   <h4 style={{ marginTop: 0 }}>API Health</h4>
                   <div aria-live="polite" aria-atomic="true" style={{ display: "grid", gap: 16, marginTop: 20 }}>
                     {[
-                      { label: "Status", value: "Operational", color: "var(--success)", dot: true },
-                      { label: "Region", value: "Global (Edge)", color: "var(--text)", dot: false },
-                      { label: "CORS", value: "Supported", color: "var(--success)", dot: false },
-                    ].map(({ label, value, color, dot }) => (
+                      { label: "Region", value: "Global (Edge)", color: "var(--text)" },
+                      { label: "CORS", value: "Supported", color: "var(--success)" },
+                    ].map(({ label, value, color }) => (
                       <div key={label} style={{ display: "flex", justifyContent: "space-between" }}>
                         <span style={{ fontSize: 14, color: "var(--muted)" }}>{label}</span>
                         <span style={{ fontSize: 14, color, fontWeight: label !== "Region" ? 600 : undefined }}>
@@ -1019,6 +1023,10 @@ print(response.json())`;
                         </span>
                       </div>
                     ))}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 14, color: "var(--muted)" }}>Status</span>
+                      <StatusBadge status={apiStatusToVariant(api.status)} />
+                    </div>
                   </div>
                 </div>
 
