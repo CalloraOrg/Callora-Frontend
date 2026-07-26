@@ -1140,27 +1140,40 @@ code,
   margin-bottom: 8px;
 }
 
+/* ── Status-chip pattern overlays (color-blind safe) ────────────────
+   Each variant gets a unique SVG background pattern so that the chip
+   is distinguishable by texture alone, satisfying WCAG 1.4.1.
+   Patterns use `currentColor` with low opacity so they adapt to
+   whatever color the variant defines.                        */
+
 .status-chip.pending {
   border-color: rgba(250, 204, 21, 0.3);
-  background: rgba(250, 204, 21, 0.12);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1.2' fill='currentColor' fill-opacity='0.25'/%3E%3C/svg%3E") repeat,
+    rgba(250, 204, 21, 0.12);
   color: #ffe08a;
 }
 
 .status-chip.confirmed {
   border-color: rgba(115, 242, 187, 0.3);
+  /* solid — no pattern, this is the baseline reference state */
   background: rgba(115, 242, 187, 0.12);
   color: var(--success);
 }
 
 .status-chip.failed {
   border-color: rgba(255, 125, 141, 0.28);
-  background: rgba(255, 125, 141, 0.12);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1.2' stroke-opacity='0.3'/%3E%3Cline x1='3' y1='0' x2='6' y2='3' stroke='currentColor' stroke-width='1.2' stroke-opacity='0.3'/%3E%3Cline x1='0' y1='3' x2='3' y2='6' stroke='currentColor' stroke-width='1.2' stroke-opacity='0.3'/%3E%3C/svg%3E") repeat,
+    rgba(255, 125, 141, 0.12);
   color: var(--danger);
 }
 
 .status-chip.approving {
   border-color: rgba(78, 133, 255, 0.3);
-  background: rgba(78, 133, 255, 0.14);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cline x1='0' y1='8' x2='8' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='4' y1='8' x2='8' y2='4' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='0' y1='4' x2='4' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3C/svg%3E") repeat,
+    rgba(78, 133, 255, 0.14);
   color: #cbd9ff;
 }
 
