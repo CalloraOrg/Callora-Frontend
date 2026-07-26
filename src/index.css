@@ -3630,6 +3630,147 @@ code,
   }
 }
 
+/* ── ApiUsage responsive breakpoint audit (v7) ──────────────────────────
+   Three granular tiers ensure the page looks polished on every viewport:
+
+   - 768px (tablet portrait):   compact spacing, full-width forms, 2-col stats
+   - 640px (large phone):       tighter margins, wrapped action rows
+   - 480px (small phone):       minimal padding, single-column everything
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* 768px – tablet portrait */
+@media (max-width: 768px) {
+  .api-usage-page .test-call-form .form-row select {
+    width: 100%;
+  }
+
+  .api-usage-page .response-meta {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .api-usage-page .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .api-usage-page .history-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .api-usage-page .key-input-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .api-usage-page .key-input-group input {
+    width: 100%;
+  }
+}
+
+/* 640px – large phone */
+@media (max-width: 640px) {
+  .api-usage-page .api-header {
+    padding: 16px;
+  }
+
+  .api-usage-page .api-header-actions {
+    width: 100%;
+  }
+
+  .api-usage-page .api-header-actions button {
+    width: 100%;
+  }
+
+  .api-usage-page .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .api-usage-page .test-call-form .form-row {
+    gap: 6px;
+  }
+
+  .api-usage-page .response-display {
+    padding: 16px;
+  }
+
+  .api-usage-page .response-json {
+    padding: 12px;
+    font-size: 0.8125rem;
+    overflow-x: auto;
+  }
+
+  .api-usage-page .mini-chart {
+    padding: 16px;
+  }
+
+  .api-usage-page .chart-labels span {
+    font-size: 0.75rem;
+  }
+
+  .api-usage-page .code-block {
+    padding: 14px;
+    font-size: 0.8125rem;
+    overflow-x: auto;
+  }
+}
+
+/* 480px – small phone */
+@media (max-width: 480px) {
+  .api-usage-page .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .api-usage-page .api-logo {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .api-usage-page .api-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .api-usage-page .api-description {
+    font-size: 0.8125rem;
+  }
+
+  .api-usage-page .surface {
+    border-radius: 18px;
+  }
+
+  .api-usage-page .key-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .api-usage-page .key-actions button {
+    width: 100%;
+  }
+
+  .api-usage-page .language-tabs {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .api-usage-page .tab-button {
+    flex: 1;
+    min-width: 80px;
+  }
+
+  .api-usage-page .documentation-link a {
+    width: 100%;
+  }
+
+  .api-usage-page .kbd-hint {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
 @media (max-width: 768px) {
   .app-shell {
     padding: 20px 14px 32px;

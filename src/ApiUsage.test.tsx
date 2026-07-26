@@ -99,6 +99,61 @@ statValues.forEach((el, i) => {
    });
  });
 
+describe('ApiUsage - Responsive Breakpoints', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'location', {
+      value: { search: '', pathname: '/api-usage' },
+      writable: true,
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: false, media: query, onchange: null,
+        addListener: vi.fn(), removeListener: vi.fn(),
+        addEventListener: vi.fn(), removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    vi.clearAllMocks();
+  });
+
+  it('renders stats grid with stat-card elements for responsive layout', () => {
+    render(<ApiUsage />);
+    const statsGrid = document.querySelector('.stats-grid');
+    expect(statsGrid).toBeTruthy();
+    const statCards = statsGrid?.querySelectorAll('.stat-card');
+    expect(statCards?.length).toBe(5);
+  });
+
+  it('renders chart bars with responsive-friendly markup', () => {
+    render(<ApiUsage />);
+    const chartBars = document.querySelectorAll('.chart-bar');
+    expect(chartBars.length).toBe(7);
+    const chartLabels = document.querySelectorAll('.chart-labels span');
+    expect(chartLabels.length).toBe(7);
+  });
+
+  it('renders language tabs with tab-button elements', () => {
+    render(<ApiUsage />);
+    const tabButtons = document.querySelectorAll('.tab-button');
+    expect(tabButtons.length).toBe(3);
+  });
+
+  it('renders code-block with code content', () => {
+    render(<ApiUsage />);
+    const codeBlock = document.querySelector('.code-block');
+    expect(codeBlock).toBeTruthy();
+    const codeElement = codeBlock?.querySelector('code');
+    expect(codeElement?.textContent).toBeTruthy();
+  });
+
+  it('renders surface sections that stack vertically', () => {
+    render(<ApiUsage />);
+    const surfaces = document.querySelectorAll('.api-usage-page > .surface');
+    expect(surfaces.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
 describe('ApiUsage - prefers-reduced-motion', () => {
    let originalMatchMedia: typeof window.matchMedia;
 
