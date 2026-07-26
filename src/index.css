@@ -1110,14 +1110,26 @@ code,
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
-  padding: 18px;
+  margin-bottom: 24px;
+  padding: 18px 20px;
   border-radius: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   background: var(--surface-soft);
 }
 
-.status-banner strong,
+.status-banner strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.status-banner p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
 .preview-card strong,
 .hash-card strong,
 .error-card strong,
@@ -1169,8 +1181,12 @@ code,
 
 .field-label {
   display: block;
-  font-size: 0.94rem;
+  font-size: 0.88rem;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin-bottom: 8px;
 }
 
 .input-shell {
@@ -1183,11 +1199,17 @@ code,
   border-radius: 18px;
   border: 1px solid var(--line);
   background: var(--surface-soft);
+  transition: border-color 240ms, background-color 240ms;
+}
+
+.input-shell:focus-within {
+  border-color: var(--accent);
+  background: var(--surface);
 }
 
 .input-shell.invalid {
-  border-color: rgba(255, 125, 141, 0.45);
-  background: rgba(255, 125, 141, 0.07);
+  border-color: rgba(255, 125, 141, 0.55);
+  background: rgba(255, 125, 141, 0.1);
 }
 
 .input-shell input {
@@ -1213,16 +1235,58 @@ code,
 .preset-row {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.preset-row button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 240ms;
+}
+
+.preset-row button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(78, 133, 255, 0.08);
+}
+
+.preset-row button:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.preset-row button.active {
+  border-color: var(--accent);
+  background: rgba(78, 133, 255, 0.18);
+  color: var(--accent);
 }
 
 .error-text {
-  margin: 0;
+  margin: 8px 0 0 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 125, 141, 0.12);
   color: var(--danger);
   font-size: 0.92rem;
+  line-height: 1.4;
 }
 
-.security-note,
+.security-note {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  margin-top: 6px;
+}
+
 .hash-card,
 .error-card,
 .success-card,
@@ -1230,7 +1294,20 @@ code,
   padding: 18px;
 }
 
-.security-note strong,
+.security-note strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.94rem;
+  color: var(--text);
+}
+
+.security-note p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .preview-row strong {
   font-size: 1rem;
 }
@@ -1290,6 +1367,17 @@ code,
 .hash-actions a,
 .hash-actions button {
   min-height: 44px;
+  transition: all 240ms;
+}
+
+.hash-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hash-actions button:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .hash-actions a {
