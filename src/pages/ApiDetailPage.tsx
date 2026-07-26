@@ -12,6 +12,7 @@ import { formatPrice } from "../utils/format";
 import { Icons } from "../utils/icons";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
+import EndpointPreview from "../components/EndpointPreview";
 import RatingHistogram from "../components/RatingHistogram";
 import { ApiDetailStickyTOC, type TocSection } from "../components/ApiDetailStickyTOC";
 import { CheckIcon } from "../components/icons";
@@ -744,44 +745,51 @@ print(response.json())`;
                       <div style={{ display: "grid", gap: 20, marginTop: 16 }}>
                         {documentationEndpoints.map((ep: ApiEndpoint, idx) => (
                           <div key={ep.id} className="preview-card" style={{ padding: 0, overflow: "hidden" }}>
-                            <div className="endpoint-card-header">
-                              <div className="endpoint-title-row">
-                                <span className={`method-badge method-badge--${(ep.method || "get").toLowerCase()}`}>{ep.method}</span>
-                                <strong style={{ fontSize: 15 }}>{ep.title}</strong>
-                              </div>
-                              <div className="endpoint-header-actions">
-                                <code className="endpoint-url">{ep.url}</code>
-                                <div className="endpoint-client-buttons">
-                                  <button
-                                    type="button"
-                                    className="icon-button"
-                                    aria-label="Copy Postman import URL"
-                                    title="Open in Postman"
-                                    onClick={() => {
-                                      const url = getPostmanImportUrl(ep.method, ep.url, ep.title, API_BASE_URL);
-                                      copyToClipboard(url).then((ok) => showToast(ok ? "Postman import URL copied" : "Failed to copy", ok ? "success" : "error"));
-                                    }}
-                                  >
-                                    <Icons.ExternalLink size={14} />
-                                    <span>Postman</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="icon-button"
-                                    aria-label="Copy Insomnia import URL"
-                                    title="Open in Insomnia"
-                                    onClick={() => {
-                                      const url = getInsomniaImportUrl(ep.method, ep.url, ep.title, API_BASE_URL);
-                                      copyToClipboard(url).then((ok) => showToast(ok ? "Insomnia import URL copied" : "Failed to copy", ok ? "success" : "error"));
-                                    }}
-                                  >
-                                    <Icons.ExternalLink size={14} />
-                                    <span>Insomnia</span>
-                                  </button>
-                                  <EndpointSaveButton endpointId={ep.id} />
+                            {/*
+                              EndpointPreview wraps the card header so that hovering
+                              or focusing it shows a floating schema preview (params,
+                              types, response shape) without navigating away.
+                            */}
+                            <EndpointPreview endpoint={ep}>
+                              <div className="endpoint-card-header">
+                                <div className="endpoint-title-row">
+                                  <span className={`method-badge method-badge--${(ep.method || "get").toLowerCase()}`}>{ep.method}</span>
+                                  <strong style={{ fontSize: 15 }}>{ep.title}</strong>
+                                </div>
+                                <div className="endpoint-header-actions">
+                                  <code className="endpoint-url">{ep.url}</code>
+                                  <div className="endpoint-client-buttons">
+                                    <button
+                                      type="button"
+                                      className="icon-button"
+                                      aria-label="Copy Postman import URL"
+                                      title="Open in Postman"
+                                      onClick={() => {
+                                        const url = getPostmanImportUrl(ep.method, ep.url, ep.title, API_BASE_URL);
+                                        copyToClipboard(url).then((ok) => showToast(ok ? "Postman import URL copied" : "Failed to copy", ok ? "success" : "error"));
+                                      }}
+                                    >
+                                      <Icons.ExternalLink size={14} />
+                                      <span>Postman</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="icon-button"
+                                      aria-label="Copy Insomnia import URL"
+                                      title="Open in Insomnia"
+                                      onClick={() => {
+                                        const url = getInsomniaImportUrl(ep.method, ep.url, ep.title, API_BASE_URL);
+                                        copyToClipboard(url).then((ok) => showToast(ok ? "Insomnia import URL copied" : "Failed to copy", ok ? "success" : "error"));
+                                      }}
+                                    >
+                                      <Icons.ExternalLink size={14} />
+                                      <span>Insomnia</span>
+                                    </button>
+                                    <EndpointSaveButton endpointId={ep.id} />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            </EndpointPreview>
 
                             <div style={{ padding: 24 }}>
                               {/* id anchors only on first endpoint card */}

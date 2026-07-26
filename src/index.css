@@ -2591,6 +2591,159 @@ code,
   font-size: 0.8125rem;
 }
 
+/* ── EndpointPreview ────────────────────────────────────────────────────────
+   Per-endpoint hover/focus preview card that overlays the endpoint card
+   header.  Uses design tokens throughout so both themes work automatically.
+   ─────────────────────────────────────────────────────────────────────────── */
+.endpoint-preview__wrapper {
+  position: relative;
+}
+
+.endpoint-preview__trigger {
+  /* Remove native focus ring — the :focus-visible ring from focus.css
+     applies automatically via the global selector. */
+  outline: none;
+  border-radius: inherit;
+  cursor: default;
+}
+
+.endpoint-preview__trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.endpoint-preview__panel {
+  position: absolute;
+  /* Offset below the trigger header row */
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 16px;
+  /* Shadow from existing design system */
+  box-shadow: var(--shadow, 0 24px 80px rgba(3, 8, 22, 0.45));
+}
+
+.endpoint-preview__topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.endpoint-preview__eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+
+.endpoint-preview__title {
+  margin: 0 0 4px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.endpoint-preview__url {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}
+
+.endpoint-preview__section-label {
+  margin: 0 0 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.endpoint-preview__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.endpoint-preview__table th {
+  text-align: left;
+  padding: 4px 6px 6px 0;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.endpoint-preview__table td {
+  padding: 7px 6px 7px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.endpoint-preview__table tr:last-child td {
+  border-bottom: none;
+}
+
+.endpoint-preview__param-name {
+  color: var(--accent);
+  font-size: 0.8125rem;
+}
+
+.endpoint-preview__required {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--danger, #ff7d8d);
+}
+
+.endpoint-preview__optional {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.endpoint-preview__overflow {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.endpoint-preview__no-params {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.endpoint-preview__response {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.endpoint-preview__response-pre {
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  overflow-x: auto;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text);
+  max-height: 120px;
+}
+
+.endpoint-preview__params {
+  /* keeps the params section from stretching the panel too tall */
+}
+
 .api-detail-plan-price {
   font-size: 2rem;
   font-weight: 800;

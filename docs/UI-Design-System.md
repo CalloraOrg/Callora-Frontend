@@ -451,6 +451,94 @@ Interactive documentation helper that previews endpoint groups on hover and keyb
 
 ---
 
+### EndpointPreview
+
+Per-endpoint floating schema preview. Wraps an individual endpoint card header and reveals a compact panel — method badge, URL, parameter table, and optional response shape — when the user hovers or focuses the header row.
+
+Complements `EndpointGroupHover` (group-level overview) by providing **schema-level detail** for each endpoint without requiring navigation to the full docs.
+
+**Props:**
+
+| Prop       | Type                    | Description                                                                                  |
+| ---------- | ----------------------- | -------------------------------------------------------------------------------------------- |
+| `endpoint` | `EndpointPreviewData`   | The endpoint whose schema should be previewed. See type definition below.                    |
+| `children` | `React.ReactNode`       | Content that acts as the hover/focus trigger — typically an endpoint card header row.        |
+
+**`EndpointPreviewData` type:**
+
+```ts
+type EndpointPreviewData = {
+  id: string;
+  title: string;
+  url: string;
+  method: string;           // e.g. "GET", "POST"
+  params: {
+    name: string;
+    type: string;
+    required?: boolean;
+  }[];
+  response?: string;        // Optional JSON response-shape snippet
+  group?: string;
+};
+```
+
+**Visual Spec:**
+
+- Panel: `preview-card` base class, `340px` wide, positioned below the trigger via `top: calc(100% + 6px)`, `z-index: 100`
+- Top-line row: uppercase "Schema preview" eyebrow label (accent colour) + HTTP method badge
+- Endpoint title (`font-weight: 700`) followed by the URL as a `<code>` element
+- **Parameters table**: Name (`var(--accent)` monospace), Type (`.type-tag` chip), Required (Yes/No)
+- Up to 5 parameters shown; excess parameters are replaced with "+N more parameters — see full docs"
+- **Response shape** (optional): `<pre>` block with `var(--surface-soft)` background, `max-height: 120px`, scroll on overflow
+- `pointer-events: none` on the panel — the panel is read-only and must not capture mouse events
+
+**States:**
+
+- Default (closed): No panel; trigger has no `aria-describedby`
+- Hover / Focus (open): Panel appears; trigger gains `aria-describedby` pointing at the panel
+- Escape: Panel closes; focus returns to the trigger trigger without reopening the panel (guarded by a `suppressNextFocus` flag)
+
+**Accessibility (WCAG 2.1 AA):**
+
+- Trigger `div` carries `role="button"`, `tabIndex={0}`, and `aria-label="Preview schema for <title>"`
+- While open: `aria-describedby` on the trigger links to the panel's `id` (generated via `useId`)
+- Panel has `role="tooltip"` and `aria-label="<title> schema preview"` for screen readers
+- Escape key dismisses the panel from any keyboard state
+- Focus ring via `:focus-visible` at `2px solid var(--accent)`, `3px offset`
+- All colours from design tokens — both themes work automatically
+
+**Usage:**
+
+```tsx
+import EndpointPreview from "../components/EndpointPreview";
+
+// Inside a documentation endpoint list:
+{endpoints.map((ep) => (
+  <div key={ep.id} className="preview-card">
+    <EndpointPreview endpoint={ep}>
+      {/* This content becomes the hover/focus trigger */}
+      <div className="endpoint-card-header">
+        <span className={`method-badge method-badge--${ep.method.toLowerCase()}`}>
+          {ep.method}
+        </span>
+        <strong>{ep.title}</strong>
+      </div>
+    </EndpointPreview>
+
+    {/* Full parameter table below, as before */}
+    <div style={{ padding: 24 }}>…</div>
+  </div>
+))}
+```
+
+**Files:**
+
+- Component: `src/components/EndpointPreview.tsx`
+- Tests: `src/components/EndpointPreview.test.tsx` (20 tests)
+- Styles: CSS block in `src/index.css` (`.endpoint-preview__*` classes)
+
+---
+
 ### FiltersSidebar
 
 Sidebar for filtering marketplace results. Rendered inside the desktop layout and also embedded inside the `FiltersBottomSheet` on mobile.
