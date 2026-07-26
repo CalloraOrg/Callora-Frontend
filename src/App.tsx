@@ -4,6 +4,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import ApiUsage from "./ApiUsage";
 import Dashboard from "./components/Dashboard";
 import MyApis from "./pages/MyApis";
+import PlanBadgePage from "./pages/PlanBadge";
 import RouteProgressBar from "./components/RouteProgressBar";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
@@ -111,6 +112,7 @@ const APP_ROUTES = {
   marketplace: "/marketplace",
   publish: "/publish",
   myApis: "/apis/my-apis",
+  planBadge: "/apis/plan-badge",
   apiUsage: "/api-usage",
   billing: "/billing",
   documentation: "/documentation",
@@ -571,6 +573,12 @@ function App() {
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
 
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
+
+            {/* ── My APIs ─────────────────────────────────────────────── */}
+            <Route path={APP_ROUTES.myApis} element={<MyApis />} />
+
+            {/* ── Plan Badge (issue #529) ──────────────────────────────── */}
+            <Route path={APP_ROUTES.planBadge} element={<PlanBadgePage />} />
 
             <Route
               path={APP_ROUTES.billing}
