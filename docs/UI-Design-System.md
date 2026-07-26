@@ -404,6 +404,37 @@ Sidebar for filtering marketplace results.
 
 ---
 
+### MarketplacePage
+
+Full-page marketplace listing with two-way URL filter state synchronization.
+
+**URL Query Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `q` | `string` | Search query, populates the search input |
+| `categories` | `string` | Comma-separated category slugs |
+| `tag` | `string` | Active tag filter |
+| `minPrice` | `number` | Minimum price filter |
+| `maxPrice` | `number` | Maximum price filter |
+| `popularity` | `string` | Popularity filter (`mostUsed`, `newest`, or omitted) |
+| `favorites` | `1` | Favorites-only toggle when set to `1` |
+| `sort` | `SortValue` | Sort order (`popularity`, `price-asc`, `latency-asc`, `newest`) |
+| `page` | `number` | Current pagination page (clamped to valid range) |
+
+**Behaviour:**
+- All filter state is derived from URL search params on mount, so filtered views are fully shareable and bookmarkable.
+- Changing a filter updates the corresponding URL param with `replace: true` (no history entry per keystroke).
+- Changing filters resets `?page=1`. Navigating pages writes `?page=<n>` to the URL.
+- Invalid page values (e.g. `?page=99` with 1 page of results) are clamped to the nearest valid value.
+- "Clear Filters" removes all filter params from the URL and resets sort/popularity to defaults.
+
+**Accessibility:**
+- Filter badge shows active count with `aria-label`
+- Mobile filter trigger uses `aria-haspopup="dialog"` and `aria-expanded`
+
+---
+
 ### NotFound
 
 404 error page with search functionality.
