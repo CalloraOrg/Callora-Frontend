@@ -279,9 +279,13 @@ describe("FiltersSidebar", () => {
       expect(screen.queryByTestId("filters-zero-results")).toBeNull();
     });
 
-    it("does NOT render zero-results block when resultCount is 0 but NO filters active", () => {
+    it("renders empty variant when resultCount=0 and NO filters active (genuine empty marketplace)", () => {
       render(<FiltersSidebar {...baseProps} resultCount={0} />);
-      expect(screen.queryByTestId("filters-zero-results")).toBeNull();
+      const block = screen.getByTestId("filters-zero-results");
+      expect(block).toBeTruthy();
+      expect(
+        block.querySelector('[data-testid="empty-state-empty"]'),
+      ).toBeTruthy();
     });
 
     it("renders zero-results illustration when resultCount=0 and categories selected", () => {
@@ -323,6 +327,20 @@ describe("FiltersSidebar", () => {
         <FiltersSidebar {...baseProps} favoritesOnly={true} resultCount={0} />,
       );
       expect(screen.getByTestId("filters-zero-results")).toBeTruthy();
+    });
+
+    it("renders filtered variant when resultCount=0 AND filters active", () => {
+      render(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["AI/ML"])}
+          resultCount={0}
+        />,
+      );
+      const block = screen.getByTestId("filters-zero-results");
+      expect(
+        block.querySelector('[data-testid="empty-state-filtered"]'),
+      ).toBeTruthy();
     });
 
     it("uses compact size EmptyState inside the sidebar", () => {

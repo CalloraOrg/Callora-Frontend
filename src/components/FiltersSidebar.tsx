@@ -320,84 +320,33 @@ export default function FiltersSidebar({
         </div>
       </FilterGroup>
 
-      {/* ── Status ──────────────────────────────────────────────────────── */}
-      <FilterGroup
-        title="Status"
-        storageKey="status"
-        prefersReducedMotion={prefersReducedMotion}
-      >
-        <div className="filter-options" style={{ display: "grid", gap: 8 }}>
-          {STATUS_OPTIONS.map((s) => {
-            const id = `status-${s.value}`;
-            return (
-              <div
-                key={s.value}
-                className="filter-option"
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  id={id}
-                  type="checkbox"
-                  className="filter-checkbox"
-                  checked={selectedStatuses.has(s.value)}
-                  onChange={() => toggleStatus(s.value)}
-                />
-                <span
-                  className={`sb-pattern-${s.value}`}
-                  aria-hidden="true"
-                  style={{
-                    display: "inline-block",
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    backgroundColor: `var(--sb-${s.value}-bg)`,
-                    border: `1px solid var(--sb-${s.value}-border)`,
-                    flexShrink: 0,
-                  }}
-                />
-                <label
-                  htmlFor={id}
-                  className="filter-label"
-                  style={{ color: "var(--text)" }}
-                >
-                  {s.label}
-                </label>
-              </div>
-            );
-          })}
-        </div>
-      </FilterGroup>
+      {/* ── Zero-results / Empty-state illustration (v7) ─────────────────
+         Two distinct cases:
+         1. Active filters + zero results → "filtered" variant with a
+            Clear-filters CTA so users can broaden their search.
+         2. No filters active + zero results → "empty" variant telling
+            users no APIs are available yet.
 
-      {/* ── Zero-results illustration (v7) ───────────────────────────────
-         Visually separates from the filter groups above with a soft token-
-         based top border so the call-to-action feels grouped with the
-         result-count feedback rather than with the Favorites section.
-         The wrapper is aria-live="polite" so screen readers announce the
-         zero-results state when filters narrow the count to 0. */}
-      {typeof resultCount === "number" &&
-        resultCount === 0 &&
-        hasActiveFilters && (
-          <div
-            data-testid="filters-zero-results"
-            style={{
-              margin: "12px 0 12px",
-              paddingTop: "12px",
-              borderTop: "1px solid var(--line)",
-            }}
-            role="status"
-            aria-live="polite"
-          >
-            <EmptyState
-              variant="filtered"
-              size="compact"
-              onClearFilters={hasActiveFilters ? clearFilters : undefined}
-            />
-          </div>
-        )}
+         Both are wrapped in role="status" aria-live="polite" so screen
+         readers announce the state change. */}
+      {typeof resultCount === "number" && resultCount === 0 && (
+        <div
+          data-testid="filters-zero-results"
+          style={{
+            margin: "12px 0 12px",
+            paddingTop: "12px",
+            borderTop: "1px solid var(--line)",
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <EmptyState
+            variant={hasActiveFilters ? "filtered" : "empty"}
+            size="compact"
+            onClearFilters={hasActiveFilters ? clearFilters : undefined}
+          />
+        </div>
+      )}
 
       {/* ── Keyboard shortcuts ──────────────────────────────────────── */}
       <KbdHint shortcuts={FILTER_SHORTCUTS} label="Filter keyboard shortcuts" />
