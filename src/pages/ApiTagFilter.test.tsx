@@ -232,6 +232,24 @@ describe("ApiTagFilter", () => {
     expect(buttons.length).toBe(1);
     expect(buttons[0].textContent).toBe("All");
   });
+
+  // ── Loading state ────────────────────────────────────────────────────────
+
+  it("renders the skeleton instead of tags when isLoading is true", () => {
+    const { container } = render(
+      <ApiTagFilter
+        tags={MOCK_TAGS}
+        selectedTag={null}
+        onTagChange={() => {}}
+        isLoading={true}
+      />,
+    );
+    // Should not render the "All" button or tag buttons
+    expect(screen.queryByRole("button", { name: "All" })).toBeNull();
+    // Should render the skeleton
+    const skeletonPills = container.querySelectorAll(".skeleton");
+    expect(skeletonPills.length).toBeGreaterThan(0);
+  });
 });
 
 // ── getAllUniqueTags utility ────────────────────────────────────────────────

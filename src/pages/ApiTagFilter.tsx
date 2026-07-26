@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import MOCK_APIS from "../data/mockApis";
 import { TagIcon } from "../components/icons";
+import { ApiTagFilterSkeleton } from "../components/Skeleton";
 
 /**
  * Extracts all unique tags from the mock API data, sorted alphabetically.
@@ -25,6 +26,8 @@ export interface ApiTagFilterProps {
   selectedTag: string | null;
   /** Called when a tag is toggled. Pass null to clear. */
   onTagChange: (tag: string | null) => void;
+  /** Whether the tag data is still loading. */
+  isLoading?: boolean;
 }
 
 /**
@@ -53,6 +56,7 @@ export default function ApiTagFilter({
   tags,
   selectedTag,
   onTagChange,
+  isLoading,
 }: ApiTagFilterProps) {
   const isAllSelected = selectedTag === null;
 
@@ -74,6 +78,10 @@ export default function ApiTagFilter({
     }
     return counts;
   }, [tags]);
+
+  if (isLoading) {
+    return <ApiTagFilterSkeleton />;
+  }
 
   return (
     <div className="api-tag-filter" role="group" aria-label="Filter by tag">
