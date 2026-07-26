@@ -133,6 +133,7 @@ export default function MarketplacePage(): JSX.Element {
   };
   const { favorites } = useFavorites();
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set());
   const sortParam = (searchParams.get("sort") ?? "popularity") as SortValue;
   const setSortParam = (value: SortValue) => {
     setSearchParams(
@@ -194,7 +195,8 @@ export default function MarketplacePage(): JSX.Element {
       minPrice !== null ||
       maxPrice !== null ||
       popularity !== "any" ||
-      favoritesOnly
+      favoritesOnly ||
+      selectedStatuses.size > 0
     );
   };
 
@@ -207,7 +209,8 @@ export default function MarketplacePage(): JSX.Element {
     (minPrice !== null ? 1 : 0) +
     (maxPrice !== null ? 1 : 0) +
     (popularity !== "any" ? 1 : 0) +
-    (favoritesOnly ? 1 : 0);
+    (favoritesOnly ? 1 : 0) +
+    (selectedStatuses.size > 0 ? 1 : 0);
 
   /**
    * Handle retry for fetch errors.
@@ -241,6 +244,10 @@ export default function MarketplacePage(): JSX.Element {
 
     if (selectedCategories.size > 0) {
       items = items.filter((a) => selectedCategories.has(a.category ?? ""));
+    }
+
+    if (selectedStatuses.size > 0) {
+      items = items.filter((a) => a.status && selectedStatuses.has(a.status));
     }
 
     if (favoritesOnly) {
@@ -303,6 +310,7 @@ export default function MarketplacePage(): JSX.Element {
     popularity,
     favoritesOnly,
     sortParam,
+    selectedStatuses,
   ]);
 
 
@@ -335,6 +343,14 @@ export default function MarketplacePage(): JSX.Element {
     setSearchParams({ page: "1" });
   };
 
+  const toggleStatus = (s: string) => {
+    const copy = new Set(selectedStatuses);
+    if (copy.has(s)) copy.delete(s);
+    else copy.add(s);
+    setSelectedStatuses(copy);
+    setSearchParams({ page: "1" });
+  };
+
   const clearCategories = () => {
     setSelectedCategories(new Set());
     setSearchParams({ page: "1" });
@@ -347,6 +363,7 @@ export default function MarketplacePage(): JSX.Element {
     setMaxPrice(null);
     setPopularity("any");
     setFavoritesOnly(false);
+    setSelectedStatuses(new Set());
     setSortParam("popularity");
     setSearch("");
   };
@@ -448,6 +465,8 @@ export default function MarketplacePage(): JSX.Element {
             clearFilters={clearFilters}
             favoritesOnly={favoritesOnly}
             toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+            selectedStatuses={selectedStatuses}
+            toggleStatus={toggleStatus}
             resultCount={filtered.length}
           />
         </aside>
@@ -622,6 +641,8 @@ export default function MarketplacePage(): JSX.Element {
         clearFilters={clearFilters}
         favoritesOnly={favoritesOnly}
         toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+        selectedStatuses={selectedStatuses}
+        toggleStatus={toggleStatus}
         triggerRef={filtersTriggerRef}
       />
 

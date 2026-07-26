@@ -502,6 +502,112 @@ describe("FiltersSidebar", () => {
     });
   });
 
+  describe("status filter with color-blind patterns", () => {
+    it("renders the Status filter group", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      expect(screen.getByText("Status")).toBeTruthy();
+    });
+
+    it("renders checkboxes for each status option", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      expect(screen.getByLabelText("Operational")).toBeTruthy();
+      expect(screen.getByLabelText("Degraded")).toBeTruthy();
+      expect(screen.getByLabelText("Maintenance")).toBeTruthy();
+      expect(screen.getByLabelText("Down")).toBeTruthy();
+    });
+
+    it("calls toggleStatus when checkbox is clicked", () => {
+      const toggleStatus = vi.fn();
+      render(
+        <FiltersSidebar {...baseProps} toggleStatus={toggleStatus} />,
+      );
+      fireEvent.click(screen.getByLabelText("Maintenance"));
+      expect(toggleStatus).toHaveBeenCalledWith("maintenance");
+    });
+
+    it("renders a pattern indicator circle for each status using sb-pattern-* class", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const indicators = document.querySelectorAll('[class*="sb-pattern-"]');
+      expect(indicators.length).toBe(4);
+      indicators.forEach((el) => {
+        expect(
+          el.classList.contains("sb-pattern-operational") ||
+          el.classList.contains("sb-pattern-degraded") ||
+          el.classList.contains("sb-pattern-maintenance") ||
+          el.classList.contains("sb-pattern-down"),
+        ).toBe(true);
+      });
+    });
+
+    it("marks the status checkbox as checked when status is selected", () => {
+      render(
+        <FiltersSidebar
+          {...baseProps}
+          selectedStatuses={new Set(["degraded", "maintenance"])}
+        />,
+      );
+      expect(
+        (screen.getByLabelText("Degraded") as HTMLInputElement).checked,
+      ).toBe(true);
+      expect(
+        (screen.getByLabelText("Maintenance") as HTMLInputElement).checked,
+      ).toBe(true);
+      expect(
+        (screen.getByLabelText("Operational") as HTMLInputElement).checked,
+      ).toBe(false);
+      expect(
+        (screen.getByLabelText("Down") as HTMLInputElement).checked,
+      ).toBe(false);
+    });
+
+    it("pattern indicator has sb-pattern-* class matching the status variant", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const operationalIndicator = document.querySelector(".sb-pattern-operational");
+      expect(operationalIndicator).toBeTruthy();
+      expect(operationalIndicator?.getAttribute("aria-hidden")).toBe("true");
+
+      const degradedIndicator = document.querySelector(".sb-pattern-degraded");
+      expect(degradedIndicator).toBeTruthy();
+    });
+
+    it("pattern indicator uses CSS custom properties for status colors via inline style", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const degradedIndicator = document.querySelector(
+        ".sb-pattern-degraded",
+      ) as HTMLElement;
+      expect(degradedIndicator).toBeTruthy();
+      expect(degradedIndicator.style.backgroundColor).toBe(
+        "var(--sb-degraded-bg)",
+      );
+      expect(degradedIndicator.style.border).toContain(
+        "var(--sb-degraded-border)",
+      );
+    });
+
+    it("indicator aria-hidden prevents AT announcement", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const indicators = document.querySelectorAll('[aria-hidden="true"]');
+      const patternIndicators = Array.from(indicators).filter((el) =>
+        Array.from(el.classList).some((c) => c.startsWith("sb-pattern-")),
+      );
+      expect(patternIndicators.length).toBe(4);
+    });
+
+    describe("status filter impacts clear-filters visibility", () => {
+      it("shows Clear filters button when status filter is active", () => {
+        const clearFilters = vi.fn();
+        render(
+          <FiltersSidebar
+            {...baseProps}
+            selectedStatuses={new Set(["down"])}
+            clearFilters={clearFilters}
+          />,
+        );
+        expect(screen.getByText("Clear filters")).toBeTruthy();
+      });
+    });
+  });
+
   describe("responsive behaviour", () => {
     it("renders the mobile toggle button", () => {
       const { container } = render(<FiltersSidebar {...baseProps} />);

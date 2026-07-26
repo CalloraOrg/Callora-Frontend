@@ -23,15 +23,16 @@ export const ALL_CATEGORIES = [
   "Other",
 ];
 
-/** Keyboard shortcuts shown in the FiltersSidebar footer. */
-const FILTER_SHORTCUTS: readonly Shortcut[] = [
-  { key: "/", description: "Focus search", category: "Marketplace" },
-  { key: "Esc", description: "Close filters", category: "Marketplace" },
-];
+export const STATUS_OPTIONS = [
+  { value: "operational", label: "Operational" },
+  { value: "degraded", label: "Degraded" },
+  { value: "maintenance", label: "Maintenance" },
+  { value: "down", label: "Down" },
+] as const;
 
 interface FilterGroupProps {
   title: string;
-  storageKey: "categories" | "price" | "popularity" | "favorites";
+  storageKey: "categories" | "price" | "popularity" | "favorites" | "status";
   prefersReducedMotion: boolean;
   children: React.ReactNode;
 }
@@ -94,6 +95,8 @@ export default function FiltersSidebar({
   clearFilters,
   favoritesOnly = false,
   toggleFavoritesOnly = () => {},
+  selectedStatuses = new Set<string>(),
+  toggleStatus = () => {},
   resultCount,
 }: {
   selectedCategories: Set<string>;
@@ -107,6 +110,8 @@ export default function FiltersSidebar({
   clearFilters: () => void;
   favoritesOnly?: boolean;
   toggleFavoritesOnly?: () => void;
+  selectedStatuses?: Set<string>;
+  toggleStatus?: (s: string) => void;
   resultCount?: number;
 }) {
   const prefersReducedMotion = useMemo(() => {
@@ -125,7 +130,8 @@ export default function FiltersSidebar({
     minPrice !== null ||
     maxPrice !== null ||
     popularity !== "any" ||
-    favoritesOnly;
+    favoritesOnly ||
+    selectedStatuses.size > 0;
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -308,9 +314,61 @@ export default function FiltersSidebar({
             htmlFor="favorites-only-checkbox"
             className="filter-label"
             style={{ color: "var(--text)" }}
-          >
+            >
             Favorites only
           </label>
+        </div>
+      </FilterGroup>
+
+      {/* ── Status ──────────────────────────────────────────────────────── */}
+      <FilterGroup
+        title="Status"
+        storageKey="status"
+        prefersReducedMotion={prefersReducedMotion}
+      >
+        <div className="filter-options" style={{ display: "grid", gap: 8 }}>
+          {STATUS_OPTIONS.map((s) => {
+            const id = `status-${s.value}`;
+            return (
+              <div
+                key={s.value}
+                className="filter-option"
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  id={id}
+                  type="checkbox"
+                  className="filter-checkbox"
+                  checked={selectedStatuses.has(s.value)}
+                  onChange={() => toggleStatus(s.value)}
+                />
+                <span
+                  className={`sb-pattern-${s.value}`}
+                  aria-hidden="true"
+                  style={{
+                    display: "inline-block",
+                    width: 12,
+                    height: 12,
+                    borderRadius: "50%",
+                    backgroundColor: `var(--sb-${s.value}-bg)`,
+                    border: `1px solid var(--sb-${s.value}-border)`,
+                    flexShrink: 0,
+                  }}
+                />
+                <label
+                  htmlFor={id}
+                  className="filter-label"
+                  style={{ color: "var(--text)" }}
+                >
+                  {s.label}
+                </label>
+              </div>
+            );
+          })}
         </div>
       </FilterGroup>
 

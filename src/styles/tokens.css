@@ -104,6 +104,11 @@
   --sb-pending-bg: rgba(78, 133, 255, 0.14);
   --sb-pending-fg: #4e85ff;
   --sb-pending-border: rgba(78, 133, 255, 0.35);
+
+  /* maintenance — amber/neutral, distinct from warning/error */
+  --sb-maintenance-bg: rgba(251, 191, 36, 0.08);
+  --sb-maintenance-fg: #fbbf24;
+  --sb-maintenance-border: rgba(251, 191, 36, 0.25);
 }
 
 [data-theme="light"] {
@@ -134,4 +139,8 @@
   --sb-pending-bg: rgba(37, 99, 235, 0.1);
   --sb-pending-fg: #1e40af;
   --sb-pending-border: rgba(37, 99, 235, 0.25);
+
+  --sb-maintenance-bg: rgba(217, 119, 6, 0.08);
+  --sb-maintenance-fg: #92400e;
+  --sb-maintenance-border: rgba(217, 119, 6, 0.25);
 }
