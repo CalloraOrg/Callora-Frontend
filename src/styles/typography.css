@@ -6,3 +6,8 @@
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Ensure amounts/counts inside TagChip use tabular-nums */
+.tag-chip {
+  font-variant-numeric: tabular-nums;
+}
