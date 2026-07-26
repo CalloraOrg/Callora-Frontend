@@ -47,10 +47,32 @@
   background-repeat: repeat;
 }
 
-/* Maintenance: crosshatch (╳) — both diagonals so it reads as "scheduled
-   work" distinct from the single-direction stripes of error/degraded. */
-.sb-pattern-maintenance {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='0.8' stroke-opacity='0.2'/%3E%3Cline x1='6' y1='0' x2='0' y2='6' stroke='currentColor' stroke-width='0.8' stroke-opacity='0.2'/%3E%3C/svg%3E");
+/* ── SearchInput Status Chips ───────────────────────────────────────────────
+   Explicit class aliases for SearchInput status chips to apply patterns
+   consistently with WCAG 1.4.1 (Use of Color).
+   ──────────────────────────────────────────────────────────────────────── */
+.search-status-pattern-operational,
+.search-status-pattern-success {
+  background-image: none;
+}
+
+.search-status-pattern-error,
+.search-status-pattern-down {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='3' y1='0' x2='6' y2='3' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='0' y1='3' x2='3' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3C/svg%3E");
   background-size: 6px 6px;
   background-repeat: repeat;
 }
+
+.search-status-pattern-warning,
+.search-status-pattern-degraded {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cline x1='0' y1='8' x2='8' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='4' y1='8' x2='8' y2='4' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='0' y1='4' x2='4' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+
+.search-status-pattern-pending {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1' fill='currentColor' fill-opacity='0.3'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+
