@@ -25,6 +25,8 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - **Global Command Palette**: Instantly jump to views, search APIs by name, cycle/toggle light & dark themes, or trigger vault deposits. Use `Cmd+K` on macOS or `Ctrl+K` on Windows/Linux to open.
 - **Pattern-based status badges**: Status indicators now use distinct textures in addition to color so they remain understandable for color-blind users and in grayscale displays.
 - **Smooth theme transition**: Light/dark switches animate color tokens (background, text, border) over 240 ms instead of snapping. The transition is gated behind a `theme-transitions-ready` class that ThemeProvider adds after the first paint, preventing any flash on load. Animated elements (toasts, skeletons, spinners) are automatically excluded. Use the `.no-theme-transition` escape hatch on any element that must opt out.
+- **Breadcrumb middle-ellipsis** (Issue #537): The `<Breadcrumb>` component now accepts a `middleEllipsis` prop. When enabled, individual labels longer than `middleEllipsisMaxLen` characters (default 24) are abbreviated using a `"start…end"` pattern — preserving both the resource-type prefix and the unique identifier suffix. The full label is always exposed via `aria-label` and `title` so screen-reader users receive the complete text. Used by `RateLimitCard` where API names, plan tiers, and endpoint paths can be arbitrarily long.
+- **RateLimitCard**: New card component (`src/pages/RateLimitCard.tsx`) showing quota usage, a colour-and-shape status badge (OK / Warning / Critical), a progress bar with full ARIA attributes, and a reset-time countdown. The breadcrumb at the top uses middle-ellipsis to handle long API / plan names gracefully.
 
 ## Keyboard shortcuts
 
@@ -115,7 +117,8 @@ callora-frontend/
 │   │   └── Skeleton.tsx
 │   ├── pages/               # Standalone page components
 │   │   ├── ApiDetailPage.tsx
-│   │   └── MarketplacePage.tsx
+│   │   ├── MarketplacePage.tsx
+│   │   └── RateLimitCard.tsx  # (Issue #537) Rate-limit quota card with middle-ellipsis breadcrumb
 │   ├── hooks/               # Custom React hooks
 │   │   └── useDebounce.ts
 │   ├── data/                # Static and mock data
