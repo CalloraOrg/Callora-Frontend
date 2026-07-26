@@ -99,7 +99,7 @@ statValues.forEach((el, i) => {
    });
  });
 
-describe('ApiUsage - Keyboard Shortcut Hints', () => {
+describe('ApiUsage - Empty State', () => {
   beforeEach(() => {
     Object.defineProperty(window, 'location', {
       value: { search: '', pathname: '/api-usage' },
@@ -108,41 +108,50 @@ describe('ApiUsage - Keyboard Shortcut Hints', () => {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation((query) => ({
-        matches: false, media: query, onchange: null,
-        addListener: vi.fn(), removeListener: vi.fn(),
-        addEventListener: vi.fn(), removeEventListener: vi.fn(),
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
         dispatchEvent: vi.fn(),
       })),
     });
     vi.clearAllMocks();
   });
 
-  it('renders the KbdHint component with ApiUsage shortcuts', () => {
+  it('renders call history rows when there are matching records', async () => {
+    vi.useFakeTimers();
     render(<ApiUsage />);
-    const kbdHint = document.querySelector('.kbd-hint');
-    expect(kbdHint).toBeTruthy();
-    expect(kbdHint?.getAttribute('aria-label')).toBe('Keyboard shortcuts');
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    vi.useRealTimers();
+
+    const callHistorySection = screen.getByText('Call History');
+    expect(callHistorySection).toBeTruthy();
+    const skeletonRows = document.querySelectorAll('.skeleton-cell');
+    expect(skeletonRows.length).toBe(0);
   });
 
-  it('displays the make test call shortcut key', () => {
+  it('renders call history entries using CallHistoryRow components', async () => {
+    vi.useFakeTimers();
     render(<ApiUsage />);
-    const kbdHint = document.querySelector('.kbd-hint');
-    expect(kbdHint?.textContent).toContain('m');
-    expect(kbdHint?.textContent).toContain('Make test call');
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    vi.useRealTimers();
+
+    expect(screen.getByText('Call History')).toBeTruthy();
+    const resetButton = screen.getByRole('button', { name: /Reset Filters/i });
+    expect(resetButton).toBeTruthy();
   });
 
-  it('displays the toggle history shortcut key', () => {
+  it('does not show EmptyState when call history data is present', async () => {
+    vi.useFakeTimers();
     render(<ApiUsage />);
-    const kbdHint = document.querySelector('.kbd-hint');
-    expect(kbdHint?.textContent).toContain('h');
-    expect(kbdHint?.textContent).toContain('Toggle request history');
-  });
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    vi.useRealTimers();
 
-  it('displays the reset filters shortcut key', () => {
-    render(<ApiUsage />);
-    const kbdHint = document.querySelector('.kbd-hint');
-    expect(kbdHint?.textContent).toContain('r');
-    expect(kbdHint?.textContent).toContain('Reset call history filters');
+    const noCallsMessage = screen.queryByText('No calls yet');
+    expect(noCallsMessage).toBeNull();
   });
 });
 

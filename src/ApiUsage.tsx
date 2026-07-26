@@ -803,7 +803,20 @@ export default function ApiUsage() {
            {isTableLoading ? (
              <SkeletonRow rows={5} />
            ) : filteredCallHistory.length === 0 ? (
-             <EmptyState message="No call records match the selected filter." />
+             filtersAreActive ? (
+               <EmptyState
+                 variant="filtered"
+                 title="No matching calls"
+                 message="No call records match the selected filter. Try adjusting the filters."
+                 onClearFilters={handleResetFilters}
+               />
+             ) : (
+               <EmptyState
+                 variant="empty"
+                 title="No calls yet"
+                 message="Make your first test call above to see it appear in history."
+               />
+             )
            ) : (
              filteredCallHistory.map(call => (
                <CallHistoryRow
