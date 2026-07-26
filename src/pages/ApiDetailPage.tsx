@@ -17,6 +17,7 @@ import { ApiDetailStickyTOC, type TocSection } from "../components/ApiDetailStic
 import { CheckIcon } from "../components/icons";
 import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
 import SubscribeButton from "../components/SubscribeButton";
+import SubscribeCTA from "./SubscribeCTA";
 import { useToast } from "../components/Toast";
 import { useCollections } from "../state/collectionsStore";
 import RelatedApisRail from "../components/RelatedApisRail";
@@ -1074,6 +1075,12 @@ print(response.json())`;
         {/* /api-detail-shell */}
       </div>
       {/* /api-detail-container */}
+      <SubscribeCTA
+        apiName={api.name}
+        pricePerRequest={api.pricePerRequest ?? 0}
+        onSubscribe={() => showToast(`Subscribed to ${api.name}!`, "success")}
+        observeElementSelector=".api-hero__cta--detail"
+      />
     </div>
   );
 }
