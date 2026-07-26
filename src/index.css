@@ -4806,6 +4806,13 @@ code,
   font-weight: 600;
 }
 
+/* Static state under prefers-reduced-motion: no color transition on TOC links. */
+@media (prefers-reduced-motion: reduce) {
+  .api-detail-toc__link {
+    transition: none;
+  }
+}
+
 @media (max-width: 1100px) {
   .api-detail-toc {
     display: none;
