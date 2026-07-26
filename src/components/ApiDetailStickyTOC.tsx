@@ -8,7 +8,7 @@
  * the active item, respects prefers-reduced-motion via CSS transition.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 
 export interface TocSection {
   id: string;
@@ -22,6 +22,12 @@ interface ApiDetailStickyTOCProps {
 export function ApiDetailStickyTOC({ sections }: ApiDetailStickyTOCProps) {
   const [activeId, setActiveId] = useState<string | null>(sections[0]?.id ?? null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+
+  const prefersReducedMotion = useMemo(() => {
+    return typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
 
   useEffect(() => {
     observerRef.current?.disconnect();
@@ -59,6 +65,7 @@ export function ApiDetailStickyTOC({ sections }: ApiDetailStickyTOCProps) {
               href={`#${id}`}
               aria-current={activeId === id ? "location" : undefined}
               className={activeId === id ? "api-detail-toc__link api-detail-toc__link--active" : "api-detail-toc__link"}
+              style={prefersReducedMotion ? { transition: "none" } : undefined}
             >
               {label}
             </a>
