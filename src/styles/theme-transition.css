@@ -123,7 +123,9 @@
   .bottom-sheet,
   /* History panel slide animation */
   .history-panel,
-  .history-bottom-sheet
+  .history-bottom-sheet,
+  /* Sticky action bar (#583) — slide-up entrance animation */
+  .theme-sticky-bar
 ) {
   /* Remove the color transition so keyframe animations are unimpeded.
      These elements still receive their own per-property transitions defined
