@@ -226,15 +226,15 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
             width: 260,
             background: "var(--surface-strong, rgba(17,24,46,0.98))",
             border: "1px solid var(--line-strong, rgba(169,184,255,0.28))",
-            borderRadius: 12,
+            borderRadius: "var(--radius-md)",
             boxShadow: "var(--shadow, 0 24px 80px rgba(3,8,22,0.45))",
-            padding: "12px",
+            padding: "var(--mkt-space-lg)",
           }}
         >
           <p
             style={{
               margin: 0,
-              fontSize: "0.75rem",
+              fontSize: "var(--mkt-font-size-micro)",
               fontWeight: 700,
               color: "var(--muted)",
               textTransform: "uppercase",
@@ -245,7 +245,7 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
           </p>
 
           {collections.length === 0 && !showNewInput && (
-            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ marginTop: "var(--mkt-space-lg)", display: "flex", flexDirection: "column", gap: "var(--mkt-space-md)" }}>
               <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.85rem" }}>
                 No collections yet.
               </p>
@@ -261,14 +261,14 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
           )}
 
           {collections.length > 0 && (
-            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto" }}>
+            <div style={{ marginTop: "var(--mkt-space-lg)", display: "flex", flexDirection: "column", gap: "var(--mkt-space-sm)", maxHeight: 180, overflowY: "auto" }}>
               {collections.map((collection) => (
                 <label
                   key={collection.id}
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 10,
+                    gap: "var(--mkt-space-lg)",
                     padding: "6px 4px",
                     borderRadius: 8,
                     background: savedIn.has(collection.id)
@@ -288,7 +288,7 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
                   <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {collection.name}
                   </span>
-                  <span className="tabular-nums" style={{ color: "var(--muted)", fontSize: 11 }}>
+                  <span style={{ color: "var(--muted)", fontSize: "var(--mkt-font-size-micro)" }}>
                     {collection.endpointIds.length}
                   </span>
                 </label>
@@ -297,7 +297,7 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
           )}
 
           {showNewInput ? (
-            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <div style={{ display: "flex", gap: "var(--mkt-space-md)", marginTop: "var(--mkt-space-lg)" }}>
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -652,7 +652,7 @@ print(response.json())`;
             <div className="api-detail-price-panel">
               <div className="api-detail-price tabular-nums">{`$${formatPrice(api.pricePerRequest ?? 0)}`}</div>
               <div className="api-detail-price-label">per successful request</div>
-              <button className="primary-button" style={{ marginTop: 16 }}>
+              <button className="primary-button" style={{ marginTop: "var(--mkt-space-xl)" }}>
                 Connect API
               </button>
             </div>
@@ -682,15 +682,15 @@ print(response.json())`;
                 {/* ── OVERVIEW ────────────────────────────────────────────── */}
                 {tab === "overview" && (
                   <section id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" tabIndex={0}>
-                    <div className="preview-card" style={{ padding: 24, marginBottom: 32 }}>
-                      <h3 style={{ marginTop: 0 }}>About this API</h3>
-                      <p style={{ lineHeight: 1.6, fontSize: 16, color: "var(--muted)" }}>{api.description}</p>
+            <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-5xl)" }}>
+              <h3 style={{ marginTop: 0 }}>About this API</h3>
+              <p style={{ lineHeight: "var(--mkt-line-height-relaxed)", fontSize: "var(--mkt-font-size-base)", color: "var(--muted)" }}>{api.description}</p>
                     </div>
 
                     <div className="api-detail-two-column">
                       <div>
                         <h2>Key Features</h2>
-                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                        <ul style={{ paddingLeft: "var(--mkt-space-2xl)", lineHeight: "var(--mkt-line-height-loose)" }}>
                           {(api.features || []).map((f) => (
                             <li key={f} style={{ color: "var(--muted)" }}>
                               {f}
@@ -700,7 +700,7 @@ print(response.json())`;
                       </div>
                       <div>
                         <h2>Primary Use Cases</h2>
-                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                        <ul style={{ paddingLeft: "var(--mkt-space-2xl)", lineHeight: "var(--mkt-line-height-loose)" }}>
                           {(api.useCases || []).map((u) => (
                             <li key={u} style={{ color: "var(--muted)" }}>
                               {u}
@@ -710,7 +710,7 @@ print(response.json())`;
                       </div>
                     </div>
 
-                    <h2 style={{ marginTop: 40 }}>Performance Metrics</h2>
+                    <h2 style={{ marginTop: "var(--mkt-space-6xl)" }}>Performance Metrics</h2>
                     <div className="api-detail-metrics">
                       {[
                         {
@@ -729,9 +729,9 @@ print(response.json())`;
                           color: "var(--success)",
                         },
                       ].map(({ label, value, color }) => (
-                        <div key={label} className="stat-card" style={{ padding: 20, background: "var(--surface-soft)", borderRadius: 12 }}>
-                          <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
-                          <div className="tabular-nums" style={{ fontSize: 24, fontWeight: 700, marginTop: 8, color }}>{value}</div>
+                        <div key={label} className="stat-card">
+                          <div style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
+                          <div style={{ fontSize: "var(--mkt-font-size-xl)", fontWeight: 700, marginTop: "var(--mkt-space-md)", color }}>{value}</div>
                         </div>
                       ))}
                     </div>
@@ -745,26 +745,26 @@ print(response.json())`;
                     role="tabpanel"
                     aria-labelledby="tab-documentation"
                     tabIndex={0}
-                    style={{ display: "flex", gap: 32, alignItems: "flex-start", flexWrap: "wrap" }}
+                    style={{ display: "flex", gap: "var(--mkt-space-5xl)", alignItems: "flex-start" }}
                   >
                     {/* Main documentation content */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="endpoint-section-header">
                         <h3 id="toc-endpoints">Available Endpoints</h3>
-                        <span style={{ fontSize: 13, color: "var(--muted)" }}>
+                        <span style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)" }}>
                           Base URL: <code>{API_BASE_URL}</code>
                         </span>
                       </div>
 
                       {endpointGroups.length > 0 && <EndpointGroupHover groups={endpointGroups} />}
 
-                      <div style={{ display: "grid", gap: 20, marginTop: 16 }}>
+                      <div style={{ display: "grid", gap: "var(--mkt-space-2xl)", marginTop: "var(--mkt-space-xl)" }}>
                         {documentationEndpoints.map((ep: ApiEndpoint, idx) => (
                           <div key={ep.id} className="preview-card" style={{ padding: 0, overflow: "hidden" }}>
                             <div className="endpoint-card-header">
                               <div className="endpoint-title-row">
                                 <span className={`method-badge method-badge--${(ep.method || "get").toLowerCase()}`}>{ep.method}</span>
-                                <strong style={{ fontSize: 15 }}>{ep.title}</strong>
+                                <strong style={{ fontSize: "var(--mkt-font-size-lg)" }}>{ep.title}</strong>
                               </div>
                               <div className="endpoint-header-actions">
                                 <code className="endpoint-url">{ep.url}</code>
@@ -800,13 +800,13 @@ print(response.json())`;
                               </div>
                             </div>
 
-                            <div style={{ padding: 24 }}>
+                            <div style={{ padding: "var(--mkt-space-3xl)" }}>
                               {/* id anchors only on first endpoint card */}
-                              <h4 id={idx === 0 ? "toc-parameters" : undefined} style={{ margin: "0 0 12px 0", fontSize: 14 }}>
+                              <h4 id={idx === 0 ? "toc-parameters" : undefined} style={{ margin: "0 0 var(--mkt-space-lg) 0", fontSize: "var(--mkt-font-size-tag)" }}>
                                 Request Parameters
                               </h4>
                               <div className="endpoint-table-wrap">
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--mkt-font-size-sm)" }}>
                                   <thead>
                                     <tr style={{ textAlign: "left", color: "var(--muted)", borderBottom: "1px solid var(--line)" }}>
                                       <th style={{ padding: "8px 0" }}>Parameter</th>
@@ -830,7 +830,7 @@ print(response.json())`;
                                 </table>
                               </div>
 
-                              <h4 id={idx === 0 ? "toc-implementation" : undefined} style={{ margin: "24px 0 12px 0", fontSize: 14 }}>
+                              <h4 id={idx === 0 ? "toc-implementation" : undefined} style={{ margin: "var(--mkt-space-3xl) 0 var(--mkt-space-lg) 0", fontSize: "var(--mkt-font-size-tag)" }}>
                                 Implementation
                               </h4>
                               <CodeExample snippets={allSnippets} defaultLanguage="bash" />
@@ -859,54 +859,47 @@ print(response.json())`;
                 {tab === "pricing" && (
                   <section id="panel-pricing" role="tabpanel" aria-labelledby="tab-pricing" tabIndex={0}>
                     <h2>Pricing Plans</h2>
-                    <PricingTierTable
-                      onSelectTier={(tier) => showToast(`Selected ${tier.name} plan!`, "success")}
-                      tiers={[
-                        {
-                          name: "Free",
-                          price: "$0",
-                          description: "Perfect for experimentation and testing.",
-                          features: api.features?.map((f) => ({ label: f, included: true })) || [
-                            { label: "Standard Support", included: false },
-                            { label: "High Rate Limits", included: false },
-                          ],
-                          ctaLabel: "Get Started",
-                        },
-                        {
-                          name: "Standard",
-                          price: `$${formatPrice(api.pricePerRequest ?? 0)}`,
-                          description: "Ideal for production-grade applications.",
-                          features: api.features?.map((f) => ({ label: f, included: true })) || [
-                            { label: "Standard Support", included: true },
-                            { label: "High Rate Limits", included: true },
-                          ],
-                          ctaLabel: "Upgrade Now",
-                          isRecommended: true,
-                          tier: "pro",
-                        },
-                        {
-                          name: "Enterprise",
-                          price: "Custom",
-                          description: "Tailored for large-scale, high-volume needs.",
-                          features: [
-                            ...(api.features?.map((f) => ({ label: f, included: true })) || []),
-                            { label: "Dedicated Support", included: true },
-                            { label: "Custom SLA", included: true },
-                            { label: "Dedicated Infrastructure", included: true },
-                          ],
-                          ctaLabel: "Contact Sales",
-                          tier: "enterprise",
-                        },
-                      ]}
-                    />
+                    <div className="api-detail-pricing-grid">
+                      {/* Standard plan */}
+                      <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", border: "2px solid var(--accent)" }}>
+                        <PlanBadge tier="pro" />
+                        <div className="api-detail-plan-price">
+                          {`$${formatPrice(api.pricePerRequest ?? 0)}`} <span style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>/ call</span>
+                        </div>
+                        <p style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>Perfect for startups and scaling applications. Pay only for what you use.</p>
+                        <ul style={{ padding: 0, listStyle: "none", fontSize: "var(--mkt-font-size-tag)", marginTop: "var(--mkt-space-2xl)" }}>
+                          {["Unlimited Throughput", "99.9% Uptime SLA", "Community Support"].map((feat) => (
+                            <li key={feat} style={{ marginBottom: "var(--mkt-space-lg)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              <CheckIcon size={16} aria-hidden="true" /> {feat}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
 
+                      {/* Enterprise plan */}
+                      <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)" }}>
+                        <PlanBadge tier="enterprise" />
+                        <div className="api-detail-plan-price">Custom</div>
+                        <p style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>For high-volume needs requiring dedicated infrastructure and support.</p>
+                        <ul style={{ padding: 0, listStyle: "none", fontSize: "var(--mkt-font-size-tag)", marginTop: "var(--mkt-space-2xl)" }}>
+                          {["Dedicated Node", "24/7 Phone Support", "Custom Rate Limits"].map((feat) => (
+                            <li key={feat} style={{ marginBottom: "var(--mkt-space-lg)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              <CheckIcon size={16} aria-hidden="true" /> {feat}
+                            </li>
+                          ))}
+                        </ul>
+                        <button className="secondary-button" style={{ width: "100%", marginTop: "var(--mkt-space-lg)" }}>
+                          Contact Sales
+                        </button>
+                      </div>
+                    </div>
 
                     {/* Cost calculator */}
-                    <div className="preview-card" style={{ padding: 32 }}>
+                    <div className="preview-card" style={{ padding: "var(--mkt-space-5xl)" }}>
                       <h4 style={{ marginTop: 0 }}>Cost Calculator</h4>
                       <p style={{ color: "var(--muted)" }}>Estimate your monthly billing based on projected request volume.</p>
-                      <div style={{ marginTop: 32 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                      <div style={{ marginTop: "var(--mkt-space-5xl)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--mkt-space-lg)" }}>
                           <span style={{ fontWeight: 600 }}>Monthly Volume</span>
                           <span className="tabular-nums" style={{ color: "var(--accent)", fontWeight: 700 }}>{requests.toLocaleString()} Requests</span>
                         </div>
@@ -926,10 +919,10 @@ print(response.json())`;
                         />
                         <div className="api-detail-calculator-total">
                           <div>
-                            <div style={{ fontSize: 12, color: "var(--muted)" }}>Estimated Monthly Total</div>
-                            <div className="tabular-nums" style={{ fontSize: 28, fontWeight: 800, color: "var(--text)" }}>{estimatedCost(requests)}</div>
+                            <div style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)" }}>Estimated Monthly Total</div>
+                            <div style={{ fontSize: "var(--mkt-font-size-2xl)", fontWeight: 800, color: "var(--text)" }}>{estimatedCost(requests)}</div>
                           </div>
-                          <div style={{ textAlign: "right", fontSize: 13, color: "var(--muted)" }}>
+                          <div style={{ textAlign: "right", fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)" }}>
                             * Volume discounts apply automatically
                             <br />
                             at 500k+ requests.
@@ -944,20 +937,20 @@ print(response.json())`;
                 {tab === "examples" && (
                   <section id="panel-examples" role="tabpanel" aria-labelledby="tab-examples" tabIndex={0}>
                     <h3>Integration Gallery</h3>
-                    <p style={{ color: "var(--muted)", marginBottom: 24 }}>Explore these boilerplate examples to get integrated in minutes.</p>
+                    <p style={{ color: "var(--muted)", marginBottom: "var(--mkt-space-3xl)" }}>Explore these boilerplate examples to get integrated in minutes.</p>
 
-                    <div className="preview-card" style={{ padding: 24, marginBottom: 24 }}>
+                    <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-3xl)" }}>
                       <div className="api-detail-example-tags">
-                        <span style={{ padding: "4px 12px", background: "#e0f2fe", color: "#0369a1", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>
+                        <span style={{ padding: "4px 12px", background: "#e0f2fe", color: "#0369a1", borderRadius: 4, fontSize: "var(--mkt-font-size-micro)", fontWeight: 600 }}>
                           React / Next.js
                         </span>
-                        <span style={{ padding: "4px 12px", background: "#fef3c7", color: "#92400e", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>Server-side</span>
+                        <span style={{ padding: "4px 12px", background: "#fef3c7", color: "#92400e", borderRadius: 4, fontSize: "var(--mkt-font-size-micro)", fontWeight: 600 }}>Server-side</span>
                       </div>
                       <h4>Fetching data in a Next.js Page</h4>
                       <CodeExample snippets={allSnippets} defaultLanguage="javascript" />
                     </div>
 
-                    <div className="preview-card" style={{ padding: 24 }}>
+                    <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)" }}>
                       <h4>Python Data Analysis Workflow</h4>
                       <CodeExample snippets={allSnippets} defaultLanguage="python" />
                     </div>
@@ -974,19 +967,114 @@ print(response.json())`;
                  * any runtime JS.  See issue #580 and src/styles/print.css.
                  */}
                 {tab === "reviews" && (
-                  <ReviewsTab
-                    reviews={rawReviews}
-                    averageRating={averageRating}
-                    onWriteReview={() => showToast("Review form coming soon!", "info")}
-                  />
+                  <section id="panel-reviews" role="tabpanel" aria-labelledby="tab-reviews" tabIndex={0}>
+                    <div className="api-detail-reviews-header">
+                      <h3 style={{ margin: 0 }}>Developer Feedback</h3>
+                      <button className="secondary-button">Write a Review</button>
+                    </div>
+
+                    {rawReviews.length === 0 ? (
+                      <div className="preview-card" style={{ padding: "var(--mkt-space-6xl)", textAlign: "center", borderStyle: "dashed", marginTop: "var(--mkt-space-xl)" }}>
+                        <div style={{ fontSize: 40, marginBottom: "var(--mkt-space-xl)" }}>💬</div>
+                        <h4>No public reviews yet</h4>
+                        <p style={{ color: "var(--muted)", maxWidth: 400, margin: "0 auto" }}>Be the first to share your experience with this API.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ marginTop: 16 }}>
+                          <RatingHistogram rating={averageRating} distribution={ratingDistribution} />
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-lg)", marginBottom: "var(--mkt-space-xl)", flexWrap: "wrap" }}>
+                          <label htmlFor="review-sort" style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)", whiteSpace: "nowrap" }}>
+                            Sort by
+                          </label>
+                          <select
+                            id="review-sort"
+                            value={reviewSort}
+                            onChange={(e) => setReviewSort(e.target.value as ReviewSort)}
+                            style={{
+                              fontSize: "var(--mkt-font-size-sm)",
+                              padding: "5px 10px",
+                              borderRadius: 6,
+                              border: "1px solid var(--line)",
+                              background: "var(--surface-soft)",
+                              color: "var(--text)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <option value="newest">Newest</option>
+                            <option value="highest">Highest rated</option>
+                            <option value="lowest">Lowest rated</option>
+                          </select>
+                        </div>
+
+                        <div style={{ display: "grid", gap: "var(--mkt-space-xl)" }}>
+                          {sortedReviews.map((review) => (
+                            <div key={review.id} className="preview-card" style={{ padding: "var(--mkt-space-2xl)" }}>
+                              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--mkt-space-md)", flexWrap: "wrap", marginBottom: "var(--mkt-space-lg)" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-md)", flexWrap: "wrap", minWidth: 0 }}>
+                                  <span style={{ fontWeight: 600, fontSize: "var(--mkt-font-size-tag)", color: "var(--text)", whiteSpace: "nowrap" }}>{review.author}</span>
+                                  {review.verified && (
+                                    <span
+                                      title="Has called this API in the last 30 days"
+                                      aria-label="Verified Developer – has called this API in the last 30 days"
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                        padding: "2px 8px",
+                                        borderRadius: 999,
+                                        fontSize: "var(--mkt-font-size-micro)",
+                                        fontWeight: 600,
+                                        lineHeight: "18px",
+                                        background: "rgba(16, 185, 129, 0.12)",
+                                        color: "var(--success)",
+                                        border: "1px solid rgba(16, 185, 129, 0.3)",
+                                        cursor: "default",
+                                        whiteSpace: "nowrap",
+                                        flexShrink: 0,
+                                        userSelect: "none",
+                                      }}
+                                    >
+                                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">
+                                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                      Verified Developer
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-md)", flexShrink: 0 }}>
+                                  <span role="img" aria-label={`${review.rating} out of 5 stars`} style={{ display: "flex", gap: 1 }}>
+                                    {Array.from({ length: 5 }, (_, i) => (
+                                      <svg key={i} width="13" height="13" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                        <path
+                                          d="M10 1.5l2.39 4.84 5.34.78-3.87 3.77.91 5.32L10 13.77l-4.77 2.44.91-5.32L2.27 7.12l5.34-.78L10 1.5z"
+                                          fill={i < review.rating ? "var(--accent)" : "var(--line)"}
+                                        />
+                                      </svg>
+                                    ))}
+                                  </span>
+                                  <span style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)", whiteSpace: "nowrap" }}>
+                                    {new Date(review.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                                  </span>
+                                </div>
+                              </div>
+                              <p style={{ margin: 0, fontSize: "var(--mkt-font-size-tag)", lineHeight: "var(--mkt-line-height-relaxed)", color: "var(--muted)" }}>{review.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </section>
                 )}
 
                 {/* ── EMBED ───────────────────────────────────────────────── */}
                 {tab === "embed" && (
                   <section id="panel-embed" role="tabpanel" aria-labelledby="tab-embed" tabIndex={0}>
-                    <div className="preview-card" style={{ padding: 24, marginBottom: 24 }}>
+                    <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-3xl)" }}>
                       <h3 style={{ marginTop: 0 }}>Embed Widget</h3>
-                      <p style={{ color: "var(--muted)", marginBottom: 24, fontSize: 14 }}>
+                      <p style={{ color: "var(--muted)", marginBottom: "var(--mkt-space-3xl)", fontSize: "var(--mkt-font-size-tag)" }}>
                         Embed a real-time widget on your website to showcase this API's performance metrics. Customize the size and copy the embed code below.
                       </p>
                     </div>
@@ -1009,19 +1097,16 @@ print(response.json())`;
             {/* ── Sidebar ─────────────────────────────────────────────────── */}
             <aside className="api-detail-sidebar no-print">
               <div className="api-detail-sidebar-inner">
-                <div className="stat-card" style={{ padding: 24, marginBottom: 20 }}>
+                <div className="stat-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-2xl)" }}>
                   <h4 style={{ marginTop: 0 }}>API Health</h4>
-                  <div aria-live="polite" aria-atomic="true" style={{ display: "grid", gap: 16, marginTop: 20 }}>
+                  <div style={{ display: "grid", gap: "var(--mkt-space-xl)", marginTop: "var(--mkt-space-2xl)" }}>
                     {[
                       { label: "Region", value: "Global (Edge)", color: "var(--text)" },
                       { label: "CORS", value: "Supported", color: "var(--success)" },
                     ].map(({ label, value, color }) => (
                       <div key={label} style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 14, color: "var(--muted)" }}>{label}</span>
-                        <span style={{ fontSize: 14, color, fontWeight: label !== "Region" ? 600 : undefined }}>
-                          {dot && <span aria-hidden="true" style={{ marginRight: 6 }}>●</span>}
-                          {value}
-                        </span>
+                        <span style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>{label}</span>
+                        <span style={{ fontSize: "var(--mkt-font-size-tag)", color, fontWeight: label !== "Region" ? 600 : undefined }}>{value}</span>
                       </div>
                     ))}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1031,11 +1116,11 @@ print(response.json())`;
                   </div>
                 </div>
 
-                <div className="preview-card" style={{ padding: 24, marginBottom: 20 }}>
+                <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-2xl)" }}>
                   <h4 style={{ marginTop: 0 }}>SDKs &amp; Tools</h4>
-                  <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
+                  <div style={{ display: "grid", gap: "var(--mkt-space-lg)", marginTop: "var(--mkt-space-xl)" }}>
                     {["📦 Node.js SDK", "📦 Python Wrapper", "📜 OpenAPI Spec (JSON)"].map((label) => (
-                      <button key={label} className="ghost-button" style={{ justifyContent: "flex-start", width: "100%", fontSize: 13 }}>
+                      <button key={label} className="ghost-button" style={{ justifyContent: "flex-start", width: "100%", fontSize: "var(--mkt-font-size-sm)" }}>
                         {label}
                       </button>
                     ))}
@@ -1045,16 +1130,16 @@ print(response.json())`;
                 <div
                   style={{
                     background: "linear-gradient(rgba(78,133,255,0.1),rgba(78,133,255,0.05))",
-                    padding: 24,
+                    padding: "var(--mkt-space-3xl)",
                     borderRadius: 16,
                     border: "1px solid rgba(78,133,255,0.2)",
                   }}
                 >
                   <h4 style={{ marginTop: 0, color: "var(--accent-strong)" }}>Support</h4>
-                  <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
+                  <p style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)", lineHeight: "var(--mkt-line-height-normal)" }}>
                     Need help with integration? Access our developer Discord or email the provider directly.
                   </p>
-                  <button className="primary-button" style={{ width: "100%", marginTop: 12 }}>
+                  <button className="primary-button" style={{ width: "100%", marginTop: "var(--mkt-space-lg)" }}>
                     Contact Publisher
                   </button>
                 </div>
