@@ -38,6 +38,11 @@ describe("print stylesheet contract", () => {
     expect(css).toMatch(/pre[\s\S]*?white-space:\s*pre-wrap\s*!important/);
     expect(css).toMatch(/pre[\s\S]*?overflow:\s*visible\s*!important/);
   });
+
+  it("forces EndpointSummary collapsibles to expand on print", () => {
+    expect(css).toMatch(/\.endpoint-summary-content--collapsed\s*\{[\s\S]*?display:\s*block\s*!important/);
+    expect(css).toMatch(/\.endpoint-summary-trigger\s+\.chevron-icon\s*\{[\s\S]*?display:\s*none\s*!important/);
+  });
 });
 
 describe("no-print markup", () => {

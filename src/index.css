@@ -5050,6 +5050,18 @@ code,
     font-size: 0.85em;
     color: #444;
   }
+
+  /* Expand EndpointSummary collapsibles when printing */
+  .endpoint-summary-content--collapsed {
+    display: block !important;
+  }
+  .endpoint-summary-trigger .chevron-icon {
+    display: none !important;
+  }
+  .endpoint-summary-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
 }
 
 /* Share Snapshot Button */
