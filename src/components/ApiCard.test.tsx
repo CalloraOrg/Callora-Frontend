@@ -350,3 +350,98 @@ describe("ApiCard responsiveness", () => {
   });
 });
 
+describe("ApiCard — Identity color stripe", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Provide a default matchMedia mock so prefersReducedMotion resolves safely.
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+  });
+
+  it("renders a color stripe element", () => {
+    render(<ApiCard api={mockApi} />);
+    const stripe = screen.getByTestId("api-card-color-stripe");
+    expect(stripe).toBeTruthy();
+  });
+
+  it("stripe is hidden from assistive technology", () => {
+    render(<ApiCard api={mockApi} />);
+    const stripe = screen.getByTestId("api-card-color-stripe");
+    expect(stripe.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("stripe has a deterministic color derived from the API id", () => {
+    render(<ApiCard api={mockApi} />);
+    const stripe = screen.getByTestId("api-card-color-stripe");
+    expect(stripe.style.background).toBeTruthy();
+  });
+
+  it("different API ids produce different stripe colours", () => {
+    const apiA: APIItem = { ...mockApi, id: "alpha-api" };
+    const apiB: APIItem = { ...mockApi, id: "beta-api" };
+
+    const { unmount: unmountA } = render(<ApiCard api={apiA} />);
+    const colourA = screen.getByTestId("api-card-color-stripe").style.background;
+    unmountA();
+
+    const { unmount: unmountB } = render(<ApiCard api={apiB} />);
+    const colourB = screen.getByTestId("api-card-color-stripe").style.background;
+    unmountB();
+
+    expect(colourA).not.toBe(colourB);
+  });
+
+  it("same API id always produces the same stripe colour", () => {
+    const { unmount: unmount1 } = render(<ApiCard api={mockApi} />);
+    const colour1 = screen.getByTestId("api-card-color-stripe").style.background;
+    unmount1();
+
+    const { unmount: unmount2 } = render(<ApiCard api={mockApi} />);
+    const colour2 = screen.getByTestId("api-card-color-stripe").style.background;
+    unmount2();
+
+    expect(colour1).toBe(colour2);
+  });
+
+  it("stripe is not rendered in the loading/skeleton state", () => {
+    render(<ApiCard loading />);
+    expect(screen.queryByTestId("api-card-color-stripe")).toBeNull();
+  });
+
+  it("stripe has position absolute and covers full card height", () => {
+    render(<ApiCard api={mockApi} />);
+    const stripe = screen.getByTestId("api-card-color-stripe");
+    expect(stripe.style.position).toBe("absolute");
+    expect(stripe.style.height).toBe("100%");
+    expect(stripe.style.left).toBe("0px");
+    expect(stripe.style.top).toBe("0px");
+  });
+
+  it("stripe respects reduced motion (transition=none)", () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+
+    render(<ApiCard api={mockApi} />);
+    const stripe = screen.getByTestId("api-card-color-stripe");
+    expect(stripe.style.transition).toBe("none");
+
+    vi.restoreAllMocks();
+  });
+});
+
