@@ -2026,15 +2026,15 @@ code,
 .api-detail-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 24px;
+  gap: var(--mkt-space-3xl);
   align-items: center;
-  padding: 24px;
+  padding: var(--mkt-space-3xl);
 }
 
 .api-detail-heading,
 .api-detail-brand {
   display: flex;
-  gap: 16px;
+  gap: var(--mkt-space-xl);
   align-items: center;
   min-width: 0;
 }
@@ -2052,7 +2052,7 @@ code,
   background: var(--accent);
   color: var(--text-main);
 
-  font-size: 1.5rem;
+  font-size: var(--mkt-font-size-xl);
   font-weight: 700;
 }
 
@@ -2097,35 +2097,35 @@ code,
 }
 
 .api-detail-price {
-  font-size: 1.5rem;
+  font-size: var(--mkt-font-size-xl);
   font-weight: 700;
   color: var(--accent-strong);
 }
 
 .api-detail-price-label {
-  font-size: 0.8125rem;
+  font-size: var(--mkt-font-size-sm);
 }
 
 .api-detail-price-panel .primary-button {
-  margin-top: 16px;
-  padding: 12px 32px;
+  margin-top: var(--mkt-space-xl);
+  padding: var(--mkt-space-lg) var(--mkt-space-5xl);
 }
 
 .api-detail-content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 40px;
+  gap: var(--mkt-space-6xl);
 }
 
 .api-detail-tabs {
   /* Layout placement — sticks below topbar while scrolling */
-  margin-bottom: 32px;
+  margin-bottom: var(--mkt-space-5xl);
   position: sticky;
   top: 0;
   z-index: 20;
   /* Small bottom padding prevents the first line of content below from
      being obscured by the sticky bar at top:0. */
-  padding-bottom: 4px;
+  padding-bottom: var(--mkt-space-sm);
   /* The Tabs component (.tabs-nav) provides border-bottom, overflow-x,
      display:flex, and background. We only need to ensure the sticky
      background matches the page background here. */
@@ -2135,10 +2135,10 @@ code,
 .kbd-hint {
   display: flex;
   justify-content: flex-end;
-  gap: 16px;
-  padding: 8px 0;
+  gap: var(--mkt-space-xl);
+  padding: var(--mkt-space-md) 0;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: var(--mkt-font-size-micro);
 }
 
 .kbd-hint__item {
@@ -2166,18 +2166,18 @@ code,
 .api-detail-pricing-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 32px;
+  gap: var(--mkt-space-5xl);
 }
 
 .api-detail-pricing-grid {
-  gap: 24px;
-  margin-bottom: 40px;
+  gap: var(--mkt-space-3xl);
+  margin-bottom: var(--mkt-space-6xl);
 }
 
 .api-detail-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--mkt-space-xl);
 }
 
 .endpoint-section-header,
@@ -2187,24 +2187,24 @@ code,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: var(--mkt-space-xl);
 }
 
 .endpoint-card-header {
-  padding: 16px 24px;
+  padding: var(--mkt-space-xl) var(--mkt-space-3xl);
   background: var(--surface-soft);
 }
 
 .endpoint-title-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--mkt-space-lg);
   min-width: 0;
 }
 
 .endpoint-url {
   max-width: 45%;
-  font-size: 0.75rem;
+  font-size: var(--mkt-font-size-micro);
   color: var(--muted);
   overflow-wrap: anywhere;
   text-align: right;
@@ -2213,14 +2213,14 @@ code,
 .endpoint-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--mkt-space-md);
   min-width: 0;
 }
 
 .endpoint-client-buttons {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--mkt-space-xs); /* 2px gap for tightly-packed icon buttons */
   flex-shrink: 0;
 }
 
@@ -2594,12 +2594,12 @@ code,
 .api-detail-plan-price {
   font-size: 2rem;
   font-weight: 800;
-  margin: 12px 0;
+  margin: var(--mkt-space-lg) 0;
 }
 
 .api-detail-calculator-total {
-  margin-top: 32px;
-  padding: 20px;
+  margin-top: var(--mkt-space-5xl);
+  padding: var(--mkt-space-2xl);
   background: var(--surface-soft);
   border-radius: 8px;
 }
@@ -2607,8 +2607,8 @@ code,
 .api-detail-example-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--mkt-space-lg);
+  margin-bottom: var(--mkt-space-xl);
 }
 
 .api-detail-sidebar {
@@ -3126,14 +3126,14 @@ code,
 
   .api-detail-hero {
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: var(--mkt-space-2xl);
   }
 
   .api-detail-price-panel {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--mkt-space-xl);
     text-align: left;
     border-top: 1px solid var(--line);
     padding-top: 18px;
@@ -3141,14 +3141,14 @@ code,
 
   .api-detail-content-grid {
     grid-template-columns: 1fr;
-    gap: 28px;
+    gap: var(--mkt-space-4xl);
   }
 
   .api-detail-sidebar-inner {
     position: static;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    gap: var(--mkt-space-xl);
   }
 
   .api-detail-sidebar-inner > * {
@@ -3271,7 +3271,7 @@ code,
   }
 
   .api-detail-hero {
-    padding: 16px 0 20px;
+    padding: var(--mkt-space-xl) 0 var(--mkt-space-2xl);
   }
 
   .api-detail-heading {
@@ -3281,7 +3281,7 @@ code,
 
   .api-detail-brand {
     width: 100%;
-    gap: 12px;
+    gap: var(--mkt-space-lg);
   }
 
   .api-detail-logo {
@@ -3304,7 +3304,7 @@ code,
 
   .api-detail-price-panel .primary-button {
     width: 100%;
-    margin-top: 12px;
+    margin-top: var(--mkt-space-lg);
   }
 
   .api-detail-tabs {
@@ -3313,7 +3313,7 @@ code,
 
   .kbd-hint {
     justify-content: flex-start;
-    gap: 12px;
+    gap: var(--mkt-space-lg);
     overflow-x: auto;
     scrollbar-width: thin;
   }
@@ -3324,8 +3324,8 @@ code,
 
   /* Tighten tab button spacing on narrow viewports */
   .api-detail-tabs .tabs-tab {
-    margin: 0 8px;
-    font-size: 14px;
+    margin: 0 var(--mkt-space-md);
+    font-size: var(--mkt-font-size-tag);
   }
 
   .api-detail-two-column,
@@ -3344,7 +3344,7 @@ code,
   }
 
   .endpoint-card-header {
-    padding: 14px 16px;
+    padding: var(--mkt-space-lg) var(--mkt-space-xl);
   }
 
   .endpoint-group-hover__shell {
@@ -3374,7 +3374,7 @@ code,
   }
 
   .api-detail-calculator-total {
-    gap: 12px;
+    gap: var(--mkt-space-lg);
   }
 
   .api-detail-calculator-total > div:last-child {
@@ -4343,12 +4343,10 @@ code,
    Uses only design tokens — no hardcoded hex values.
    ─────────────────────────────────────────────────────────────────────────── */
 .api-hero__cta--detail {
-  /* Row layout with a bottom gutter matching the token-based spacing used
-     elsewhere on the page (same 16px as the old inline padding-bottom). */
   display: flex;
-  gap: 0.75rem;
-  padding-bottom: 16px;
-  flex-wrap: wrap; /* buttons can wrap before stacking on mid-range widths */
+  gap: var(--mkt-space-lg);
+  padding-bottom: var(--mkt-space-xl);
+  flex-wrap: wrap;
   align-items: center;
 }
 

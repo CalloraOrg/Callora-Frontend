@@ -8,9 +8,9 @@
   --status-icon-size: 16px;
 
   /* ── Market spacing tokens ────────────────────────────────────────
-     Used by MarketplacePage and its children.  Named on a 4px grid
-     with explicit scale values so every hardcoded gap / padding /
-     margin in marketplace CSS is replaceable with var(--mkt-…). */
+     Used by MarketplacePage, ApiDetailPage, and their children.
+     Named on a 4px grid with explicit scale values so every hardcoded
+     gap / padding / margin is replaceable with var(--mkt-…). */
   --mkt-space-xs: 2px;
   --mkt-space-sm: 4px;
   --mkt-space-md: 8px;
@@ -19,14 +19,24 @@
   --mkt-space-2xl: 20px;
   --mkt-space-3xl: 24px;
   --mkt-space-4xl: 28px;
+  --mkt-space-5xl: 32px;
+  --mkt-space-6xl: 40px;
+  --mkt-space-7xl: 48px;
 
-  /* ── Market typography tokens ─────────────────────────────────────
-     Tight, readable defaults for the marketplace listing page. */
-  --mkt-font-size-sm: 0.8125rem;
-  --mkt-font-size-micro: 0.75rem;
-  --mkt-font-size-tag: 0.875rem;
+  /* ── Market / detail typography tokens ────────────────────────────
+     Tight, readable defaults consumed by marketplace + detail pages. */
+  --mkt-font-size-micro: 0.75rem;    /* 12px */
+  --mkt-font-size-sm: 0.8125rem;     /* 13px */
+  --mkt-font-size-tag: 0.875rem;     /* 14px */
+  --mkt-font-size-base: 1rem;        /* 16px */
+  --mkt-font-size-lg: 0.9375rem;     /* 15px */
+  --mkt-font-size-xl: 1.5rem;        /* 24px */
+  --mkt-font-size-2xl: 1.75rem;      /* 28px */
   --mkt-font-size-page-title: clamp(1.75rem, 3vw, 2.35rem);
   --mkt-line-height-tight: 1.05;
+  --mkt-line-height-normal: 1.5;
+  --mkt-line-height-relaxed: 1.6;
+  --mkt-line-height-loose: 2;
   --mkt-grid-min: 240px;
 
   /* ── Market colour references ─────────────────────────────────────

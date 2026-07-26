@@ -484,4 +484,107 @@ describe("ApiDetailPage", () => {
       expect(docPanel.tabIndex).toBe(0);
     });
   });
+
+  describe("design tokens", () => {
+    it("metrics stat-cards use CSS class for styling instead of redundant inline overrides", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const metricStatCards = document.querySelectorAll(".api-detail-metrics .stat-card");
+      expect(metricStatCards.length).toBe(3);
+
+      metricStatCards.forEach((card) => {
+        const el = card as HTMLElement;
+        // Inline padding, background, border-radius must NOT be set
+        // since the CSS class handles them
+        expect(el.style.padding).toBe("");
+        expect(el.style.background).toBe("");
+        expect(el.style.borderRadius).toBe("");
+      });
+    });
+
+    it("stat-card metric labels use token-based font-size references", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const metricHeaders = document.querySelectorAll(".stat-card > div:first-child");
+      expect(metricHeaders.length).toBeGreaterThan(0);
+
+      metricHeaders.forEach((header) => {
+        const style = (header as HTMLElement).getAttribute("style") || "";
+        expect(style).toMatch(/var\(--mkt-/);
+      });
+    });
+
+    it("CTA row uses token-based gap via CSS class (no inline gap override)", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const ctaRow = document.querySelector(".api-hero__cta--detail") as HTMLElement;
+      expect(ctaRow).toBeTruthy();
+      expect(ctaRow.style.gap).toBe("");
+    });
+
+    it("pricing plan price font-size is handled by CSS class not inline", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const pricingPlans = document.querySelectorAll(".api-detail-plan-price");
+      expect(pricingPlans.length).toBe(2);
+      pricingPlans.forEach((card) => {
+        expect((card as HTMLElement).style.fontSize).toBe("");
+      });
+    });
+
+    it("calculator total section uses CSS class for margin-top and padding", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const calcTotal = document.querySelector(".api-detail-calculator-total") as HTMLElement;
+      expect(calcTotal).toBeTruthy();
+      expect(calcTotal.style.marginTop).toBe("");
+      expect(calcTotal.style.padding).toBe("");
+    });
+
+    it("overview description uses token-based font-size and line-height", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const overviewPanel = screen.getByRole("tabpanel", { name: "Overview" });
+      const description = overviewPanel.querySelector("p");
+      expect(description).toBeTruthy();
+      const style = description?.getAttribute("style") || "";
+      expect(style).toContain("var(--mkt-font-size-base)");
+      expect(style).toContain("var(--mkt-line-height-relaxed)");
+    });
+
+    it("endpoint cards use token-based inline padding", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      const endpointSections = document.querySelectorAll(".endpoint-table-wrap");
+      expect(endpointSections.length).toBeGreaterThan(0);
+      // Parent div should use var(--mkt-space-3xl) for padding
+      const parentDiv = endpointSections[0]?.closest("div[style*='var(--mkt-space-3xl)']");
+      expect(parentDiv).toBeTruthy();
+    });
+
+    it("review sort select on API with reviews uses token-based font-size", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      const sortSelect = document.getElementById("review-sort") as HTMLElement;
+      expect(sortSelect).toBeTruthy();
+      expect(sortSelect.style.fontSize).toContain("var(--mkt-");
+    });
+  });
 });
