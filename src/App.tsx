@@ -21,6 +21,7 @@ import MarketplacePage from "./pages/MarketplacePage";
 import ThemePlayground from "./pages/ThemePlayground";
 import DesignSystemDocs from "./pages/DesignSystemDocs";
 import A11yAudit from "./pages/A11yAudit";
+import EndpointSummary from "./pages/EndpointSummary";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 
@@ -120,6 +121,7 @@ const APP_ROUTES = {
   themePlayground: "/theme-playground",
   designSystem: "/design-system/docs",
   serverError: "/500",
+  endpointSummary: "/endpoint-summary",
 } as const;
 
 function createMockHash() {
@@ -276,6 +278,7 @@ function App() {
     [APP_ROUTES.billing]: "Billing – Callora",
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
+    [APP_ROUTES.endpointSummary]: "Endpoint Summary – Callora",
   };
   const routeDescriptionMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
@@ -283,6 +286,7 @@ function App() {
     [APP_ROUTES.billing]: "Manage your USDC vault, deposit funds, and view transaction status.",
     "/api-usage": "Monitor API usage, request stats, and view call history.",
     [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
+    [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
   };
   const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
@@ -676,6 +680,7 @@ function App() {
 
             <Route path="/a11y-audit" element={<A11yAudit />} />
 
+            <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
           </Routes>
         </main>

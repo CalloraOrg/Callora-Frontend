@@ -1,196 +1,41 @@
-/**
- * print.css — ReviewsTab print stylesheet (issue #580)
- *
- * Campaign : GrantFox FWC26 / Stellar Wave
- * Section  : src/pages/ReviewsTab.tsx
- *
- * PURPOSE
- * ───────
- * This file documents and centralises the @media print rules that are
- * specific to the ReviewsTab component.  The canonical rules are compiled
- * into the main src/index.css bundle so they are always loaded; this file
- * is the human-readable, single-responsibility source of truth for those
- * rules and is *not* imported by src/main.tsx (the combined index.css
- * already ships them).
- *
- * DESIGN INTENT
- * ─────────────
- *  1. Hide chrome – interactive elements (.no-print, .reviews-tab__sort-row)
- *     are suppressed so the printed page shows only meaningful content.
- *  2. Expand collapsibles – review cards and the rating histogram are always
- *     expanded (no max-height truncation) when printing.
- *  3. Inject a section heading – a print-only "Developer Reviews" label is
- *     added via .reviews-tab::before so the document stays navigable without
- *     the tab chrome.
- *  4. Card readability – each .reviews-tab__card gets a visible border,
- *     white background, and break-inside: avoid so cards never split across
- *     page boundaries.
- *  5. Light-theme colours – the @media print block in index.css already
- *     overrides all --color-* custom properties to black-on-white.  The rules
- *     here rely on those overrides rather than repeating hex values.
- *
- * WCAG 2.1 AA
- * ───────────
- *  • Colour contrast: all text is rendered as #1a2332 on #ffffff (12.6:1).
- *  • Star ratings carry aria-label on the parent <span>; SVGs are aria-hidden.
- *  • Verified-developer badges carry an explicit aria-label.
- *
- * NOTE: This file is intentionally excluded from the Vite / main.tsx import
- * chain.  The src/print.test.ts suite asserts that main.tsx does NOT import
- * print.css to avoid double-loading.  The declarations below are mirrored into
- * the @media print block at the bottom of src/index.css.
- */
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   @page – applies to every printed sheet
-   ───────────────────────────────────────────────────────────────────────────── */
-
-@page {
-  margin: 1.5cm;
-  size: auto;
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   @media print – ReviewsTab rules
-   ───────────────────────────────────────────────────────────────────────────── */
-
+/* Print styles for Callora Frontend */
 @media print {
-  /* ── 1. Hide interactive chrome ──────────────────────────────────────────── */
-
-  /*
-   * .reviews-tab__sort-row   – the "Sort by" label + <select> control
-   * .no-print                – global utility already in index.css (repeated
-   *                            here for documentation completeness)
-   */
-  .reviews-tab__sort-row,
-  .reviews-tab .api-detail-reviews-header {
+  /* Hide interactive components and chrome */
+  .no-print,
+  .topbar,
+  .app-footer,
+  .primary-button,
+  .ghost-button,
+  .icon-button,
+  button.endpoint-summary-trigger .chevron-icon {
     display: none !important;
   }
 
-  /* ── 2. Section-level container ──────────────────────────────────────────── */
-
-  .reviews-tab {
-    /*
-     * Remove any screen-only padding / overflow constraints so the full
-     * review list is visible on paper.
-     */
-    overflow: visible !important;
-    max-height: none !important;
-    padding-top: 0 !important;
-  }
-
-  /*
-   * Print-only heading injected before the reviews list.
-   * Kept out of the DOM so it has zero impact on screen layout.
-   * Uses a generic serif font so it renders cleanly on any printer without
-   * requiring a web-font download.
-   */
-  .reviews-tab::before {
-    content: "Developer Reviews";
-    display: block;
-    font-size: 1.15rem;
-    font-weight: 700;
-    font-family: Georgia, "Times New Roman", serif;
-    color: #1a2332;
-    margin-bottom: 0.75rem;
-    border-bottom: 1px solid #ccc;
-    padding-bottom: 0.35rem;
-  }
-
-  /* ── 3. Rating histogram ──────────────────────────────────────────────────── */
-
-  /*
-   * Expand the histogram fully; remove any overflow clip or max-height that
-   * might be applied on narrow screens.
-   */
-  .reviews-tab .rating-histogram,
-  .reviews-tab [class*="rating-histogram"] {
-    overflow: visible !important;
-    max-height: none !important;
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-    margin-bottom: 1rem;
-  }
-
-  /* ── 4. Individual review cards ──────────────────────────────────────────── */
-
-  /*
-   * Each .reviews-tab__card:
-   *   • Gets a visible border + white background (readable on paper).
-   *   • Is forced to avoid page splits so an author's name never floats on a
-   *     different page from the review body.
-   *   • Has decorative shadows and transitions removed.
-   */
-  .reviews-tab__card {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-    border: 1px solid #ccc !important;
+  /* Force light theme tokens */
+  :root,
+  html,
+  body {
+    --page-bg: #f5f7fa !important;
+    --surface: #ffffff !important;
+    --text: #1a2332 !important;
+    --muted: #64748b !important;
     background: #ffffff !important;
-    border-radius: 6px !important;
-    box-shadow: none !important;
-    margin-bottom: 0.75rem;
-    padding: 12px !important;
-  }
-
-  /* ── 5. Review list container ────────────────────────────────────────────── */
-
-  /*
-   * Remove the CSS grid gap so cards sit flush when printed; vertical rhythm
-   * is handled by the margin-bottom on .reviews-tab__card above.
-   */
-  .reviews-tab__list {
-    display: block !important;
-    gap: 0 !important;
-  }
-
-  /* ── 6. Author / rating row inside each card ─────────────────────────────── */
-
-  /*
-   * Keep the author name, verified badge, star rating, and date all on one
-   * line where possible.  Flex-wrap is left enabled so very long names still
-   * wrap rather than overflow the page margin.
-   */
-  .reviews-tab__card [style*="justify-content: space-between"] {
-    flex-wrap: wrap !important;
-  }
-
-  /* ── 7. Verified-developer badge ─────────────────────────────────────────── */
-
-  /*
-   * Print the badge with a plain border instead of a colour tint so it still
-   * reads as "verified" on monochrome printers.
-   */
-  .reviews-tab__card [aria-label*="Verified Developer"] {
-    background: transparent !important;
-    border: 1px solid #555 !important;
     color: #1a2332 !important;
   }
 
-  /* ── 8. Star SVGs ─────────────────────────────────────────────────────────── */
-
-  /*
-   * Force filled stars to print as a mid-grey and empty stars as light-grey
-   * so they are distinguishable without colour on greyscale printers.
-   */
-  .reviews-tab__card svg path[fill="var(--accent)"] {
-    fill: #555 !important;
+  /* Force all collapsible summaries to expand on print */
+  .endpoint-summary-content--collapsed {
+    display: block !important;
   }
 
-  .reviews-tab__card svg path[fill="var(--line)"] {
-    fill: #ddd !important;
+  /* Prevent page breaks inside cards */
+  .endpoint-summary-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
-  /* ── 9. Review body text ──────────────────────────────────────────────────── */
-
-  .reviews-tab__card p {
-    color: #333 !important;
-    orphans: 3;
-    widows: 3;
-  }
-
-  /* ── 10. Date label ───────────────────────────────────────────────────────── */
-
-  .reviews-tab__card [style*="color: var(--muted)"][style*="font-size: 12"] {
-    color: #555 !important;
+  /* Clean table formatting */
+  .endpoint-table-wrap table {
+    width: 100% !important;
   }
 }
