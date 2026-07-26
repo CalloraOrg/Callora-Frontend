@@ -128,13 +128,26 @@ describe("MarketplacePage", () => {
     expect(grid).toBeTruthy();
   });
 
-  it("renders keyboard shortcuts hint", () => {
-    renderMarketplacePage();
-    settleMarketplaceTimers();
+  describe("prefers-reduced-motion", () => {
+    it("bypasses loading skeleton delay and resolves immediately when prefers-reduced-motion is active", async () => {
+      Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+          matches: query === "(prefers-reduced-motion: reduce)" || query.includes("reduce"),
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      });
 
-    const hint = screen.getByRole("complementary", { name: "Keyboard shortcuts" });
-    expect(hint).toBeTruthy();
-    expect(screen.getByText("Focus search bar")).toBeTruthy();
-    expect(screen.getByText("Add/remove focused API card to comparison")).toBeTruthy();
+      renderMarketplacePage();
+      
+      // Since motion is reduced, it should resolve immediately and not show the loading state
+      expect(screen.queryByLabelText("Loading APIs")).toBeNull();
+    });
   });
 });

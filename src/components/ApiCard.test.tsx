@@ -350,3 +350,43 @@ describe("ApiCard responsiveness", () => {
   });
 });
 
+describe("ApiCard aria-live announcements", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    pinnedApisStore._reset();
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(query => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+  });
+
+  it("announces pinning and unpinning", () => {
+    render(<ApiCard api={mockApi} />);
+    const pinBtn = screen.getByRole("button", { name: /Pin api-1 to dashboard/i });
+    
+    fireEvent.click(pinBtn);
+    expect(screen.getByText("Pinned to dashboard")).toBeTruthy();
+    expect(screen.getByText("Pinned to dashboard").getAttribute("aria-live")).toBe("polite");
+    
+    fireEvent.click(pinBtn);
+    expect(screen.getByText("Unpinned from dashboard")).toBeTruthy();
+  });
+
+  it("announces favorite toggle", () => {
+    render(<ApiCard api={mockApi} />);
+    const favBtn = screen.getByLabelText("Add to favorites");
+    
+    fireEvent.click(favBtn);
+    expect(screen.getByText("Added to favorites")).toBeTruthy();
+  });
+});
+

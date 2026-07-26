@@ -56,4 +56,9 @@ describe("@layer focus contract", () => {
     const dropdown = read("src/components/Dropdown.tsx");
     expect(dropdown).not.toMatch(/outline:\s*open\s*\?[^:]*:\s*["']none["']/);
   });
+
+  it("focus.css defines focus-visible rules for MarketplacePage interactive elements", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.marketplace-page[\s\S]*?focus-visible/);
+  });
 });

@@ -4,6 +4,7 @@ export const DENSITY_STORAGE_KEY = 'callora.density';
 
 const VALID: DensityPreference[] = ['comfortable', 'compact'];
 
+
 export function readDensityPreference(): DensityPreference {
   try {
     const stored = localStorage.getItem(DENSITY_STORAGE_KEY);
