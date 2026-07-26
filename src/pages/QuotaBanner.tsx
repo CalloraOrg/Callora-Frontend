@@ -1,86 +1,70 @@
-import { useState, useEffect, useCallback } from 'react';
 import FormField from '../components/FormField';
-import KbdHint from '../components/KbdHint';
-import type { Shortcut } from '../hooks/useGlobalShortcuts';
+import './QuotaBanner.css';
+
+export type QuotaStatus = 'ok' | 'warn' | 'danger';
 
 export type QuotaBannerProps = {
-  /** Optional callback fired when the primary action (Save/Submit quota) is triggered. */
-  onSave?: (quota: string) => void;
-  /** Initial value for the quota input field. */
-  initialQuota?: string;
-  /** Custom label for the primary action button (defaults to "Save Quota"). */
-  primaryActionLabel?: string;
-  /** Primary action keyboard shortcut key hint (defaults to "Ctrl+Enter"). */
-  shortcutKey?: string;
+  title?: string;
+  status?: QuotaStatus;
+  statusLabel?: string;
+  hint?: string;
+  extraInfo?: string;
+  inputId?: string;
+  value?: string;
+  onChange?: (value: string) => void;
+  statusOptions?: FieldStatus;
 };
 
-/**
- * QuotaBanner
- *
- * GrantFox FWC26 campaign (Stellar Wave) component.
- * Displays quota details with an accessible input field, a primary action button,
- * and a subtle shortcut hint chip (`KbdHint`) for quick keyboard execution.
- */
+export type FieldStatus = 'idle' | 'error' | 'success';
+
 export default function QuotaBanner({
-  onSave,
-  initialQuota = '',
-  primaryActionLabel = 'Save Quota',
-  shortcutKey = 'Ctrl+Enter',
+  title = 'Quota Details',
+  status = 'ok',
+  statusLabel,
+  hint = 'Enter quota amount',
+  extraInfo = 'Some extra info about quota.',
+  inputId = 'quota-input',
+  value = '',
+  onChange,
+  statusOptions = 'idle',
 }: QuotaBannerProps) {
-  const [quota, setQuota] = useState(initialQuota);
-
-  const handleSave = useCallback(() => {
-    onSave?.(quota);
-  }, [onSave, quota]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-        event.preventDefault();
-        handleSave();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave]);
-
-  const primaryShortcut: Shortcut = {
-    key: shortcutKey,
-    description: 'Save',
-    category: 'Quota',
+  const statusLabels: Record<QuotaStatus, string> = {
+    ok: 'Active',
+    warn: 'Warning',
+    danger: 'Exceeded',
   };
 
+  const displayLabel = statusLabel ?? statusLabels[status];
+
   return (
-    <div className="quota-banner">
-      <h2>Quota Details</h2>
-      <FormField id="quota-input" label="Quota" hint="Enter quota amount" status="idle">
-        <input
-          type="text"
-          id="quota-input"
-          value={quota}
-          onChange={(e) => setQuota(e.target.value)}
-          aria-describedby="quota-extra-info"
-        />
-      </FormField>
-      {/* Subtle hint chip for the primary action */}
-      <KbdHint shortcuts={[primaryShortcut]} label="Primary action" />
-      <p id="quota-extra-info">Some extra info about quota.</p>
-      <div className="quota-banner__actions">
-        <button
-          type="button"
-          className="primary-button quota-banner__primary-btn"
-          onClick={handleSave}
-          aria-label={`${primaryActionLabel} (${shortcutKey})`}
+    <section className="quota-banner" aria-labelledby="quota-banner-title">
+      <header className="quota-banner__header">
+        <h2 id="quota-banner-title" className="quota-banner__title">
+          {title}
+        </h2>
+        <span className={`quota-banner__status quota-banner__status--${status}`}>
+          {displayLabel}
+        </span>
+      </header>
+      <div className="quota-banner__field">
+        <FormField
+          id={inputId}
+          label="Quota"
+          hint={hint}
+          status={statusOptions}
         >
-          <span>{primaryActionLabel}</span>
-          <KbdHint
-            shortcut={primaryShortcut}
-            variant="chip"
-            label={`Shortcut hint: ${shortcutKey}`}
+          <input
+            type="text"
+            id={inputId}
+            value={value}
+            onChange={(e) => onChange?.(e.target.value)}
+            aria-describedby={`${inputId}-hint ${inputId}-extra-info`}
           />
-        </button>
+        </FormField>
       </div>
-    </div>
+      <p id={`${inputId}-extra-info`} className="quota-banner__hint">
+        {extraInfo}
+      </p>
+    </section>
   );
 }
-
