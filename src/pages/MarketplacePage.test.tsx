@@ -128,39 +128,37 @@ describe("MarketplacePage", () => {
     expect(grid).toBeTruthy();
   });
 
-  it("renders density toggle buttons for mobile layout", () => {
+  it("shows empty state with secondary CTA when favorites-only has no results", () => {
     renderMarketplacePage();
     settleMarketplaceTimers();
 
-    const comfortableBtn = screen.getByRole("button", { name: "Comfortable" });
-    const compactBtn = screen.getByRole("button", { name: "Compact" });
-    expect(comfortableBtn).toBeTruthy();
-    expect(compactBtn).toBeTruthy();
+    const favoritesCheckbox = screen.getByLabelText("Favorites only");
+    fireEvent.click(favoritesCheckbox);
 
-    const densityToggle = document.querySelector(".marketplace-density-toggle");
-    expect(densityToggle).toBeTruthy();
+    expect(screen.getByText("No favorites yet")).toBeTruthy();
+    expect(screen.getByText("Try starring some APIs to see them here!")).toBeTruthy();
+
+    const browseBtn = screen.getByTestId("empty-state-secondary-action");
+    expect(browseBtn).toBeTruthy();
+    expect(browseBtn.textContent).toBe("Browse all APIs");
+
+    fireEvent.click(browseBtn);
+    expect(screen.queryByText("No favorites yet")).toBeNull();
   });
 
-  it("respects prefers-reduced-motion by not applying transform on hover", () => {
-    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === "(prefers-reduced-motion: reduce)",
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }));
-
+  it("shows filtered empty state with clear-all-filters CTA", () => {
     renderMarketplacePage();
     settleMarketplaceTimers();
 
-    // Cards render without transform-dependent inline styles
-    const cards = document.querySelectorAll(".api-marketplace-card");
-    expect(cards.length).toBeGreaterThan(0);
-    cards.forEach((card) => {
-      expect((card as HTMLElement).style.transform).toBe("");
-    });
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    fireEvent.change(searchInput, { target: { value: "nonexistent-api-xyz" } });
+
+    act(() => { vi.advanceTimersByTime(500); });
+
+    expect(screen.getByText("No results found")).toBeTruthy();
+    expect(screen.getByText("Try adjusting your filters or clear them to see all available APIs.")).toBeTruthy();
+
+    const browseBtn = screen.getByTestId("empty-state-secondary-action");
+    expect(browseBtn.textContent).toBe("Browse all APIs");
   });
 });

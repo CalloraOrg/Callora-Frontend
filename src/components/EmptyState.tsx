@@ -15,6 +15,11 @@ export interface EmptyStateProps {
     label: string;
     onClick: () => void;
   };
+  /** Secondary CTA shown below the primary action — helpful for marketplace empty states. */
+  secondaryAction?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 /**
@@ -252,6 +257,7 @@ export default function EmptyState({
   onClearFilters,
   onRetry,
   action,
+  secondaryAction,
 }: EmptyStateProps) {
   const defaults = {
     empty: {
@@ -399,6 +405,21 @@ export default function EmptyState({
           type="button"
         >
           {action.label}
+        </button>
+      )}
+
+      {secondaryAction && (
+        <button
+          className="ghost-button"
+          onClick={secondaryAction.onClick}
+          style={{
+            ...buttonStyle,
+            minHeight: isCompact ? "32px" : "40px",
+          }}
+          type="button"
+          data-testid="empty-state-secondary-action"
+        >
+          {secondaryAction.label}
         </button>
       )}
 
