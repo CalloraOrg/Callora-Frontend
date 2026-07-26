@@ -24,6 +24,9 @@ import MOCK_APIS from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import PlanBadge from "../components/PlanBadge";
+import PricingTierTable from "../components/PricingTierTable";
+
+
 
 /**
  * ApiDetailPage
@@ -849,40 +852,47 @@ print(response.json())`;
                 {tab === "pricing" && (
                   <section id="panel-pricing" role="tabpanel" aria-labelledby="tab-pricing" tabIndex={0}>
                     <h2>Pricing Plans</h2>
-                    <div className="api-detail-pricing-grid">
-                      {/* Standard plan */}
-                      <div className="preview-card" style={{ padding: 24, border: "2px solid var(--accent)" }}>
-                        <PlanBadge tier="pro" />
-                        <div className="api-detail-plan-price tabular-nums">
-                          {`$${formatPrice(api.pricePerRequest ?? 0)}`} <span style={{ fontSize: 14, color: "var(--muted)" }}>/ call</span>
-                        </div>
-                        <p style={{ fontSize: 14, color: "var(--muted)" }}>Perfect for startups and scaling applications. Pay only for what you use.</p>
-                        <ul style={{ padding: 0, listStyle: "none", fontSize: 14, marginTop: 20 }}>
-                          {["Unlimited Throughput", "99.9% Uptime SLA", "Community Support"].map((feat) => (
-                            <li key={feat} style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                              <CheckIcon size={16} aria-hidden="true" /> {feat}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                    <PricingTierTable
+                      onSelectTier={(tier) => showToast(`Selected ${tier.name} plan!`, "success")}
+                      tiers={[
+                        {
+                          name: "Free",
+                          price: "$0",
+                          description: "Perfect for experimentation and testing.",
+                          features: api.features?.map((f) => ({ label: f, included: true })) || [
+                            { label: "Standard Support", included: false },
+                            { label: "High Rate Limits", included: false },
+                          ],
+                          ctaLabel: "Get Started",
+                        },
+                        {
+                          name: "Standard",
+                          price: `$${formatPrice(api.pricePerRequest ?? 0)}`,
+                          description: "Ideal for production-grade applications.",
+                          features: api.features?.map((f) => ({ label: f, included: true })) || [
+                            { label: "Standard Support", included: true },
+                            { label: "High Rate Limits", included: true },
+                          ],
+                          ctaLabel: "Upgrade Now",
+                          isRecommended: true,
+                          tier: "pro",
+                        },
+                        {
+                          name: "Enterprise",
+                          price: "Custom",
+                          description: "Tailored for large-scale, high-volume needs.",
+                          features: [
+                            ...(api.features?.map((f) => ({ label: f, included: true })) || []),
+                            { label: "Dedicated Support", included: true },
+                            { label: "Custom SLA", included: true },
+                            { label: "Dedicated Infrastructure", included: true },
+                          ],
+                          ctaLabel: "Contact Sales",
+                          tier: "enterprise",
+                        },
+                      ]}
+                    />
 
-                      {/* Enterprise plan */}
-                      <div className="preview-card" style={{ padding: 24 }}>
-                        <PlanBadge tier="enterprise" />
-                        <div className="api-detail-plan-price">Custom</div>
-                        <p style={{ fontSize: 14, color: "var(--muted)" }}>For high-volume needs requiring dedicated infrastructure and support.</p>
-                        <ul style={{ padding: 0, listStyle: "none", fontSize: 14, marginTop: 20 }}>
-                          {["Dedicated Node", "24/7 Phone Support", "Custom Rate Limits"].map((feat) => (
-                            <li key={feat} style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                              <CheckIcon size={16} aria-hidden="true" /> {feat}
-                            </li>
-                          ))}
-                        </ul>
-                        <button className="secondary-button" style={{ width: "100%", marginTop: 10 }}>
-                          Contact Sales
-                        </button>
-                      </div>
-                    </div>
 
                     {/* Cost calculator */}
                     <div className="preview-card" style={{ padding: 32 }}>
