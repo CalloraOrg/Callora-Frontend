@@ -57,8 +57,23 @@ describe("@layer focus contract", () => {
     expect(dropdown).not.toMatch(/outline:\s*open\s*\?[^:]*:\s*["']none["']/);
   });
 
-  it("focus.css defines focus-visible rules for MarketplacePage interactive elements", () => {
+  it("focus.css defines focus-visible rules for ApiDetailPage tabs", () => {
     const focusCss = read("src/styles/focus.css");
-    expect(focusCss).toMatch(/\.marketplace-page[\s\S]*?focus-visible/);
+    expect(focusCss).toMatch(/\.api-detail-tabs\s*\[role="tab"\]:focus-visible/);
+  });
+
+  it("focus.css defines focus-visible rules for ApiDetailPage breadcrumb links", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.api-detail-page\s*\.breadcrumb\s*a:focus-visible/);
+  });
+
+  it("focus.css defines focus-visible rules for ApiDetailPage SubscribeButton", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.api-detail-page\s*\.subscribe-button:focus-visible/);
+  });
+
+  it("focus.css defines focus-visible rules for ApiDetailPage hero Back button", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.api-detail-hero\s*\.ghost-button:focus-visible/);
   });
 });
