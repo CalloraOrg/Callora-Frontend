@@ -28,23 +28,61 @@ import { colorFromId } from "../utils/colorFromId";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
-export function ApiCardSkeleton() {
+export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfortable" | "compact" } = {}) {
+  const isCompact = density === "compact";
+
   return (
     <article
-      className="preview-card api-marketplace-card api-card-skeleton"
+      className={`preview-card api-marketplace-card api-card-skeleton${isCompact ? " api-card--compact" : ""}`}
       aria-busy="true"
       aria-label="Loading API"
       style={{
-        padding: 12,
+        padding: isCompact ? 10 : 12,
         display: "flex",
         flexDirection: "column",
-        minHeight: 220,
-        gap: 8,
+        minHeight: isCompact ? 188 : 220,
+        gap: isCompact ? 6 : 8,
         border: "1px solid rgba(255,255,255,0.03)",
         pointerEvents: "none",
+        position: "relative",
       }}
     >
       <span className="sr-only">Loading API</span>
+
+      {/* Color stripe placeholder — matches the final card's identity stripe */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 4,
+          height: "100%",
+          borderRadius: "var(--radius-lg) 0 0 var(--radius-lg)",
+          background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+        }}
+      />
+
+      {/* Bookmark button placeholder */}
+      <div style={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}>
+        <Skeleton tone="stellar" width={32} height={32} borderRadius="50%" />
+      </div>
+
+      {/* Pin button placeholder */}
+      <div style={{ position: "absolute", top: 48, right: 8, zIndex: 1 }}>
+        <Skeleton tone="stellar" width={32} height={32} borderRadius="50%" />
+      </div>
+
+      {/* Favorite button placeholder */}
+      <div style={{ position: "absolute", top: 8, left: 8, zIndex: 1 }}>
+        <Skeleton tone="stellar" width={32} height={32} borderRadius="50%" />
+      </div>
+
+      {/* Compare button placeholder */}
+      <div style={{ position: "absolute", top: 8, left: 48, zIndex: 1 }}>
+        <Skeleton tone="stellar" width={60} height={28} borderRadius={8} />
+      </div>
+
       <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <Skeleton tone="stellar" width={56} height={56} borderRadius={10} />
 
@@ -54,10 +92,12 @@ export function ApiCardSkeleton() {
             <Skeleton tone="stellar" width="20%" height={12} />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <Skeleton tone="stellar" width="90%" height={14} />
-            <Skeleton tone="stellar" width="70%" height={14} />
-          </div>
+          {!isCompact && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <Skeleton tone="stellar" width="90%" height={14} />
+              <Skeleton tone="stellar" width="70%" height={14} />
+            </div>
+          )}
         </div>
 
         <div
@@ -84,10 +124,12 @@ export function ApiCardSkeleton() {
 
       {/* WhyApi placeholder — matches the real card's rationale section
           that appears in comfortable mode. */}
-      <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 4 }}>
-        <Skeleton tone="stellar" width="35%" height={12} />
-        <Skeleton tone="stellar" width="80%" height={12} />
-      </div>
+      {!isCompact && (
+        <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 4 }}>
+          <Skeleton tone="stellar" width="35%" height={14} />
+          <Skeleton tone="stellar" width="80%" height={14} />
+        </div>
+      )}
 
       {/* Sparkline section — matches the real card's 24h sparkline
           that appears between tags and stats. */}
@@ -101,20 +143,6 @@ export function ApiCardSkeleton() {
         }}
       >
         <Skeleton tone="stellar" width={52} height={12} />
-        <Skeleton tone="stellar" width={90} height={28} />
-      </div>
-
-      <div
-        style={{
-          marginTop: 10,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        <Skeleton tone="stellar" width={50} height={12} />
         <Skeleton tone="stellar" width={90} height={28} />
       </div>
 
@@ -583,7 +611,7 @@ export default function ApiCard({
   activeTag?: string | null;
   onBrowse?: () => void;
 }) {
-  if (loading) return <ApiCardSkeleton />;
+  if (loading) return <ApiCardSkeleton density={density} />;
   if (!api) {
     return (
       <EmptyState

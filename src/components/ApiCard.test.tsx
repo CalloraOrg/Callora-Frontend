@@ -347,20 +347,62 @@ describe("ApiCard reduced motion", () => {
 describe("ApiCard skeleton", () => {
   it("includes sparkline placeholder to match final card layout", () => {
     render(<ApiCard loading />);
-    // The skeleton should have the sparkline section (24h label + sparkline area)
     const cards = document.querySelectorAll(".api-card-skeleton");
     expect(cards.length).toBe(1);
-    // Verify the skeleton is rendered (not the actual card)
     expect(screen.getByText("Loading API")).toBeTruthy();
   });
 
-  it("includes WhyApi placeholder to match comfortable-mode card shape", () => {
+  it("renders color stripe placeholder matching final card identity stripe", () => {
     const { container } = render(<ApiCard loading />);
-    // The skeleton renders multiple Skeleton blocks — one for the WhyApi section
+    const stripe = container.querySelector('[aria-hidden="true"]')?.closest('span');
+    expect(stripe?.style?.borderRadius).toContain("radius-lg");
+  });
+
+  it("renders action button placeholders at expected positions", () => {
+    const { container } = render(<ApiCard loading />);
+    // 4 absolute-positioned button placeholders (bookmark, pin, favorite, compare)
+    const placeholders = container.querySelectorAll('.skeleton--stellar');
+    // We should have many skeletons; the absolute ones are at z-index 1
+    const absoluteWrappers = container.querySelectorAll('[style*="z-index: 1"]');
+    expect(absoluteWrappers.length).toBe(4);
+  });
+
+  it("renders only one sparkline section (no duplicate)", () => {
+    const { container } = render(<ApiCard loading />);
+    // There should be exactly one sparkline section with width 90
+    const sparklines = container.querySelectorAll('.skeleton--stellar');
+    const width90 = Array.from(sparklines).filter(
+      (el) => (el as HTMLElement).style.width === '90px'
+    );
+    expect(width90.length).toBe(1);
+  });
+
+  it("renders WhyApi placeholder in comfortable mode", () => {
+    const { container } = render(<ApiCard loading />);
+    // In comfortable mode there should be skeleton lines for WhyApi (height 14px)
+    const height14 = container.querySelectorAll('.skeleton--stellar[style*="height: 14px"]');
+    // Description lines + WhyApi lines + stat labels
+    expect(height14.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("hides WhyApi placeholder in compact mode", () => {
+    const { container } = render(<ApiCard loading density="compact" />);
+    // In compact mode, WhyApi is not rendered — fewer total skeletons than comfortable
     const skeletons = container.querySelectorAll(".skeleton--stellar");
-    // Title, provider, description lines, tags, WhyApi lines, sparkline label,
-    // sparkline, 3 stat labels, 3 stat values, CTA, rating
-    expect(skeletons.length).toBeGreaterThanOrEqual(12);
+    // Compact has ~21 skeletons vs comfortable ~26
+    expect(skeletons.length).toBeLessThan(24);
+  });
+
+  it("applies compact class when density is compact", () => {
+    render(<ApiCard loading density="compact" />);
+    const card = document.querySelector('.api-card-skeleton');
+    expect(card?.className).toContain('api-card--compact');
+  });
+
+  it("does not apply compact class in comfortable mode", () => {
+    render(<ApiCard loading density="comfortable" />);
+    const card = document.querySelector('.api-card-skeleton');
+    expect(card?.className).not.toContain('api-card--compact');
   });
 
   it("uses tone stellar for themed skeleton appearance", () => {
