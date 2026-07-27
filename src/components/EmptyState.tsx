@@ -133,6 +133,41 @@ function EmptyIllustration({
     );
   }
 
+  if (variant === "api-card") {
+    return (
+      <svg
+        width={box}
+        height={box}
+        viewBox="0 0 64 64"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <rect
+          x="16"
+          y="16"
+          width="32"
+          height="32"
+          rx="4"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+          strokeDasharray="4 4"
+        />
+        <path
+          d="M24 32h16"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+        <path
+          d="M32 24v16"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+      </svg>
+    );
+  }
+
   if (variant === "filtered") {
     return (
       <svg
@@ -433,6 +468,10 @@ export default function EmptyState({
     "api-detail": {
       title: "API not found",
       message: "This API may have moved or is no longer available.",
+    },
+    "api-card": {
+      title: "API unavailable",
+      message: "This API could not be loaded or is currently unavailable.",
     },
     filtered: {
       title: "No results found",

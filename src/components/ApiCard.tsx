@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ContextMenu } from './ContextMenu';
 import Skeleton from "./Skeleton";
 import TagChip from "./TagChip";
+import EmptyState from "./EmptyState";
 import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import { useFavorites } from "../hooks/useFavorites";
@@ -611,23 +612,38 @@ export default function ApiCard({
   activeTag?: string | null;
   onBrowse?: () => void;
 }) {
-  if (loading) return <ApiCardSkeleton density={density} />;
+  if (loading) {
+    return <ApiCardSkeleton />;
+  }
+
   if (!api) {
     return (
-      <EmptyState
-        title="No API selected"
-        description="Select an API from the marketplace or browse featured APIs to get started."
-        ctaLabel="Browse marketplace"
-        onCta={onBrowse}
-      />
+      <article
+        className="preview-card api-marketplace-card"
+        style={{
+          padding: 0,
+          display: "flex",
+          minHeight: density === "compact" ? 180 : 220,
+          border: "1px solid var(--line-strong, rgba(255,255,255,0.05))",
+        }}
+      >
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <EmptyState
+            variant="api-card"
+            size={density === "compact" ? "compact" : "default"}
+            action={{
+              label: "Explore Marketplace",
+              onClick: () => {
+                window.location.href = "/marketplace";
+              },
+            }}
+          />
+        </div>
+      </article>
     );
   }
 
-  const isMobile = useMediaQuery("(max-width: 768px)");  
-  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
-
-  const [liveMessage, setLiveMessage] = useState("");
-  const announce = useCallback((msg: string) => setLiveMessage(msg), []);
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
   const avgLatencyMs = api.avgLatencyMs;
