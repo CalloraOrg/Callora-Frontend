@@ -24,7 +24,7 @@ import EmptyState from "./EmptyState";
 import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
 import { ClockIcon, BoltIcon } from "./icons";
-import { colorFromId } from "../utils/colorFromId";
+import StatusBadge from "./StatusBadge";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -634,6 +634,12 @@ export default function ApiCard({
   const uptimePercent = api.uptimePercent;
   const isCompact = density === "compact" || isMobile;
 
+  const prefersReducedMotion = useMemo(() => {
+    return typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)")?.matches;
+  }, []);
+
   const { isFavorite, toggleFavorite } = useFavorites();
   const { apis: comparedApis } = useCompareStore();
   const isCompared = comparedApis.some((item) => item.id === api.id);
@@ -850,9 +856,10 @@ export default function ApiCard({
         </div>
 
         <div className="api-marketplace-card-body" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <strong>{api.name}</strong>
             <div style={{ color: "var(--muted)", fontSize: 12 }}>{api.provider?.name}</div>
+            {api.status && <StatusBadge status={api.status} />}
           </div>
 
           {!isCompact && (

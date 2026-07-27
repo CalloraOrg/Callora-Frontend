@@ -41,7 +41,8 @@
 }
 
 /* Pending: small dot grid — feels "in progress" without directional bias */
-.sb-pattern-pending {
+.sb-pattern-pending,
+.sb-pattern-maintenance {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1' fill='currentColor' fill-opacity='0.3'/%3E%3C/svg%3E");
   background-size: 8px 8px;
   background-repeat: repeat;

@@ -49,7 +49,7 @@ const PATTERN_DESCRIPTIONS: Record<StatusVariant, string> = {
   warning: 'opposite diagonal stripes',
   degraded: 'opposite diagonal stripes',
   pending: 'dot pattern',
-  maintenance: 'crosshatch pattern',
+  maintenance: 'dot pattern',
 };
 
 const PATTERN_KEYS: Record<StatusVariant, string> = {
@@ -60,7 +60,7 @@ const PATTERN_KEYS: Record<StatusVariant, string> = {
   warning: 'opposite-stripes',
   degraded: 'opposite-stripes',
   pending: 'dots',
-  maintenance: 'crosshatch',
+  maintenance: 'dots',
 };
 
 /**
