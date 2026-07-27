@@ -42,8 +42,7 @@ type TooltipProps = {
   hoverDelayMs?: number;
   /** Long-press duration in ms before the tooltip opens on touch. */
   longPressMs?: number;
-  /** Delay in ms before the tooltip opens on mouse hover. Defaults to 0. */
-  hoverDelayMs?: number;
+
 };
 
 type ChildHandlers = {
@@ -61,7 +60,7 @@ export default function Tooltip({
   children,
   hoverDelayMs = 300,
   longPressMs = 500,
-  hoverDelayMs = 0,
+
 }: TooltipProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const tooltipId = useId();
@@ -70,7 +69,7 @@ export default function Tooltip({
   const hoverTimer = useRef<number | null>(null);
   // Timer for touch long-press reveal.
   const pressTimer = useRef<number | null>(null);
-  const hoverTimer = useRef<number | null>(null);
+
 
   const clearPressTimer = () => {
     if (pressTimer.current !== null) {
@@ -103,27 +102,12 @@ export default function Tooltip({
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  /**
-   * Start the hover-delay timer.
-   * If hoverDelayMs is 0 we open immediately to keep the
-   * interaction snappy for callers that want instant feedback.
-   */
-  const handleMouseEnter = () => {
-    clearHoverTimer();
-    if (hoverDelayMs <= 0) {
-      setOpen(true);
-    } else {
-      hoverTimer.current = window.setTimeout(
-        () => setOpen(true),
-        hoverDelayMs,
-      );
-    }
-  };
+
 
   const hide = () => {
     clearHoverTimer();
     clearPressTimer();
-    clearHoverTimer();
+
     setOpen(false);
   };
 
@@ -157,7 +141,7 @@ export default function Tooltip({
       },
       onFocus: (e: FocusEvent) => {
         childProps.onFocus?.(e);
-        show();
+        setOpen(true);
       },
       onBlur: (e: FocusEvent) => {
         childProps.onBlur?.(e);

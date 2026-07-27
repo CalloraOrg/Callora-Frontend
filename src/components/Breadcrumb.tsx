@@ -104,21 +104,7 @@ export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProp
   const middleItems = useMemo(() => items.slice(1, -1), [items]);
   const shouldCollapseMiddle = middleItems.length > 0;
 
-  /**
-   * Compute the visible display label for each item.
-   * When middleEllipsis is enabled, labels longer than middleEllipsisMaxLen
-   * are shortened using the middle-ellipsis pattern. The full label is still
-   * available via the title attribute and aria-label.
-   */
-  const displayLabels = useMemo(
-    () =>
-      items.map((item) =>
-        middleEllipsis
-          ? truncateMiddle(item.label, middleEllipsisMaxLen)
-          : item.label,
-      ),
-    [items, middleEllipsis, middleEllipsisMaxLen],
-  );
+
 
   useEffect(() => {
     if (!isPopoverOpen) return;

@@ -1,5 +1,4 @@
 import React from "react";
-
 import ExternalLink from "./ExternalLink";
 import { EmptyStateSkeleton } from "./Skeleton";
 
@@ -25,10 +24,10 @@ export interface EmptyStateProps {
     label: string;
     onClick: () => void;
   };
-  /** @deprecated Use `action` instead */
-  ctaLabel?: string;
-  /** @deprecated Use `action.onClick` instead */
-  onCta?: () => void;
+  secondaryAction?: {
+    label: string;
+    onClick: () => void;
+  };
   loading?: boolean;
 }
 
@@ -412,8 +411,7 @@ export default function EmptyState({
   onClearFilters,
   onRetry,
   action,
-  ctaLabel,
-  onCta,
+  secondaryAction,
   loading = false,
 }: EmptyStateProps) {
   const resolvedMessage = message ?? description;
