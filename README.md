@@ -27,8 +27,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - **Pattern-based status badges**: Status indicators now use distinct textures in addition to color so they remain understandable for color-blind users and in grayscale displays.
 - **Response diff highlighting**: Pass a `compareWith` prop to `CallHistoryRow` to show a line-by-line diff between two call responses, with added (green), removed (red), and unchanged context lines. Includes a Diff/Raw toggle, before/after call labels, and full WCAG 2.1 AA accessibility. See [docs/ResponseDiff.md](docs/ResponseDiff.md).
 - **Smooth theme transition**: Light/dark switches animate color tokens (background, text, border) over 240 ms instead of snapping. The transition is gated behind a `theme-transitions-ready` class that ThemeProvider adds after the first paint, preventing any flash on load. Animated elements (toasts, skeletons, spinners) are automatically excluded. Use the `.no-theme-transition` escape hatch on any element that must opt out.
-- **Breadcrumb middle-ellipsis** (Issue #537): The `<Breadcrumb>` component now accepts a `middleEllipsis` prop. When enabled, individual labels longer than `middleEllipsisMaxLen` characters (default 24) are abbreviated using a `"start…end"` pattern — preserving both the resource-type prefix and the unique identifier suffix. The full label is always exposed via `aria-label` and `title` so screen-reader users receive the complete text. Used by `RateLimitCard` where API names, plan tiers, and endpoint paths can be arbitrarily long.
-- **RateLimitCard**: New card component (`src/pages/RateLimitCard.tsx`) showing quota usage, a colour-and-shape status badge (OK / Warning / Critical), a progress bar with full ARIA attributes, and a reset-time countdown. The breadcrumb at the top uses middle-ellipsis to handle long API / plan names gracefully.
+- **Endpoint hover preview**: On the API Detail documentation tab, hovering or focusing an individual endpoint card header reveals a compact floating panel showing the HTTP method badge, endpoint URL, parameter table (name / type / required), and an optional response-shape snippet. Keyboard accessible (Escape dismisses); all colours from design tokens. See `src/components/EndpointPreview.tsx`.
 
 ## Keyboard shortcuts
 
@@ -115,6 +114,8 @@ callora-frontend/
 │   │   ├── CommandPalette_MANUAL_TEST_PLAN.md
 │   │   ├── Dashboard.tsx
 │   │   ├── EmptyState.tsx
+│   │   ├── EndpointGroupHover.tsx
+│   │   ├── EndpointPreview.tsx
 │   │   ├── FiltersSidebar.tsx
 │   │   ├── NotFound.tsx
 │   │   ├── SearchBar.tsx
