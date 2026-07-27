@@ -27,31 +27,31 @@ import { ClockIcon, BoltIcon } from "./icons";
 
 export function ApiCardSkeleton() {
   return (
-    <article
+      <article
       className="preview-card api-marketplace-card api-card-skeleton"
       aria-busy="true"
       aria-label="Loading API"
       style={{
-        padding: 12,
+        padding: "var(--mkt-card-compact-padding)",
         display: "flex",
         flexDirection: "column",
-        minHeight: 220,
-        gap: 8,
+        minHeight: "var(--mkt-card-min-height)",
+        gap: "var(--mkt-space-md)",
         border: "1px solid rgba(255,255,255,0.03)",
         pointerEvents: "none",
       }}
     >
       <span className="sr-only">Loading API</span>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: "var(--mkt-space-lg)", alignItems: "center" }}>
         <Skeleton tone="stellar" width={56} height={56} borderRadius={10} />
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--mkt-space-md)" }}>
+          <div style={{ display: "flex", gap: "var(--mkt-space-md)", alignItems: "baseline" }}>
             <Skeleton tone="stellar" width="60%" height={18} />
             <Skeleton tone="stellar" width="20%" height={12} />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--mkt-space-sm)" }}>
             <Skeleton tone="stellar" width="90%" height={14} />
             <Skeleton tone="stellar" width="70%" height={14} />
           </div>
@@ -63,7 +63,7 @@ export function ApiCardSkeleton() {
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-end",
-            gap: 6,
+            gap: "var(--mkt-space-sm)"
           }}
         >
           <Skeleton tone="stellar" width={50} height={12} />
@@ -71,7 +71,7 @@ export function ApiCardSkeleton() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+      <div style={{ display: "flex", gap: "var(--mkt-space-md)", flexWrap: "wrap", marginTop: "var(--mkt-space-xs)" }}>
         <Skeleton tone="stellar" width={45} height={24} borderRadius={8} />
         <Skeleton tone="stellar" width={55} height={24} borderRadius={8} />
         <Skeleton tone="stellar" width={40} height={24} borderRadius={8} />
@@ -82,7 +82,7 @@ export function ApiCardSkeleton() {
           marginTop: "auto",
           display: "flex",
           flexDirection: "column",
-          gap: 12,
+          gap: "var(--mkt-space-lg)",
         }}
       >
         <div className="api-card__stats" aria-hidden="true">
@@ -95,12 +95,12 @@ export function ApiCardSkeleton() {
         </div>
 
         <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-          }}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "var(--mkt-space-lg)",
+        }}
         >
           <Skeleton tone="stellar" width={100} height={36} borderRadius={14} />
           <Skeleton tone="stellar" width={60} height={14} />
@@ -322,25 +322,25 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false }: BookmarkBu
             top: "48px",
             right: "8px",
             zIndex: 100,
-            width: 230,
+            width: "var(--mkt-card-popover-width)",
             background: "var(--surface-strong, rgba(17,24,46,0.98))",
             border: "1px solid var(--line-strong, rgba(169,184,255,0.28))",
-            borderRadius: 12,
+            borderRadius: "var(--mkt-card-popover-radius)",
             boxShadow: "var(--shadow, 0 24px 80px rgba(3,8,22,0.45))",
             padding: "10px 10px 8px",
             backdropFilter: "blur(20px)",
           }}
         >
-          <p style={{ margin: "0 0 8px", fontSize: "0.8rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <p style={{ margin: "0 0 var(--mkt-space-md)", fontSize: "var(--mkt-font-size-sm)", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
             Save to collection
           </p>
 
-          {collections.length === 0 && !showNew && <p style={{ color: "var(--muted)", fontSize: "0.82rem", margin: "0 0 8px" }}>No collections yet.</p>}
+          {collections.length === 0 && !showNew && <p style={{ color: "var(--muted)", fontSize: "var(--mkt-font-size-popover)", margin: "0 0 var(--mkt-space-md)" }}>No collections yet.</p>}
 
           {collections.map((col) => (
             <label
               key={col.id}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 4px", borderRadius: 6, cursor: "pointer", fontSize: "0.88rem", color: "var(--text)" }}
+              style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-md)", padding: "var(--mkt-space-xs) var(--mkt-space-sm)", borderRadius: "var(--mkt-radius-sm, 6px)", cursor: "pointer", fontSize: "var(--mkt-font-size-popover-label)", color: "var(--text)" }}
             >
               <input
                 type="checkbox"
@@ -350,12 +350,12 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false }: BookmarkBu
                 style={{ accentColor: "var(--accent)", width: 15, height: 15 }}
               />
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{col.name}</span>
-              <span style={{ color: "var(--muted)", fontSize: 11 }}>{col.endpointIds.length}</span>
+              <span style={{ color: "var(--muted)", fontSize: "var(--mkt-font-size-xs)" }}>{col.endpointIds.length}</span>
             </label>
           ))}
 
           {showNew ? (
-            <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+            <div style={{ display: "flex", gap: "var(--mkt-space-sm)", marginTop: "var(--mkt-card-margin-top-sm)" }}>
               <input
                 ref={newInputRef}
                 value={newName}
@@ -363,52 +363,52 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false }: BookmarkBu
                 onKeyDown={handleNewKeyDown}
                 placeholder="Collection name"
                 aria-label="New collection name"
-                style={{
-                  flex: 1,
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid var(--accent)",
-                  borderRadius: 6,
-                  color: "var(--text)",
-                  padding: "4px 8px",
-                  fontSize: "0.82rem",
-                }}
+                 style={{
+                   flex: 1,
+                   background: "rgba(255,255,255,0.06)",
+                   border: "1px solid var(--accent)",
+                   borderRadius: "var(--mkt-radius-sm)",
+                   color: "var(--text)",
+                   padding: "var(--mkt-space-xs) var(--mkt-space-md)",
+                   fontSize: "var(--mkt-font-size-popover)",
+                 }}
               />
               <button
                 onClick={handleCreateAndAdd}
                 disabled={!newName.trim()}
                 aria-label="Create collection"
-                style={{
-                  background: "var(--accent)",
-                  border: "none",
-                  borderRadius: 6,
-                  color: "#fff",
-                  cursor: "pointer",
-                  padding: "4px 8px",
-                  fontSize: "0.82rem",
-                  fontWeight: 700,
-                }}
+                 style={{
+                   background: "var(--accent)",
+                   border: "none",
+                   borderRadius: "var(--mkt-radius-sm)",
+                   color: "#fff",
+                   cursor: "pointer",
+                   padding: "var(--mkt-space-xs) var(--mkt-space-md)",
+                   fontSize: "var(--mkt-font-size-popover)",
+                   fontWeight: 700,
+                 }}
               >
                 ✓
               </button>
             </div>
           ) : (
             <button
-              onClick={() => setShowNew(true)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                width: "100%",
-                marginTop: 8,
-                background: "none",
-                border: "1px dashed var(--line-strong, rgba(169,184,255,0.28))",
-                borderRadius: 8,
-                color: "var(--accent)",
-                cursor: "pointer",
-                padding: "5px 8px",
-                fontSize: "0.82rem",
-                fontWeight: 600,
-              }}
+               onClick={() => setShowNew(true)}
+               style={{
+                 display: "flex",
+                 alignItems: "center",
+                 gap: "var(--mkt-space-sm)",
+                 width: "100%",
+                 marginTop: "var(--mkt-space-md)",
+                 background: "none",
+                 border: "1px dashed var(--line-strong, rgba(169,184,255,0.28))",
+                 borderRadius: "var(--mkt-card-tag-radius)",
+                 color: "var(--accent)",
+                 cursor: "pointer",
+                 padding: "var(--mkt-space-xs) var(--mkt-space-md)",
+                 fontSize: "var(--mkt-font-size-popover)",
+                 fontWeight: 600,
+               }}
             >
               <span aria-hidden="true">＋</span> New collection
             </button>
@@ -652,13 +652,13 @@ export default function ApiCard({
       onContextMenu={handleContextMenu}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      style={{
-        padding: isCompact ? 10 : 12,
-        display: "flex",
-        flexDirection: "column",
-        minHeight: isCompact ? 188 : 220,
-        gap: isCompact ? 6 : 8,
-      }}
+       style={{
+         padding: isCompact ? "var(--mkt-card-compact-padding)" : "var(--mkt-card-padding)",
+         display: "flex",
+         flexDirection: "column",
+         minHeight: isCompact ? "var(--mkt-card-compact-min-height)" : "var(--mkt-card-min-height)",
+         gap: isCompact ? "var(--mkt-card-compact-gap)" : "var(--mkt-card-gap)",
+       }}
     >
       {menuPos && <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)} actions={contextActions} />}
       {/* Absolutely-positioned bookmark button in the top-right corner */}
@@ -679,63 +679,63 @@ export default function ApiCard({
          onClick={handleCompareClick}
          disabled={!canCompare}
          className="api-card__compare-btn"
-         style={{
-           position: "absolute",
-           top: "8px",
-           left: "48px",
-           zIndex: 10,
-           background: isCompared ? "var(--accent)" : "rgba(0,0,0,0.5)",
-           color: "white",
-           border: "none",
-           borderRadius: "8px",
-           padding: "4px 8px",
-           fontSize: "0.75rem",
-           fontWeight: 600,
-           cursor: canCompare ? "pointer" : "not-allowed",
-           opacity: isCompared ? 1 : 0.6,
-           transition: prefersReducedMotion ? "none" : "opacity 0.2s, background 0.2s"
-         }}
+        style={{
+            position: "absolute",
+            top: "var(--mkt-space-md)",
+            left: "48px",
+            zIndex: 10,
+            background: isCompared ? "var(--accent)" : "rgba(0,0,0,0.5)",
+            color: "white",
+            border: "none",
+            borderRadius: "var(--mkt-card-compare-radius)",
+            padding: "var(--mkt-space-xs) var(--mkt-space-md)",
+            fontSize: "var(--mkt-font-size-micro)",
+            fontWeight: 600,
+            cursor: canCompare ? "pointer" : "not-allowed",
+            opacity: isCompared ? 1 : 0.6,
+            transition: prefersReducedMotion ? "none" : "opacity 0.2s, background 0.2s"
+          }}
          aria-label={isCompared ? `Remove ${api.name} from comparison` : `Add ${api.name} to comparison`}
          aria-pressed={isCompared}
        >
          {isCompared ? "Compared" : "Compare"}
        </button>
 
-      <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div className="api-marketplace-card-header" style={{ display: "flex", gap: "var(--mkt-space-lg)", alignItems: "center" }}>
         <div
-          className="api-marketplace-card-icon"
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 10,
-            background: "rgba(255,255,255,0.04)",
-            display: "grid",
-            placeItems: "center",
-            fontWeight: 700,
-            fontSize: 20,
-            flexShrink: 0,
-          }}
+         className="api-marketplace-card-icon"
+           style={{
+             width: "var(--mkt-card-icon-size)",
+             height: "var(--mkt-card-icon-size)",
+             borderRadius: "var(--mkt-card-icon-radius)",
+             background: "rgba(255,255,255,0.04)",
+             display: "grid",
+             placeItems: "center",
+             fontWeight: 700,
+             fontSize: "var(--mkt-card-icon-font-size)",
+             flexShrink: 0,
+           }}
         >
           {api.name[0]}
         </div>
 
         <div className="api-marketplace-card-body" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-            <strong>{api.name}</strong>
-            <div style={{ color: "var(--muted)", fontSize: 12 }}>{api.provider?.name}</div>
+           <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: "var(--mkt-space-md)", alignItems: "baseline", flexWrap: "wrap" }}>
+             <strong>{api.name}</strong>
+             <div style={{ color: "var(--muted)", fontSize: "var(--mkt-font-size-micro)" }}>{api.provider?.name}</div>
           </div>
 
           {!isCompact && (
             <div
               className="api-marketplace-card-description"
-              style={{
-                color: "var(--muted)",
-                marginTop: 6,
-                overflow: "hidden",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-              }}
+               style={{
+                 color: "var(--muted)",
+                 marginTop: "var(--mkt-card-margin-top-sm)",
+                 overflow: "hidden",
+                 display: "-webkit-box",
+                 WebkitLineClamp: 2,
+                 WebkitBoxOrient: "vertical",
+               }}
             >
               {api.description}
             </div>
@@ -743,15 +743,15 @@ export default function ApiCard({
         </div>
 
         {/* Price — bookmark moved out of here, paddingRight leaves room for it */}
-        <div
-          className="api-marketplace-card-price numeric-tabular"
-          style={{ textAlign: "right", paddingRight: 36, flexShrink: 0 }}
-        >
-          <div style={{ color: "var(--muted)", fontSize: 12 }}>
-            {`$${formatPrice(pricePerCall)}`} / call
-          </div>
-          {api.rating !== undefined && (
-            <div style={{ color: "var(--muted)", marginTop: 6 }}>
+         <div
+           className="api-marketplace-card-price numeric-tabular"
+           style={{ textAlign: "right", paddingRight: "var(--mkt-card-price-padding-right)", flexShrink: 0 }}
+         >
+           <div style={{ color: "var(--muted)", fontSize: "var(--mkt-font-size-micro)" }}>
+             {`$${formatPrice(pricePerCall)}`} / call
+           </div>
+           {api.rating !== undefined && (
+             <div style={{ color: "var(--muted)", marginTop: "var(--mkt-card-margin-top-sm)" }}>
               <RatingHistogram rating={api.rating} distribution={api.ratingDistribution} placement="top-end">
                 ⭐ {api.rating}
               </RatingHistogram>
@@ -760,7 +760,7 @@ export default function ApiCard({
         </div>
       </div>
 
-      <div className="api-marketplace-card-tags" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className="api-marketplace-card-tags" style={{ display: "flex", gap: "var(--mkt-space-md)", flexWrap: "wrap" }}>
         {((api.tags as string[]) || []).slice(0, 4).map((t: string) => (
           <TagChip key={t} tag={t} active={activeTag?.toLowerCase() === t.toLowerCase()} onClick={onTagClick} />
         ))}
@@ -771,17 +771,17 @@ export default function ApiCard({
 
       <div
         style={{
-          marginTop: 10,
+          marginTop: "var(--mkt-space-md)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 12,
+          gap: "var(--mkt-space-lg)",
           flexWrap: "wrap",
         }}
       >
         <span
           style={{
-            fontSize: 12,
+            fontSize: "var(--mkt-font-size-micro)",
             color: "var(--muted)",
             fontWeight: 600,
           }}
@@ -798,7 +798,7 @@ export default function ApiCard({
           marginTop: "auto",
           display: "flex",
           flexDirection: "column",
-          gap: 12,
+          gap: "var(--mkt-space-lg)",
         }}
       >
         {/* Always render three cells so marketplace rows keep consistent heights while missing values stay scannable. */}
@@ -809,14 +809,14 @@ export default function ApiCard({
           </div>
 
           <div className="api-card__stat">
-            <span className="api-card__stat-label" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span className="api-card__stat-label" style={{ display: "inline-flex", alignItems: "center", gap: "var(--mkt-space-sm)" }}>
               <ClockIcon size={16} /> Latency
             </span>
             {renderStatValue(avgLatencyMs !== undefined ? `${avgLatencyMs} ms` : undefined)}
           </div>
 
           <div className="api-card__stat">
-            <span className="api-card__stat-label" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span className="api-card__stat-label" style={{ display: "inline-flex", alignItems: "center", gap: "var(--mkt-space-sm)" }}>
               <BoltIcon size={16} /> Uptime
             </span>
             {renderStatValue(uptimePercent !== undefined ? `${uptimePercent.toFixed(2)}%` : undefined)}
@@ -828,14 +828,14 @@ export default function ApiCard({
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            gap: 12,
+              gap: "var(--mkt-space-lg)",
             flexWrap: "wrap",
           }}
         >
           <span className="ghost-button" aria-hidden="true" style={{ display: "inline-flex", alignItems: "center" }}>
             View Details
           </span>
-          <div style={{ color: "var(--muted)", fontSize: 12 }}>
+          <div style={{ color: "var(--muted)", fontSize: "var(--mkt-font-size-micro)" }}>
             {api.rating ? (
               <RatingHistogram rating={api.rating} distribution={api.ratingDistribution} placement="top-end">
                 {api.rating} ★

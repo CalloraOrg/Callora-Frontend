@@ -1746,20 +1746,20 @@ code,
 .api-card__stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  padding: 12px 0 0;
+  gap: var(--mkt-space-lg);
+  padding: var(--mkt-space-lg) 0 0;
   border-top: 1px solid var(--line);
 }
 
 .api-card__stat {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--mkt-space-sm);
 }
 
 .api-card__stat-label {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--mkt-font-size-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1.2;
@@ -1782,13 +1782,13 @@ code,
 /* Narrow viewports (≤768px): reduce spacing and adjust stat grid. */
 @media (max-width: 768px) {
   .api-marketplace-card {
-    padding: 10px;
-    gap: 6px;
+    padding: var(--mkt-card-compact-padding);
+    gap: var(--mkt-card-compact-gap);
     min-height: auto;
   }
 
   .api-marketplace-card-header {
-    gap: 8px;
+    gap: var(--mkt-space-md);
   }
 
   .api-marketplace-card-icon {
@@ -1796,34 +1796,34 @@ code,
     height: 44px;
     min-width: 44px;
     font-size: 16px;
-    border-radius: 8px;
+    border-radius: var(--mkt-radius-sm);
   }
 
   .api-marketplace-card-price {
-    padding-right: 28px;
+    padding-right: var(--mkt-space-xl);
   }
 
   .api-card__stats {
-    gap: 8px;
-    padding: 10px 0 0;
+    gap: var(--mkt-space-md);
+    padding: var(--mkt-space-sm) 0 0;
   }
 
   .api-card__stat-label {
-    font-size: 10px;
+    font-size: var(--mkt-font-size-xs);
   }
 
   .api-card__stat-value {
-    font-size: 0.875rem;
+    font-size: var(--mkt-font-size-tag);
     white-space: normal;
     overflow-wrap: anywhere;
   }
 
   .api-marketplace-card-footer-row {
-    gap: 8px;
+    gap: var(--mkt-space-md);
   }
 
   .kbd-hint {
-    gap: 8px;
+    gap: var(--mkt-space-md);
   }
 
   .kbd-hint__item {
@@ -1834,44 +1834,44 @@ code,
 /* Extra-narrow viewports (≤480px): stack content, collapse stats. */
 @media (max-width: 480px) {
   .api-marketplace-card {
-    padding: 8px;
-    gap: 6px;
+    padding: var(--mkt-card-compact-padding);
+    gap: var(--mkt-card-compact-gap);
   }
 
   .api-marketplace-card-header {
-    gap: 6px;
+    gap: var(--mkt-card-margin-top-sm);
   }
 
   .api-marketplace-card-title-row {
     flex-direction: column;
-    gap: 2px;
+    gap: var(--mkt-space-xs);
   }
 
   .api-marketplace-card-description {
-    font-size: 0.8125rem;
+    font-size: var(--mkt-font-size-sm);
   }
 
   .api-card__stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-    padding: 8px 0 0;
+    gap: var(--mkt-card-compact-gap);
+    padding: var(--mkt-space-sm) 0 0;
   }
 
   .api-card__stat-value {
-    font-size: 0.8125rem;
+    font-size: var(--mkt-font-size-sm);
   }
 
   .api-card__compare-btn {
-    padding: 4px 6px;
-    font-size: 0.65rem;
-    left: 44px;
+    padding: var(--mkt-space-xs) var(--mkt-space-sm);
+    font-size: var(--mkt-font-size-micro);
+    left: var(--mkt-space-md);
     min-width: 36px;
     min-height: 36px;
   }
 
   .kbd-hint {
-    gap: 4px;
-    padding: 4px 0;
+    gap: var(--mkt-space-sm);
+    padding: var(--mkt-space-xs) 0;
   }
 
   .kbd-hint__item {

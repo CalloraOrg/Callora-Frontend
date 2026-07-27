@@ -344,9 +344,156 @@ describe("ApiCard responsiveness", () => {
   it("retains comfortable mode styling on wide viewports by default", () => {
     mockViewportWidth(false); // Simulate desktop
     render(<ApiCard api={mockApi} density="comfortable" />);
-    
+     
     const card = screen.getByRole("button", { name: /View details for Responsive API/i });
     expect(card.className).not.toContain("api-card--compact");
+  });
+});
+
+describe("ApiCard design tokens", () => {
+  function mockMatchMedia() {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    pinnedApisStore._reset();
+  });
+
+  beforeEach(() => {
+    mockMatchMedia();
+  });
+
+  it("card uses token-based gap instead of hardcoded inline values", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const card = screen.getByRole("button", { name: /View details for Stellar Metering API/i });
+    expect(card.style.gap).toContain("var(--mkt-");
+  });
+
+  it("card uses token-based padding instead of hardcoded inline values", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const card = screen.getByRole("button", { name: /View details for Stellar Metering API/i });
+    expect(card.style.padding).toContain("var(--mkt-");
+  });
+
+  it("card uses token-based minHeight instead of hardcoded inline values", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const card = screen.getByRole("button", { name: /View details for Stellar Metering API/i });
+    expect(card.style.minHeight).toContain("var(--mkt-");
+  });
+
+  it("card uses token-based gap in the header row", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const headerRow = document.querySelector(".api-marketplace-card-header");
+    expect(headerRow).toBeTruthy();
+    const style = (headerRow as HTMLElement).getAttribute("style") || "";
+    expect(style).toContain("var(--mkt-space-lg)");
+  });
+
+  it("card uses token-based font-size for provider name", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const providerDiv = document.querySelector(".api-marketplace-card-title-row > div[style]");
+    expect(providerDiv).toBeTruthy();
+    const style = (providerDiv as HTMLElement).getAttribute("style") || "";
+    expect(style).toContain("var(--mkt-font-size-micro)");
+  });
+
+  it("card uses token-based font-size for price label", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const priceDiv = document.querySelector(".api-marketplace-card-price > div[style]");
+    expect(priceDiv).toBeTruthy();
+    const style = (priceDiv as HTMLElement).getAttribute("style") || "";
+    expect(style).toContain("var(--mkt-font-size-micro)");
+  });
+
+  it("card uses token-based borderRadius for icon container", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const icon = document.querySelector(".api-marketplace-card-icon");
+    expect(icon).toBeTruthy();
+    const style = (icon as HTMLElement).getAttribute("style") || "";
+    expect(style).toContain("var(--mkt-card-icon-radius)");
+  });
+
+  it("card uses token-based compare button font-size", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const compareBtn = screen.getByRole("button", { name: /Add Stellar Metering API to comparison/i });
+    const style = compareBtn.getAttribute("style") || "";
+    expect(style).toContain("var(--mkt-font-size-micro)");
+  });
+
+  it("card uses token-based margin-top for description", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const description = document.querySelector(".api-marketplace-card-description");
+    expect(description).toBeTruthy();
+    const style = (description as HTMLElement).getAttribute("style") || "";
+    expect(style).toContain("var(--mkt-card-margin-top-sm)");
+  });
+
+  it("card uses token-based gap in the tags row", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const tagsRow = document.querySelector(".api-marketplace-card-tags");
+    expect(tagsRow).toBeTruthy();
+    const style = (tagsRow as HTMLElement).getAttribute("style") || "";
+    expect(style).toContain("var(--mkt-space-md)");
+  });
+
+  it("token references appear in the card's inline styles", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const card = screen.getByRole("button", { name: /View details for Stellar Metering API/i });
+    const style = card.getAttribute("style") || "";
+    expect(style).toContain("var(--mkt-card-padding)");
+    expect(style).toContain("var(--mkt-card-gap)");
+    expect(style).toContain("var(--mkt-card-min-height)");
+  });
+
+  it("compact density card uses token-based compact padding", () => {
+    render(<ApiCard api={mockApi} density="compact" />);
+
+    const card = screen.getByRole("button", { name: /View details for Stellar Metering API/i });
+    expect(card.style.padding).toContain("var(--mkt-card-compact-padding)");
+  });
+
+  it("compact density card uses token-based compact gap", () => {
+    render(<ApiCard api={mockApi} density="compact" />);
+
+    const card = screen.getByRole("button", { name: /View details for Stellar Metering API/i });
+    expect(card.style.gap).toContain("var(--mkt-card-compact-gap)");
+  });
+
+  it("key design tokens are referenced in rendered card elements", () => {
+    render(<ApiCard api={mockApi} />);
+
+    const card = screen.getByRole("button", { name: /View details for Stellar Metering API/i });
+    const cardStyle = card.getAttribute("style") || "";
+    expect(cardStyle).toContain("var(--mkt-card-padding)");
+    expect(cardStyle).toContain("var(--mkt-card-gap)");
+    expect(cardStyle).toContain("var(--mkt-card-min-height)");
+
+    const headerRow = document.querySelector(".api-marketplace-card-header");
+    expect(headerRow?.getAttribute("style")).toContain("var(--mkt-space-lg)");
+
+    const icon = document.querySelector(".api-marketplace-card-icon");
+    expect(icon?.getAttribute("style")).toContain("var(--mkt-card-icon-radius)");
   });
 });
 
