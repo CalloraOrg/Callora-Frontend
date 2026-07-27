@@ -299,47 +299,49 @@ describe('ApiUsage - prefers-reduced-motion', () => {
      });
 
      expect(screen.getByText('Call History')).toBeTruthy();
-   });
- });
-
-describe('ApiUsage - Loading Skeleton (v7)', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    Object.defineProperty(window, 'location', {
-      value: { search: '', pathname: '/api-usage' },
-      writable: true,
     });
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
+  describe('ApiUsage - Skeleton Parity', () => {
+    let originalMatchMedia: typeof window.matchMedia;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockImplementation((query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      window.matchMedia = originalMatchMedia;
+    });
+
+    it('renders skeleton rows with shape and height parity matching the final component', () => {
+      render(<ApiUsage />);
+      
+      const skeletonRows = document.querySelectorAll('.table-row');
+      expect(skeletonRows.length).toBeGreaterThan(0);
+      
+      const firstSkeletonRow = skeletonRows[1];
+      const skeletonCells = firstSkeletonRow.querySelectorAll('.skeleton-cell');
+      
+      expect(skeletonCells.length).toBe(7);
+      
+      const statusIconSkeleton = skeletonCells[2];
+      expect(statusIconSkeleton.getAttribute('style')).toContain('width: 16px');
+      expect(statusIconSkeleton.getAttribute('style')).toContain('border-radius: 50%');
+      
+      const actionButtonSkeleton = skeletonCells[6];
+      expect(actionButtonSkeleton.getAttribute('style')).toContain('width: 64px');
+      expect(actionButtonSkeleton.getAttribute('style')).toContain('height: 32px');
+    });
   });
-
-  it('renders the themed page skeleton on mount when prefers-reduced-motion is false', () => {
-    window.matchMedia = vi.fn().mockImplementation((query) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }));
-
-    render(<ApiUsage />);
-
-    // The container should show aria-busy="true" and label
-    const shell = screen.getByLabelText('API usage loading shell');
-    expect(shell).toBeTruthy();
-    expect(shell.getAttribute('aria-busy')).toBe('true');
-
-    // There should be skeleton cells and elements present
-    const skeletonElements = document.querySelectorAll('.skeleton');
-    expect(skeletonElements.length).toBeGreaterThan(0);
-    
-    // And some should have the stellar tone/theme
-    const stellarSkeletons = document.querySelectorAll('.skeleton--stellar');
-    expect(stellarSkeletons.length).toBeGreaterThan(0);
-  });
-});

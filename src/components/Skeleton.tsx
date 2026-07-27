@@ -39,10 +39,13 @@ export function SkeletonRow({ rows = 5 }: { rows?: number }) {
     <div className="table-row">
       <Skeleton width="60%" height="16px" className="skeleton-cell" />
       <Skeleton width="85%" height="16px" className="skeleton-cell" />
-      <Skeleton width="50%" height="16px" className="skeleton-cell" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Skeleton width="16px" height="16px" borderRadius="50%" className="skeleton-cell" />
+        <Skeleton width="50px" height="16px" className="skeleton-cell" />
+      </div>
       <Skeleton width="45%" height="16px" className="skeleton-cell" />
-      <Skeleton width="35%" height="16px" className="skeleton-cell" />
-      <Skeleton width="50%" height="16px" className="skeleton-cell" />
+      <Skeleton width="40%" height="16px" className="skeleton-cell" />
+      <Skeleton width="64px" height="32px" borderRadius="6px" className="skeleton-cell" />
     </div>
   );
   return (

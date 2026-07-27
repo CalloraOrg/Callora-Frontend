@@ -1,19 +1,21 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import EmptyState from '../components/EmptyState';
-import Skeleton, { SkeletonRow, ApiUsageSkeleton } from '../components/Skeleton';
-import { formatPrice } from '../utils/format';
-import type { JsonSchema } from '../components/RequestBodyEditor';
-import CallHistoryRow from '../components/CallHistoryRow';
-import Breadcrumb from '../components/Breadcrumb';
-import RequestHistoryPanel from '../components/RequestHistoryPanel';
-import ParamsBuilder from '../components/ParamsBuilder';
-import { useFetchTracker } from '../hooks/useFetchTracker';
-import { useQuota } from '../hooks/useQuota';
-import PlanNudge from '../components/PlanNudge';
-import CallsHeatmap from '../components/CallsHeatmap';
-import Tabs from '../components/Tabs';
-import { Icons } from '../utils/icons';
-import { LinkIcon } from '../components/icons';
+import EmptyState from './components/EmptyState';
+import Skeleton, { SkeletonRow } from './components/Skeleton';
+import { formatPrice } from './utils/format';
+import type { JsonSchema } from './components/RequestBodyEditor';
+import CallHistoryRow from './components/CallHistoryRow';
+import Breadcrumb from './components/Breadcrumb';
+import RequestHistoryPanel from './components/RequestHistoryPanel';
+import ParamsBuilder from './components/ParamsBuilder';
+import { useFetchTracker } from './hooks/useFetchTracker';
+import { useQuota } from './hooks/useQuota';
+import PlanNudge from './components/PlanNudge';
+import CallsHeatmap from './components/CallsHeatmap';
+import Tabs from './components/Tabs';
+import { Icons } from './utils/icons';
+import { LinkIcon } from './components/icons';
+import KbdHint from './components/KbdHint';
+import { SHORTCUTS } from './hooks/useGlobalShortcuts';
 import {
   clearHistory,
   loadHistory,
