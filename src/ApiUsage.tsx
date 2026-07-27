@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import EmptyState from './components/EmptyState';
-import Skeleton from './components/Skeleton';
-import CallHistoryRow from './pages/CallHistoryRow';
+import Skeleton, { SkeletonRow } from './components/Skeleton';
 import { formatPrice } from './utils/format';
 import type { JsonSchema } from './components/RequestBodyEditor';
 import CallHistoryRow from './components/CallHistoryRow';
