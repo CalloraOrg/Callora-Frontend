@@ -3,7 +3,7 @@
  *
  * Combines a color token (--sb-<status>-bg/fg/border) with a unique SVG
  * background pattern (defined in src/styles/patterns.css) so that each
- * status is distinguishable by texture as well as by color.  This satisfies
+ * status is distinguishable by texture as well as by color. This satisfies
  * WCAG 1.4.1 (Use of Color) and helps users with deuteranopia/protanopia.
  *
  * Usage:
@@ -17,50 +17,51 @@
  *   className — passed through to the root element for layout composition
  */
 
-import React from 'react';
+import React from "react";
+import "../styles/patterns.css";
 
 /** All supported status variants. */
 export type StatusVariant =
-  | 'success'
-  | 'error'
-  | 'warning'
-  | 'operational'
-  | 'degraded'
-  | 'down'
-  | 'pending'
-  | 'maintenance';
+  | "success"
+  | "error"
+  | "warning"
+  | "operational"
+  | "degraded"
+  | "down"
+  | "pending"
+  | "maintenance";
 
 const DEFAULT_LABELS: Record<StatusVariant, string> = {
-  success: 'Operational',
-  operational: 'Operational',
-  error: 'Error',
-  down: 'Down',
-  warning: 'Degraded',
-  degraded: 'Degraded',
-  pending: 'Pending',
-  maintenance: 'Maintenance',
+  success: "Operational",
+  operational: "Operational",
+  error: "Error",
+  down: "Down",
+  warning: "Degraded",
+  degraded: "Degraded",
+  pending: "Pending",
+  maintenance: "Maintenance",
 };
 
 const PATTERN_DESCRIPTIONS: Record<StatusVariant, string> = {
-  success: 'solid baseline',
-  operational: 'solid baseline',
-  error: 'diagonal stripes',
-  down: 'diagonal stripes',
-  warning: 'opposite diagonal stripes',
-  degraded: 'opposite diagonal stripes',
-  pending: 'dot pattern',
-  maintenance: 'crosshatch pattern',
+  success: "solid baseline",
+  operational: "solid baseline",
+  error: "diagonal stripes",
+  down: "diagonal stripes",
+  warning: "opposite diagonal stripes",
+  degraded: "opposite diagonal stripes",
+  pending: "dot pattern",
+  maintenance: "crosshatch pattern",
 };
 
 const PATTERN_KEYS: Record<StatusVariant, string> = {
-  success: 'baseline',
-  operational: 'baseline',
-  error: 'stripes',
-  down: 'stripes',
-  warning: 'opposite-stripes',
-  degraded: 'opposite-stripes',
-  pending: 'dots',
-  maintenance: 'crosshatch',
+  success: "baseline",
+  operational: "baseline",
+  error: "stripes",
+  down: "stripes",
+  warning: "opposite-stripes",
+  degraded: "opposite-stripes",
+  pending: "dots",
+  maintenance: "crosshatch",
 };
 
 /**
@@ -70,17 +71,17 @@ const PATTERN_KEYS: Record<StatusVariant, string> = {
  * directly; the other two values share names with existing StatusVariants.
  */
 export function apiStatusToVariant(
-  status: 'operational' | 'degraded' | 'maintenance' | undefined,
+  status: "operational" | "degraded" | "maintenance" | undefined,
 ): StatusVariant {
   switch (status) {
-    case 'operational':
-      return 'operational';
-    case 'degraded':
-      return 'degraded';
-    case 'maintenance':
-      return 'maintenance';
+    case "operational":
+      return "operational";
+    case "degraded":
+      return "degraded";
+    case "maintenance":
+      return "maintenance";
     default:
-      return 'pending';
+      return "pending";
   }
 }
 
@@ -90,10 +91,10 @@ function Dot({ status }: { status: StatusVariant }) {
     <span
       aria-hidden="true"
       style={{
-        display: 'inline-block',
-        width: '0.5em',
-        height: '0.5em',
-        borderRadius: '50%',
+        display: "inline-block",
+        width: "0.5em",
+        height: "0.5em",
+        borderRadius: "50%",
         backgroundColor: `var(--sb-${status}-fg)`,
         flexShrink: 0,
       }}
@@ -101,7 +102,7 @@ function Dot({ status }: { status: StatusVariant }) {
   );
 }
 
-export type PatternStyle = 'default' | 'dense' | 'high-contrast';
+export type PatternStyle = "default" | "dense" | "high-contrast";
 
 type Props = {
   status: StatusVariant;
@@ -119,17 +120,17 @@ export function StatusBadge({
   label,
   className,
   showPattern = true,
-  patternStyle = 'default',
+  patternStyle = "default",
 }: Props) {
   const visibleLabel = label ?? DEFAULT_LABELS[status];
   const patternDescription = PATTERN_DESCRIPTIONS[status];
   const patternKey = PATTERN_KEYS[status];
 
   const patternModifierClass = !showPattern
-    ? 'sb-pattern--disabled'
-    : patternStyle !== 'default'
+    ? "sb-pattern--disabled"
+    : patternStyle !== "default"
       ? `sb-pattern--${patternStyle}`
-      : '';
+      : "";
 
   const rootClassNames = [
     `sb-pattern-${status}`,
@@ -137,7 +138,7 @@ export function StatusBadge({
     className,
   ]
     .filter(Boolean)
-    .join(' ');
+    .join(" ");
 
   return (
     <span
@@ -148,27 +149,24 @@ export function StatusBadge({
       data-pattern-enabled={showPattern}
       data-pattern-style={patternStyle}
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.375em',
-        padding: '0.2em 0.6em',
-        borderRadius: '0.375em',
-        fontSize: '0.75rem',
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.375em",
+        padding: "0.2em 0.6em",
+        borderRadius: "0.375em",
+        fontSize: "0.75rem",
         fontWeight: 600,
         lineHeight: 1.4,
-        letterSpacing: '0.02em',
+        letterSpacing: "0.02em",
         backgroundColor: `var(--sb-${status}-bg)`,
         color: `var(--sb-${status}-fg)`,
         border: `1px solid var(--sb-${status}-border)`,
-        // Ensure the pattern SVG uses the foreground color
-        // (SVG uses `currentColor` for strokes/fills)
-        whiteSpace: 'nowrap',
+        whiteSpace: "nowrap",
       }}
-      // Expose status semantically; the visible text already conveys it but
-      // role="status" would be too assertive for a static badge.
+      // Expose status semantically
       role="img"
       aria-label={visibleLabel}
-      aria-description={`Pattern-based status badge: ${visibleLabel} with ${showPattern ? patternDescription : 'no pattern'}`}
+      aria-description={`Pattern-based status badge: ${visibleLabel} with ${showPattern ? patternDescription : "no pattern"}`}
     >
       <Dot status={status} />
       {visibleLabel}
