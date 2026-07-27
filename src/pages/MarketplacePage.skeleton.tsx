@@ -43,7 +43,7 @@ export default function MarketplacePageSkeleton() {
 
       {/* ── Main layout ── */}
       <div className="marketplace-layout">
-        <aside className="marketplace-sidebar">
+        <aside className="marketplace-sidebar filters-sidebar">
           <FiltersSidebarSkeleton />
         </aside>
 

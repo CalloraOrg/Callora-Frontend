@@ -134,23 +134,23 @@ export default function CodeExample({
   return (
     <div className="code-sample">
       {/* Header Section: Contains Language Tabs and Copy Button */}
-      <div
-        className="no-print"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 12px",
-          background: "var(--bg-subtle, #f9f9f9)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
+      <div className="no-print code-sample__header">
         {/* Navigation Tabs List with Roving Tabindex */}
         <div 
           ref={tablistRef}
           className="code-sample__tabs" 
           role="tablist"
           aria-label="Code language"
+          style={{
+            display: "flex",
+            flexWrap: "nowrap",
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: "none",
+            gap: "2px",
+            flex: "1 1 auto",
+            minWidth: 0,
+          }}
         >
           {languages.map((lang, index) => (
             <button
@@ -163,17 +163,30 @@ export default function CodeExample({
               className={`code-sample__tab ${resolvedLanguage === lang ? 'code-sample__tab--active' : ''}`}
               onClick={() => setActiveLanguage(lang)}
               onKeyDown={(e) => handleTabKeyDown(e, index)}
+              style={{
+                flexShrink: 0,
+                minHeight: "36px",
+                minWidth: "44px",
+                padding: "6px 12px",
+                whiteSpace: "nowrap",
+              }}
             >
               {lang}
             </button>
           ))}
         </div>
 
-        {/* Action: Copy to Clipboard */}
+        {/* Action: Copy to Clipboard.
+             Full-width on narrow viewports so it's an easy tap target. */}
         <button
           className={`ghost-button code-sample__copy ${copied ? 'code-sample__copy--success' : ''}`}
           onClick={handleCopy}
           aria-label="Copy code snippet to clipboard"
+          style={{
+            flexShrink: 0,
+            minHeight: "36px",
+            minWidth: "75px",
+          }}
         >
           {copied ? (
             <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
@@ -185,13 +198,16 @@ export default function CodeExample({
         </button>
       </div>
 
-      {/* Code Display Area */}
+      {/* Code Display Area.
+           Horizontal scroll on narrow viewports so long lines
+           don't force the page to overflow. */}
       <div
         role="tabpanel"
         id={`tabpanel-${resolvedLanguage}`}
         aria-labelledby={`tab-${resolvedLanguage}`}
         tabIndex={0}
         className="code-sample__panel"
+        style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
       >
         <pre className="code-sample__pre">
           <code>{activeCode}</code>

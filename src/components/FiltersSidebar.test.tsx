@@ -279,9 +279,13 @@ describe("FiltersSidebar", () => {
       expect(screen.queryByTestId("filters-zero-results")).toBeNull();
     });
 
-    it("does NOT render zero-results block when resultCount is 0 but NO filters active", () => {
+    it("renders empty variant when resultCount=0 and NO filters active (genuine empty marketplace)", () => {
       render(<FiltersSidebar {...baseProps} resultCount={0} />);
-      expect(screen.queryByTestId("filters-zero-results")).toBeNull();
+      const block = screen.getByTestId("filters-zero-results");
+      expect(block).toBeTruthy();
+      expect(
+        block.querySelector('[data-testid="empty-state-empty"]'),
+      ).toBeTruthy();
     });
 
     it("renders zero-results illustration when resultCount=0 and categories selected", () => {
@@ -323,6 +327,20 @@ describe("FiltersSidebar", () => {
         <FiltersSidebar {...baseProps} favoritesOnly={true} resultCount={0} />,
       );
       expect(screen.getByTestId("filters-zero-results")).toBeTruthy();
+    });
+
+    it("renders filtered variant when resultCount=0 AND filters active", () => {
+      render(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["AI/ML"])}
+          resultCount={0}
+        />,
+      );
+      const block = screen.getByTestId("filters-zero-results");
+      expect(
+        block.querySelector('[data-testid="empty-state-filtered"]'),
+      ).toBeTruthy();
     });
 
     it("uses compact size EmptyState inside the sidebar", () => {
@@ -384,7 +402,7 @@ describe("FiltersSidebar", () => {
       );
       const block = screen.getByTestId("filters-zero-results") as HTMLElement;
       expect(block.style.borderTop).toMatch(/var\(--line\)/);
-      expect(block.style.paddingTop).toBe("12px");
+      expect(block.style.paddingTop).toMatch(/var\(--mkt-space-lg/);
     });
 
     it("zero-results wrapper keeps role='status' and aria-live='polite' for assistive tech", () => {
@@ -502,6 +520,52 @@ describe("FiltersSidebar", () => {
     });
   });
 
+  describe("aria-live announcements", () => {
+    it("renders a LiveRegion element for screen-reader announcements", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion.getAttribute("aria-live")).toBe("polite");
+      expect(liveRegion.getAttribute("role")).toBe("status");
+    });
+
+    it("announces when a category is selected", async () => {
+      render(<FiltersSidebar {...baseProps} selectedCategories={new Set(["AI/ML"])} />);
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toContain("AI/ML");
+      expect(liveRegion.textContent).toContain("Filters active");
+    });
+
+    it("announces when all filters are cleared", () => {
+      const clearFilters = vi.fn();
+      render(<FiltersSidebar {...baseProps} clearFilters={clearFilters} />);
+      fireEvent.click(screen.getByText("Clear filters"));
+      expect(clearFilters).toHaveBeenCalled();
+      // handleClearFilters calls setAnnouncement which triggers the effect
+    });
+
+    it("announces zero results message via the LiveRegion", async () => {
+      render(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["Data & Analytics"])}
+          resultCount={0}
+        />,
+      );
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toContain("No APIs match");
+    });
+
+    it("does not announce when resultCount transitions from undefined to 0 without active filters", async () => {
+      render(<FiltersSidebar {...baseProps} resultCount={0} />);
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toBe("");
+    });
+  });
+
   describe("responsive behaviour", () => {
     it("renders the mobile toggle button", () => {
       const { container } = render(<FiltersSidebar {...baseProps} />);
@@ -526,6 +590,33 @@ describe("FiltersSidebar", () => {
       toggle.style.display = "inline-block";
       fireEvent.click(toggle);
       expect(screen.getByRole("dialog", { name: /Filters/i })).toBeTruthy();
+    });
+  });
+
+  describe("keyboard shortcut hints", () => {
+    it("renders kbd-hint with filter shortcuts", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const kbdHint = screen.getByRole("complementary", { name: "Filter keyboard shortcuts" });
+      expect(kbdHint).toBeTruthy();
+      expect(kbdHint.querySelector(".kbd-hint__key")).toBeTruthy();
+    });
+
+    it("shows slash shortcut for focusing search", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      expect(screen.getByText("/")).toBeTruthy();
+      expect(screen.getByText("Focus search")).toBeTruthy();
+    });
+
+    it("shows Escape shortcut for closing filters", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      expect(screen.getByText("Esc")).toBeTruthy();
+      expect(screen.getByText("Close filters")).toBeTruthy();
+    });
+
+    it("has proper aria-label on kbd-hint", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const kbdHint = screen.getByRole("complementary", { name: "Filter keyboard shortcuts" });
+      expect(kbdHint.getAttribute("aria-label")).toBe("Filter keyboard shortcuts");
     });
   });
 });

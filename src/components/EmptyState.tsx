@@ -1,7 +1,14 @@
 import React from "react";
 import ExternalLink from "./ExternalLink";
+import { EmptyStateSkeleton } from "./Skeleton";
 
-export type EmptyStateVariant = "empty" | "api-detail" | "filtered" | "error" | "api-card";
+export type EmptyStateVariant =
+  | "empty"
+  | "api-detail"
+  | "filtered"
+  | "error"
+  | "plan-badge"
+  | "risk-gauge";
 export type EmptyStateSize = "default" | "compact";
 
 export interface EmptyStateProps {
@@ -9,12 +16,19 @@ export interface EmptyStateProps {
   size?: EmptyStateSize;
   title?: string;
   message?: string;
+  /** @deprecated Use `message` instead */
+  description?: string;
   onClearFilters?: () => void;
   onRetry?: () => void | Promise<void>;
   action?: {
     label: string;
     onClick: () => void;
   };
+  secondaryAction?: {
+    label: string;
+    onClick: () => void;
+  };
+  loading?: boolean;
 }
 
 /**
@@ -211,6 +225,142 @@ function EmptyIllustration({
     );
   }
 
+  if (variant === "plan-badge") {
+    // Illustration: a tiered medal/ribbon motif representing plan tiers,
+    // with an accent sparkle to suggest "upgrade potential".
+    // Uses --plan-free-bg, --plan-pro-fg, --plan-enterprise-fg tokens
+    // that are already defined by the PlanBadge component.
+    return (
+      <svg
+        width={box}
+        height={box}
+        viewBox="0 0 64 64"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {/* Medal circle */}
+        <circle
+          cx="32"
+          cy="30"
+          r="14"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+        />
+        {/* Inner medal ring (accent) */}
+        <circle
+          cx="32"
+          cy="30"
+          r="9"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+        {/* Ribbon left */}
+        <path
+          d="M26 43L20 54l6-2 4 4 3-8"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        {/* Ribbon right */}
+        <path
+          d="M38 43L44 54l-6-2-4 4-3-8"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        {/* Star / tier symbol in centre */}
+        <path
+          d="M32 23l1.5 4.5H38l-3.8 2.8 1.5 4.5L32 32l-3.7 2.8 1.5-4.5L26 27.5h4.5z"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+          fill="none"
+        />
+        {/* Decorative sparkle dots — tier-colour accents */}
+        <circle cx="14" cy="16" r="1.5" fill="var(--accent)" stroke="none" />
+        <circle cx="50" cy="13" r="1.25" fill="var(--accent)" stroke="none" />
+        {/* Subtle top dashes — upgrade-path metaphor */}
+        <path
+          d="M10 10h12M18 6h8"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.7}
+          strokeDasharray={size === "compact" ? "2 2" : "3 3"}
+          opacity="0.5"
+        />
+      </svg>
+    );
+  }
+
+  if (variant === "risk-gauge") {
+    const cx = 32;
+    const cy = 34;
+    const r = 20;
+    const startAngle = -210;
+    const endAngle = 30;
+
+    function polar(angle: number, radius: number) {
+      const rad = ((angle - 90) * Math.PI) / 180;
+      return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+    }
+
+    const arcStart = polar(startAngle, r);
+    const arcEnd = polar(endAngle, r);
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+
+    return (
+      <svg
+        width={box}
+        height={box}
+        viewBox="0 0 64 64"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {/* Gauge arc track */}
+        <path
+          d={`M ${arcStart.x} ${arcStart.y} A ${r} ${r} 0 ${largeArc} 1 ${arcEnd.x} ${arcEnd.y}`}
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.7}
+          opacity="0.35"
+        />
+        {/* Gauge arc fill (lower half — safer zone) */}
+        <path
+          d={`M ${cx} ${cy} L ${arcStart.x} ${arcStart.y} A ${r} ${r} 0 0 1 ${cx} ${cy + 6} Z`}
+          stroke="var(--accent)"
+          strokeWidth={accentStroke * 0.5}
+          opacity="0.5"
+        />
+        {/* Needle */}
+        <line
+          x1={cx}
+          y1={cy}
+          x2={cx + 3}
+          y2={cy - r + 4}
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+        <circle cx={cx} cy={cy} r={3} stroke="var(--accent)" strokeWidth={accentStroke} />
+        {/* Shield outline behind the gauge */}
+        <path
+          d="M32 6l14 7v12c0 10.5-5.6 19.2-14 23-8.4-3.8-14-12.5-14-23V13l14-7z"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.8}
+          opacity="0.6"
+        />
+        {/* Decorative sparkle dots */}
+        <circle cx="16" cy="12" r="1.5" fill="var(--accent)" stroke="none" />
+        <circle cx="48" cy="14" r="1.25" fill="var(--accent)" stroke="none" />
+        <path
+          d="M52 48l2 2M54 52l1.5 1.5"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+      </svg>
+    );
+  }
+
   return (
     <svg
       width={box}
@@ -249,14 +399,22 @@ function EmptyIllustration({
 }
 
 /**
- * EmptyState component with three distinct variants for different marketplace states.
+ * EmptyState component with distinct variants for different marketplace states.
  *
  * Variants:
- * - empty:    Default state when no APIs exist in the marketplace.
+ * - empty:      Default state when no APIs exist in the marketplace.
  * - api-detail: A requested API listing is unavailable. Uses an API-card illustration.
- * - filtered: Active filters yield zero results. Shows a "Clear all filters" CTA.
- *             Used inline inside FiltersSidebar (compact) and the results grid (default).
- * - error:    Network/fetch failure. Shows a "Retry" button plus a status link.
+ * - filtered:   Active filters yield zero results. Shows a "Clear all filters" CTA.
+ *               Used inline inside FiltersSidebar (compact) and the results grid (default).
+ * - error:      Network/fetch failure. Shows a "Retry" button plus a status link.
+ * - plan-badge: No plan/tier is attached to the current API or account.
+ *               Shows a medal-and-ribbon illustration with a "Choose a plan" CTA
+ *               so users can select a tier (free/pro/enterprise) and begin receiving
+ *               calls.  Used by the PlanBadge page (issue #529).
+ * - risk-gauge: No risk assessment data is available yet.
+ *               Shows a shield-and-gauge illustration with a "Run assessment" CTA
+ *               so users can evaluate their API risk profile.  Used by the
+ *               RiskGauge page (issue #664).
  *
  * Sizes:
  * - default:  Full-size layout for result areas (48px padding, 80px illustration).
@@ -284,10 +442,24 @@ export default function EmptyState({
   size = "default",
   title,
   message,
+  description,
   onClearFilters,
   onRetry,
   action,
+  secondaryAction,
+  loading = false,
 }: EmptyStateProps) {
+  const resolvedMessage = message ?? description;
+  const resolvedAction = action ?? (ctaLabel && onCta ? { label: ctaLabel, onClick: onCta } : undefined);
+
+  if (loading) {
+    return (
+      <EmptyStateSkeleton
+        size={size}
+        hasAction={!!resolvedAction || (variant === "filtered" && !!onClearFilters) || (variant === "error" && !!onRetry)}
+      />
+    );
+  }
   const defaults = {
     empty: {
       title: "No APIs available",
@@ -315,10 +487,34 @@ export default function EmptyState({
           ? "Error loading results. Please retry."
           : "We encountered an error fetching the marketplace. Please try again.",
     },
+    /**
+     * plan-badge variant — shown on the PlanBadge page when no plan data
+     * is associated with the current account/API.  The CTA guides users
+     * toward choosing a plan (issue #529).
+     */
+    "plan-badge": {
+      title: "No plan selected",
+      message:
+        size === "compact"
+          ? "Choose a plan to unlock API access."
+          : "This API doesn't have a plan attached yet. Select a plan tier to set rate limits and start receiving calls.",
+    },
+    /**
+     * risk-gauge variant — shown on the RiskGauge page when no risk
+     * assessment data is available yet.  The CTA guides users toward
+     * running their first risk assessment (issue #664).
+     */
+    "risk-gauge": {
+      title: "No risk data yet",
+      message:
+        size === "compact"
+          ? "Run an assessment to evaluate your API risk profile."
+          : "Run a risk assessment to evaluate your API's security, reliability, and compliance posture.",
+    },
   };
 
   const finalTitle = title ?? defaults[variant].title;
-  const finalMessage = message ?? defaults[variant].message;
+  const finalMessage = resolvedMessage ?? defaults[variant].message;
   const [isRetrying, setIsRetrying] = React.useState(false);
 
   const handleRetry = async () => {
@@ -430,14 +626,14 @@ export default function EmptyState({
 
       <p style={messageStyle}>{finalMessage}</p>
 
-      {action && (
+      {resolvedAction && (
         <button
           className={isCompact ? "ghost-button" : "primary-button"}
-          onClick={action.onClick}
+          onClick={resolvedAction.onClick}
           style={buttonStyle}
           type="button"
         >
-          {action.label}
+          {resolvedAction.label}
         </button>
       )}
 

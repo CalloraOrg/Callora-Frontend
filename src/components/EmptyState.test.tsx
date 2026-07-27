@@ -15,7 +15,7 @@ describe("EmptyState", () => {
   });
 
   describe("variants", () => {
-    const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
+    const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge"];
 
     it.each(variants)("renders the %s variant illustration", (variant) => {
       render(<EmptyState variant={variant} />);
@@ -31,6 +31,8 @@ describe("EmptyState", () => {
         "api-detail": /API not found/i,
         filtered: /No results found/i,
         error: /Failed to load APIs/i,
+        "plan-badge": /No plan selected/i,
+        "risk-gauge": /No risk data yet/i,
       };
       expect(screen.getByText(titles[variant])).toBeTruthy();
     });
@@ -319,6 +321,45 @@ describe("EmptyState", () => {
         expect(hexRe.test(html)).toBe(false);
         unmount();
       });
+    });
+  });
+
+  describe("loading skeleton", () => {
+    it("renders EmptyStateSkeleton when loading prop is true", () => {
+      const { container } = render(<EmptyState loading />);
+      const skeleton = container.querySelector(".empty-state-skeleton");
+      expect(skeleton).toBeTruthy();
+      expect(skeleton?.getAttribute("aria-busy")).toBe("true");
+      expect(skeleton?.getAttribute("aria-label")).toBe("Loading empty state");
+      
+      const shimmerElements = skeleton?.querySelectorAll(".skeleton");
+      expect(shimmerElements?.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("applies compact classes/styles for compact size skeleton", () => {
+      const { container } = render(<EmptyState loading size="compact" />);
+      const skeleton = container.querySelector(".empty-state-skeleton");
+      expect(skeleton?.classList.contains("empty-state-skeleton--compact")).toBe(true);
+      expect((skeleton as HTMLElement).style.padding).toBe("16px 12px");
+    });
+
+    it("applies default styles and min-height for default size skeleton", () => {
+      const { container } = render(<EmptyState loading size="default" />);
+      const skeleton = container.querySelector(".empty-state-skeleton");
+      expect(skeleton?.classList.contains("empty-state-skeleton--compact")).toBe(false);
+      expect((skeleton as HTMLElement).style.minHeight).toBe("300px");
+      expect((skeleton as HTMLElement).style.padding).toBe("48px 32px");
+    });
+
+    it("renders action button placeholder only when hasAction is determined", () => {
+      const { container: noAction } = render(<EmptyState loading />);
+      const initialSkeletonsCount = noAction.querySelectorAll(".skeleton").length;
+
+      const { container: withAction } = render(
+        <EmptyState loading action={{ label: "Go", onClick: () => {} }} />
+      );
+      const withActionSkeletonsCount = withAction.querySelectorAll(".skeleton").length;
+      expect(withActionSkeletonsCount).toBe(initialSkeletonsCount + 1);
     });
   });
 });

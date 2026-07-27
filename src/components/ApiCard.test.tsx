@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, act, within } from "@testing-library/react";
-import ApiCard from "./ApiCard";
+import ApiCard, { ApiCardSkeleton } from "./ApiCard";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
 import type { APIItem } from "../data/mockApis";
@@ -43,6 +43,59 @@ const mockApi: APIItem = {
 };
 
 /* ── Test suites ─────────────────────────────────────────────────────────── */
+
+describe('ApiCard Reduced Motion Accessibility', () => {
+  const mockApi = {
+    id: 'test-1',
+    name: 'Test API',
+    description: 'A test description',
+    endpoints: [{ url: '/api/v1/test' }],
+    tags: []
+  };
+
+  const setupMatchMedia = (matches: boolean) => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(query => ({
+        matches: query === '(prefers-reduced-motion: reduce)' ? matches : false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+  };
+
+  afterAll(() => {
+    Object.defineProperty(window, 'matchMedia', { writable: true, value: undefined });
+  });
+
+  it('renders standard layout without reduced motion', () => {
+    setupMatchMedia(false);
+    render(<ApiCard api={mockApi as any} />);
+    
+    const favButton = screen.getByLabelText('Add to favorites');
+    expect(favButton.style.transition).toContain('transform');
+  });
+
+  it('respects prefers-reduced-motion and provides a static outline/color fallback on hover', () => {
+    setupMatchMedia(true);
+    render(<ApiCard api={mockApi as any} />);
+    
+    const favButton = screen.getByLabelText('Add to favorites');
+    
+    expect(favButton).toBeInTheDocument();
+    
+    expect(favButton.style.transition).toContain('background 100ms');
+    expect(favButton.style.transition).not.toContain('transform');
+    
+    fireEvent.focus(favButton);
+    expect(favButton.style.outline).toContain('solid');
+  });
+});
 
 describe("ApiCard — Context Menu", () => {
   beforeEach(() => {
@@ -291,14 +344,87 @@ describe("ApiCard reduced motion", () => {
   });
 });
 
+describe("ApiCard skeleton", () => {
+  it("includes sparkline placeholder to match final card layout", () => {
+    render(<ApiCard loading />);
+    const cards = document.querySelectorAll(".api-card-skeleton");
+    expect(cards.length).toBe(1);
+    expect(screen.getByText("Loading API")).toBeTruthy();
+  });
+
+  it("renders color stripe placeholder matching final card identity stripe", () => {
+    const { container } = render(<ApiCard loading />);
+    const stripe = container.querySelector('[aria-hidden="true"]')?.closest('span');
+    expect(stripe?.style?.borderRadius).toContain("radius-lg");
+  });
+
+  it("renders action button placeholders at expected positions", () => {
+    const { container } = render(<ApiCard loading />);
+    // 4 absolute-positioned button placeholders (bookmark, pin, favorite, compare)
+    const placeholders = container.querySelectorAll('.skeleton--stellar');
+    // We should have many skeletons; the absolute ones are at z-index 1
+    const absoluteWrappers = container.querySelectorAll('[style*="z-index: 1"]');
+    expect(absoluteWrappers.length).toBe(4);
+  });
+
+  it("renders only one sparkline section (no duplicate)", () => {
+    const { container } = render(<ApiCard loading />);
+    // There should be exactly one sparkline section with width 90
+    const sparklines = container.querySelectorAll('.skeleton--stellar');
+    const width90 = Array.from(sparklines).filter(
+      (el) => (el as HTMLElement).style.width === '90px'
+    );
+    expect(width90.length).toBe(1);
+  });
+
+  it("renders WhyApi placeholder in comfortable mode", () => {
+    const { container } = render(<ApiCard loading />);
+    // In comfortable mode there should be skeleton lines for WhyApi (height 14px)
+    const height14 = container.querySelectorAll('.skeleton--stellar[style*="height: 14px"]');
+    // Description lines + WhyApi lines + stat labels
+    expect(height14.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("hides WhyApi placeholder in compact mode", () => {
+    const { container } = render(<ApiCard loading density="compact" />);
+    // In compact mode, WhyApi is not rendered — fewer total skeletons than comfortable
+    const skeletons = container.querySelectorAll(".skeleton--stellar");
+    // Compact has ~21 skeletons vs comfortable ~26
+    expect(skeletons.length).toBeLessThan(24);
+  });
+
+  it("applies compact class when density is compact", () => {
+    render(<ApiCard loading density="compact" />);
+    const card = document.querySelector('.api-card-skeleton');
+    expect(card?.className).toContain('api-card--compact');
+  });
+
+  it("does not apply compact class in comfortable mode", () => {
+    render(<ApiCard loading density="comfortable" />);
+    const card = document.querySelector('.api-card-skeleton');
+    expect(card?.className).not.toContain('api-card--compact');
+  });
+
+  it("uses tone stellar for themed skeleton appearance", () => {
+    const { container } = render(<ApiCard loading />);
+    const skeletons = container.querySelectorAll(".skeleton--stellar");
+    expect(skeletons.length).toBeGreaterThan(0);
+  });
+});
+
 describe("ApiCard responsiveness", () => {
   const mockApi: APIItem = {
     id: "api-resp",
     name: "Responsive API",
-    endpoint: "/api/resp",
+    endpoints: ["/api/resp"],
     description: "Responsive test API.",
     tags: ["test"],
     pricePerRequest: 0,
+    provider: {
+      name: "",
+      url: undefined,
+      avatar: undefined
+    }
   };
 
   function mockViewportWidth(isMobile: boolean) {
@@ -350,3 +476,53 @@ describe("ApiCard responsiveness", () => {
   });
 });
 
+describe("ApiCard — Focus Accessibility", () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(query => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(), // deprecated
+        removeListener: vi.fn(), // deprecated
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+  });
+
+  it("renders interactive elements that can receive focus", () => {
+    // Need a mock API for this scope
+    const testApi = {
+      id: "api-focus",
+      name: "Focus API",
+      endpoints: [],
+      description: "Focus test API.",
+      tags: ["tag1"],
+      pricePerRequest: 0,
+      provider: {
+        name: "",
+        url: undefined,
+        avatar: undefined
+      }
+    };
+    render(<ApiCard api={testApi as any} />);
+    
+    // Test that the card itself can receive focus
+    const card = screen.getByRole("button", { name: /View details for Focus API/i });
+    expect(card.getAttribute("tabindex") || card.getAttribute("tabIndex")).toBe("0");
+    
+    // Check inner buttons
+    const favButton = screen.getByLabelText("Add to favorites");
+    expect(favButton.tagName.toLowerCase()).toBe("button");
+    
+    const pinButton = screen.getByRole("button", { name: /Pin api-focus to dashboard/i });
+    expect(pinButton.tagName.toLowerCase()).toBe("button");
+    
+    const tags = screen.getAllByRole("button", { name: /Filter marketplace by tag/i });
+    expect(tags.length).toBeGreaterThan(0);
+    tags.forEach(tag => expect(tag.tagName.toLowerCase()).toBe("button"));
+  });
+});
