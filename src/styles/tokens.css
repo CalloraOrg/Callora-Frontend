@@ -8,7 +8,7 @@
   --status-icon-size: 16px;
 
   /* ── Market spacing tokens ────────────────────────────────────────
-     Used by MarketplacePage, ApiCard, ApiDetailPage, and their children.
+     Used by MarketplacePage, ApiDetailPage, and their children.
      Named on a 4px grid with explicit scale values so every hardcoded
      gap / padding / margin is replaceable with var(--mkt-…). */
   --mkt-space-xs: 2px;
@@ -23,17 +23,13 @@
   --mkt-space-6xl: 40px;
   --mkt-space-7xl: 48px;
 
-  /* ── Market / card typography tokens ────────────────────────────
-     Tight, readable defaults for the marketplace listing page and
-     ApiCard component. */
+  /* ── Market / detail typography tokens ────────────────────────────
+     Tight, readable defaults consumed by marketplace + detail pages. */
   --mkt-font-size-micro: 0.75rem;    /* 12px */
-  --mkt-font-size-xs: 0.6875rem;     /* 11px */
   --mkt-font-size-sm: 0.8125rem;     /* 13px */
   --mkt-font-size-tag: 0.875rem;     /* 14px */
   --mkt-font-size-base: 1rem;        /* 16px */
   --mkt-font-size-lg: 0.9375rem;     /* 15px */
-  --mkt-font-size-popover: 0.82rem;      /* 13px */
-  --mkt-font-size-popover-label: 0.88rem; /* 14px */
   --mkt-font-size-xl: 1.5rem;        /* 24px */
   --mkt-font-size-2xl: 1.75rem;      /* 28px */
   --mkt-font-size-page-title: clamp(1.75rem, 3vw, 2.35rem);
@@ -131,6 +127,11 @@
   --sb-pending-bg: rgba(78, 133, 255, 0.14);
   --sb-pending-fg: #4e85ff;
   --sb-pending-border: rgba(78, 133, 255, 0.35);
+
+  /* maintenance — purple/violet tint (distinct from blue-pending and amber-degraded) */
+  --sb-maintenance-bg: rgba(167, 139, 250, 0.14);
+  --sb-maintenance-fg: #a78bfa;
+  --sb-maintenance-border: rgba(167, 139, 250, 0.35);
 }
 
 [data-theme="light"] {
@@ -161,4 +162,9 @@
   --sb-pending-bg: rgba(37, 99, 235, 0.1);
   --sb-pending-fg: #1e40af;
   --sb-pending-border: rgba(37, 99, 235, 0.25);
+
+  /* maintenance — lighter purple for light theme */
+  --sb-maintenance-bg: rgba(124, 58, 237, 0.1);
+  --sb-maintenance-fg: #5b21b6;
+  --sb-maintenance-border: rgba(124, 58, 237, 0.25);
 }

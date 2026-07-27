@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
-import ApiUsage from "./ApiUsage";
+import ApiUsage from "./pages/ApiUsage";
 import Dashboard from "./components/Dashboard";
 import MyApis from "./pages/MyApis";
+import PlanBadgePage from "./pages/PlanBadge";
 import RouteProgressBar from "./components/RouteProgressBar";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
@@ -20,11 +21,20 @@ import MarketplacePage from "./pages/MarketplacePage";
 import ThemePlayground from "./pages/ThemePlayground";
 import DesignSystemDocs from "./pages/DesignSystemDocs";
 import A11yAudit from "./pages/A11yAudit";
+import RateLimitCard from "./pages/RateLimitCard";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
+
+const STAGE_LABELS: Record<DepositStage, string> = {
+  input: "Enter Amount",
+  approving: "Approving",
+  pending: "Pending",
+  confirmed: "Confirmed",
+  failed: "Failed",
+};
 
 type Feature = {
   icon: string;
@@ -103,6 +113,7 @@ const APP_ROUTES = {
   marketplace: "/marketplace",
   publish: "/publish",
   myApis: "/apis/my-apis",
+  planBadge: "/apis/plan-badge",
   apiUsage: "/api-usage",
   billing: "/billing",
   documentation: "/documentation",
@@ -110,6 +121,7 @@ const APP_ROUTES = {
   themePlayground: "/theme-playground",
   designSystem: "/design-system/docs",
   serverError: "/500",
+  rateLimitCard: "/rate-limit",
 } as const;
 
 function createMockHash() {
@@ -266,6 +278,7 @@ function App() {
     [APP_ROUTES.billing]: "Billing – Callora",
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
+    [APP_ROUTES.endpointSummary]: "Endpoint Summary – Callora",
   };
   const routeDescriptionMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
@@ -273,6 +286,7 @@ function App() {
     [APP_ROUTES.billing]: "Manage your USDC vault, deposit funds, and view transaction status.",
     "/api-usage": "Monitor API usage, request stats, and view call history.",
     [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
+    [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
   };
   const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
@@ -399,9 +413,11 @@ function App() {
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
-  const openDeposit = () => {
+  const openDeposit = (presetAmount?: number) => {
     navigate(APP_ROUTES.billing);
-    resetFlow(amountInput, selectedPreset);
+    const nextAmount = presetAmount !== undefined ? String(presetAmount) : amountInput;
+    const nextPreset: number | "custom" = presetAmount !== undefined ? presetAmount : selectedPreset;
+    resetFlow(nextAmount, nextPreset);
     setIsDepositOpen(true);
   };
 
@@ -557,10 +573,16 @@ function App() {
 
             <Route path={APP_ROUTES.publish} element={<PublishApi />} />
 
-            <Route path={APP_ROUTES.dashboard} element={<Dashboard vaultBalance={vaultBalance} walletBalance={walletBalance} openDeposit={openDeposit} />} />
+            <Route path={APP_ROUTES.dashboard} element={<Dashboard vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
 
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
+
+            {/* ── My APIs ─────────────────────────────────────────────── */}
+            <Route path={APP_ROUTES.myApis} element={<MyApis />} />
+
+            {/* ── Plan Badge (issue #529) ──────────────────────────────── */}
+            <Route path={APP_ROUTES.planBadge} element={<PlanBadgePage />} />
 
             <Route
               path={APP_ROUTES.billing}
@@ -610,11 +632,11 @@ function App() {
                   <aside className="surface prototype-panel">
                     <p className="eyebrow">Prototype state preview</p>
                     <h2>Review both success and failure flows.</h2>
-                    <div className="outcome-toggle">
-                      <button className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
+                    <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
+                      <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
                         Confirmed path
                       </button>
-                      <button className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
+                      <button role="radio" aria-checked={demoOutcome === "failed"} className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
                         Failed path
                       </button>
                     </div>
@@ -657,6 +679,8 @@ function App() {
             <Route path={APP_ROUTES.serverError} element={<ServerError onRetry={handleServerRetry} onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
 
             <Route path="/a11y-audit" element={<A11yAudit />} />
+
+            <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
           </Routes>
@@ -713,12 +737,12 @@ function App() {
 
               <div className="modal-body">
                 <div className="stage-strip" aria-label="Transaction flow status">
-                  {["input", "approving", "pending", demoOutcome === "confirmed" ? "confirmed" : "failed"].map((item) => {
+                  {(["input", "approving", "pending", demoOutcome === "confirmed" ? "confirmed" : "failed"] as const).map((item) => {
                     const isActive = item === depositStage || (item === "input" && depositStage === "input" && hasValidAmount);
 
                     return (
                       <span key={item} className={`stage-pill ${isActive ? "active" : ""}`}>
-                        {item}
+                        {STAGE_LABELS[item]}
                       </span>
                     );
                   })}
@@ -729,7 +753,7 @@ function App() {
                     <strong>{stageLabel}</strong>
                     <p>{statusMessage}</p>
                   </div>
-                  <span className={`status-chip ${depositStage}`}>{depositStage}</span>
+                  <span className={`status-chip ${depositStage}`}>{STAGE_LABELS[depositStage]}</span>
                 </div>
 
                 <div className="modal-grid">
@@ -759,9 +783,10 @@ function App() {
                         disabled={isBusy}
                         placeholder="0.00"
                         aria-describedby="deposit-help"
+                        aria-invalid={validationMessage.length > 0 && depositStage === "input"}
                       />
                       <span>USDC</span>
-                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy}>
+                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy} aria-label={`Set maximum amount: ${formatUsdShortcut(walletBalance)}`}>
                         Max
                       </button>
                     </div>
@@ -772,13 +797,13 @@ function App() {
 
                     {validationMessage && depositStage === "input" && <p className="error-text">{validationMessage}</p>}
 
-                    <div className="preset-row">
+                    <div className="preset-row" role="radiogroup" aria-label="Deposit amount preset">
                       {PRESET_AMOUNTS.map((preset) => (
-                        <button key={preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
+                        <button key={preset} role="radio" aria-checked={selectedPreset === preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
                           ${preset}
                         </button>
                       ))}
-                      <button className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy}>
+                      <button role="radio" aria-checked={selectedPreset === "custom"} className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy}>
                         Custom
                       </button>
                     </div>
@@ -871,7 +896,7 @@ function App() {
                     Deposit another amount
                   </button>
                 ) : (
-                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy}>
+                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
                     {depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
                   </button>
                 )}

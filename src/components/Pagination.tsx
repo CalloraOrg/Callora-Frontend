@@ -13,6 +13,10 @@ export function Pagination({
   onPageChange,
   onPageSizeChange,
 }: PaginationProps) {
+  if (totalPages <= 1) {
+    return null;
+  }
+
   // Helper: generate page numbers with ellipses
   const getPageNumbers = () => {
     const pages = [];
