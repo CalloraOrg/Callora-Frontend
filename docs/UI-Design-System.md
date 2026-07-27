@@ -201,6 +201,7 @@ Summarizes consumed API budget or request allowance on the dashboard with both a
 **Accessibility:**
 
 - Uses `role="progressbar"` with `aria-valuemin`, `aria-valuemax`, `aria-valuenow`, and `aria-valuetext`
+- Both the `<section>` and progressbar carry an explicit `aria-label` matching the `label` prop (defaults to "Usage") for self-contained accessible naming
 - `aria-valuetext` includes the usage state, consumed amount, limit, remaining allowance, and percentage used
 - A visually hidden description mirrors the announced status for screen readers
 - Color is not the only indicator; visible state text is always rendered
@@ -451,6 +452,94 @@ Interactive documentation helper that previews endpoint groups on hover and keyb
 
 ---
 
+### EndpointPreview
+
+Per-endpoint floating schema preview. Wraps an individual endpoint card header and reveals a compact panel — method badge, URL, parameter table, and optional response shape — when the user hovers or focuses the header row.
+
+Complements `EndpointGroupHover` (group-level overview) by providing **schema-level detail** for each endpoint without requiring navigation to the full docs.
+
+**Props:**
+
+| Prop       | Type                    | Description                                                                                  |
+| ---------- | ----------------------- | -------------------------------------------------------------------------------------------- |
+| `endpoint` | `EndpointPreviewData`   | The endpoint whose schema should be previewed. See type definition below.                    |
+| `children` | `React.ReactNode`       | Content that acts as the hover/focus trigger — typically an endpoint card header row.        |
+
+**`EndpointPreviewData` type:**
+
+```ts
+type EndpointPreviewData = {
+  id: string;
+  title: string;
+  url: string;
+  method: string;           // e.g. "GET", "POST"
+  params: {
+    name: string;
+    type: string;
+    required?: boolean;
+  }[];
+  response?: string;        // Optional JSON response-shape snippet
+  group?: string;
+};
+```
+
+**Visual Spec:**
+
+- Panel: `preview-card` base class, `340px` wide, positioned below the trigger via `top: calc(100% + 6px)`, `z-index: 100`
+- Top-line row: uppercase "Schema preview" eyebrow label (accent colour) + HTTP method badge
+- Endpoint title (`font-weight: 700`) followed by the URL as a `<code>` element
+- **Parameters table**: Name (`var(--accent)` monospace), Type (`.type-tag` chip), Required (Yes/No)
+- Up to 5 parameters shown; excess parameters are replaced with "+N more parameters — see full docs"
+- **Response shape** (optional): `<pre>` block with `var(--surface-soft)` background, `max-height: 120px`, scroll on overflow
+- `pointer-events: none` on the panel — the panel is read-only and must not capture mouse events
+
+**States:**
+
+- Default (closed): No panel; trigger has no `aria-describedby`
+- Hover / Focus (open): Panel appears; trigger gains `aria-describedby` pointing at the panel
+- Escape: Panel closes; focus returns to the trigger trigger without reopening the panel (guarded by a `suppressNextFocus` flag)
+
+**Accessibility (WCAG 2.1 AA):**
+
+- Trigger `div` carries `role="button"`, `tabIndex={0}`, and `aria-label="Preview schema for <title>"`
+- While open: `aria-describedby` on the trigger links to the panel's `id` (generated via `useId`)
+- Panel has `role="tooltip"` and `aria-label="<title> schema preview"` for screen readers
+- Escape key dismisses the panel from any keyboard state
+- Focus ring via `:focus-visible` at `2px solid var(--accent)`, `3px offset`
+- All colours from design tokens — both themes work automatically
+
+**Usage:**
+
+```tsx
+import EndpointPreview from "../components/EndpointPreview";
+
+// Inside a documentation endpoint list:
+{endpoints.map((ep) => (
+  <div key={ep.id} className="preview-card">
+    <EndpointPreview endpoint={ep}>
+      {/* This content becomes the hover/focus trigger */}
+      <div className="endpoint-card-header">
+        <span className={`method-badge method-badge--${ep.method.toLowerCase()}`}>
+          {ep.method}
+        </span>
+        <strong>{ep.title}</strong>
+      </div>
+    </EndpointPreview>
+
+    {/* Full parameter table below, as before */}
+    <div style={{ padding: 24 }}>…</div>
+  </div>
+))}
+```
+
+**Files:**
+
+- Component: `src/components/EndpointPreview.tsx`
+- Tests: `src/components/EndpointPreview.test.tsx` (20 tests)
+- Styles: CSS block in `src/index.css` (`.endpoint-preview__*` classes)
+
+---
+
 ### FiltersSidebar
 
 Sidebar for filtering marketplace results. Rendered inside the desktop layout and also embedded inside the `FiltersBottomSheet` on mobile.
@@ -598,6 +687,37 @@ Mobile-only bottom-sheet that wraps `FiltersSidebar`. Shown when the user taps t
   triggerRef={filtersTriggerRef}
 />
 ```
+
+---
+
+### MarketplacePage
+
+Full-page marketplace listing with two-way URL filter state synchronization.
+
+**URL Query Parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `q` | `string` | Search query, populates the search input |
+| `categories` | `string` | Comma-separated category slugs |
+| `tag` | `string` | Active tag filter |
+| `minPrice` | `number` | Minimum price filter |
+| `maxPrice` | `number` | Maximum price filter |
+| `popularity` | `string` | Popularity filter (`mostUsed`, `newest`, or omitted) |
+| `favorites` | `1` | Favorites-only toggle when set to `1` |
+| `sort` | `SortValue` | Sort order (`popularity`, `price-asc`, `latency-asc`, `newest`) |
+| `page` | `number` | Current pagination page (clamped to valid range) |
+
+**Behaviour:**
+- All filter state is derived from URL search params on mount, so filtered views are fully shareable and bookmarkable.
+- Changing a filter updates the corresponding URL param with `replace: true` (no history entry per keystroke).
+- Changing filters resets `?page=1`. Navigating pages writes `?page=<n>` to the URL.
+- Invalid page values (e.g. `?page=99` with 1 page of results) are clamped to the nearest valid value.
+- "Clear Filters" removes all filter params from the URL and resets sort/popularity to defaults.
+
+**Accessibility:**
+- Filter badge shows active count with `aria-label`
+- Mobile filter trigger uses `aria-haspopup="dialog"` and `aria-expanded`
 
 ---
 
@@ -754,6 +874,8 @@ Highlights the active section as the user scrolls using IntersectionObserver.
 - `aria-current="location"` on the active link
 - All links are keyboard-navigable anchor links
 - Hidden from print output via `.no-print`
+- Under `prefers-reduced-motion: reduce`, link color transitions are disabled
+  (static instant state change via CSS + inline `transition: none`)
 
 **Usage Example:**
 
@@ -766,6 +888,155 @@ const TOC: TocSection[] = [
 
 <ApiDetailStickyTOC sections={TOC} />;
 ```
+
+---
+
+### StatusBadge
+
+Color-blind-safe status indicator used wherever an API or system health state
+must be communicated visually. Each variant combines a **color token** with a
+**unique SVG background pattern** so the badge is distinguishable by texture
+alone — satisfying WCAG 1.4.1 (Use of Color) for deuteranopia, protanopia, and
+tritanopia users.
+
+**Source:** `src/components/StatusBadge.tsx`
+**Styles (patterns):** `src/styles/patterns.css`
+**Tokens:** `src/styles/tokens.css`
+
+**Props:**
+
+| Prop         | Type            | Default             | Description                                                          |
+| ------------ | --------------- | ------------------- | -------------------------------------------------------------------- |
+| `status`     | `StatusVariant` | (required)          | Which status variant to render (see table below).                    |
+| `label?`     | `string`        | per-variant default | Override the visible text. Defaults to a human-readable status name. |
+| `className?` | `string`        | —                   | Extra CSS class(es) forwarded to the root `<span>`.                  |
+
+**`StatusVariant` values:**
+
+| Variant       | Default label | Pattern            | CSS class                | Token prefix         |
+| ------------- | ------------- | ------------------ | ------------------------ | -------------------- |
+| `operational` | Operational   | None (solid)       | `sb-pattern-operational` | `--sb-operational-*` |
+| `success`     | Operational   | None (solid)       | `sb-pattern-success`     | `--sb-success-*`     |
+| `degraded`    | Degraded      | ╱ opposite stripes | `sb-pattern-degraded`    | `--sb-degraded-*`    |
+| `warning`     | Degraded      | ╱ opposite stripes | `sb-pattern-warning`     | `--sb-warning-*`     |
+| `maintenance` | Maintenance   | ╳ crosshatch       | `sb-pattern-maintenance` | `--sb-maintenance-*` |
+| `down`        | Down          | ╲ diagonal stripes | `sb-pattern-down`        | `--sb-down-*`        |
+| `error`       | Error         | ╲ diagonal stripes | `sb-pattern-error`       | `--sb-error-*`       |
+| `pending`     | Pending       | • dot grid         | `sb-pattern-pending`     | `--sb-pending-*`     |
+
+**`apiStatusToVariant` helper:**
+
+When consuming an `APIItem` from the data layer, its `status` field is one of
+`"operational" | "degraded" | "maintenance"`. Use the exported helper to convert
+it to a `StatusVariant` before passing it to `<StatusBadge>`:
+
+```tsx
+import { StatusBadge, apiStatusToVariant } from '../components/StatusBadge';
+
+// api.status: "operational" | "degraded" | "maintenance" | undefined
+<StatusBadge status={apiStatusToVariant(api.status)} />
+```
+
+Mapping table:
+
+| `APIItem.status` | `StatusVariant` |
+| ---------------- | --------------- |
+| `"operational"`  | `"operational"` |
+| `"degraded"`     | `"degraded"`    |
+| `"maintenance"`  | `"maintenance"` |
+| `undefined`      | `"pending"`     |
+
+**Design tokens (all three per-variant properties must be defined for both themes):**
+
+```css
+/* dark theme — maintenance variant (purple) */
+[data-theme="dark"] {
+  --sb-maintenance-bg:     rgba(167, 139, 250, 0.14);
+  --sb-maintenance-fg:     #a78bfa;
+  --sb-maintenance-border: rgba(167, 139, 250, 0.35);
+}
+
+/* light theme */
+[data-theme="light"] {
+  --sb-maintenance-bg:     rgba(124, 58, 237, 0.1);
+  --sb-maintenance-fg:     #5b21b6;
+  --sb-maintenance-border: rgba(124, 58, 237, 0.25);
+}
+```
+
+**Pattern CSS (crosshatch example — `src/styles/patterns.css`):**
+
+The crosshatch (╳) is rendered as two overlaid SVG line sets via
+`background-image` multi-layer syntax:
+
+```css
+.sb-pattern-maintenance {
+  background-image:
+    url("data:image/svg+xml,…"),  /* ╲ diagonal pass */
+    url("data:image/svg+xml,…");  /* ╱ diagonal pass */
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+```
+
+The pattern layers on top of the solid `background-color` set by the token,
+using `stroke-opacity: 0.2` to stay subtle at badge scale.
+
+**Visual Spec:**
+
+- Display: `inline-flex`, `align-items: center`, `gap: 0.375em`
+- Padding: `0.2em 0.6em`, border-radius: `0.375em`
+- Font: 0.75 rem, weight 600, letter-spacing 0.02em
+- Dot indicator: 0.5em circle using `--sb-<status>-fg`, `aria-hidden`
+- Background: token `--sb-<status>-bg` + SVG pattern overlay (patterns.css)
+- Border: `1px solid var(--sb-<status>-border)`
+
+**Accessibility:**
+
+- `role="img"` — treats the badge as a non-interactive image rather than live text.
+- `aria-label` — the visible text label (defaults to variant name, overridable via `label` prop).
+- `aria-description` — includes the pattern name, e.g.  
+  `"Pattern-based status badge: Maintenance with crosshatch pattern"`.  
+  This ensures screen readers convey the texture-based cue even when the SVG is invisible.
+- `data-status` / `data-pattern` — data attributes for E2E selectors and QA tooling.
+- Dot indicator carries `aria-hidden="true"` so it is not double-announced.
+
+**Where it is used — ApiDetailPage:**
+
+`ApiDetailPage` renders `<StatusBadge>` in two places:
+
+1. **Hero title area** (`.api-detail-title`) — shown immediately below the API
+   name and provider/price meta line for at-a-glance visibility.
+2. **Sidebar "API Health" section** — replaces the previous plain-text
+   `"● Operational"` string, surfacing both pattern and color cues with full
+   accessibility semantics.
+
+Both placements read from `api.status` via `apiStatusToVariant()`.
+
+**Usage Examples:**
+
+```tsx
+// Direct variant
+<StatusBadge status="operational" />
+<StatusBadge status="maintenance" />
+<StatusBadge status="degraded" label="Partial outage" />
+
+// From APIItem data (preferred pattern in ApiDetailPage)
+import { StatusBadge, apiStatusToVariant } from '../components/StatusBadge';
+
+<StatusBadge status={apiStatusToVariant(api.status)} />
+```
+
+**Adding a new variant:**
+
+1. Add the variant string to the `StatusVariant` union in `StatusBadge.tsx`.
+2. Add entries to `DEFAULT_LABELS`, `PATTERN_DESCRIPTIONS`, and `PATTERN_KEYS`.
+3. Add a `.sb-pattern-<variant>` CSS rule in `src/styles/patterns.css` using an
+   SVG data URI pattern distinct from all existing ones.
+4. Add `--sb-<variant>-bg`, `--sb-<variant>-fg`, and `--sb-<variant>-border`
+   tokens to both `[data-theme="dark"]` and `[data-theme="light"]` blocks in
+   `src/styles/tokens.css`.
+5. Update this documentation section.
 
 ---
 
@@ -911,6 +1182,7 @@ The following utility classes are defined in `src/index.css` and should be used 
 - `.brand` - Large brand heading
 - `.eyebrow` - Small uppercase label
 - `.helper-text` - Secondary/muted text
+- `.numeric-tabular` - Apply `font-variant-numeric: tabular-nums` to any numeric display (prices, counts, stats, pagination). Use this wherever digits must stay fixed-width so values don't cause layout shift as they change. Defined in `src/styles/typography.css`. `.tabular-nums` is kept as a backwards-compatible alias but `.numeric-tabular` is the canonical name.
 
 ### Link Classes
 

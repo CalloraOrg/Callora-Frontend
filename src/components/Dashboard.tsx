@@ -14,7 +14,11 @@ import MOCK_APIS from '../data/mockApis';
 interface DashboardProps {
   vaultBalance: number;
   walletBalance: number;
-  openDeposit: () => void;
+  /** Optional average cost per call (USDC) used for runway estimation. */
+  costPerCall?: number;
+  /** Average daily calls used for runway-to-days conversion. Defaults to 100. */
+  callsPerDay?: number;
+  openDeposit: (presetAmount?: number) => void;
 }
 
 interface ActivityItem {
@@ -23,7 +27,13 @@ interface ActivityItem {
   date: string; // ISO string
 }
 
-export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: DashboardProps) {
+export default function Dashboard({
+  vaultBalance,
+  walletBalance,
+  costPerCall,
+  callsPerDay,
+  openDeposit,
+}: DashboardProps) {
   const navigate = useNavigate();
   const [activity, setActivity] = useState<ActivityItem[] | null>(null);
 
@@ -69,11 +79,15 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
         used={totalUsage}
         limit={vaultBalance}
         unit="USDC"
+        costPerCall={costPerCall}
+        callsPerDay={callsPerDay}
       />
 
       {/* Quick actions */}
       <div className="dashboard-actions">
-        <button className="primary-button no-print" onClick={openDeposit}>Deposit</button>
+        <button className="primary-button no-print" onClick={() => openDeposit()}>Deposit</button>
+        <button className="secondary-button dashboard-quick-topup" onClick={() => openDeposit(50)} aria-label="Quick top-up with 50 USDC">+ $50 Top-up</button>
+        <button className="secondary-button dashboard-quick-topup" onClick={() => openDeposit(100)} aria-label="Quick top-up with 100 USDC">+ $100 Top-up</button>
         <button className="secondary-button" onClick={() => navigate('/marketplace')}>Browse APIs</button>
         <button className="secondary-button" onClick={() => navigate('/api-usage')}>View Usage</button>
       </div>

@@ -335,3 +335,160 @@ describe('no-theme-transition escape hatch', () => {
     expect(el.classList.contains('no-theme-transition')).toBe(true);
   });
 });
+
+// ── ThemeStickyBar (#583 – sticky bottom action bar) ─────────────────────────
+/**
+ * Tests for the sticky bottom action bar introduced in issue #583
+ * (GrantFox FWC26 / Stellar Wave campaign).
+ *
+ * The bar appears once the user scrolls past 120 px and exposes two primary
+ * theme actions: cycle theme and reset to system.
+ *
+ * JSDOM does not implement scroll physics, so we simulate scroll events by
+ * directly mutating window.scrollY via Object.defineProperty and dispatching
+ * a synthetic 'scroll' event.
+ */
+
+/** Helper: mutate window.scrollY and fire a scroll event. */
+function simulateScroll(y: number) {
+  Object.defineProperty(window, 'scrollY', {
+    writable: true,
+    configurable: true,
+    value: y,
+  });
+  window.dispatchEvent(new Event('scroll'));
+}
+
+describe('ThemeStickyBar', () => {
+  it('renders the sticky bar element in the DOM', () => {
+    renderWithTheme();
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar).toBeDefined();
+  });
+
+  it('is NOT visible (missing --visible modifier) before scrolling', () => {
+    renderWithTheme();
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.classList.contains('theme-sticky-bar--visible')).toBe(false);
+  });
+
+  it('becomes visible after scrolling past the 120 px threshold', () => {
+    renderWithTheme();
+    act(() => {
+      simulateScroll(121);
+    });
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.classList.contains('theme-sticky-bar--visible')).toBe(true);
+  });
+
+  it('hides again when user scrolls back above the threshold', () => {
+    renderWithTheme();
+
+    // First scroll down to reveal…
+    act(() => { simulateScroll(200); });
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.classList.contains('theme-sticky-bar--visible')).toBe(true);
+
+    // …then scroll back up to conceal.
+    act(() => { simulateScroll(50); });
+    expect(bar.classList.contains('theme-sticky-bar--visible')).toBe(false);
+  });
+
+  it('has aria-hidden="true" when not scrolled', () => {
+    renderWithTheme();
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('has aria-hidden="false" when scrolled past threshold', () => {
+    renderWithTheme();
+    act(() => { simulateScroll(150); });
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.getAttribute('aria-hidden')).toBe('false');
+  });
+
+  it('has role="toolbar" and a descriptive aria-label', () => {
+    renderWithTheme();
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.getAttribute('role')).toBe('toolbar');
+    expect(bar.getAttribute('aria-label')).toBe('Theme controls');
+  });
+
+  it('cycle button (#theme-sticky-cycle) cycles dark → light on click', () => {
+    renderWithTheme();
+
+    // Scroll to reveal the bar so actions are reachable.
+    act(() => { simulateScroll(200); });
+
+    const cycleBtn = document.getElementById('theme-sticky-cycle');
+    expect(cycleBtn).not.toBeNull();
+
+    // Starts in dark mode.
+    const headerBtn = screen.getByRole('button', { hidden: true, name: /toggle theme/i });
+    expect(headerBtn.textContent).toContain('dark');
+
+    act(() => { fireEvent.click(cycleBtn!); });
+    act(() => { vi.runAllTimers(); });
+
+    expect(headerBtn.textContent).toContain('light');
+  });
+
+  it('reset button (#theme-sticky-reset) resets theme to "system"', () => {
+    renderWithTheme();
+    act(() => { simulateScroll(200); });
+
+    const resetBtn = document.getElementById('theme-sticky-reset');
+    expect(resetBtn).not.toBeNull();
+
+    // Click reset; theme should become 'system'.
+    act(() => { fireEvent.click(resetBtn!); });
+    act(() => { vi.runAllTimers(); });
+
+    // The header toggle label should now read 'system'.
+    const label = document.querySelector('.theme-toggle-label');
+    expect(label?.textContent).toBe('system');
+  });
+
+  it('reset button has aria-pressed="true" when theme is already "system"', () => {
+    renderWithTheme();
+    act(() => { simulateScroll(200); });
+
+    // Reset to system first.
+    const resetBtn = document.getElementById('theme-sticky-reset');
+    act(() => { fireEvent.click(resetBtn!); });
+    act(() => { vi.runAllTimers(); });
+
+    expect(resetBtn!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('cycle button has aria-pressed="true" in dark mode', () => {
+    renderWithTheme();
+    act(() => { simulateScroll(200); });
+    const cycleBtn = document.getElementById('theme-sticky-cycle');
+    // Default theme is dark → actualTheme 'dark' → aria-pressed true.
+    expect(cycleBtn!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('cycle button carries the --primary class', () => {
+    renderWithTheme();
+    act(() => { simulateScroll(200); });
+    const cycleBtn = document.getElementById('theme-sticky-cycle');
+    expect(cycleBtn!.classList.contains('theme-sticky-bar__btn--primary')).toBe(true);
+  });
+
+  it('removes the scroll listener on unmount (no memory leak)', () => {
+    const addSpy    = vi.spyOn(window, 'addEventListener');
+    const removeSpy = vi.spyOn(window, 'removeEventListener');
+
+    const { unmount } = renderWithTheme();
+    unmount();
+
+    // The 'scroll' listener that was added must be removed.
+    const scrollAdds    = addSpy.mock.calls.filter(([evt]) => evt === 'scroll');
+    const scrollRemoves = removeSpy.mock.calls.filter(([evt]) => evt === 'scroll');
+    expect(scrollRemoves.length).toBeGreaterThanOrEqual(scrollAdds.length);
+
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
+  });
+});
