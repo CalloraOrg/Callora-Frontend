@@ -69,8 +69,8 @@ describe("ApiDetailPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
 
     expect(screen.getByRole("heading", { name: "Endpoint groups" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /forecast 1 endpoint/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /historical weather 1 endpoint/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /forecast 2 endpoints/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /alerts 2 endpoints/i })).toBeTruthy();
   });
 
   it("shows the group preview when a trigger receives keyboard focus", () => {
@@ -78,12 +78,12 @@ describe("ApiDetailPage", () => {
     settleLoadingState();
 
     fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
-    fireEvent.focus(screen.getByRole("button", { name: /forecast 1 endpoint/i }));
+    fireEvent.focus(screen.getByRole("button", { name: /forecast 2 endpoints/i }));
 
     const preview = screen.getByLabelText("Forecast group preview");
     expect(preview).toBeTruthy();
     expect(within(preview).getByText("Get Forecast")).toBeTruthy();
-    expect(within(preview).getByText(/1 endpoint.*2 request parameter/)).toBeTruthy();
+    expect(within(preview).getByText(/2 parameters/i)).toBeTruthy();
   });
 
   // ── Skeleton / loading ────────────────────────────────────────────────────
@@ -467,6 +467,17 @@ describe("ApiDetailPage", () => {
       // "Try API", "View Pricing", and SubscribeButton
       expect((buttons?.length ?? 0)).toBeGreaterThanOrEqual(2);
     });
+
+    it("injects responsive styles for mobile viewports", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      
+      // Look for the style tag we injected
+      const styles = Array.from(document.querySelectorAll("style"));
+      const hasMobileStyle = styles.some(style => style.textContent?.includes("@media (max-width: 480px)"));
+      expect(hasMobileStyle).toBe(true);
+
+    });
   });
 
   describe("keyboard navigation and focus", () => {
@@ -482,6 +493,57 @@ describe("ApiDetailPage", () => {
       const docPanel = screen.getByRole("tabpanel", { name: "Documentation" });
       expect(docPanel).toBeTruthy();
       expect(docPanel.tabIndex).toBe(0);
+    });
+  });
+
+  describe("aria-live announcements", () => {
+    it("announces when the page details have loaded", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion?.textContent).toBe("WeatherSim API detail page loaded");
+    });
+
+    it("announces tab selection changes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      expect(liveRegion?.textContent).toBe("Showing Documentation tab");
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+      expect(liveRegion?.textContent).toBe("Showing Pricing tab");
+    });
+
+    it("announces cost calculator slider adjustments", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+      fireEvent.change(slider, { target: { value: "5000" } });
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion?.textContent).toBe("Estimated monthly total: $50.00 for 5,000 requests");
+    });
+
+    it("announces review sorting criteria changes", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      const select = screen.getByLabelText("Sort by");
+      fireEvent.change(select, { target: { value: "highest" } });
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion?.textContent).toBe("Reviews sorted by highest rated");
     });
   });
 });

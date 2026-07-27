@@ -23,7 +23,7 @@ export default function TagChip({
   return (
     <button
       type="button"
-      className={`tag-chip${active ? " tag-chip--active" : ""}`}
+      className={`tag-chip tabular-nums${active ? " tag-chip--active" : ""}`}
       aria-pressed={active}
       aria-label={`Filter marketplace by tag ${tag}`}
       onClick={handleClick}

@@ -1,0 +1,83 @@
+/* QuotaBanner — design-token-driven spacing & typography */
+.quota-banner {
+  display: grid;
+  gap: var(--mkt-space-lg);
+  padding: var(--mkt-space-xl);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.quota-banner__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mkt-space-md);
+  flex-wrap: wrap;
+}
+
+.quota-banner__title {
+  margin: 0;
+  font-size: var(--mkt-font-size-page-title);
+  line-height: var(--mkt-line-height-tight);
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.quota-banner__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mkt-space-xs);
+  padding: var(--mkt-space-xs) var(--mkt-space-sm);
+  border-radius: 999px;
+  font-size: var(--mkt-font-size-tag);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.quota-banner__status--ok {
+  background: var(--sb-success-bg);
+  color: var(--sb-success-fg);
+  border: 1px solid var(--sb-success-border);
+}
+
+.quota-banner__status--warn {
+  background: var(--sb-warning-bg);
+  color: var(--sb-warning-fg);
+  border: 1px solid var(--sb-warning-border);
+}
+
+.quota-banner__status--danger {
+  background: var(--sb-error-bg);
+  color: var(--sb-error-fg);
+  border: 1px solid var(--sb-error-border);
+}
+
+.quota-banner__field {
+  width: 100%;
+}
+
+.quota-banner__hint {
+  margin: 0;
+  font-size: var(--mkt-font-size-sm);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .quota-banner {
+    padding: var(--mkt-space-md);
+    gap: var(--mkt-space-md);
+  }
+
+  .quota-banner__title {
+    font-size: clamp(1.25rem, 4vw, 1.75rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quota-banner__status {
+    transition: none;
+  }
+}
