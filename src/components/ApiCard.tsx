@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ContextMenu } from './ContextMenu';
 import Skeleton from "./Skeleton";
 import TagChip from "./TagChip";
+import EmptyState from "./EmptyState";
 import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import { useFavorites } from "../hooks/useFavorites";
@@ -516,12 +517,38 @@ export default function ApiCard({
   onTagClick?: (tag: string) => void;
   activeTag?: string | null;
 }) {
-  if (loading || !api) {
+  if (loading) {
     return <ApiCardSkeleton />;
   }
 
+  if (!api) {
+    return (
+      <article
+        className="preview-card api-marketplace-card"
+        style={{
+          padding: 0,
+          display: "flex",
+          minHeight: density === "compact" ? 180 : 220,
+          border: "1px solid var(--line-strong, rgba(255,255,255,0.05))",
+        }}
+      >
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <EmptyState
+            variant="api-card"
+            size={density === "compact" ? "compact" : "default"}
+            action={{
+              label: "Explore Marketplace",
+              onClick: () => {
+                window.location.href = "/marketplace";
+              },
+            }}
+          />
+        </div>
+      </article>
+    );
+  }
+
   const isMobile = useMediaQuery("(max-width: 768px)");
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
   const avgLatencyMs = api.avgLatencyMs;
@@ -666,7 +693,7 @@ export default function ApiCard({
 
       {/* Pin/unpin button — below bookmark, top-right */}
       <PinButton apiId={api.id} prefersReducedMotion={prefersReducedMotion} />
-      
+
       <FavoriteButton
         endpointId={api.id}
         isFavorite={isFavorite(api.id)}
