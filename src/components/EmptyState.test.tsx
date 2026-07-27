@@ -15,7 +15,7 @@ describe("EmptyState", () => {
   });
 
   describe("variants", () => {
-    const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
+    const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge"];
 
     it.each(variants)("renders the %s variant illustration", (variant) => {
       render(<EmptyState variant={variant} />);
@@ -31,6 +31,8 @@ describe("EmptyState", () => {
         "api-detail": /API not found/i,
         filtered: /No results found/i,
         error: /Failed to load APIs/i,
+        "plan-badge": /No plan selected/i,
+        "risk-gauge": /No risk data yet/i,
       };
       expect(screen.getByText(titles[variant])).toBeTruthy();
     });

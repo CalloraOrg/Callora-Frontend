@@ -82,7 +82,8 @@ export type EmptyStateVariant =
   | "api-detail"
   | "filtered"
   | "error"
-  | "plan-badge";
+  | "plan-badge"
+  | "risk-gauge";
 export type EmptyStateSize = "default" | "compact";
 
 export interface EmptyStateProps {
@@ -325,6 +326,75 @@ function EmptyIllustration({
     );
   }
 
+  if (variant === "risk-gauge") {
+    const cx = 32;
+    const cy = 34;
+    const r = 20;
+    const startAngle = -210;
+    const endAngle = 30;
+
+    function polar(angle: number, radius: number) {
+      const rad = ((angle - 90) * Math.PI) / 180;
+      return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+    }
+
+    const arcStart = polar(startAngle, r);
+    const arcEnd = polar(endAngle, r);
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+
+    return (
+      <svg
+        width={box}
+        height={box}
+        viewBox="0 0 64 64"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {/* Gauge arc track */}
+        <path
+          d={`M ${arcStart.x} ${arcStart.y} A ${r} ${r} 0 ${largeArc} 1 ${arcEnd.x} ${arcEnd.y}`}
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.7}
+          opacity="0.35"
+        />
+        {/* Gauge arc fill (lower half — safer zone) */}
+        <path
+          d={`M ${cx} ${cy} L ${arcStart.x} ${arcStart.y} A ${r} ${r} 0 0 1 ${cx} ${cy + 6} Z`}
+          stroke="var(--accent)"
+          strokeWidth={accentStroke * 0.5}
+          opacity="0.5"
+        />
+        {/* Needle */}
+        <line
+          x1={cx}
+          y1={cy}
+          x2={cx + 3}
+          y2={cy - r + 4}
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+        <circle cx={cx} cy={cy} r={3} stroke="var(--accent)" strokeWidth={accentStroke} />
+        {/* Shield outline behind the gauge */}
+        <path
+          d="M32 6l14 7v12c0 10.5-5.6 19.2-14 23-8.4-3.8-14-12.5-14-23V13l14-7z"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.8}
+          opacity="0.6"
+        />
+        {/* Decorative sparkle dots */}
+        <circle cx="16" cy="12" r="1.5" fill="var(--accent)" stroke="none" />
+        <circle cx="48" cy="14" r="1.25" fill="var(--accent)" stroke="none" />
+        <path
+          d="M52 48l2 2M54 52l1.5 1.5"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+      </svg>
+    );
+  }
+
   return (
     <svg
       width={box}
@@ -375,6 +445,10 @@ function EmptyIllustration({
  *               Shows a medal-and-ribbon illustration with a "Choose a plan" CTA
  *               so users can select a tier (free/pro/enterprise) and begin receiving
  *               calls.  Used by the PlanBadge page (issue #529).
+ * - risk-gauge: No risk assessment data is available yet.
+ *               Shows a shield-and-gauge illustration with a "Run assessment" CTA
+ *               so users can evaluate their API risk profile.  Used by the
+ *               RiskGauge page (issue #664).
  *
  * Sizes:
  * - default:  Full-size layout for result areas (48px padding, 80px illustration).
@@ -449,6 +523,18 @@ export default function EmptyState({
         size === "compact"
           ? "Choose a plan to unlock API access."
           : "This API doesn't have a plan attached yet. Select a plan tier to set rate limits and start receiving calls.",
+    },
+    /**
+     * risk-gauge variant — shown on the RiskGauge page when no risk
+     * assessment data is available yet.  The CTA guides users toward
+     * running their first risk assessment (issue #664).
+     */
+    "risk-gauge": {
+      title: "No risk data yet",
+      message:
+        size === "compact"
+          ? "Run an assessment to evaluate your API risk profile."
+          : "Run a risk assessment to evaluate your API's security, reliability, and compliance posture.",
     },
   };
 
