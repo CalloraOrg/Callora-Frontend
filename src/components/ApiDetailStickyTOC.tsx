@@ -25,11 +25,7 @@ export function ApiDetailStickyTOC({ sections }: ApiDetailStickyTOCProps) {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  const prefersReducedMotion = useMemo(() => {
-    return typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }, []);
+
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");

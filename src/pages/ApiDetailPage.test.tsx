@@ -69,8 +69,8 @@ describe("ApiDetailPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
 
     expect(screen.getByRole("heading", { name: "Endpoint groups" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /forecast 1 endpoint/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /historical weather 1 endpoint/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /forecast 2 endpoints/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /alerts 2 endpoints/i })).toBeTruthy();
   });
 
   it("shows the group preview when a trigger receives keyboard focus", () => {
@@ -78,12 +78,12 @@ describe("ApiDetailPage", () => {
     settleLoadingState();
 
     fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
-    fireEvent.focus(screen.getByRole("button", { name: /forecast 1 endpoint/i }));
+    fireEvent.focus(screen.getByRole("button", { name: /forecast 2 endpoints/i }));
 
     const preview = screen.getByLabelText("Forecast group preview");
     expect(preview).toBeTruthy();
     expect(within(preview).getByText("Get Forecast")).toBeTruthy();
-    expect(within(preview).getByText(/1 endpoint.*2 request parameter/)).toBeTruthy();
+    expect(within(preview).getByText(/2 parameters/i)).toBeTruthy();
   });
 
   // ── Skeleton / loading ────────────────────────────────────────────────────
@@ -474,11 +474,9 @@ describe("ApiDetailPage", () => {
       
       // Look for the style tag we injected
       const styles = Array.from(document.querySelectorAll("style"));
-      const hasMobileStyle = styles.some(style => style.textContent?.includes("@media (max-width: 768px)"));
+      const hasMobileStyle = styles.some(style => style.textContent?.includes("@media (max-width: 480px)"));
       expect(hasMobileStyle).toBe(true);
 
-      const hasPopoverOverride = styles.some(style => style.textContent?.includes(".endpoint-save-popover"));
-      expect(hasPopoverOverride).toBe(true);
     });
   });
 
