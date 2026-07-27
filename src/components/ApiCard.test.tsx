@@ -487,7 +487,7 @@ describe("ApiCard responsiveness", () => {
   it("retains comfortable mode styling on wide viewports by default", () => {
     mockViewportWidth(false); // Simulate desktop
     render(<ApiCard api={mockApi} density="comfortable" />);
-    
+     
     const card = screen.getByRole("button", { name: /View details for Responsive API/i });
     expect(card.className).not.toContain("api-card--compact");
   });

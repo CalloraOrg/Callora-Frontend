@@ -39,7 +39,7 @@
   --mkt-line-height-loose: 2;
   --mkt-grid-min: 240px;
 
-  /* ── Market colour references ─────────────────────────────────────
+  /* ── Market colour references ──────────────────────────────────
      Replaces hardcoded hex / rgba values used by marketplace cards. */
   --mkt-card-border: rgba(255, 255, 255, 0.03);
   --mkt-card-hover-border: #4666ff;
@@ -47,6 +47,19 @@
   --mkt-card-compact-padding: 10px;
   --mkt-card-compact-gap: 6px;
   --mkt-card-compact-min-height: 188px;
+  --mkt-card-padding: 12px;
+  --mkt-card-gap: 8px;
+  --mkt-card-min-height: 220px;
+  --mkt-card-icon-radius: 10px;
+  --mkt-card-icon-size: 56px;
+  --mkt-card-icon-font-size: 20px;
+  --mkt-card-popover-radius: 12px;
+  --mkt-card-popover-width: 230px;
+  --mkt-card-compare-radius: 8px;
+  --mkt-card-tag-radius: 8px;
+  --mkt-card-margin-top-sm: 6px;
+  --mkt-card-price-padding-right: 36px;
+  --mkt-radius-sm: 6px;
 
   /* ── Market layout tokens ───────────────────────────────────────── */
   --mkt-page-padding: 20px;
