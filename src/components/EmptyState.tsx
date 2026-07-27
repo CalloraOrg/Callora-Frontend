@@ -1,79 +1,5 @@
 import React from "react";
 
-export default function EmptyState({
-  title = "Nothing here",
-  description,
-  ctaLabel = "Browse APIs",
-  onCta,
-}: {
-  title?: string;
-  description?: string;
-  ctaLabel?: string;
-  onCta?: () => void;
-}) {
-  return (
-    <div
-      role="region"
-      aria-label={title}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 20,
-        minHeight: 220,
-        gap: 12,
-        textAlign: "center",
-      }}
-    >
-      <svg
-        width="120"
-        height="80"
-        viewBox="0 0 120 80"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <defs>
-          <linearGradient id="g" x1="0" x2="1">
-            <stop offset="0" stopColor="#6EE7B7" />
-            <stop offset="1" stopColor="#60A5FA" />
-          </linearGradient>
-        </defs>
-        <rect x="6" y="10" width="108" height="56" rx="8" fill="url(#g)" opacity="0.14" />
-        <g fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.9">
-          <path d="M18 54c8-10 22-18 42-18s34 8 42 18" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="36" cy="34" r="6" />
-          <circle cx="84" cy="28" r="6" />
-        </g>
-      </svg>
-
-      <h3 style={{ margin: 0, fontSize: 18 }}>{title}</h3>
-
-      {description ? (
-        <p style={{ margin: 0, color: "var(--muted)", maxWidth: 420 }}>{description}</p>
-      ) : (
-        <p style={{ margin: 0, color: "var(--muted)", maxWidth: 420 }}>There are no APIs to show right now.</p>
-      )}
-
-      <button
-        onClick={onCta}
-        style={{
-          marginTop: 8,
-          background: "var(--accent, #4E85FF)",
-          color: "white",
-          border: "none",
-          borderRadius: 8,
-          padding: "8px 14px",
-          fontWeight: 700,
-          cursor: "pointer",
-        }}
-      >
-        {ctaLabel}
-      </button>
-    </div>
-  );
-}
-import React from "react";
 import ExternalLink from "./ExternalLink";
 import { EmptyStateSkeleton } from "./Skeleton";
 
@@ -90,12 +16,18 @@ export interface EmptyStateProps {
   size?: EmptyStateSize;
   title?: string;
   message?: string;
+  /** @deprecated Use `message` instead */
+  description?: string;
   onClearFilters?: () => void;
   onRetry?: () => void | Promise<void>;
   action?: {
     label: string;
     onClick: () => void;
   };
+  /** @deprecated Use `action` instead */
+  ctaLabel?: string;
+  /** @deprecated Use `action.onClick` instead */
+  onCta?: () => void;
   loading?: boolean;
 }
 
@@ -402,16 +334,22 @@ export default function EmptyState({
   size = "default",
   title,
   message,
+  description,
   onClearFilters,
   onRetry,
   action,
+  ctaLabel,
+  onCta,
   loading = false,
 }: EmptyStateProps) {
+  const resolvedMessage = message ?? description;
+  const resolvedAction = action ?? (ctaLabel && onCta ? { label: ctaLabel, onClick: onCta } : undefined);
+
   if (loading) {
     return (
       <EmptyStateSkeleton
         size={size}
-        hasAction={!!action || (variant === "filtered" && !!onClearFilters) || (variant === "error" && !!onRetry)}
+        hasAction={!!resolvedAction || (variant === "filtered" && !!onClearFilters) || (variant === "error" && !!onRetry)}
       />
     );
   }
@@ -453,7 +391,7 @@ export default function EmptyState({
   };
 
   const finalTitle = title ?? defaults[variant].title;
-  const finalMessage = message ?? defaults[variant].message;
+  const finalMessage = resolvedMessage ?? defaults[variant].message;
   const [isRetrying, setIsRetrying] = React.useState(false);
 
   const handleRetry = async () => {
@@ -565,29 +503,14 @@ export default function EmptyState({
 
       <p style={messageStyle}>{finalMessage}</p>
 
-      {action && (
+      {resolvedAction && (
         <button
           className={isCompact ? "ghost-button" : "primary-button"}
-          onClick={action.onClick}
+          onClick={resolvedAction.onClick}
           style={buttonStyle}
           type="button"
         >
-          {action.label}
-        </button>
-      )}
-
-      {secondaryAction && (
-        <button
-          className="ghost-button"
-          onClick={secondaryAction.onClick}
-          style={{
-            ...buttonStyle,
-            minHeight: isCompact ? "32px" : "40px",
-          }}
-          type="button"
-          data-testid="empty-state-secondary-action"
-        >
-          {secondaryAction.label}
+          {resolvedAction.label}
         </button>
       )}
 
