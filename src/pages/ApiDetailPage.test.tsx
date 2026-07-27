@@ -484,4 +484,55 @@ describe("ApiDetailPage", () => {
       expect(docPanel.tabIndex).toBe(0);
     });
   });
+
+  describe("aria-live announcements", () => {
+    it("announces when the page details have loaded", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion?.textContent).toBe("WeatherSim API detail page loaded");
+    });
+
+    it("announces tab selection changes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      expect(liveRegion?.textContent).toBe("Showing Documentation tab");
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+      expect(liveRegion?.textContent).toBe("Showing Pricing tab");
+    });
+
+    it("announces cost calculator slider adjustments", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+      fireEvent.change(slider, { target: { value: "5000" } });
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion?.textContent).toBe("Estimated monthly total: $50.00 for 5,000 requests");
+    });
+
+    it("announces review sorting criteria changes", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      const select = screen.getByLabelText("Sort by");
+      fireEvent.change(select, { target: { value: "highest" } });
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion?.textContent).toBe("Reviews sorted by highest rated");
+    });
+  });
 });

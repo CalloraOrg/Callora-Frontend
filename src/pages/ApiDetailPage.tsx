@@ -24,6 +24,7 @@ import MOCK_APIS from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import PlanBadge from "../components/PlanBadge";
+import LiveRegion from "../components/LiveRegion";
 
 /**
  * ApiDetailPage
@@ -344,7 +345,14 @@ export default function ApiDetailPage({ onBack }: Props) {
   const [requests, setRequests] = useState(1000);
   const [isLoading, setIsLoading] = useState(true);
   const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
+  const [announcement, setAnnouncement] = useState("");
   const { showToast } = useToast();
+
+  const handleTabChange = useCallback((newTab: TabType) => {
+    setTab(newTab);
+    const tabLabel = TAB_ITEMS.find((t) => t.id === newTab)?.label ?? newTab;
+    setAnnouncement(`Showing ${tabLabel} tab`);
+  }, []);
 
   const prefersReducedMotion = useMemo(() => {
     return typeof window !== "undefined" &&
@@ -445,6 +453,12 @@ export default function ApiDetailPage({ onBack }: Props) {
     const timer = setTimeout(() => setIsLoading(false), delay);
     return () => clearTimeout(timer);
   }, [prefersReducedMotion]);
+
+  useEffect(() => {
+    if (!isLoading && api) {
+      setAnnouncement(`${api.name} detail page loaded`);
+    }
+  }, [isLoading, api]);
 
   // ── Not found (post-load) ─────────────────────────────────────────────────
 
@@ -645,7 +659,7 @@ print(response.json())`;
           {/* Responsive class handles flex→column stacking on narrow viewports */}
           <div className="api-hero__cta api-hero__cta--detail no-print">
             <button className="primary-button">Try API</button>
-            <button className="secondary-button" onClick={() => setTab("pricing")}>
+            <button className="secondary-button" onClick={() => handleTabChange("pricing")}>
               View Pricing
             </button>
             <SubscribeButton apiName={api.name} onSubscribe={() => showToast(`Subscribed to ${api.name}!`, "success")} />
@@ -657,7 +671,7 @@ print(response.json())`;
               {/* Tab navigation */}
               <div className="api-detail-tabs no-print">
                 <KbdHint shortcuts={API_DETAIL_SHORTCUTS} />
-                <Tabs tabs={TAB_ITEMS} activeTab={tab} onChange={(id) => setTab(id as TabType)} />
+                <Tabs tabs={TAB_ITEMS} activeTab={tab} onChange={(id) => handleTabChange(id as TabType)} />
               </div>
 
               {/* Tab panels */}
@@ -892,7 +906,11 @@ print(response.json())`;
                           max={1000000}
                           step={100}
                           value={requests}
-                          onChange={(e) => setRequests(Number(e.target.value))}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setRequests(val);
+                            setAnnouncement(`Estimated monthly total: ${estimatedCost(val)} for ${val.toLocaleString()} requests`);
+                          }}
                           style={{ width: "100%", height: 6, borderRadius: 3, appearance: "none", background: "var(--line)" }}
                         />
                         <div className="api-detail-calculator-total">
@@ -962,7 +980,12 @@ print(response.json())`;
                           <select
                             id="review-sort"
                             value={reviewSort}
-                            onChange={(e) => setReviewSort(e.target.value as ReviewSort)}
+                            onChange={(e) => {
+                              const nextSort = e.target.value as ReviewSort;
+                              setReviewSort(nextSort);
+                              const sortLabel = nextSort === "newest" ? "newest" : nextSort === "highest" ? "highest rated" : "lowest rated";
+                              setAnnouncement(`Reviews sorted by ${sortLabel}`);
+                            }}
                             style={{
                               fontSize: 13,
                               padding: "5px 10px",
@@ -1127,6 +1150,7 @@ print(response.json())`;
         {/* /api-detail-shell */}
       </div>
       {/* /api-detail-container */}
+      <LiveRegion>{announcement}</LiveRegion>
     </div>
   );
 }
