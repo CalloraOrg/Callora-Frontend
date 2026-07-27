@@ -27,7 +27,8 @@ export type StatusVariant =
   | 'operational'
   | 'degraded'
   | 'down'
-  | 'pending';
+  | 'pending'
+  | 'maintenance';
 
 const DEFAULT_LABELS: Record<StatusVariant, string> = {
   success: 'Operational',
@@ -37,6 +38,7 @@ const DEFAULT_LABELS: Record<StatusVariant, string> = {
   warning: 'Degraded',
   degraded: 'Degraded',
   pending: 'Pending',
+  maintenance: 'Maintenance',
 };
 
 const PATTERN_DESCRIPTIONS: Record<StatusVariant, string> = {
@@ -47,6 +49,7 @@ const PATTERN_DESCRIPTIONS: Record<StatusVariant, string> = {
   warning: 'opposite diagonal stripes',
   degraded: 'opposite diagonal stripes',
   pending: 'dot pattern',
+  maintenance: 'dot pattern',
 };
 
 const PATTERN_KEYS: Record<StatusVariant, string> = {
@@ -57,6 +60,7 @@ const PATTERN_KEYS: Record<StatusVariant, string> = {
   warning: 'opposite-stripes',
   degraded: 'opposite-stripes',
   pending: 'dots',
+  maintenance: 'dots',
 };
 
 /** Small circle indicator rendered before the text label. */

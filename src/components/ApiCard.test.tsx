@@ -5,6 +5,23 @@ import React from "react";
 import type { APIItem } from "../data/mockApis";
 import { pinnedApisStore } from "../state/pinnedApis";
 
+// Mock matchMedia globally for ApiCard tests
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    })),
+  });
+}
+
 /* ── Mocks ─────────────────────────────────────────────────────────────────
    vi.mock factories are hoisted to the top of the file by Vitest, so they
    cannot reference variables declared in module scope. All mock state must
@@ -347,6 +364,62 @@ describe("ApiCard responsiveness", () => {
     
     const card = screen.getByRole("button", { name: /View details for Responsive API/i });
     expect(card.className).not.toContain("api-card--compact");
+  });
+});
+
+describe("ApiCard status badges and color-blind patterns", () => {
+  it("renders the operational status badge with solid baseline pattern", () => {
+    const apiWithStatus: APIItem = {
+      id: "api-1",
+      name: "Stellar Metering API",
+      description: "A mock API for testing.",
+      tags: ["weather", "forecast", "geo"],
+      pricePerRequest: 0.01,
+      provider: { name: "Acme Labs" },
+      endpoints: [{ id: "meter", url: "/api/v1/meter", method: "GET", title: "Meter" }],
+      status: "operational",
+    };
+    render(<ApiCard api={apiWithStatus} />);
+    const badge = screen.getByRole("img", { name: "Operational" });
+    expect(badge).toBeTruthy();
+    expect(badge.getAttribute("data-pattern")).toBe("baseline");
+    expect(badge.className).toContain("sb-pattern-operational");
+  });
+
+  it("renders the degraded status badge with opposite-stripes pattern", () => {
+    const apiWithStatus: APIItem = {
+      id: "api-1",
+      name: "Stellar Metering API",
+      description: "A mock API for testing.",
+      tags: ["weather", "forecast", "geo"],
+      pricePerRequest: 0.01,
+      provider: { name: "Acme Labs" },
+      endpoints: [{ id: "meter", url: "/api/v1/meter", method: "GET", title: "Meter" }],
+      status: "degraded",
+    };
+    render(<ApiCard api={apiWithStatus} />);
+    const badge = screen.getByRole("img", { name: "Degraded" });
+    expect(badge).toBeTruthy();
+    expect(badge.getAttribute("data-pattern")).toBe("opposite-stripes");
+    expect(badge.className).toContain("sb-pattern-degraded");
+  });
+
+  it("renders the maintenance status badge with dots pattern", () => {
+    const apiWithStatus: APIItem = {
+      id: "api-1",
+      name: "Stellar Metering API",
+      description: "A mock API for testing.",
+      tags: ["weather", "forecast", "geo"],
+      pricePerRequest: 0.01,
+      provider: { name: "Acme Labs" },
+      endpoints: [{ id: "meter", url: "/api/v1/meter", method: "GET", title: "Meter" }],
+      status: "maintenance",
+    };
+    render(<ApiCard api={apiWithStatus} />);
+    const badge = screen.getByRole("img", { name: "Maintenance" });
+    expect(badge).toBeTruthy();
+    expect(badge.getAttribute("data-pattern")).toBe("dots");
+    expect(badge.className).toContain("sb-pattern-maintenance");
   });
 });
 

@@ -22,6 +22,7 @@ import type { Shortcut } from "../hooks/useGlobalShortcuts";
 import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
 import { ClockIcon, BoltIcon } from "./icons";
+import StatusBadge from "./StatusBadge";
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -531,7 +532,7 @@ export default function ApiCard({
   const prefersReducedMotion = useMemo(() => {
     return typeof window !== "undefined" &&
       typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.matchMedia("(prefers-reduced-motion: reduce)")?.matches;
   }, []);
 
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -720,9 +721,10 @@ export default function ApiCard({
         </div>
 
         <div className="api-marketplace-card-body" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+          <div className="api-marketplace-card-title-row" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <strong>{api.name}</strong>
             <div style={{ color: "var(--muted)", fontSize: 12 }}>{api.provider?.name}</div>
+            {api.status && <StatusBadge status={api.status} />}
           </div>
 
           {!isCompact && (
