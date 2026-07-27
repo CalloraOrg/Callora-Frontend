@@ -1,26 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import EmptyState from './components/EmptyState';
-import Skeleton, { SkeletonRow } from './components/Skeleton';
-import { formatPrice } from './utils/format';
-import type { JsonSchema } from './components/RequestBodyEditor';
-import CallHistoryRow from './components/CallHistoryRow';
-import Breadcrumb from './components/Breadcrumb';
-import RequestHistoryPanel from './components/RequestHistoryPanel';
-import ParamsBuilder from './components/ParamsBuilder';
-import { useFetchTracker } from './hooks/useFetchTracker';
-import { useQuota } from './hooks/useQuota';
-import PlanNudge from './components/PlanNudge';
-import CallsHeatmap from './components/CallsHeatmap';
-import Tabs from './components/Tabs';
-import { Icons } from './utils/icons';
-import { LinkIcon } from './components/icons';
+import EmptyState from '../components/EmptyState';
+import Skeleton, { SkeletonRow, ApiUsageSkeleton } from '../components/Skeleton';
+import { formatPrice } from '../utils/format';
+import type { JsonSchema } from '../components/RequestBodyEditor';
+import CallHistoryRow from '../components/CallHistoryRow';
+import Breadcrumb from '../components/Breadcrumb';
+import RequestHistoryPanel from '../components/RequestHistoryPanel';
+import ParamsBuilder from '../components/ParamsBuilder';
+import { useFetchTracker } from '../hooks/useFetchTracker';
+import { useQuota } from '../hooks/useQuota';
+import PlanNudge from '../components/PlanNudge';
+import CallsHeatmap from '../components/CallsHeatmap';
+import Tabs from '../components/Tabs';
+import { Icons } from '../utils/icons';
+import { LinkIcon } from '../components/icons';
 import {
   clearHistory,
   loadHistory,
   saveEntry,
   type HistoryEntry,
-} from './state/testCallHistory';
-import { copySnapshotUrl, parseSnapshotUrl } from './utils/snapshotUrl';
+} from '../state/testCallHistory';
+import { copySnapshotUrl, parseSnapshotUrl } from '../utils/snapshotUrl';
 
 const MOCK_USAGE_PERCENT = 80;
 const LOADING_DELAY_MS = 500;
@@ -226,6 +226,7 @@ export default function ApiUsage() {
   const [filterResetMessage, setFilterResetMessage] = useState('');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
   const [isTableLoading, setIsTableLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const toggleHistory = useCallback(() => setIsHistoryOpen(prev => !prev), []);
   const [historyEntries, setHistoryEntries] = useState<any[]>([]);
@@ -239,6 +240,7 @@ export default function ApiUsage() {
   useEffect(() => {
     const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
     const timer = setTimeout(() => {
+      setIsPageLoading(false);
       setIsTableLoading(false);
     }, delay);
     return () => clearTimeout(timer);
@@ -521,6 +523,10 @@ export default function ApiUsage() {
       a.click();
     }
   };
+
+  if (isPageLoading) {
+    return <ApiUsageSkeleton />;
+  }
 
   return (
     <div className="api-usage-page">
