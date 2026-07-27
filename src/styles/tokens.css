@@ -43,6 +43,36 @@
   --mkt-page-padding-sm: 14px;
   --mkt-sidebar-padding-start: 8px;
   --mkt-drawer-offset: 80px;
+
+  /* ── ApiUsage spacing tokens ────────────────────────────────────────
+     Named on a 4px grid, following the same scale as --mkt-* tokens but
+     namespaced under --api- for the ApiUsage page.  Replaces hardcoded
+     padding / gap / margin values in the ApiUsage component styles. */
+  --api-space-xs: 2px;
+  --api-space-sm: 4px;
+  --api-space-md: 8px;
+  --api-space-lg: 12px;
+  --api-space-xl: 16px;
+  --api-space-2xl: 20px;
+  --api-space-3xl: 24px;
+  --api-space-4xl: 28px;
+  --api-space-5xl: 32px;
+  --api-space-6xl: 40px;
+
+  /* ── ApiUsage typography tokens ─────────────────────────────────────
+     Locked font sizes for the ApiUsage page sections. */
+  --api-font-size-xs: 0.6875rem;
+  --api-font-size-sm: 0.8125rem;
+  --api-font-size-md: 0.875rem;
+  --api-font-size-base: 0.9375rem;
+  --api-font-size-lg: 1.25rem;
+  --api-font-size-xl: 1.5rem;
+  --api-line-height-tight: 1.15;
+  --api-line-height-normal: 1.5;
+
+  /* ── ApiUsage surface tokens ──────────────────────────────────────── */
+  --api-card-min-height: 48px;
+  --api-border-radius: 18px;
 }
 
 /* Light-mode overrides for tokens whose contrast depends on the theme */
