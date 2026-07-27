@@ -10,26 +10,25 @@ Object.assign(navigator, {
 });
 
 // Mock dependencies
-vi.mock('./hooks/useFetchTracker', () => ({
+vi.mock('../hooks/useFetchTracker', () => ({
   useFetchTracker: () => ({ trackFetch: vi.fn(async (promise) => promise) })
 }));
 
-vi.mock('./hooks/useQuota', () => ({
+vi.mock('../hooks/useQuota', () => ({
   useQuota: () => ({ usagePercent: 50, isDismissed: false, dismiss: vi.fn() })
 }));
 
-vi.mock('./components/PlanNudge', () => ({
+vi.mock('../components/PlanNudge', () => ({
   default: () => <div data-testid="plan-nudge">PlanNudge</div>
 }));
 
-vi.mock('./components/CallsHeatmap', () => ({
+vi.mock('../components/CallsHeatmap', () => ({
   default: () => <div data-testid="calls-heatmap">CallsHeatmap</div>
 }));
 
 describe('ApiUsage - Filter Reset', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    writeTextMock.mockResolvedValue(undefined);
     Object.defineProperty(window, 'location', {
       value: {
         search: '',
@@ -53,8 +52,15 @@ describe('ApiUsage - Filter Reset', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('should enable reset button when filters are active and announce reset to screen readers', async () => {
     render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     const resetButton = screen.getByRole('button', { name: /Reset Filters/i });
     expect(resetButton.disabled).toBe(true);
     const successTab = screen.getByRole('tab', { name: /Success/i });
@@ -74,6 +80,9 @@ describe('ApiUsage - Filter Reset', () => {
 
   it('renders an accessible breadcrumb with the current page announced', () => {
     render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i });
     expect(breadcrumb).toBeTruthy();
     const marketplaceLink = screen.getByRole('link', { name: 'Marketplace' });
@@ -105,6 +114,7 @@ describe('ApiUsage - Filter Reset', () => {
 
 describe('ApiUsage - Tabular Numerals', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     Object.defineProperty(window, 'location', {
       value: { search: '', pathname: '/api-usage' },
       writable: true,
@@ -122,18 +132,25 @@ describe('ApiUsage - Tabular Numerals', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('applies tabular-nums to all stat-value elements', () => {
     render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     const statValues = document.querySelectorAll('.stat-value.tabular-nums');
     expect(statValues.length).toBe(5);
     const labels = ['Calls Today', 'Calls This Week', 'Total Spent', 'Avg Response Time', 'Success Rate'];
-statValues.forEach((el, i) => {
-       expect(el.classList.contains('tabular-nums')).toBe(true);
-       const card = el.closest('.stat-card');
-       expect(card.querySelector('.stat-label').textContent).toBe(labels[i]);
-     });
-   });
- });
+    statValues.forEach((el, i) => {
+      expect(el.classList.contains('tabular-nums')).toBe(true);
+      const card = el.closest('.stat-card');
+      expect(card.querySelector('.stat-label').textContent).toBe(labels[i]);
+    });
+  });
+});
 
 describe('ApiUsage - Empty State', () => {
   beforeEach(() => {
@@ -284,3 +301,45 @@ describe('ApiUsage - prefers-reduced-motion', () => {
      expect(screen.getByText('Call History')).toBeTruthy();
    });
  });
+
+describe('ApiUsage - Loading Skeleton (v7)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(window, 'location', {
+      value: { search: '', pathname: '/api-usage' },
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders the themed page skeleton on mount when prefers-reduced-motion is false', () => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    render(<ApiUsage />);
+
+    // The container should show aria-busy="true" and label
+    const shell = screen.getByLabelText('API usage loading shell');
+    expect(shell).toBeTruthy();
+    expect(shell.getAttribute('aria-busy')).toBe('true');
+
+    // There should be skeleton cells and elements present
+    const skeletonElements = document.querySelectorAll('.skeleton');
+    expect(skeletonElements.length).toBeGreaterThan(0);
+    
+    // And some should have the stellar tone/theme
+    const stellarSkeletons = document.querySelectorAll('.skeleton--stellar');
+    expect(stellarSkeletons.length).toBeGreaterThan(0);
+  });
+});

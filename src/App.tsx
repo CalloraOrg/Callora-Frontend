@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
-import ApiUsage from "./ApiUsage";
+import ApiUsage from "./pages/ApiUsage";
 import Dashboard from "./components/Dashboard";
 import MyApis from "./pages/MyApis";
 import PlanBadgePage from "./pages/PlanBadge";
