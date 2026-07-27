@@ -129,14 +129,23 @@ describe("MarketplacePage", () => {
   });
 
   describe("aria-live announcements (v7)", () => {
+    /** Helper: grab the page-level LiveRegion (last one in DOM order).
+     *  FiltersSidebar also renders a LiveRegion, so we must use getAllByTestId
+     *  to avoid ambiguity errors. */
+    function getPageLiveRegion() {
+      const regions = screen.getAllByTestId("live-region");
+      return regions[regions.length - 1];
+    }
+
     it("renders a live region for screen reader announcements", () => {
       renderMarketplacePage();
       settleMarketplaceTimers();
 
-      const region = screen.queryByTestId("live-region");
-      expect(region).toBeTruthy();
-      expect(region?.getAttribute("role")).toBe("status");
-      expect(region?.getAttribute("aria-live")).toBe("polite");
+      const regions = screen.getAllByTestId("live-region");
+      expect(regions.length).toBeGreaterThanOrEqual(1);
+      const region = getPageLiveRegion();
+      expect(region.getAttribute("role")).toBe("status");
+      expect(region.getAttribute("aria-live")).toBe("polite");
     });
 
     it("announces when filters are cleared", () => {
@@ -155,7 +164,7 @@ describe("MarketplacePage", () => {
       const clearBtn = screen.getByText("Clear filters");
       fireEvent.click(clearBtn);
 
-      const liveRegion = screen.getByTestId("live-region");
+      const liveRegion = getPageLiveRegion();
       expect(liveRegion.textContent).toMatch(/All filters cleared/i);
     });
   });
