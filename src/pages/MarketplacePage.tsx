@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import ApiCard from "../components/ApiCard";
 import useDocumentTitle from "../hooks/useDocumentTitle";
@@ -21,6 +21,7 @@ import {
   type DensityPreference,
 } from "../utils/density";
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
+import LiveRegion from "../components/LiveRegion";
 import { useCompareStore } from "../state/compareStore";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
 
@@ -211,6 +212,16 @@ export default function MarketplacePage(): JSX.Element {
   /** Tag list memoised from the mock dataset — stable across re-renders. */
   const allTags = useMemo(() => getAllUniqueTags(), []);
 
+  // ── Aria-live announcements for screen readers ───────────────────────
+  const [announcement, setAnnouncement] = useState("");
+  const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const announce = useCallback((msg: string) => {
+    if (announceTimerRef.current) clearTimeout(announceTimerRef.current);
+    setAnnouncement(msg);
+    announceTimerRef.current = setTimeout(() => setAnnouncement(""), 3000);
+  }, []);
+
   // Filter and sort items
   const filtered = useMemo(() => {
     let items = MOCK_APIS.slice();
@@ -294,6 +305,39 @@ export default function MarketplacePage(): JSX.Element {
   ]);
 
 
+  // ── Aria-live announcements (relies on filtered being defined above) ──
+  const prevFilteredCount = useRef(0);
+  const isFirstFilterRender = useRef(true);
+  useEffect(() => {
+    if (isFirstFilterRender.current) {
+      isFirstFilterRender.current = false;
+      return;
+    }
+    const prev = prevFilteredCount.current;
+    if (prev !== filtered.length) {
+      if (filtered.length === 0 && prev > 0) {
+        announce("No APIs match the current filters.");
+      } else if (filtered.length > 0 && prev === 0) {
+        announce(`${filtered.length} API${filtered.length !== 1 ? "s" : ""} found.`);
+      }
+      prevFilteredCount.current = filtered.length;
+    }
+  }, [filtered.length, announce]);
+
+  // Announce when tag filter changes
+  const prevTag = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevTag.current;
+    if (selectedTag !== prev) {
+      if (selectedTag) {
+        announce(`Filtering by tag: ${selectedTag}`);
+      } else {
+        announce("Tag filter removed.");
+      }
+      prevTag.current = selectedTag;
+    }
+  }, [selectedTag, announce]);
+
 
   const handleTagClick = (tag: string) => {
     setSelectedTag(
@@ -337,6 +381,7 @@ export default function MarketplacePage(): JSX.Element {
     setFavoritesOnly(false);
     setSortParam("popularity");
     setSearch("");
+    announce("All filters cleared. Showing all APIs.");
   };
 
   const handlePageChange = (page: number) => {
@@ -559,6 +604,9 @@ export default function MarketplacePage(): JSX.Element {
           )}
         </main>
       </div>
+
+      {/* Screen-reader announcement region */}
+      <LiveRegion message={announcement} />
 
       {/* Mobile bottom-sheet — only rendered when open */}
       <FiltersBottomSheet

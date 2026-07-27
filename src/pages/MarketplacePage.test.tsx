@@ -127,4 +127,36 @@ describe("MarketplacePage", () => {
     const grid = document.querySelector(".marketplace-grid");
     expect(grid).toBeTruthy();
   });
+
+  describe("aria-live announcements (v7)", () => {
+    it("renders a live region for screen reader announcements", () => {
+      renderMarketplacePage();
+      settleMarketplaceTimers();
+
+      const region = screen.queryByTestId("live-region");
+      expect(region).toBeTruthy();
+      expect(region?.getAttribute("role")).toBe("status");
+      expect(region?.getAttribute("aria-live")).toBe("polite");
+    });
+
+    it("announces when filters are cleared", () => {
+      renderMarketplacePage();
+      settleMarketplaceTimers();
+
+      // First apply a filter to enable clear
+      const weatherTag = screen.getByRole("button", {
+        name: "Filter marketplace by tag weather",
+      });
+      fireEvent.click(weatherTag);
+
+      expect(screen.getByText("Filtered by tag: #weather")).toBeTruthy();
+
+      // Now clear all filters
+      const clearBtn = screen.getByText("Clear filters");
+      fireEvent.click(clearBtn);
+
+      const liveRegion = screen.getByTestId("live-region");
+      expect(liveRegion.textContent).toMatch(/All filters cleared/i);
+    });
+  });
 });
