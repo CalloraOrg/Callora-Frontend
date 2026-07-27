@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import TestInBrowser from "../components/TestInBrowser";
-import Skeleton from "../components/Skeleton";
+import Skeleton, { ApiDetailPageSkeleton } from "../components/Skeleton";
 import EmbedPreview from "../components/EmbedPreview";
 import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
@@ -473,80 +473,7 @@ export default function ApiDetailPage({ onBack }: Props) {
   // ── Skeleton loading ──────────────────────────────────────────────────────
 
   if (isLoading) {
-    return (
-      <div className="api-detail-page">
-        <div className="api-detail-container">
-          <Breadcrumb
-            items={[
-              { label: "Marketplace", href: "/marketplace" },
-              { label: "Loading…", href: "", isCurrent: true },
-            ]}
-          />
-          <div className="api-detail-shell">
-            <div className="api-detail-hero">
-              <div className="api-detail-heading">
-                <button className="ghost-button no-print" onClick={onBack} type="button">
-                  Back
-                </button>
-                <div className="api-detail-brand">
-                  <Skeleton width={56} height={56} borderRadius={10} />
-                  <div className="api-detail-title" style={{ flex: 1, marginLeft: 12 }}>
-                    <Skeleton width="60%" height={32} style={{ marginBottom: 8 }} />
-                    <Skeleton width="40%" height={16} />
-                  </div>
-                </div>
-              </div>
-              <div className="api-detail-price-panel">
-                <Skeleton width={100} height={32} style={{ marginBottom: 8 }} />
-                <Skeleton width={120} height={14} style={{ marginBottom: 12 }} />
-                <Skeleton width="100%" height={44} borderRadius={8} />
-              </div>
-            </div>
-
-            <div className="api-detail-content-grid">
-              <div className="content-left">
-                <nav className="api-detail-tabs no-print">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} width={80} height={20} style={{ marginRight: 24 }} />
-                  ))}
-                </nav>
-                <div className="api-detail-metrics">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="stat-card-skeleton" style={{ padding: 20 }}>
-                      <Skeleton width="40%" height={12} style={{ marginBottom: 12 }} />
-                      <Skeleton width="60%" height={28} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <aside className="api-detail-sidebar no-print">
-                <div className="api-detail-sidebar-inner">
-                  <div className="stat-card-skeleton" style={{ padding: 24, marginBottom: 20 }}>
-                    <Skeleton width="50%" height={20} style={{ marginBottom: 16 }} />
-                    <Skeleton width="100%" height={16} style={{ marginBottom: 8 }} />
-                    <Skeleton width="100%" height={16} style={{ marginBottom: 8 }} />
-                    <Skeleton width="100%" height={16} />
-                  </div>
-                  <div className="preview-card-skeleton" style={{ padding: 24, marginBottom: 20 }}>
-                    <Skeleton width="50%" height={20} style={{ marginBottom: 16 }} />
-                    <Skeleton width="100%" height={36} style={{ marginBottom: 8 }} />
-                    <Skeleton width="100%" height={36} style={{ marginBottom: 8 }} />
-                    <Skeleton width="100%" height={36} />
-                  </div>
-                  <div style={{ padding: 24, borderRadius: 16 }}>
-                    <Skeleton width="50%" height={20} style={{ marginBottom: 12 }} />
-                    <Skeleton width="100%" height={14} style={{ marginBottom: 6 }} />
-                    <Skeleton width="100%" height={14} style={{ marginBottom: 16 }} />
-                    <Skeleton width="100%" height={44} borderRadius={8} />
-                  </div>
-                </div>
-              </aside>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <ApiDetailPageSkeleton onBack={onBack} />;
   }
 
   // Safety guard — unreachable after the checks above, satisfies TS

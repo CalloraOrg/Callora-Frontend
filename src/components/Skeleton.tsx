@@ -1,4 +1,5 @@
 import { CSSProperties, Fragment } from "react";
+import Breadcrumb from "./Breadcrumb";
 
 interface SkeletonProps {
   width?: string | number;
@@ -201,6 +202,87 @@ export function ApiUsageSkeleton() {
             <Skeleton tone="stellar" width="60%" height={14} />
             <Skeleton tone="stellar" width="75%" height={14} />
             <Skeleton tone="stellar" width="40%" height={14} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ApiDetailPageSkeleton({ onBack }: { onBack?: () => void }) {
+  return (
+    <div
+      className="api-detail-page"
+      aria-busy="true"
+      aria-label="API detail loading shell"
+    >
+      <div className="api-detail-container">
+        <Breadcrumb
+          items={[
+            { label: "Marketplace", href: "/marketplace" },
+            { label: "Loading…", href: "", isCurrent: true },
+          ]}
+        />
+        <div className="api-detail-shell">
+          <div className="api-detail-hero">
+            <div className="api-detail-heading">
+              <button className="ghost-button no-print" onClick={onBack} type="button">
+                Back
+              </button>
+              <div className="api-detail-brand" style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <Skeleton tone="stellar" width={56} height={56} borderRadius={10} />
+                <div className="api-detail-title" style={{ flex: 1, display: "grid", gap: 8 }}>
+                  <Skeleton tone="stellar" width="60%" height={32} />
+                  <Skeleton tone="stellar" width="40%" height={16} />
+                </div>
+              </div>
+            </div>
+            <div className="api-detail-price-panel" style={{ display: "grid", gap: 8 }}>
+              <Skeleton tone="stellar" width={100} height={32} />
+              <Skeleton tone="stellar" width={120} height={14} />
+              <Skeleton tone="stellar" width="100%" height={44} borderRadius={8} />
+            </div>
+          </div>
+
+          <div className="api-detail-content-grid">
+            <div className="content-left">
+              <nav className="api-detail-tabs no-print" style={{ display: "flex", gap: 24, marginBottom: 16 }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton tone="stellar" key={i} width={80} height={20} />
+                ))}
+              </nav>
+              <div className="api-detail-metrics" style={{ display: "flex", gap: 16 }}>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="stat-card-skeleton" style={{ padding: 20, flex: 1, display: "grid", gap: 12 }}>
+                    <Skeleton tone="stellar" width="40%" height={12} />
+                    <Skeleton tone="stellar" width="60%" height={28} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <aside className="api-detail-sidebar no-print">
+              <div className="api-detail-sidebar-inner" style={{ display: "grid", gap: 20 }}>
+                <div className="stat-card-skeleton" style={{ padding: 24, display: "grid", gap: 12 }}>
+                  <Skeleton tone="stellar" width="50%" height={20} />
+                  <Skeleton tone="stellar" width="100%" height={16} />
+                  <Skeleton tone="stellar" width="100%" height={16} />
+                  <Skeleton tone="stellar" width="100%" height={16} />
+                </div>
+                <div className="preview-card-skeleton" style={{ padding: 24, display: "grid", gap: 12 }}>
+                  <Skeleton tone="stellar" width="50%" height={20} />
+                  <Skeleton tone="stellar" width="100%" height={36} />
+                  <Skeleton tone="stellar" width="100%" height={36} />
+                  <Skeleton tone="stellar" width="100%" height={36} />
+                </div>
+                <div style={{ padding: 24, borderRadius: 16, border: "1px solid var(--line)", display: "grid", gap: 12 }}>
+                  <Skeleton tone="stellar" width="50%" height={20} />
+                  <Skeleton tone="stellar" width="100%" height={14} />
+                  <Skeleton tone="stellar" width="100%" height={14} />
+                  <Skeleton tone="stellar" width="100%" height={44} borderRadius={8} />
+                </div>
+              </div>
+            </aside>
           </div>
         </div>
       </div>
