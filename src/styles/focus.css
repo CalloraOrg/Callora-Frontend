@@ -97,6 +97,19 @@
     outline-offset: 3px;
   }
 
+  /* ── HelpPopover trigger (info icon) ──────────────────────────────────── */
+  .help-popover-trigger {
+    color: var(--muted);
+    transition: color 180ms ease;
+  }
+
+  .help-popover-trigger:hover,
+  .help-popover-trigger:focus-visible {
+    color: var(--accent);
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
   /* ── ApiDetailPage: icon buttons (Postman / Insomnia / Save) ────────────── */
   .api-detail-page .icon-button:focus-visible,
   .endpoint-client-buttons .icon-button:focus-visible {
