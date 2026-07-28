@@ -3269,7 +3269,7 @@ code,
 .api-usage-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--api-space-3xl);
   max-width: 1180px;
   margin: 0 auto;
 }
@@ -3278,8 +3278,8 @@ code,
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 24px;
-  padding: 24px;
+  gap: var(--api-space-3xl);
+  padding: var(--api-space-3xl);
   background: var(--surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
@@ -3287,7 +3287,7 @@ code,
 
 .api-header-info {
   display: flex;
-  gap: 16px;
+  gap: var(--api-space-xl);
   align-items: center;
 }
 
@@ -3304,8 +3304,8 @@ code,
 }
 
 .api-header h1 {
-  margin: 0 0 4px 0;
-  font-size: 1.8rem;
+  margin: 0 0 var(--api-space-sm) 0;
+  font-size: var(--api-font-size-xl);
   font-weight: 600;
 }
 
@@ -3317,7 +3317,7 @@ code,
 .api-header-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--api-space-lg);
   align-items: flex-end;
 }
 
@@ -3356,11 +3356,11 @@ code,
 }
 
 .api-key-section h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--api-space-xl) 0;
 }
 
 .api-key-card {
-  padding: 20px;
+  padding: var(--api-space-2xl);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
 }
@@ -3368,12 +3368,12 @@ code,
 .api-key-display {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--api-space-xl);
 }
 
 .key-input-group {
   display: flex;
-  gap: 8px;
+  gap: var(--api-space-md);
 }
 
 .api-key-input {
@@ -3389,30 +3389,30 @@ code,
 
 .key-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--api-space-md);
 }
 
 .usage-instruction {
-  margin: 12px 0 0 0;
+  margin: var(--api-space-lg) 0 0 0;
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--api-font-size-md);
 }
 
 .test-call-section h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--api-space-xl) 0;
 }
 
 .test-call-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--api-space-xl);
+  margin-bottom: var(--api-space-3xl);
 }
 
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--api-space-md);
 }
 
 .form-row label {
@@ -3444,7 +3444,7 @@ code,
 }
 
 .response-display h3 {
-  margin: 0 0 12px 0;
+  margin: 0 0 var(--api-space-lg) 0;
 }
 
 .loading-placeholder {
@@ -3455,9 +3455,9 @@ code,
 
 .response-meta {
   display: flex;
-  gap: 16px;
-  margin-bottom: 12px;
-  font-size: 0.875rem;
+  gap: var(--api-space-xl);
+  margin-bottom: var(--api-space-lg);
+  font-size: var(--api-font-size-md);
 }
 
 .response-time,
@@ -3475,28 +3475,28 @@ code,
 }
 
 .usage-stats-section h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--api-space-xl) 0;
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--api-space-xl);
+  margin-bottom: var(--api-space-3xl);
 }
 
 .stat-card {
-  padding: 20px;
+  padding: var(--api-space-2xl);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--api-space-md);
 }
 
 .stat-label {
-  font-size: 0.875rem;
+  font-size: var(--api-font-size-md);
   color: var(--muted);
 }
 
@@ -3546,19 +3546,19 @@ code,
 }
 
 .call-history-section h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--api-space-xl) 0;
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: var(--api-space-xl);
 }
 
 .history-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--api-space-md);
 }
 
 .filter-select {
@@ -4049,17 +4049,17 @@ code,
   }
 
   .api-usage-page {
-    gap: 16px;
+    gap: var(--api-space-xl);
   }
 
   .api-header {
-    padding: 16px;
+    padding: var(--api-space-xl);
   }
 
   .api-header-info {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: var(--api-space-lg);
   }
 
   .api-logo {
@@ -4068,7 +4068,7 @@ code,
   }
 
   .api-header h1 {
-    font-size: 1.4rem;
+    font-size: var(--api-font-size-lg);
   }
 
   .stats-grid {
