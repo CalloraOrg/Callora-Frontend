@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EmptyState from "./EmptyState";
 import type { EmptyStateSize, EmptyStateVariant } from "./EmptyState";
@@ -361,6 +361,107 @@ describe("EmptyState", () => {
       );
       const withActionSkeletonsCount = withAction.querySelectorAll(".skeleton").length;
       expect(withActionSkeletonsCount).toBe(initialSkeletonsCount + 1);
+    });
+  });
+
+  describe("copy-to-clipboard", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("renders copy button when copyable is true and message is present", () => {
+      render(<EmptyState copyable message="Copy this text" />);
+      expect(screen.getByLabelText("Copy message to clipboard")).toBeTruthy();
+    });
+
+    it("does not render copy button when copyable is false (default)", () => {
+      render(<EmptyState message="No copy here" />);
+      expect(screen.queryByLabelText("Copy message to clipboard")).toBeNull();
+    });
+
+    it("copies the message text to clipboard on click", async () => {
+      render(<EmptyState copyable message="Test message" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Test message");
+    });
+
+    it("shows 'Copied' feedback after clicking", async () => {
+      render(<EmptyState copyable message="Some text" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(btn.textContent).toMatch(/Copied/);
+    });
+
+    it("announces copy success via aria-live region", async () => {
+      render(<EmptyState copyable message="Announce this" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      const liveRegion = screen.getByText("Message copied to clipboard");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion.getAttribute("aria-live")).toBe("polite");
+    });
+
+    it("reverts 'Copied' feedback after 2 seconds", async () => {
+      render(<EmptyState copyable message="Revert test" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(btn.textContent).toMatch(/Copied/);
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(btn.textContent).toMatch(/Copy/);
+    });
+
+    it("copies the resolved message (message prop takes precedence over description)", async () => {
+      render(
+        <EmptyState
+          copyable
+          message="Primary message"
+          description="Deprecated description"
+        />,
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Copy message to clipboard"));
+      });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Primary message");
+    });
+
+    it("copies the default message when no custom message is provided", async () => {
+      render(<EmptyState variant="empty" copyable />);
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Copy message to clipboard"));
+      });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        "Check back soon for new integrations.",
+      );
+    });
+
+    it("renders copy button with compact size styling", () => {
+      render(<EmptyState copyable size="compact" message="Compact copy" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      expect(btn).toBeTruthy();
+      expect(btn.style.fontSize).toBe("0.75rem");
     });
   });
 });
