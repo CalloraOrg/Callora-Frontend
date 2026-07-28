@@ -1,6 +1,6 @@
 /* src/styles/patterns.css */
 
-/* ── StatusBadge: color-blind-safe patterns ────────────────────────────────
+/* ── StatusBadge: color-blind-safe patterns (Issue #685) ──────────────────
    Each status gets a unique CSS background-image pattern so that the badge
    can be distinguished by shape/texture alone, satisfying WCAG 1.4.1
    (Use of Color) and supporting deuteranopia / protanopia / tritanopia.
@@ -8,6 +8,13 @@
    Patterns are applied as a second background layer on top of the solid
    background-color already set by the --sb-*-bg tokens. They are rendered
    as inline SVG data URIs so no external assets are required.
+
+   Pattern groups (related severity levels share a texture):
+     Baseline (solid)    → success, operational
+     Diagonal stripes ╲  → error, down
+     Opposite stripes ╱  → warning, degraded
+     Dots               → pending
+     Crosshatch ╳       → maintenance
    ──────────────────────────────────────────────────────────────────────── */
 
 /* Success / Operational: no pattern — solid color baseline */
