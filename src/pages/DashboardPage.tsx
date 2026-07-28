@@ -1,8 +1,8 @@
-import Dashboard from '../components/Dashboard';
+import DashboardOverview from './DashboardOverview';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 /**
- * DashboardPage – wrapper for the Dashboard component to set page title.
+ * DashboardPage – wrapper for the DashboardOverview component to set page title.
  */
 export default function DashboardPage() {
   useDocumentTitle(
@@ -10,10 +10,11 @@ export default function DashboardPage() {
     "Your Callora dashboard showing balances, recent activity and quick actions.",
   );
   return (
-    <Dashboard
+    <DashboardOverview
       vaultBalance={0}
       walletBalance={0}
       openDeposit={(_presetAmount?: number) => {}}
     />
   );
 }
+
