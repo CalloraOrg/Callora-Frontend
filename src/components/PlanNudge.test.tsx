@@ -64,7 +64,7 @@ describe('PlanNudge', () => {
   it('renders a keyboard shortcut hint on the upgrade link', () => {
     renderNudge();
     const link = screen.getByRole('link', { name: /upgrade your plan/i });
-    const kbdHint = link.querySelector('.kbd-hint--subtle');
+    const kbdHint = link.querySelector('.kbd-hint--chip');
     expect(kbdHint).toBeInTheDocument();
     expect(kbdHint).toHaveAttribute('aria-label', 'Upgrade keyboard shortcut');
   });
