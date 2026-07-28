@@ -7,32 +7,6 @@ import KbdHint from "../components/KbdHint";
 import type { Shortcut } from "../hooks/useGlobalShortcuts";
 
 /**
- * Skeleton placeholder shown while tags are loading.
- * Renders pill-shaped skeleton elements matching the component's layout
- * so the transition to the real filter is seamless.
- */
-export function ApiTagFilterSkeleton() {
-  return (
-    <div
-      className="api-tag-filter"
-      role="group"
-      aria-label="Loading tag filter"
-      aria-busy="true"
-    >
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Skeleton
-          key={i}
-          width={i === 0 ? 48 : 80 + i * 12}
-          height={36}
-          borderRadius={999}
-          className="api-tag-filter__pill-skeleton"
-        />
-      ))}
-    </div>
-  );
-}
-
-/**
  * Extracts all unique tags from the mock API data, sorted alphabetically.
  * Memoised callers can cache for the lifetime of the page.
  */
@@ -89,21 +63,26 @@ export interface ApiTagFilterProps {
  * automatically supported.
  */
 /**
- * Skeleton placeholder for ApiTagFilter — matches pill height + spacing
- * so layout doesn't jump when real content loads.
+ * Skeleton placeholder shown while tags are loading.
+ * Renders pill-shaped skeleton elements matching the component's layout
+ * so the transition to the real filter is seamless.
  */
 export function ApiTagFilterSkeleton() {
   return (
     <div
       className="api-tag-filter"
       role="group"
-      aria-label="Loading tag filters"
+      aria-label="Loading tag filter"
       aria-busy="true"
-      style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", flexWrap: "wrap" }}
     >
-      <div className="skeleton" style={{ width: 36, height: 32, borderRadius: 8 }} />
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="skeleton" style={{ width: 70 + i * 10, height: 32, borderRadius: 8 }} />
+        <Skeleton
+          key={i}
+          width={i === 0 ? 48 : 80 + i * 12}
+          height={36}
+          borderRadius={999}
+          className="api-tag-filter__pill-skeleton"
+        />
       ))}
     </div>
   );

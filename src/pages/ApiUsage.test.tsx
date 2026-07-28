@@ -93,6 +93,9 @@ describe('ApiUsage - Filter Reset', () => {
 
   it('announces status filter changes to screen readers', async () => {
     render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     fireEvent.click(screen.getByRole('tab', { name: /Error/i }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -102,6 +105,9 @@ describe('ApiUsage - Filter Reset', () => {
 
   it('announces copy actions to screen readers', async () => {
     render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
     await act(async () => {
       await Promise.resolve();
@@ -223,6 +229,9 @@ describe('ApiUsage - prefers-reduced-motion', () => {
 
    it('applies focus-visible styles on interactive elements when keyboard-focused', () => {
     render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
 
     // All interactive buttons get focus-visible outlines via global @layer focus
     const buttons = document.querySelectorAll('.api-usage-page button');
