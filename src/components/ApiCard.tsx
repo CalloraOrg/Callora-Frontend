@@ -4,6 +4,14 @@
  * Marketplace API card.
  * Includes a bookmark/save button that opens a small popover
  * allowing users to add/remove the endpoint from collections.
+ *
+ * Skeleton parity (Issue #718):
+ * ApiCardSkeleton intentionally mirrors the final ApiCard shape so
+ * the first-paint skeleton never jumps on load.  Every spacing,
+ * border, and dimension value uses the same CSS custom properties
+ * as the live card (`--mkt-card-padding`, `--mkt-card-min-height`,
+ * `--line-strong`, etc.) so dark-mode and responsive overrides apply
+ * equally to both states.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -36,13 +44,25 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
       className={`preview-card api-marketplace-card api-card-skeleton${isCompact ? " api-card--compact" : ""}`}
       aria-busy="true"
       aria-label="Loading API"
+      /*
+       * Skeleton shape parity (Issue #718):
+       * Use the same CSS custom properties as the live ApiCard so padding,
+       * min-height, gap, and border all track responsive and theme overrides
+       * without a layout jump between loading → loaded states.
+       */
       style={{
-        padding: isCompact ? 10 : 12,
+        padding: isCompact
+          ? "var(--mkt-card-compact-padding)"
+          : "var(--mkt-card-padding)",
         display: "flex",
         flexDirection: "column",
-        minHeight: isCompact ? 188 : 220,
-        gap: isCompact ? 6 : 8,
-        border: "1px solid rgba(255,255,255,0.03)",
+        minHeight: isCompact
+          ? "var(--mkt-card-compact-min-height)"
+          : "var(--mkt-card-min-height)",
+        gap: isCompact
+          ? "var(--mkt-card-compact-gap)"
+          : "var(--mkt-card-gap)",
+        border: "1px solid var(--line-strong, rgba(169,184,255,0.12))",
         pointerEvents: "none",
         position: "relative",
       }}
@@ -83,8 +103,8 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
         <Skeleton tone="stellar" width={60} height={28} borderRadius={8} />
       </div>
 
-      <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <Skeleton tone="stellar" width={56} height={56} borderRadius={10} />
+      <div className="api-marketplace-card-header" style={{ display: "flex", gap: "var(--mkt-space-lg)", alignItems: "center" }}>
+        <Skeleton tone="stellar" width="var(--mkt-card-icon-size)" height="var(--mkt-card-icon-size)" borderRadius="var(--mkt-card-icon-radius)" />
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--mkt-space-md)" }}>
           <div style={{ display: "flex", gap: "var(--mkt-space-md)", alignItems: "baseline" }}>
@@ -612,7 +632,7 @@ export default function ApiCard({
   onBrowse?: () => void;
 }) {
   if (loading) {
-    return <ApiCardSkeleton />;
+    return <ApiCardSkeleton density={density} />;
   }
 
   if (!api) {
