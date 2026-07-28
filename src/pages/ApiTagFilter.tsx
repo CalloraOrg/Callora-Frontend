@@ -3,6 +3,8 @@ import MOCK_APIS from "../data/mockApis";
 import Skeleton from "../components/Skeleton";
 import { TagIcon } from "../components/icons";
 import Tooltip from "../components/Tooltip";
+import KbdHint from "../components/KbdHint";
+import type { Shortcut } from "../hooks/useGlobalShortcuts";
 
 /**
  * Skeleton placeholder shown while tags are loading.
@@ -57,7 +59,7 @@ export interface ApiTagFilterProps {
   hoverDelayMs?: number;
   /** Optional touch long-press duration in ms for tooltips. Defaults to 500. */
   longPressMs?: number;
-  /** Show skeleton loading state while tags are being fetched. */
+  /** Show skeleton loading state instead of tags. */
   isLoading?: boolean;
 }
 
@@ -86,6 +88,33 @@ export interface ApiTagFilterProps {
  * custom properties from `tokens.css`.  Dark / light themes are
  * automatically supported.
  */
+/**
+ * Skeleton placeholder for ApiTagFilter — matches pill height + spacing
+ * so layout doesn't jump when real content loads.
+ */
+export function ApiTagFilterSkeleton() {
+  return (
+    <div
+      className="api-tag-filter"
+      role="group"
+      aria-label="Loading tag filters"
+      aria-busy="true"
+      style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", flexWrap: "wrap" }}
+    >
+      <div className="skeleton" style={{ width: 36, height: 32, borderRadius: 8 }} />
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="skeleton" style={{ width: 70 + i * 10, height: 32, borderRadius: 8 }} />
+      ))}
+    </div>
+  );
+}
+
+/** Keyboard shortcuts for the ApiTagFilter */
+export const TAG_FILTER_SHORTCUTS: readonly Shortcut[] = [
+  { key: "Tab", description: "Navigate between tags", category: "Marketplace" },
+  { key: "Enter", description: "Toggle tag selection", category: "Marketplace" },
+];
+
 export default function ApiTagFilter({
   tags,
   selectedTag,
@@ -152,6 +181,16 @@ export default function ApiTagFilter({
           </Tooltip>
         );
       })}
+
+      {/* Keyboard shortcut hint bubble — subtle chip variant but
+          rendered as <aside> so it retains the complementary landmark role
+          for screen readers. */}
+      <KbdHint
+        shortcuts={TAG_FILTER_SHORTCUTS}
+        variant="chip"
+        as="aside"
+        label="Tag filter keyboard shortcuts"
+      />
     </div>
   );
 }

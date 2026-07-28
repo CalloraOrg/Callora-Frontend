@@ -310,7 +310,139 @@ describe("ApiTagFilter", () => {
     expect(skeletonPills.length).toBeGreaterThan(0);
   });
 
-  
+  // ── Keyboard shortcut hints (issue #444) ──────────────────────────────────
+
+  describe("keyboard shortcut hints", () => {
+    it("renders KbdHint with tag filter shortcuts", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      const hint = screen.getByRole("complementary", { name: "Tag filter keyboard shortcuts" });
+      expect(hint).toBeTruthy();
+    });
+
+    it("shows Tab shortcut for navigating between tags", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      expect(screen.getByText("Tab")).toBeTruthy();
+      expect(screen.getByText("Navigate between tags")).toBeTruthy();
+    });
+
+    it("shows Enter shortcut for toggling tag selection", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      expect(screen.getByText("Enter")).toBeTruthy();
+      expect(screen.getByText("Toggle tag selection")).toBeTruthy();
+    });
+
+    it("uses chip variant for the kbd hint", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      const hint = screen.getByRole("complementary", { name: "Tag filter keyboard shortcuts" });
+      expect(hint.classList.contains("kbd-hint--chip")).toBe(true);
+    });
+
+    it("has correct aria-label on kbd-hint", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      const hint = screen.getByRole("complementary", { name: "Tag filter keyboard shortcuts" });
+      expect(hint.getAttribute("aria-label")).toBe("Tag filter keyboard shortcuts");
+    });
+  });
+
+  // ── Tooltip primitive integration (issue #533) ───────────────────────────
+
+  describe("Tooltip primitive integration", () => {
+    it("wraps tag icon buttons in Tooltip and displays tooltip on hover", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      const weatherBtn = screen.getByRole("button", { name: /weather/i });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      fireEvent.mouseEnter(weatherBtn);
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip).toBeTruthy();
+      expect(tooltip.textContent).toMatch(/weather/i);
+
+      fireEvent.mouseLeave(weatherBtn);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("respects hoverDelayMs when passed to ApiTagFilter", () => {
+      vi.useFakeTimers();
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+          hoverDelayMs={250}
+        />,
+      );
+      const weatherBtn = screen.getByRole("button", { name: /weather/i });
+
+      fireEvent.mouseEnter(weatherBtn);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+
+      vi.useRealTimers();
+    });
+
+    it("opens tooltip on touch long-press with longPressMs", () => {
+      vi.useFakeTimers();
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+          longPressMs={300}
+        />,
+      );
+      const geoBtn = screen.getByRole("button", { name: /geo/i });
+
+      fireEvent.touchStart(geoBtn);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+
+      vi.useRealTimers();
+    });
+  });
 });
 
 // ── getAllUniqueTags utility ────────────────────────────────────────────────
