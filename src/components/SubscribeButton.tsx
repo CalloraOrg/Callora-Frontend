@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { CheckIcon } from "./icons/CheckIcon";
+import HelpPopover from "./HelpPopover";
 
 type SubscribeStatus = "idle" | "confirming" | "subscribed";
 
@@ -118,12 +119,46 @@ export default function SubscribeButton({ apiName, onSubscribe, className }: Pro
 
   // idle state
   return (
-    <button
-      className={`secondary-button subscribe-button${className ? ` ${className}` : ""}`}
-      aria-label={`Subscribe to ${apiName}`}
-      onClick={handleSubscribeClick}
+    <span
+      className={`subscribe-idle${className ? ` ${className}` : ""}`}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "var(--mkt-space-sm, 4px)",
+      }}
     >
-      Subscribe
-    </button>
+      <button
+        className="secondary-button subscribe-button"
+        aria-label={`Subscribe to ${apiName}`}
+        onClick={handleSubscribeClick}
+      >
+        Subscribe
+      </button>
+
+      <HelpPopover
+        content={
+          <span>
+            <strong style={{ display: "block", marginBottom: "0.25rem" }}>
+              What is "Subscribing"?
+            </strong>
+            <span style={{ display: "block" }}>
+              Subscribing gives you access to this API’s endpoints. You are
+              charged per successful API request — you only pay for what you
+              use.
+            </span>
+            <span
+              style={{
+                display: "block",
+                marginTop: "0.25rem",
+                opacity: 0.85,
+              }}
+            >
+              Your subscription can be managed or cancelled at any time.
+            </span>
+          </span>
+        }
+        ariaLabel={`Help: What does subscribing to ${apiName} mean?`}
+      />
+    </span>
   );
 }
