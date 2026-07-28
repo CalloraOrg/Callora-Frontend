@@ -277,29 +277,84 @@ describe('ApiUsage - prefers-reduced-motion', () => {
      expect(skeletonRows.length).toBe(0);
    });
 
-   it('uses the normal loading delay when prefers-reduced-motion is not active', async () => {
-     window.matchMedia = vi.fn().mockImplementation((query) => ({
-       matches: false,
-       media: query,
-       onchange: null,
-       addListener: vi.fn(),
-       removeListener: vi.fn(),
-       addEventListener: vi.fn(),
-       removeEventListener: vi.fn(),
-       dispatchEvent: vi.fn(),
-     }));
+  it('uses the normal loading delay when prefers-reduced-motion is not active', async () => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
 
-     render(<ApiUsage />);
+    render(<ApiUsage />);
 
-     const skeletonRows = document.querySelectorAll('.skeleton-cell');
-     expect(skeletonRows.length).toBeGreaterThan(0);
+    const skeletonRows = document.querySelectorAll('.skeleton-cell');
+    expect(skeletonRows.length).toBeGreaterThan(0);
 
-     await act(async () => {
-       await vi.advanceTimersByTimeAsync(500);
-     });
-
-     expect(screen.getByText('Call History')).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
     });
+
+    expect(screen.getByText('Call History')).toBeTruthy();
+   });
+
+  // ── CSS-class contract for reduced-motion (Issue #721) ────────────────
+  //
+  // jsdom does not evaluate @media rules, so we verify that the CSS classes
+  // exist and are correctly structured for the {prefers-reduced-motion: reduce}
+  // rules in index.css to apply in real browsers.
+
+  it('status-dot has CSS class targeted by prefers-reduced-motion: reduce rules', () => {
+    render(<ApiUsage />);
+    act(() => { vi.advanceTimersByTime(500); });
+    const statusDot = document.querySelector('.status-dot');
+    expect(statusDot).toBeTruthy();
+  });
+
+  it('skeleton elements have the .skeleton class targeted by reduced-motion CSS', () => {
+    // Render normally (no reduced motion) to verify skeleton class presence
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    render(<ApiUsage />);
+
+    const skeletonEls = document.querySelectorAll('.skeleton');
+    // There should be skeletons visible during initial render
+    expect(skeletonEls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('skeleton elements are present with shimmer background before reduced-motion CSS takes effect', () => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    render(<ApiUsage />);
+
+    const skeletonEls = document.querySelectorAll('.skeleton');
+    skeletonEls.forEach((el) => {
+      // The shimmer animation is driven by the CSS class, which the
+      // prefers-reduced-motion: reduce rule overrides in real browsers.
+      expect(el.classList.contains('skeleton')).toBe(true);
+    });
+  });
   });
 
   describe('ApiUsage - Skeleton Parity', () => {

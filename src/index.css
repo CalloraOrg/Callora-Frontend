@@ -4235,6 +4235,26 @@ code,
   }
 }
 
+/* ── ApiUsage — prefers-reduced-motion fallback (Issue #721) ───────────
+   When users prefer reduced motion, disable pulsing status dots, skeleton
+   shimmer animations, and chart-bar transitions in the ApiUsage section
+   so the UI stays completely static. */
+@media (prefers-reduced-motion: reduce) {
+  .api-usage-page .status-dot {
+    animation: none;
+    opacity: 1;
+  }
+
+  .api-usage-page .skeleton {
+    animation: none;
+    background: var(--surface-soft);
+  }
+
+  .api-usage-page .chart-bar {
+    transition: none;
+  }
+}
+
 @media (max-width: 768px) {
   .app-shell {
     padding: 20px 14px 32px;
