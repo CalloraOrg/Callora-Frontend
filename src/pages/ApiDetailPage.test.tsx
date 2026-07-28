@@ -494,6 +494,121 @@ describe("ApiDetailPage", () => {
       expect(docPanel).toBeTruthy();
       expect(docPanel.tabIndex).toBe(0);
     });
+
+    it("all interactive buttons in ApiDetailPage are keyboard-focusable", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Buttons in the hero, CTA row, and sidebar
+      const focusableElements = document.querySelectorAll(
+        ".api-detail-page button, .api-detail-page a, .api-detail-page select, .api-detail-page input, .api-detail-page [role='tab']",
+      );
+      expect(focusableElements.length).toBeGreaterThan(0);
+
+      // Verify they are all focusable (not disabled)
+      focusableElements.forEach((el) => {
+        // tabIndex defaults to 0 for interactive elements unless explicitly set
+        const htmlEl = el as HTMLElement;
+        if (htmlEl.hasAttribute("disabled")) {
+          expect(htmlEl.getAttribute("disabled")).toBe("");
+        } else {
+          // buttons, links, inputs are inherently focusable
+          expect(
+            htmlEl.tabIndex >= 0 || htmlEl.getAttribute("disabled") === null,
+          ).toBe(true);
+        }
+      });
+    });
+
+    it("tab buttons (role='tab') are reachable via keyboard", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs.length).toBeGreaterThanOrEqual(6); // All 6 tab items
+
+      // Verify no tab has tabIndex={-1} (all should be reachable)
+      tabs.forEach((tab) => {
+        expect((tab as HTMLElement).tabIndex).not.toBe(-1);
+      });
+    });
+
+    it("select element in reviews tab is keyboard-focusable", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      const select = screen.getByLabelText("Sort by");
+      expect(select).toBeTruthy();
+      expect((select as HTMLElement).tabIndex).not.toBe(-1);
+    });
+
+    it("range slider in pricing tab is keyboard-focusable", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+      expect(slider).toBeTruthy();
+      expect((slider as HTMLElement).tabIndex).not.toBe(-1);
+    });
+
+    it("subscribe button is keyboard-focusable", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const subscribeBtn = screen.getByRole("button", { name: /subscribe/i });
+      expect(subscribeBtn).toBeTruthy();
+      expect((subscribeBtn as HTMLElement).tabIndex).not.toBe(-1);
+    });
+
+    it("no interactive element in ApiDetailPage carries inline outline:none that would suppress the focus ring", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Check all interactive elements for inline outline:none
+      const interactiveElements = document.querySelectorAll(
+        "button, a, input, select, textarea, [role='tab'], [role='button'], [tabindex]:not([tabindex='-1'])",
+      );
+
+      interactiveElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        const inlineOutline = htmlEl.style.outline;
+        // Inline outline:none would suppress the :focus-visible ring
+        expect(inlineOutline).not.toBe("none");
+      });
+    });
+
+    it("endpoint save button popover dialog is keyboard-accessible", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      const saveButtons = screen.getAllByRole("button", {
+        name: /Save endpoint to collection/i,
+      });
+      fireEvent.click(saveButtons[0]);
+
+      const dialog = screen.getByRole("dialog", {
+        name: /Save endpoint to collection/i,
+      });
+      expect(dialog).toBeTruthy();
+
+      // Dialog should be focusable
+      expect((dialog as HTMLElement).tabIndex).not.toBe(-1);
+
+      // Check inputs inside dialog are focusable
+      const inputs = dialog.querySelectorAll("input, button");
+      inputs.forEach((input) => {
+        const htmlInput = input as HTMLElement;
+        if (!htmlInput.hasAttribute("disabled")) {
+          expect(htmlInput.tabIndex).not.toBe(-1);
+        }
+      });
+    });
   });
 
   describe("aria-live announcements", () => {

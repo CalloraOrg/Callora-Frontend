@@ -100,4 +100,71 @@ describe("@layer focus contract", () => {
     expect(marketplacePage).not.toMatch(/\.marketplace-filter-button:focus\s*\{/);
     expect(recentlyActiveRail).not.toMatch(/button:focus\s*\{/);
   });
+
+  describe("ApiDetailPage focus-visible rules", () => {
+    const focusCss = read("src/styles/focus.css");
+
+    it("defines focus-visible rules for all interactive buttons inside ApiDetailPage", () => {
+      expect(focusCss).toMatch(/\.api-detail-page \.primary-button:focus-visible/);
+      expect(focusCss).toMatch(/\.api-detail-page \.secondary-button:focus-visible/);
+      expect(focusCss).toMatch(/\.api-detail-page \.ghost-button:focus-visible/);
+      expect(focusCss).toMatch(/\.api-detail-page \.icon-button:focus-visible/);
+    });
+
+    it("defines focus-visible rules for ApiDetailPage form controls", () => {
+      expect(focusCss).toMatch(/\.api-detail-page input\[type="range"\]:focus-visible/);
+      expect(focusCss).toMatch(/\.api-detail-page select:focus-visible/);
+      expect(focusCss).toMatch(/\.api-detail-page input\[type="text"\]:focus-visible/);
+      expect(focusCss).toMatch(/\.api-detail-page input\[type="checkbox"\]:focus-visible/);
+    });
+
+    it("defines focus-visible rules for ApiDetailPage navigation elements", () => {
+      expect(focusCss).toMatch(/\.api-detail-page a:focus-visible/);
+      expect(focusCss).toMatch(/\.api-detail-page \.breadcrumb a:focus-visible/);
+      expect(focusCss).toMatch(/\.api-detail-tabs \[role="tab"\]:focus-visible/);
+      expect(focusCss).toMatch(/\.api-detail-toc__link:focus-visible/);
+    });
+
+    it("defines focus-visible rules for ApiDetailPage tab panels", () => {
+      expect(focusCss).toMatch(/\.api-detail-page \[role="tabpanel"\]:focus-visible/);
+    });
+
+    it("defines focus-visible rules for ApiDetailPage hero and subscribe elements", () => {
+      expect(focusCss).toMatch(/\.api-detail-hero \.ghost-button:focus-visible/);
+      expect(focusCss).toMatch(/\.api-detail-page \.subscribe-button:focus-visible/);
+    });
+
+    it("defines focus-visible rules for the save-to-collection dialog", () => {
+      expect(focusCss).toMatch(/\[role="dialog"\][\s\S]*?focus-visible/);
+    });
+
+    it("defines a global catch-all rule for all ApiDetailPage elements inside @layer focus", () => {
+      expect(focusCss).toMatch(/@layer focus[\s\S]*?\.api-detail-page \*:focus-visible/);
+    });
+
+    it("all ApiDetailPage focus-visible rules use the accent token for the ring", () => {
+      expect(focusCss).toMatch(/\.api-detail-page[\s\S]*?focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)/);
+    });
+
+    it("ApiDetailPage component has no inline outline:none override on interactive elements", () => {
+      const apiDetail = read("src/pages/ApiDetailPage.tsx");
+      expect(apiDetail).not.toMatch(/outline:\s*["']none["']/i);
+    });
+
+    it("endpoint-client-buttons use :focus-visible inside @layer focus", () => {
+      expect(focusCss).toMatch(/@layer focus[\s\S]*?endpoint-client-buttons[\s\S]*?focus-visible/);
+    });
+
+    it("focus-visible rules for ApiDetailPage live inside the @layer focus block", () => {
+      // Extract all @layer focus content and verify ApiDetailPage rules are within it
+      const layerMatch = focusCss.match(/@layer focus\s*\{(.*)\}/s);
+      expect(layerMatch).toBeTruthy();
+      if (layerMatch) {
+        const layerContent = layerMatch[1];
+        expect(layerContent).toMatch(/\.api-detail-page \*:focus-visible/);
+        expect(layerContent).toMatch(/\.api-detail-page \.primary-button:focus-visible/);
+        expect(layerContent).toMatch(/\.api-detail-page \[role="tabpanel"\]:focus-visible/);
+      }
+    });
+  });
 });
