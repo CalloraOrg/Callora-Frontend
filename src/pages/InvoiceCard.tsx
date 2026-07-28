@@ -1,15 +1,27 @@
 import { useEffect, useState } from 'react';
 
+/**
+ * Props for the InvoiceCard component.
+ */
 export type InvoiceCardProps = {
+  /** The invoice number to display (e.g., 'INV-1001') */
   invoiceNumber: string;
+  /** The formatted amount due (e.g., '$4,200') */
   amountDue: string;
+  /** Optional due date string. Defaults to 'Due in 7 days' */
   dueDate?: string;
+  /** Callback triggered when the 'Pay now' primary action is clicked */
   onPay?: () => void;
+  /** Callback triggered when the 'Download' secondary action is clicked */
   onDownload?: () => void;
 };
 
 const SCROLL_THRESHOLD = 140;
 
+/**
+ * InvoiceCard component displaying invoice details for the GrantFox FWC26 campaign.
+ * Features a sticky bottom action bar that appears on scroll.
+ */
 export function InvoiceCard({
   invoiceNumber,
   amountDue,
@@ -57,17 +69,17 @@ export function InvoiceCard({
       </div>
 
       <div
-        className={`invoice-card-action-bar${isScrolled ? ' invoice-card-action-bar--visible' : ''}`}
+        className={`theme-sticky-bar${isScrolled ? ' theme-sticky-bar--visible' : ''}`}
         role="toolbar"
         aria-label="Invoice actions"
         aria-hidden={!isScrolled}
         {...(!isScrolled ? { inert: '' } : {})}
         data-testid="invoice-card-action-bar"
       >
-        <div className="invoice-card-action-bar__inner">
+        <div className="theme-sticky-bar__inner">
           <button
             type="button"
-            className="invoice-card-action-bar__button invoice-card-action-bar__button--primary"
+            className="theme-sticky-bar__btn theme-sticky-bar__btn--primary"
             onClick={onPay}
             aria-label="Pay now"
           >
@@ -75,7 +87,7 @@ export function InvoiceCard({
           </button>
           <button
             type="button"
-            className="invoice-card-action-bar__button"
+            className="theme-sticky-bar__btn"
             onClick={onDownload}
             aria-label="Download invoice"
           >
