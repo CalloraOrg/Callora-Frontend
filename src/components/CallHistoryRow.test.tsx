@@ -2,7 +2,6 @@
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import CallHistoryRow from './CallHistoryRow';
 import type { CallRecord } from './CallHistoryRow';
@@ -74,6 +73,57 @@ describe('CallHistoryRow', () => {
     renderRow({ call: errorCall, expanded: false, onToggleExpand: () => {} });
     expect(screen.getByTestId('icon-error')).toBeTruthy();
     expect(screen.queryByTestId('icon-success')).toBeNull();
+  });
+
+  // ── Aria-live status announcement (Issue #683) ────────────────────────────
+
+  it('announces status changes through a polite live region', () => {
+    const { rerender } = render(
+      <div>
+        <CallHistoryRow call={successCall} expanded={false} onToggleExpand={() => {}} />
+      </div>,
+    );
+
+    const liveRegion = screen.getByRole('status');
+    expect(liveRegion.textContent).toBe('');
+
+    rerender(
+      <div>
+        <CallHistoryRow
+          call={errorCall}
+          expanded={false}
+          onToggleExpand={() => {}}
+        />
+      </div>,
+    );
+
+    expect(liveRegion.textContent).toContain('Call status updated to error.');
+    expect(liveRegion.getAttribute('aria-live')).toBe('polite');
+    expect(liveRegion.getAttribute('aria-atomic')).toBe('true');
+  });
+
+  it('does not announce when status stays the same', () => {
+    const { rerender } = render(
+      <div>
+        <CallHistoryRow call={successCall} expanded={false} onToggleExpand={() => {}} />
+      </div>,
+    );
+
+    const liveRegion = screen.getByRole('status');
+    expect(liveRegion.textContent).toBe('');
+
+    // Rerender with same status — no announcement expected
+    rerender(
+      <div>
+        <CallHistoryRow
+          call={{ ...successCall, responseTime: 200 }}
+          expanded={false}
+          onToggleExpand={() => {}}
+        />
+      </div>,
+    );
+
+    expect(liveRegion.textContent).toBe('');
   });
 
   // ── Theme token usage ────────────────────────────────────────────────────
@@ -306,8 +356,11 @@ it('status icon is hidden from assistive technology', () => {
       onToggleExpand: () => {},
       compareWith: identicalResponseCall,
     });
-    const notice = screen.getByRole('status');
-    expect(notice.textContent).toMatch(/identical/i);
+    // Two role="status" regions exist: the aria-live announcement span
+    // and the diff-no-changes notice. Find the one with matching text.
+    const notices = screen.getAllByRole('status');
+    const match = notices.find((el) => /identical/i.test(el.textContent ?? ''));
+    expect(match).toBeTruthy();
   });
 
   // ── Edge case: missing response ──────────────────────────────────────────
