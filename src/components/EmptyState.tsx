@@ -493,18 +493,17 @@ function MessageWithCopy({
   message: string;
   isCompact: boolean;
 }) {
-  const { copy, copied, supported } = useCopy();
+  const { handleCopy: copyToClipboard, copied, supported } = useCopy();
   const [liveFeedback, setLiveFeedback] = React.useState("");
 
   const handleCopy = useCallback(() => {
-    if (!supported) return;
-    copy(message).then((ok) => {
+    copyToClipboard(message).then((ok) => {
       if (ok) {
         setLiveFeedback("Message copied.");
         setTimeout(() => setLiveFeedback(""), 2000);
       }
     });
-  }, [copy, message, supported]);
+  }, [copyToClipboard, message]);
 
   const containerStyle: React.CSSProperties = {
     display: "flex",

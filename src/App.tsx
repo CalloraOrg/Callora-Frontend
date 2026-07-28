@@ -25,6 +25,7 @@ import RateLimitCard from "./pages/RateLimitCard";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 import { InvoiceCard } from "./pages/InvoiceCard";
+import SlaCard from "./pages/SlaCard";
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -123,6 +124,7 @@ const APP_ROUTES = {
   designSystem: "/design-system/docs",
   serverError: "/500",
   rateLimitCard: "/rate-limit",
+  slaCard: "/marketplace/grantfox-wave-compute/sla",
 } as const;
 
 function createMockHash() {
@@ -684,6 +686,9 @@ function App() {
             <Route path="/a11y-audit" element={<A11yAudit />} />
 
             <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
+
+            {/* ── SLA Details (FWC26 campaign, Issue #545) ─────────────── */}
+            <Route path={APP_ROUTES.slaCard} element={<SlaCard />} />
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
           </Routes>
