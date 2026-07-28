@@ -15,7 +15,7 @@ describe("EmptyState", () => {
   });
 
   describe("variants", () => {
-    const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge"];
+    const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
 
     it.each(variants)("renders the %s variant illustration", (variant) => {
       render(<EmptyState variant={variant} />);
@@ -33,6 +33,7 @@ describe("EmptyState", () => {
         error: /Failed to load APIs/i,
         "plan-badge": /No plan selected/i,
         "risk-gauge": /No risk data yet/i,
+        "quota-banner": /No quota configured/i,
       };
       expect(screen.getByText(titles[variant])).toBeTruthy();
     });
@@ -199,7 +200,7 @@ describe("EmptyState", () => {
     });
 
     it("nested SVG illustrations also carry aria-hidden (WCAG 1.1.1 Non-text Content)", () => {
-      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
       variants.forEach((variant) => {
         const { container, unmount } = render(<EmptyState variant={variant} />);
         const svgs = container.querySelectorAll("svg");
@@ -211,7 +212,7 @@ describe("EmptyState", () => {
     });
 
     it("SVG illustrations use strokeLinecap='round' for consistent v7 line-art style", () => {
-      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
       variants.forEach((variant) => {
         const { container, unmount } = render(
           <EmptyState variant={variant} size="default" />,
@@ -312,7 +313,7 @@ describe("EmptyState", () => {
     });
 
     it("no illustration contains hardcoded hex colors — all strokes/fills reference design tokens", () => {
-      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
       const hexRe = /#[0-9a-f]{3,8}/i;
       variants.forEach((variant) => {
         const { container, unmount } = render(<EmptyState variant={variant} />);

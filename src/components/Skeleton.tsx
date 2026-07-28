@@ -209,6 +209,57 @@ export function ApiUsageSkeleton() {
   );
 }
 
+export function EmptyStateSkeleton({
+  size = "default",
+  hasAction = false,
+}: {
+  size?: "default" | "compact";
+  hasAction?: boolean;
+}) {
+  const isCompact = size === "compact";
+  return (
+    <div
+      className={`empty-state-skeleton${isCompact ? " empty-state-skeleton--compact" : ""}`}
+      aria-busy="true"
+      aria-label="Loading empty state"
+      style={{
+        textAlign: "center",
+        padding: isCompact ? "16px 12px" : "48px 32px",
+        minHeight: isCompact ? "auto" : "300px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: isCompact ? "12px" : "16px",
+        background: "var(--surface-soft)",
+        border: isCompact ? "1px solid var(--line)" : "none",
+        borderRadius: isCompact ? "10px" : "0",
+      }}
+    >
+      <Skeleton
+        width={isCompact ? 56 : 80}
+        height={isCompact ? 56 : 80}
+        borderRadius="50%"
+      />
+      <Skeleton
+        width={isCompact ? 120 : 200}
+        height={isCompact ? 18 : 24}
+      />
+      <Skeleton
+        width={isCompact ? 180 : 280}
+        height={isCompact ? 14 : 18}
+      />
+      {hasAction && (
+        <Skeleton
+          width={isCompact ? 120 : 160}
+          height={isCompact ? 36 : 44}
+          borderRadius={8}
+        />
+      )}
+    </div>
+  );
+}
+
 export function ApiDetailPageSkeleton({ onBack }: { onBack?: () => void }) {
   return (
     <div
