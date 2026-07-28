@@ -419,6 +419,55 @@ export default function FiltersSidebar({
         </div>
       </FilterGroup>
 
+      {/* ── Status ─────────────────────────────────────────────────────── */}
+      <FilterGroup
+        title="Status"
+        storageKey="status"
+        prefersReducedMotion={prefersReducedMotion}
+      >
+        <div className="filter-options" style={{ display: "grid", gap: "var(--mkt-space-md, 8px)" }}>
+          {STATUS_OPTIONS.map((opt) => {
+            const id = `status-${opt.value}`;
+            return (
+              <div
+                key={opt.value}
+                className="filter-option"
+                style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", alignItems: "center" }}
+              >
+                <input
+                  id={id}
+                  type="checkbox"
+                  className="filter-checkbox"
+                  checked={selectedStatuses.has(opt.value)}
+                  onChange={() => toggleStatus(opt.value)}
+                />
+                <label
+                  htmlFor={id}
+                  className="filter-label"
+                  style={{ color: "var(--text)" }}
+                >
+                  <span
+                    className={`sb-pattern-${opt.value} filter-status-swatch`}
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-block",
+                      width: 12,
+                      height: 12,
+                      borderRadius: 3,
+                      backgroundColor: `var(--sb-${opt.value}-bg)`,
+                      border: `1px solid var(--sb-${opt.value}-border)`,
+                      verticalAlign: "middle",
+                      marginRight: 6,
+                    }}
+                  />
+                  {opt.label}
+                </label>
+              </div>
+            );
+          })}
+        </div>
+      </FilterGroup>
+
       {/* ── Zero-results illustration (v7) ───────────────────────────────
          Visually separates from the filter groups above with a soft token-
          based top border so the call-to-action feels grouped with the

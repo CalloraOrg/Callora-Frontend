@@ -3,7 +3,6 @@
 import { act } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CollectionsProvider } from "../state/collectionsStore";
 import MarketplacePage from "./MarketplacePage";
@@ -261,5 +260,93 @@ describe("MarketplacePage URL filter state", () => {
 
     const favCheckbox = screen.getByRole("checkbox", { name: /favorites only/i });
     expect((favCheckbox as HTMLInputElement).checked).toBe(false);
+  });
+});
+
+describe("MarketplacePage status filter", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("renders status filter options with color-blind pattern swatches", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const statusLabels = ["Operational", "Degraded", "Maintenance", "Down"];
+    statusLabels.forEach((label) => {
+      const checkbox = screen.getByRole("checkbox", { name: label });
+      expect(checkbox).toBeTruthy();
+    });
+  });
+
+  it("each status label has an associated pattern swatch", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const statusValues = ["operational", "degraded", "maintenance", "down"];
+    statusValues.forEach((status) => {
+      const checkbox = screen.getByRole("checkbox", {
+        name: new RegExp(status, "i"),
+      });
+      const filterOption = checkbox.closest(".filter-option");
+      const swatch = filterOption?.querySelector(".filter-status-swatch");
+      expect(swatch).toBeTruthy();
+      expect(swatch?.classList.contains(`sb-pattern-${status}`)).toBe(true);
+    });
+  });
+
+  it("filters APIs by operational status", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const operational = screen.getByLabelText(/operational/i);
+    fireEvent.click(operational);
+
+    expect(screen.getByText(/showing/i)).toBeTruthy();
+  });
+
+  it("reads ?statuses= param from URL", () => {
+    renderPage(["/marketplace?statuses=down,maintenance"]);
+    settleMarketplaceTimers();
+
+    expect(
+      (screen.getByLabelText(/down/i) as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(
+      (screen.getByLabelText(/maintenance/i) as HTMLInputElement).checked,
+    ).toBe(true);
+  });
+
+  it("clears status filter when clear filters is clicked", () => {
+    renderPage(["/marketplace?statuses=degraded"]);
+    settleMarketplaceTimers();
+
+    expect(
+      (screen.getByLabelText(/degraded/i) as HTMLInputElement).checked,
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /clear filters/i }));
+
+    expect(
+      (screen.getByLabelText(/degraded/i) as HTMLInputElement).checked,
+    ).toBe(false);
   });
 });
