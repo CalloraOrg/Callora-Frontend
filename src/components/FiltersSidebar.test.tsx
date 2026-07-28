@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -593,6 +594,54 @@ describe("FiltersSidebar", () => {
     });
   });
 
+  describe("aria-live announcements (v7)", () => {
+    it("renders a live region element with correct aria attributes", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const region = screen.getByTestId("live-region");
+      expect(region.getAttribute("role")).toBe("status");
+      expect(region.getAttribute("aria-live")).toBe("polite");
+      expect(region.getAttribute("aria-atomic")).toBe("true");
+    });
+
+    it("announces when a category is selected (via prop change)", () => {
+      const { rerender } = render(<FiltersSidebar {...baseProps} />);
+      // Live region is always rendered but empty when no changes
+      expect(screen.getByTestId("live-region").textContent).toBe("");
+
+      // Re-render with a category selected
+      rerender(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["AI/ML"])}
+        />,
+      );
+      const liveRegion = screen.getByTestId("live-region");
+      expect(liveRegion.textContent).toMatch(/category selected/i);
+    });
+
+    it("clears announcement message after timeout", () => {
+      vi.useFakeTimers();
+      render(<FiltersSidebar {...baseProps} />);
+      // Initially empty
+      expect(screen.getByTestId("live-region").textContent).toBe("");
+
+      // Trigger a category change via rerender
+      const { rerender } = render(<FiltersSidebar {...baseProps} />);
+      rerender(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["AI/ML"])}
+        />,
+      );
+      expect(screen.getByTestId("live-region").textContent).toMatch(
+        /category selected/i,
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.getByTestId("live-region").textContent).toBe("");
+      vi.useRealTimers();
   describe("keyboard shortcut hints", () => {
     it("renders kbd-hint with filter shortcuts", () => {
       render(<FiltersSidebar {...baseProps} />);

@@ -167,6 +167,29 @@ export default function FiltersSidebar({
   const [sheetOpen, setSheetOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
+  // ── Aria-live announcements for screen readers ─────────────────────────
+  const [announcement, setAnnouncement] = useState("");
+  const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const announce = useCallback((msg: string) => {
+    if (announceTimerRef.current) clearTimeout(announceTimerRef.current);
+    setAnnouncement(msg);
+    announceTimerRef.current = setTimeout(() => setAnnouncement(""), 3000);
+  }, []);
+
+  // Announce when categories change
+  const prevCategoryCount = useRef(selectedCategories.size);
+  useEffect(() => {
+    const prev = prevCategoryCount.current;
+    const curr = selectedCategories.size;
+    if (curr > prev) {
+      announce(`${curr} categor${curr !== 1 ? "ies" : "y"} selected.`);
+    } else if (curr < prev) {
+      announce(`Category filter removed. ${curr} categor${curr !== 1 ? "ies" : "y"} selected.`);
+    }
+    prevCategoryCount.current = curr;
+  }, [selectedCategories, announce]);
+
   useEffect(() => {
     if (sheetOpen) {
       // set focus to close button for basic accessibility
@@ -453,6 +476,8 @@ export default function FiltersSidebar({
         </button>
       </div>
 
+      {/* Screen-reader announcement region */}
+      <LiveRegion message={announcement} />
     </>
   );
 
