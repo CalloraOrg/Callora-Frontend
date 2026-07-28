@@ -307,15 +307,19 @@ size tailored specifically for inline use inside FiltersSidebar.
 
 **Props:**
 
-| Prop              | Type                                     | Default     | Description                                                               |
-| ----------------- | ---------------------------------------- | ----------- | ------------------------------------------------------------------------- |
-| `variant?`        | `"empty" \| "filtered" \| "error"`       | `"empty"`   | Which semantic state to render.                                           |
-| `size?`           | `"default" \| "compact"`                 | `"default"` | Full-size (marketplace results) vs condensed (FiltersSidebar inline).     |
-| `title?`          | `string`                                 | per variant | Override the default heading.                                             |
-| `message?`        | `string`                                 | per variant | Override the default subtitle.                                            |
-| `onClearFilters?` | `() => void`                             | —           | Shown only when `variant === "filtered"`. Renders the Clear CTA.          |
-| `onRetry?`        | `() => void \| Promise<void>`            | —           | Shown only when `variant === "error"`. Handles async loading + aria-busy. |
-| `action?`         | `{ label: string; onClick: () => void }` | —           | Optional custom CTA button rendered before any variant-specific actions.  |
+| Prop              | Type                                                                 | Default     | Description                                                               |
+| ----------------- | -------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------- |
+| `variant?`        | `"empty" \| "api-detail" \| "filtered" \| "error" \| "plan-badge" \| "risk-gauge" \| "quota-banner"` | `"empty"`   | Which semantic state to render.                                           |
+| `size?`           | `"default" \| "compact"`                                             | `"default"` | Full-size (marketplace results) vs condensed (FiltersSidebar inline).     |
+| `title?`          | `string`                                                             | per variant | Override the default heading.                                             |
+| `message?`        | `string`                                                             | per variant | Override the default subtitle.                                            |
+| `description?`    | `string`                                                             | —           | Deprecated: use `message` instead.                                        |
+| `onClearFilters?` | `() => void`                                                        | —           | Shown only when `variant === "filtered"`. Renders the Clear CTA.          |
+| `onRetry?`        | `() => void \| Promise<void>`                                        | —           | Shown only when `variant === "error"`. Handles async loading + aria-busy. |
+| `action?`         | `{ label: string; onClick: () => void }`                             | —           | Optional custom CTA button rendered before any variant-specific actions.  |
+| `secondaryAction?`| `{ label: string; onClick: () => void }`                             | —           | Optional secondary CTA button rendered after the primary action.          |
+| `loading?`        | `boolean`                                                            | `false`     | Renders the loading skeleton variant.                                     |
+| `copyable?`       | `boolean`                                                            | `false`     | When true, renders a copy-to-clipboard button for the message text.       |
 
 **Visual Spec (v7):**
 
@@ -561,7 +565,7 @@ Enhanced in v7 with an inline, context-aware **zero-results EmptyState** that ap
 | `clearFilters`         | `() => void`                  | (req)   | Reset every filter to its default/empty state.                                                            |
 | `favoritesOnly?`       | `boolean`                     | `false` | Whether the "Favorites only" toggle is checked.                                                           |
 | `toggleFavoritesOnly?` | `() => void`                  | no-op   | Toggle the `favoritesOnly` state.                                                                         |
-| `resultCount?`         | `number`                      | —       | **(v7)** Live count of results after filtering. When `0` + active filters, renders the inline EmptyState. |
+| `resultCount?`         | `number`                      | —       | **(v7)** Live count of results after filtering. When `0`, renders the inline EmptyState (filtered if filters active, empty otherwise). |
 
 **Visual Spec:**
 
@@ -570,7 +574,7 @@ Enhanced in v7 with an inline, context-aware **zero-results EmptyState** that ap
 - Price range: Two `<input type="number">` fields with a `WarningIcon` + error message when `min > max`.
 - Popularity: Accessible `Dropdown` component.
 - **Zero-results inline block (v7):** Wrapped in a `12px` padding-top + `1px solid var(--line)` top-border separator so it visually groups with "results feedback" rather than the Favorites controls above. Contains:
-  - `<EmptyState variant="filtered" size="compact" onClearFilters={clearFilters} />`
+  - `<EmptyState variant={hasActiveFilters ? "filtered" : "empty"} size="compact" onClearFilters={hasActiveFilters ? clearFilters : undefined} />`
   - Wrapper carries `role="status"` + `aria-live="polite"` for assistive-tech announcements.
 - Clear button: Ghost button style, always present at the bottom.
 
@@ -579,7 +583,9 @@ Enhanced in v7 with an inline, context-aware **zero-results EmptyState** that ap
 - Default: All filter sections expanded.
 - Collapsed: Section header shows rotated chevron; panel is `hidden`.
 - Price error: Both price inputs gain `filter-input--invalid` class; alert paragraph appears with `role="alert"`.
-- **Zero-results (v7):** When `resultCount === 0` AND at least one filter is active (categories, price bounds, non-any popularity, or favorites-only), the inline EmptyState mounts with a token-based top-border separator above it.
+- **Zero-results (v7):** When `resultCount === 0`:
+  - AND at least one filter is active → renders `variant="filtered"` with a "Clear filters" CTA.
+  - AND no filters are active → renders `variant="empty"` with the generic "No APIs available" message.
 - Focused: Standard focus ring on all inputs and buttons.
 
 **Responsive Behavior:**
