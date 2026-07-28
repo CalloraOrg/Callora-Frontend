@@ -10,7 +10,6 @@ import "./styles/tokens.css";
 import "./styles/typography.css";
 import "./styles/patterns.css";
 import "./styles/focus.css";
-import "./styles/typography.css";
 import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
 import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
