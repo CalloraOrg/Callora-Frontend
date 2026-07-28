@@ -86,6 +86,14 @@ const BREADCRUMB_ITEMS = [
  */
 const BREADCRUMB_MAX_LABEL = 28;
 
+/** Pattern class and description for each plan tier (color-blind safe). */
+const PLAN_PATTERNS: Record<string, { class: string; description: string }> = {
+  Free: { class: "free", description: "solid baseline" },
+  Developer: { class: "developer", description: "dot pattern" },
+  Pro: { class: "pro", description: "diagonal stripes" },
+  Enterprise: { class: "enterprise", description: "crosshatch pattern" },
+};
+
 export default function RateLimitCard() {
   useDocumentTitle(
     "Rate Limit Configuration – Callora",
@@ -207,7 +215,12 @@ export default function RateLimitCard() {
             {RATE_LIMIT_TIERS.map((tier) => (
               <tr key={tier.plan}>
                 <td>
-                  <span className="rate-limit-badge">{tier.plan}</span>
+                  <span
+                    className={`rate-limit-badge ${PLAN_PATTERNS[tier.plan].class}`}
+                    data-pattern={PLAN_PATTERNS[tier.plan].description}
+                  >
+                    {tier.plan}
+                  </span>
                 </td>
                 <td>{tier.requestsPerMinute.toLocaleString()}</td>
                 <td>{tier.burstLimit.toLocaleString()}</td>
