@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
+import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);

@@ -43,6 +43,12 @@ Key principles:
 
 3. Open [http://localhost:5173](http://localhost:5173).
 
+## Print stylesheet
+
+Added `src/styles/print.css` to hide UI chrome and expand collapsible
+sections when printing the `SortMenu` page. This improves printed output
+by removing interactive controls and making content fully visible. (Closes #708)
+
 ## Scripts
 
 | Command          | Description                          |
