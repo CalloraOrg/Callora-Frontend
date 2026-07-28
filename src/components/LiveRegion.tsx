@@ -53,11 +53,11 @@ export default function LiveRegion({
       role={effectiveRole}
       aria-live={effectiveLive}
       aria-atomic="true"
-      className={className}
+      className="sr-only"
       data-testid="live-region"
-      aria-hidden={!message && !children ? "true" : undefined}
+      aria-hidden={!message ? "true" : undefined}
     >
-      {message ?? children}
+      {message}
     </div>
   );
 }

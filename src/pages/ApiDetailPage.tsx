@@ -18,6 +18,7 @@ import { ApiDetailStickyTOC, type TocSection } from "../components/ApiDetailStic
 import { CheckIcon } from "../components/icons";
 import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
 import SubscribeButton from "../components/SubscribeButton";
+import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
 import SubscribeCTA from "./SubscribeCTA";
 import { useToast } from "../components/Toast";
 import { useCollections } from "../state/collectionsStore";
