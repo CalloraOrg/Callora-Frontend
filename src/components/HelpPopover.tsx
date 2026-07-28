@@ -54,12 +54,18 @@ type HelpPopoverProps = {
    * @default 300
    */
   hoverDelayMs?: number;
+  /**
+   * Additional CSS class forwarded to the trigger button.
+   * Useful for layout alignment in page headers (e.g. LatencyChart).
+   */
+  className?: string;
 };
 
 export default function HelpPopover({
   content,
   ariaLabel = "Help",
   hoverDelayMs = 300,
+  className,
 }: HelpPopoverProps): JSX.Element {
   const labelId = useId();
 
@@ -67,7 +73,7 @@ export default function HelpPopover({
     <Tooltip content={content} hoverDelayMs={hoverDelayMs}>
       <button
         type="button"
-        className="help-popover-trigger"
+        className={`help-popover-trigger${className ? ` ${className}` : ""}`}
         aria-label={ariaLabel}
         aria-describedby={labelId}
         style={{

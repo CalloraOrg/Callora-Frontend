@@ -6938,4 +6938,145 @@ code,
   }
 }
 
+/* ── LatencyChart page (GrantFox FWC26) ───────────────────────────────────────
+   Responsive latency dashboard with bar chart and HelpPopover. Uses design
+   tokens for light/dark mode consistency. */
+.latency-chart-page {
+  display: grid;
+  gap: 24px;
+  padding: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.latency-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.latency-chart-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.latency-chart-title-group h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  line-height: 1.1;
+}
+
+.latency-chart-subtitle {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.latency-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.latency-stat-card {
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(169, 184, 255, 0.12);
+  background: var(--surface-soft);
+}
+
+.latency-stat-label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.latency-stat-value {
+  display: block;
+  font-size: 1.35rem;
+}
+
+.latency-chart-container {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  min-height: 260px;
+}
+
+.latency-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 220px;
+}
+
+.latency-chart-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.latency-chart-bar {
+  width: 100%;
+  max-width: 48px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 70%, var(--accent-strong)));
+  transition: opacity 180ms ease;
+  cursor: pointer;
+}
+
+.latency-chart-bar--peak {
+  background: linear-gradient(180deg, var(--danger), color-mix(in srgb, var(--danger) 70%, var(--warning)));
+}
+
+.latency-chart-bar-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.latency-chart-caption {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .latency-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .latency-chart-bars {
+    gap: 4px;
+  }
+
+  .latency-chart-bar-label {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .latency-chart-page {
+    padding: 14px;
+  }
+
+  .latency-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .latency-chart-bars {
+    height: 160px;
+  }
+}
+
 

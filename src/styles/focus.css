@@ -346,6 +346,15 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
+
+  /* ── LatencyChart focus-visible overrides ────────────────────────────
+     Chart bars are interactive elements that receive pointer + keyboard
+     events. They need a visible focus ring for WCAG 2.4.7. */
+  .latency-chart-page .latency-chart-bar:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    background: var(--accent);
+  }
 }
 
 /* ── reduced-motion: suppress transition on focus for ApiUsage controls ── */
