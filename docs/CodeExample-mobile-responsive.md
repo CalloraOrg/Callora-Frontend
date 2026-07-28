@@ -1,9 +1,9 @@
-# CodeExample — Mobile Responsive Layout (Issue #724)
+# CodeExample — Mobile Responsive Layout (Issue #684)
 
 ## Summary
 
-**Issue #724 — Polish CodeExample layout for narrow (mobile) viewports ≤375 px**  
-*GrantFox FWC26 campaign — Callora Frontend*
+**Issue #684 — Polish CodeExample layout for narrow (mobile) viewports ≤375 px**  
+*GrantFox FWC26 campaign — Callora Frontend — Stellar Wave Program b#007*
 
 This document describes the changes made to the `CodeExample` component to ensure
 a polished, accessible layout on narrow mobile viewports (≤375 px).
