@@ -7,6 +7,7 @@ import CallHistoryRow from '../components/CallHistoryRow';
 import Breadcrumb from '../components/Breadcrumb';
 import RequestHistoryPanel from '../components/RequestHistoryPanel';
 import ParamsBuilder from '../components/ParamsBuilder';
+import UsageChart from '../components/UsageChart';
 import { useFetchTracker } from '../hooks/useFetchTracker';
 import { useQuota } from '../hooks/useQuota';
 import PlanNudge from '../components/PlanNudge';
@@ -747,23 +748,10 @@ export default function ApiUsage() {
         <div className="mini-chart">
           <h3>Calls Over Time</h3>
           <CallsHeatmap />
-          <div className="chart-placeholder" style={{ marginTop: '24px' }}>
-            {/* Simple bar chart visualization */}
-            <div className="chart-bars">
-              {[65, 59, 80, 81, 56, 55, 47].map((height, i) => (
-                <div key={i} className="chart-bar" style={{ height: `${height}%` }}></div>
-              ))}
-            </div>
-            <div className="chart-labels">
-              <span>Mon</span>
-              <span>Tue</span>
-              <span>Wed</span>
-              <span>Thu</span>
-              <span>Fri</span>
-              <span>Sat</span>
-              <span>Sun</span>
-            </div>
-          </div>
+          <UsageChart 
+            title="API Call Trends"
+            alt="Usage statistics chart showing API call trends over time"
+          />
         </div>
       </div>
 
