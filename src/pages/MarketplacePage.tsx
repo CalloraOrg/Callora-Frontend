@@ -8,7 +8,7 @@ import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import CategoryPills from "../components/CategoryPills";
 import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
-import FiltersSidebar, { ALL_CATEGORIES } from "../components/FiltersSidebar";
+import FiltersSidebar, { ALL_CATEGORIES, STATUS_OPTIONS } from "../components/FiltersSidebar";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import EmptyState from "../components/EmptyState";
@@ -27,7 +27,6 @@ import FiltersBottomSheet from "../components/FiltersBottomSheet";
 import LiveRegion from "../components/LiveRegion";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
 import { useCompareStore } from "../state/compareStore";
-import RecentlyActiveRail from "../components/RecentlyActiveRail";
 import { MarketplacePageSkeleton } from "../components/Skeleton";
 
 export default function MarketplacePage(): JSX.Element {
@@ -59,12 +58,6 @@ export default function MarketplacePage(): JSX.Element {
   );
   // Debounce search input to prevent excessive re-renders on large lists
   const debouncedSearch = useDebounce(search, 300);
-  /**
-   * Sort state persisted via URL query parameter ?sort=
-   * Default is "popularity" to match existing behaviour.
-   */
-  const [searchParams, setSearchParams] = useSearchParams();
-  const currentPage = Number(searchParams.get("page") ?? "1");
   // ── Filter persistence in URL ──────────────────────────────────────────────
   // Categories are serialised as comma-separated ?categories= param.
   // Tag, minPrice, maxPrice, popularity are individual params.
@@ -85,6 +78,13 @@ export default function MarketplacePage(): JSX.Element {
       { replace: true },
     );
   };
+
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(
+    () => {
+      const raw = searchParams.get("statuses");
+      return raw ? new Set(raw.split(",").filter(Boolean)) : new Set();
+    },
+  );
 
   const [selectedTag, setSelectedTagRaw] = useState<string | null>(() =>
     searchParams.get("tag"),
@@ -176,11 +176,6 @@ export default function MarketplacePage(): JSX.Element {
   };
 
   const currentPage = Math.max(1, Number(searchParams.get("page")) || 1);
-  const [pageSize, setPageSizeRaw] = useState<number>(12);
-  const setPageSize = (v: number) => {
-    setPageSizeRaw(v);
-    setSearchParams((prev) => { prev.set("page", "1"); return prev; }, { replace: true });
-  };
   const [shown, setShown] = useState<number>(12);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -189,7 +184,6 @@ export default function MarketplacePage(): JSX.Element {
   // Ref used to restore focus to the Filters trigger after the sheet closes
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
   const isInitialMount = useRef(true);
-  const { trackFetch } = useFetchTracker();
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -460,6 +454,7 @@ export default function MarketplacePage(): JSX.Element {
       prev.delete("favorites");
       prev.delete("sort");
       prev.delete("q");
+      prev.delete("statuses");
       prev.set("page", "1");
       return prev;
     }, { replace: true });

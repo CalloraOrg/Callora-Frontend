@@ -54,6 +54,7 @@ describe("FiltersSidebar", () => {
     expect(screen.getByText("Categories")).toBeTruthy();
     expect(screen.getByText("Price range")).toBeTruthy();
     expect(screen.getByText("Popularity")).toBeTruthy();
+    expect(screen.getByText("Status")).toBeTruthy();
   });
 
   it("renders category checkboxes", () => {
@@ -502,6 +503,9 @@ describe("FiltersSidebar", () => {
       expect(
         screen.getByRole("button", { name: "Favorites" }).style.transition,
       ).toBe("none");
+      expect(
+        screen.getByRole("button", { name: "Status" }).style.transition,
+      ).toBe("none");
     });
 
     it("preserves normal transitions when reduced motion is not active", () => {
@@ -666,6 +670,64 @@ describe("FiltersSidebar", () => {
       render(<FiltersSidebar {...baseProps} />);
       const kbdHint = screen.getByRole("complementary", { name: "Filter keyboard shortcuts" });
       expect(kbdHint.getAttribute("aria-label")).toBe("Filter keyboard shortcuts");
+    });
+  });
+
+  describe("status filter with color-blind patterns", () => {
+    it("renders all status options", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      expect(screen.getByLabelText(/operational/i)).toBeTruthy();
+      expect(screen.getByLabelText(/degraded/i)).toBeTruthy();
+      expect(screen.getByLabelText(/maintenance/i)).toBeTruthy();
+      expect(screen.getByLabelText(/down/i)).toBeTruthy();
+    });
+
+    it("calls toggleStatus when a status checkbox is clicked", () => {
+      const toggleStatus = vi.fn();
+      render(
+        <FiltersSidebar {...baseProps} toggleStatus={toggleStatus} />,
+      );
+      fireEvent.click(screen.getByLabelText(/operational/i));
+      expect(toggleStatus).toHaveBeenCalledWith("operational");
+    });
+
+    it("renders pattern swatch for each status option", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const statusValues = ["operational", "degraded", "maintenance", "down"];
+      statusValues.forEach((status) => {
+        const checkbox = screen.getByRole("checkbox", {
+          name: new RegExp(status, "i"),
+        });
+        const filterOption = checkbox.closest(".filter-option");
+        const swatch = filterOption?.querySelector(".filter-status-swatch");
+        expect(swatch).toBeTruthy();
+        expect(swatch?.classList.contains(`sb-pattern-${status}`)).toBe(true);
+      });
+    });
+
+    it("shows selected statuses as checked", () => {
+      const selectedStatuses = new Set(["operational", "down"]);
+      render(
+        <FiltersSidebar
+          {...baseProps}
+          selectedStatuses={selectedStatuses}
+        />,
+      );
+      expect(
+        (screen.getByLabelText(/operational/i) as HTMLInputElement).checked,
+      ).toBe(true);
+      expect(
+        (screen.getByLabelText(/degraded/i) as HTMLInputElement).checked,
+      ).toBe(false);
+      expect(
+        (screen.getByLabelText(/down/i) as HTMLInputElement).checked,
+      ).toBe(true);
+    });
+
+    it("has correct data-testid for the status filter panel", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const panel = screen.getByTestId("filter-panel-status");
+      expect(panel).toBeTruthy();
     });
   });
 });

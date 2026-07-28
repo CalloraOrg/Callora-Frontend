@@ -90,3 +90,14 @@
   background-size: 6px 6px;
   background-repeat: repeat;
 }
+
+/* ── Filter status swatch ──────────────────────────────────────────────────
+   Small preview swatch shown alongside each status checkbox in the sidebar
+   filter. Inherits the SVG pattern from the sb-pattern-* class and overlays
+   it on top of the status color token so the user can see both the colour
+   and the texture before selecting the filter.
+   ──────────────────────────────────────────────────────────────────────── */
+.filter-status-swatch {
+  background-blend-mode: overlay;
+  flex-shrink: 0;
+}
