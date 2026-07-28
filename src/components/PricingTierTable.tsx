@@ -41,6 +41,13 @@ const XIcon = () => (
   </svg>
 );
 
+/**
+ * Keyboard shortcut definition for the recommended plan's primary action.
+ *
+ * Issue #687: Shown as a compact "chip" variant KbdHint beneath the CTA
+ * button on the recommended tier so users discover the keyboard shortcut
+ * without it visually competing with the action button.
+ */
 const PRIMARY_SHORTCUT: readonly Shortcut[] = [
   { key: "S", description: "Select recommended plan", category: "Pricing" },
 ];
@@ -151,7 +158,16 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
             </button>
             {tier.isRecommended && (
               <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
-                <KbdHint shortcuts={PRIMARY_SHORTCUT} style={{ padding: 0 }} />
+                {/*
+                 * Issue #687: Use variant="chip" so the shortcut hint renders
+                 * as a compact pill that is visually unobtrusive yet discoverable.
+                 * The label provides an accessible name for assistive technology.
+                 */}
+                <KbdHint
+                  shortcuts={PRIMARY_SHORTCUT}
+                  variant="chip"
+                  label="Keyboard shortcut: press S to select this plan"
+                />
               </div>
             )}
           </div>
@@ -241,7 +257,16 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
 
           {tier.isRecommended && (
             <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
-              <KbdHint shortcuts={PRIMARY_SHORTCUT} style={{ padding: 0 }} />
+              {/*
+               * Issue #687: Render the shortcut hint as a "chip" pill so it is
+               * compact and visually distinct from the primary action button,
+               * yet still clearly associated with the recommended plan CTA.
+               */}
+              <KbdHint
+                shortcuts={PRIMARY_SHORTCUT}
+                variant="chip"
+                label="Keyboard shortcut: press S to select this plan"
+              />
             </div>
           )}
         </div>

@@ -77,3 +77,69 @@ describe("PricingTierTable", () => {
     expect(onSelectTier).not.toHaveBeenCalled();
   });
 });
+
+// ── Issue #687: KbdHint chip variant tests ────────────────────────────────────
+// Verify that the keyboard shortcut hint uses the compact "chip" pill style
+// so it is visually unobtrusive yet discoverable next to the recommended CTA.
+
+describe("PricingTierTable — KbdHint chip (Issue #687)", () => {
+  it("renders the KbdHint with the chip variant class on the recommended tier", () => {
+    const { container } = render(<PricingTierTable tiers={mockTiers} />);
+
+    // chip variant renders as a <span> with class kbd-hint--chip
+    const chipEl = container.querySelector(".kbd-hint--chip");
+    expect(chipEl).toBeTruthy();
+  });
+
+  it("KbdHint chip is a <span> element (compact pill, not aside)", () => {
+    const { container } = render(<PricingTierTable tiers={mockTiers} />);
+
+    const chipEl = container.querySelector(".kbd-hint--chip");
+    expect(chipEl?.tagName.toLowerCase()).toBe("span");
+  });
+
+  it("KbdHint chip carries an accessible label for screen readers", () => {
+    const { container } = render(<PricingTierTable tiers={mockTiers} />);
+
+    const chipEl = container.querySelector<HTMLElement>(".kbd-hint--chip");
+    // aria-label should communicate the full shortcut intent
+    expect(chipEl?.getAttribute("aria-label")).toContain("S");
+  });
+
+  it("KbdHint chip is only rendered for the recommended plan, not free plan", () => {
+    const { container } = render(<PricingTierTable tiers={mockTiers} />);
+
+    // Only one chip should appear (for the recommended Pro tier)
+    const chips = container.querySelectorAll(".kbd-hint--chip");
+    expect(chips.length).toBe(1);
+  });
+
+  it("KbdHint chip renders the 'S' key label", () => {
+    render(<PricingTierTable tiers={mockTiers} />);
+
+    const kbdElements = screen.getAllByText("S");
+    const kbdHintKey = kbdElements.find((el) => el.classList.contains("kbd-hint__key"));
+    expect(kbdHintKey).toBeTruthy();
+  });
+
+  it("KbdHint chip renders the shortcut description text", () => {
+    render(<PricingTierTable tiers={mockTiers} />);
+
+    expect(screen.getByText("Select recommended plan")).toBeTruthy();
+  });
+
+  it("KbdHint chip is not rendered when there are no recommended tiers", () => {
+    const tiersNoRecommended: PricingTier[] = [
+      {
+        name: "Free",
+        price: "$0",
+        description: "For experimentation",
+        features: [],
+        ctaLabel: "Get Started",
+      },
+    ];
+    const { container } = render(<PricingTierTable tiers={tiersNoRecommended} />);
+
+    expect(container.querySelector(".kbd-hint--chip")).toBeNull();
+  });
+});
