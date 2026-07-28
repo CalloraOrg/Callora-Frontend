@@ -16,6 +16,9 @@ export const SHORTCUTS: Shortcut[] = [
   { key: 'g m', description: 'Go to Marketplace', category: 'Navigation' },
   { key: 'g b', description: 'Go to Billing', category: 'Navigation' },
   
+  // Plan
+  { key: 'u', description: 'Upgrade plan', category: 'Plan' },
+  
   // Marketplace
   { key: '/', description: 'Focus search bar', category: 'Marketplace' },
   { key: 'c', description: 'Add/remove focused API card to comparison', category: 'Marketplace' },
@@ -23,7 +26,9 @@ export const SHORTCUTS: Shortcut[] = [
   // ApiDetailPage
   { key: 'Esc', description: 'Go back to Marketplace', category: 'ApiDetailPage' },
   { key: '1-5', description: 'Switch tabs (1=Overview, 2=Documentation, 3=Pricing, 4=Examples, 5=Reviews)', category: 'ApiDetailPage' },
+  { key: 's', description: 'Select recommended pricing plan', category: 'Pricing' },
 ];
+
 
 export function useGlobalShortcuts(handler: (event: KeyboardEvent) => void) {
   const isFormField = useCallback((element: Element | null): boolean => {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Icons } from '../utils/icons';
 import './MethodChip.css';
 

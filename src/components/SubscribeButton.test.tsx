@@ -7,12 +7,17 @@ import SubscribeButton from "./SubscribeButton";
 afterEach(cleanup);
 
 describe("SubscribeButton", () => {
-  it("renders an idle subscribe button with correct accessible label", () => {
+  it("renders an idle subscribe button with correct accessible label and help popover", () => {
     render(<SubscribeButton apiName="Weather API" />);
 
     const btn = screen.getByRole("button", { name: "Subscribe to Weather API" });
     expect(btn).toBeTruthy();
     expect(btn.textContent).toBe("Subscribe");
+
+    // Help popover trigger should also be present
+    expect(
+      screen.getByRole("button", { name: /Help: What does subscribing to Weather API mean\?/i })
+    ).toBeTruthy();
   });
 
   it("shows a confirmation dialog when the subscribe button is clicked", () => {
@@ -54,5 +59,44 @@ describe("SubscribeButton", () => {
     // Back to idle – the subscribe button should be visible again
     expect(screen.getByRole("button", { name: "Subscribe to Weather API" })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("applies correct focus outline classes to interactive elements for focus-visible styles", () => {
+    render(<SubscribeButton apiName="Weather API" />);
+
+    // Idle state: Subscribe button should have 'subscribe-button' class
+    const subscribeBtn = screen.getByRole("button", { name: "Subscribe to Weather API" });
+    expect(subscribeBtn.className).toContain("subscribe-button");
+
+    // Click to enter confirmation state
+    fireEvent.click(subscribeBtn);
+
+    // Confirmation state: Confirm button should have 'subscribe-button-confirm' class
+    const confirmBtn = screen.getByRole("button", { name: "Confirm" });
+    expect(confirmBtn.className).toContain("subscribe-button-confirm");
+
+    // Confirmation state: Cancel button should have 'subscribe-button-cancel' class
+    const cancelBtn = screen.getByRole("button", { name: "Cancel subscription" });
+    expect(cancelBtn.className).toContain("subscribe-button-cancel");
+  });
+
+  it("renders the help popover with correct subscription explanation content", async () => {
+    render(<SubscribeButton apiName="Weather API" />);
+
+    // The help popover should be visible in idle state
+    const helpBtn = screen.getByRole("button", { name: /Help: What does subscribing to Weather API mean\?/i });
+    expect(helpBtn).toBeTruthy();
+
+    // Hover the help button to reveal the tooltip
+    fireEvent.mouseEnter(helpBtn);
+
+    // Wait for the 300ms hover delay to elapse and the tooltip to appear
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toBeTruthy();
+
+    // Verify the tooltip contains the explanation text
+    expect(tooltip.textContent).toContain("What is");
+    expect(tooltip.textContent).toContain("Subscribing");
+    expect(tooltip.textContent).toContain("charged per successful API request");
   });
 });

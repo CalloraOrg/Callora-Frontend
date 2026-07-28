@@ -3,6 +3,7 @@ import OpenAPIImport from '../components/OpenAPIImport';
 import type { ParsedEndpoint } from '../components/OpenAPIImport';
 import FormField from '../components/FormField';
 import type { FieldStatus } from '../components/FormField';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -132,6 +133,7 @@ function fieldStatus(
  * appear only after a field is blurred or the form is submitted.
  */
 export default function PublishApi() {
+  useDocumentTitle('Publish API');
   const [form, setForm] = useState<PublishFormState>(INITIAL_FORM);
   const [touched, setTouched] = useState<TouchedState>(INITIAL_TOUCHED);
   const [submitAttempted, setSubmitAttempted] = useState(false);

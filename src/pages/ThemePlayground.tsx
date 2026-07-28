@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import StatusBadge from "../components/StatusBadge";
 import TokenEditor from "../components/TokenEditor";
+import useDocumentTitle from "../hooks/useDocumentTitle";
 
 const DEFAULT_TOKENS = {
   primary: "#4e85ff",
@@ -12,6 +13,7 @@ const DEFAULT_TOKENS = {
 type TokenKey = keyof typeof DEFAULT_TOKENS;
 
 export default function ThemePlayground() {
+  useDocumentTitle('Theme Playground');
   const [tokens, setTokens] = useState(DEFAULT_TOKENS);
 
   const cssPreview = useMemo(

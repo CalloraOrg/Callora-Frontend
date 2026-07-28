@@ -16,5 +16,6 @@ describe("ApiDetailPageSkeleton", () => {
     expect(container.querySelector(".api-detail-tabs")).toBeTruthy();
     expect(container.querySelectorAll(".stat-card-skeleton").length).toBe(3);
     expect(container.querySelectorAll(".preview-card-skeleton").length).toBe(3);
+    expect(container.querySelectorAll(".skeleton--stellar").length).toBeGreaterThan(0);
   });
 });
