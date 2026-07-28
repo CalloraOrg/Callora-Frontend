@@ -15,3 +15,21 @@
 .tag-chip {
   font-variant-numeric: tabular-nums;
 }
+
+/* ── MarketplacePage count bar ──────────────────────────────────────────────
+   Belt-and-suspenders container rule so every numeric descendant inside the
+   "Showing X–Y of N APIs" label is automatically tabular, even if a span is
+   added in the future without the explicit .numeric-tabular class.
+   Individual <span class="numeric-tabular"> wrappers remain the canonical
+   mechanism — this rule is a defensive fallback (GrantFox FWC26).          */
+.marketplace-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Marketplace filter-active badge ────────────────────────────────────────
+   The numeric count of active filters shown on the mobile "Filters" button
+   must also use tabular numerals so single-digit and double-digit counts
+   don't shift the badge width unexpectedly.                                */
+.marketplace-filter-badge {
+  font-variant-numeric: tabular-nums;
+}

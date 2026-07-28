@@ -617,7 +617,7 @@ export default function MarketplacePage(): JSX.Element {
                 Filters
                 {activeFilterCount > 0 && (
                   <span
-                    className="marketplace-filter-badge"
+                    className="marketplace-filter-badge numeric-tabular"
                     aria-label={`${activeFilterCount} active filter${activeFilterCount !== 1 ? "s" : ""}`}
                   >
                     {activeFilterCount}
