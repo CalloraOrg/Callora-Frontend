@@ -15,3 +15,13 @@
 .tag-chip {
   font-variant-numeric: tabular-nums;
 }
+
+/* Ensure amounts/counts inside SearchInput use tabular-nums */
+.search-input-container,
+.search-status-chip,
+.search-status-chip-count,
+.search-input-count,
+.search-input-result-count,
+.search-input-amount {
+  font-variant-numeric: tabular-nums;
+}

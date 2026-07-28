@@ -1,40 +1,32 @@
-/**
- * LiveRegion — a reusable screen-reader-only aria-live region for announcing
- * dynamic state changes to assistive technology.
- *
- * Usage:
- *   <LiveRegion message={announcementText} />
- *
- * When `message` is non-empty, the region's textContent updates and the
- * polite live region causes most screen readers to announce the new text
- * without interrupting the current task.
- *
- * Props:
- *   message  – The string to announce.  Pass an empty string to silence.
- *   assertive – Optional; use `role="alert"` (aria-live="assertive") for
- *               time-sensitive announcements (default: polite).
- *
- * Accessibility notes:
- *   - The element is visually hidden (.sr-only) but remains available to
- *     the accessibility tree.
- *   - `aria-live="polite"` is the default — it queues the announcement
- *     behind the current speech queue.
- *   - `aria-atomic="true"` ensures the entire message is read as one unit
- *     instead of diffing against the previous content.
- *   - When the message changes but the new message is the same string, the
- *     region uses a trailing space trick to force re-announcement.
- */
+import { useEffect, useRef, type ReactNode } from "react";
 
-import { useEffect, useRef } from "react";
-
-interface LiveRegionProps {
-  message: string;
+export interface LiveRegionProps {
+  message?: string;
   assertive?: boolean;
+  children?: ReactNode;
+  "aria-live"?: "polite" | "assertive" | "off";
+  role?: string;
+  className?: string;
+  id?: string;
+  regionId?: string;
 }
 
-export default function LiveRegion({ message, assertive = false }: LiveRegionProps) {
+export default function LiveRegion({
+  message,
+  assertive = false,
+  children,
+  "aria-live": ariaLive,
+  role,
+  className = "sr-only",
+  id,
+  regionId,
+}: LiveRegionProps) {
   const regionRef = useRef<HTMLDivElement>(null);
   const prevMessageRef = useRef(message);
+
+  const effectiveLive = ariaLive ?? (assertive ? "assertive" : "polite");
+  const effectiveRole = role ?? (assertive ? "alert" : "status");
+  const effectiveId = id ?? regionId;
 
   useEffect(() => {
     if (!message) return;
@@ -45,9 +37,8 @@ export default function LiveRegion({ message, assertive = false }: LiveRegionPro
     // non-rendering space to force re-announcement.
     if (message === prevMessageRef.current) {
       el.textContent = message + "\u200A";
-      // Restore the real text after a tick so future re-announcements work.
       requestAnimationFrame(() => {
-        el.textContent = message;
+        if (el) el.textContent = message;
       });
     } else {
       el.textContent = message;
@@ -57,41 +48,17 @@ export default function LiveRegion({ message, assertive = false }: LiveRegionPro
 
   return (
     <div
+      id={effectiveId}
       ref={regionRef}
-      role={assertive ? "alert" : "status"}
-      aria-live={assertive ? "assertive" : "polite"}
+      role={effectiveRole}
+      aria-live={effectiveLive}
       aria-atomic="true"
-      className="sr-only"
-      data-testid="live-region"
-      aria-hidden={!message ? "true" : undefined}
-    >
-      {message}
-import { ReactNode } from "react";
-
-interface LiveRegionProps {
-  children?: ReactNode;
-  "aria-live"?: "polite" | "assertive" | "off";
-  role?: string;
-  className?: string;
-  id?: string;
-}
-
-export default function LiveRegion({
-  children,
-  "aria-live": ariaLive = "polite",
-  role = "status",
-  className = "sr-only",
-  id,
-}: LiveRegionProps) {
-  return (
-    <div
-      id={id}
       className={className}
-      role={role}
-      aria-live={ariaLive}
-      aria-atomic="true"
+      data-testid="live-region"
+      aria-hidden={!message && !children ? "true" : undefined}
     >
-      {children}
+      {message ?? children}
     </div>
   );
 }
+

@@ -121,4 +121,64 @@ describe('SearchInput Component', () => {
       expect(degradedChip.getAttribute('aria-pressed')).toBe('false');
     });
   });
+
+  describe('Tabular-nums numeric displays (#740 / b#063)', () => {
+    it('applies tabular-nums and numeric-tabular CSS classes to container and status chips', () => {
+      const { container } = render(<SearchInput value="" onChange={() => {}} />);
+      const searchContainer = container.querySelector('.search-input-container');
+      expect(searchContainer?.classList.contains('tabular-nums')).toBe(true);
+      expect(searchContainer?.classList.contains('numeric-tabular')).toBe(true);
+
+      const statusChip = screen.getByRole('button', { name: 'Status filter: Operational' });
+      expect(statusChip.classList.contains('tabular-nums')).toBe(true);
+      expect(statusChip.classList.contains('numeric-tabular')).toBe(true);
+      expect(statusChip.style.fontVariantNumeric).toBe('tabular-nums');
+    });
+
+    it('renders numeric status counts with tabular-nums formatting when statusCounts is provided', () => {
+      const counts: Partial<Record<SearchStatusFilter, number>> = {
+        all: 48,
+        operational: 36,
+        degraded: 8,
+        error: 3,
+        pending: 1,
+      };
+
+      render(<SearchInput value="" onChange={() => {}} statusCounts={counts} />);
+
+      const opCount = screen.getByTestId('search-status-count-operational');
+      expect(opCount.textContent).toBe('(36)');
+      expect(opCount.classList.contains('tabular-nums')).toBe(true);
+      expect(opCount.classList.contains('numeric-tabular')).toBe(true);
+      expect(opCount.style.fontVariantNumeric).toBe('tabular-nums');
+
+      const degCount = screen.getByTestId('search-status-count-degraded');
+      expect(degCount.textContent).toBe('(8)');
+      expect(degCount.classList.contains('tabular-nums')).toBe(true);
+
+      const allCount = screen.getByTestId('search-status-count-all');
+      expect(allCount.textContent).toBe('(48)');
+    });
+
+    it('renders resultCount readout with tabular-nums styling', () => {
+      render(<SearchInput value="test" onChange={() => {}} resultCount={24} />);
+
+      const countBadge = screen.getByTestId('search-result-count');
+      expect(countBadge.textContent).toBe('24 results');
+      expect(countBadge.classList.contains('tabular-nums')).toBe(true);
+      expect(countBadge.classList.contains('numeric-tabular')).toBe(true);
+      expect(countBadge.style.fontVariantNumeric).toBe('tabular-nums');
+    });
+
+    it('renders amount display with tabular-nums styling', () => {
+      render(<SearchInput value="" onChange={() => {}} amount={1250} />);
+
+      const amountBadge = screen.getByTestId('search-amount-display');
+      expect(amountBadge.textContent).toBe('$1,250');
+      expect(amountBadge.classList.contains('tabular-nums')).toBe(true);
+      expect(amountBadge.classList.contains('numeric-tabular')).toBe(true);
+      expect(amountBadge.style.fontVariantNumeric).toBe('tabular-nums');
+    });
+  });
 });
+

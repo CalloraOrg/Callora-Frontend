@@ -212,8 +212,6 @@ export default function FiltersSidebar({
   const prevPopularityRef = useRef<string>("any");
   const prevFavoritesRef = useRef<boolean>(false);
 
-  const [announcement, setAnnouncement] = useState("");
-
   // Announce filter changes when any filter value changes.
   useEffect(() => {
     const catChanged = selectedCategories.size !== prevCategoriesRef.current.size ||
