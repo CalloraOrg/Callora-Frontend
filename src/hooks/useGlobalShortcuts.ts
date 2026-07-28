@@ -16,6 +16,9 @@ export const SHORTCUTS: Shortcut[] = [
   { key: 'g m', description: 'Go to Marketplace', category: 'Navigation' },
   { key: 'g b', description: 'Go to Billing', category: 'Navigation' },
   
+  // Plan
+  { key: 'u', description: 'Upgrade plan', category: 'Plan' },
+  
   // Marketplace
   { key: '/', description: 'Focus search bar', category: 'Marketplace' },
   { key: 'c', description: 'Add/remove focused API card to comparison', category: 'Marketplace' },
