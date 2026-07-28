@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Breadcrumb, { truncateMiddle } from "./Breadcrumb";
 
 const longBreadcrumb = [
@@ -350,5 +350,136 @@ describe("Breadcrumb – middle-ellipsis (maxLabelLength)", () => {
     expect(current?.textContent).toBe("Short");
     // No aria-label override needed
     expect(current?.getAttribute("aria-label")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Focused tests for #726 — Tooltip primitive wired to Breadcrumb icon buttons
+// ---------------------------------------------------------------------------
+describe("Breadcrumb — Tooltip on ellipsis button", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  function setup() {
+    const { container } = render(<Breadcrumb items={longBreadcrumb} />);
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+    if (!button) throw new Error("Expected breadcrumb ellipsis button");
+
+    const queryTooltip = () =>
+      container.querySelector<HTMLElement>('[role="tooltip"]');
+
+    return { container, button, queryTooltip };
+  }
+
+  it("tooltip is hidden by default on the ellipsis button", () => {
+    const { queryTooltip } = setup();
+    expect(queryTooltip()).toBeNull();
+  });
+
+  it("tooltip appears on mouseenter after hover delay and hides on mouseleave", () => {
+    vi.useFakeTimers();
+    const { button, queryTooltip } = setup();
+
+    fireEvent.mouseEnter(button);
+    expect(queryTooltip()).toBeNull();
+
+    act(() => {
+      vi.runAllTimers();
+    });
+    const tip = queryTooltip();
+    expect(tip).toBeTruthy();
+    expect(tip!.textContent).toBe("Show hidden pages");
+
+    fireEvent.mouseLeave(button);
+    expect(queryTooltip()).toBeNull();
+  });
+
+  it("tooltip appears instantly on keyboard focus and hides on blur", () => {
+    const { button, queryTooltip } = setup();
+
+    fireEvent.focus(button);
+    const tip = queryTooltip();
+    expect(tip).toBeTruthy();
+    expect(tip!.textContent).toBe("Show hidden pages");
+
+    fireEvent.blur(button);
+    expect(queryTooltip()).toBeNull();
+  });
+
+  it("button gets aria-describedby pointing at the tooltip id when open", () => {
+    const { button, queryTooltip } = setup();
+
+    fireEvent.focus(button);
+    const tip = queryTooltip();
+    expect(tip).toBeTruthy();
+    expect(button.getAttribute("aria-describedby")).toBe(tip!.id);
+
+    fireEvent.blur(button);
+  });
+
+  it("aria-describedby is absent when the tooltip is closed", () => {
+    const { button } = setup();
+    expect(button.getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("tooltip dismisses on Escape key", () => {
+    vi.useFakeTimers();
+    const { button, queryTooltip } = setup();
+
+    fireEvent.mouseEnter(button);
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(queryTooltip()).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(queryTooltip()).toBeNull();
+  });
+
+  it("tooltip content is 'Show hidden pages'; button aria-label is 'Show collapsed breadcrumb items'", () => {
+    const { button, queryTooltip } = setup();
+    fireEvent.focus(button);
+    const tip = queryTooltip();
+    expect(tip).toBeTruthy();
+    expect(tip!.textContent).toBe("Show hidden pages");
+    expect(button.getAttribute("aria-label")).toBe(
+      "Show collapsed breadcrumb items",
+    );
+    fireEvent.blur(button);
+  });
+
+  it("long-press on touch triggers the tooltip after longPressMs", () => {
+    vi.useFakeTimers();
+    const { button, queryTooltip } = setup();
+
+    fireEvent.touchStart(button);
+    expect(queryTooltip()).toBeNull();
+
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(queryTooltip()).toBeTruthy();
+
+    fireEvent.touchEnd(button);
+  });
+
+  it("releasing touch before longPressMs prevents the tooltip from showing", () => {
+    vi.useFakeTimers();
+    const { button, queryTooltip } = setup();
+
+    fireEvent.touchStart(button);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    fireEvent.touchEnd(button);
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(queryTooltip()).toBeNull();
   });
 });
