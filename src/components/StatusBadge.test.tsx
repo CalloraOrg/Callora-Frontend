@@ -112,6 +112,76 @@ describe('StatusBadge', () => {
     expect(badge.getAttribute('aria-description')).toContain('diagonal stripes');
   });
 
+  // ── showPattern toggle (Issue #685) ──────────────────────────────────────
+
+  it('hides pattern data when showPattern=false', () => {
+    render(<StatusBadge status="error" showPattern={false} />);
+    const badge = screen.getByRole('img', { name: 'Error' }) as HTMLElement;
+    expect(badge.getAttribute('data-pattern-enabled')).toBe('false');
+    expect(badge.getAttribute('data-pattern-description')).toBe('none');
+    expect(badge.getAttribute('aria-description')).toContain('no pattern');
+  });
+
+  it('applies sb-pattern--disabled class when showPattern=false', () => {
+    render(<StatusBadge status="pending" showPattern={false} />);
+    const badge = screen.getByRole('img', { name: 'Pending' });
+    expect(badge.classList.contains('sb-pattern--disabled')).toBe(true);
+  });
+
+  // ── patternStyle modifier (Issue #685) ───────────────────────────────────
+
+  it('applies default pattern style by default', () => {
+    render(<StatusBadge status="maintenance" />);
+    const badge = screen.getByRole('img', { name: 'Maintenance' }) as HTMLElement;
+    expect(badge.getAttribute('data-pattern-style')).toBe('default');
+  });
+
+  it('applies dense pattern style modifier', () => {
+    render(<StatusBadge status="maintenance" patternStyle="dense" />);
+    const badge = screen.getByRole('img', { name: 'Maintenance' });
+    expect(badge.classList.contains('sb-pattern--dense')).toBe(true);
+    expect(badge.getAttribute('data-pattern-style')).toBe('dense');
+  });
+
+  it('applies high-contrast pattern style modifier', () => {
+    render(<StatusBadge status="maintenance" patternStyle="high-contrast" />);
+    const badge = screen.getByRole('img', { name: 'Maintenance' });
+    expect(badge.classList.contains('sb-pattern--high-contrast')).toBe(true);
+    expect(badge.getAttribute('data-pattern-style')).toBe('high-contrast');
+  });
+
+  // ── down variant ─────────────────────────────────────────────────────────
+
+  it('applies sb-pattern-down CSS class for the down variant', () => {
+    render(<StatusBadge status="down" />);
+    const badge = screen.getByRole('img', { name: 'Down' });
+    expect(badge.classList.contains('sb-pattern-down')).toBe(true);
+  });
+
+  it('exposes data-pattern="stripes" and pattern description for down variant', () => {
+    render(<StatusBadge status="down" />);
+    const badge = screen.getByRole('img', { name: 'Down' }) as HTMLElement;
+    expect(badge.getAttribute('data-pattern')).toBe('stripes');
+    expect(badge.getAttribute('data-pattern-description')).toBe('diagonal stripes');
+    expect(badge.getAttribute('aria-description')).toContain('diagonal stripes');
+  });
+
+  // ── data-pattern-description attribute (Issue #685) ──────────────────────
+
+  it('exposes data-pattern-description for every variant', () => {
+    const variants: StatusVariant[] = [
+      'success', 'error', 'warning', 'operational',
+      'degraded', 'down', 'pending', 'maintenance',
+    ];
+    variants.forEach((status) => {
+      const { unmount } = render(<StatusBadge status={status} />);
+      const badge = screen.getByRole('img') as HTMLElement;
+      expect(badge.getAttribute('data-pattern-description')).toBeTruthy();
+      expect(badge.getAttribute('data-pattern-description')).not.toBe('none');
+      unmount();
+    });
+  });
+
   // ── maintenance variant ───────────────────────────────────────────────────
 
   it('renders with default label "Maintenance" for the maintenance variant', () => {
