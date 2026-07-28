@@ -1,6 +1,5 @@
 import React from "react";
 import ExternalLink from "./ExternalLink";
-import { EmptyStateSkeleton } from "./Skeleton";
 
 export type EmptyStateVariant =
   | "empty"

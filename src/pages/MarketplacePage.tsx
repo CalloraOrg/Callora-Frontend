@@ -27,7 +27,7 @@ import FiltersBottomSheet from "../components/FiltersBottomSheet";
 import LiveRegion from "../components/LiveRegion";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
 import { useCompareStore } from "../state/compareStore";
-import { MarketplacePageSkeleton } from "../components/Skeleton";
+import MarketplacePageSkeleton from "./MarketplacePage.skeleton";
 
 export default function MarketplacePage(): JSX.Element {
   const { apis } = useCompareStore();

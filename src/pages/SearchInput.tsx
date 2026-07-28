@@ -1,10 +1,13 @@
 /**
- * SearchInput — Interactive Search Input component with color-blind safe status chips.
+ * SearchInput — Interactive Search Input component with color-blind safe status chips
+ * and tabular numeric formatting.
  *
  * GrantFox FWC26 campaign (Stellar Wave) requirement:
- * Augment status indicators with subtle pattern overlays defined in src/styles/patterns.css
- * so that SearchInput status chips are distinguishable to color-blind users by shape/texture
- * as well as color, satisfying WCAG 2.1 AA (1.4.1 Use of Color).
+ * 1. Augment status indicators with subtle pattern overlays defined in src/styles/patterns.css
+ *    so that SearchInput status chips are distinguishable to color-blind users by shape/texture
+ *    as well as color, satisfying WCAG 2.1 AA (1.4.1 Use of Color).
+ * 2. Apply font-variant-numeric: tabular-nums on amounts/counts in SearchInput so digits
+ *    align vertically across light and dark themes.
  */
 
 import { useRef, type KeyboardEvent, type ChangeEvent } from 'react';
@@ -27,6 +30,14 @@ export interface SearchInputProps {
   onStatusChange?: (status: SearchStatusFilter) => void;
   /** List of status options to present as filter chips */
   statusOptions?: SearchStatusFilter[];
+  /** Optional mapping of status filter to item count */
+  statusCounts?: Partial<Record<SearchStatusFilter, number>>;
+  /** Optional result count to display alongside the input */
+  resultCount?: number;
+  /** Optional total count display */
+  totalCount?: number;
+  /** Optional numeric amount value display */
+  amount?: number;
   /** Optional custom class name */
   className?: string;
 }
@@ -48,6 +59,7 @@ const STATUS_LABELS: Record<SearchStatusFilter, string> = {
   error: 'Error',
   down: 'Down',
   pending: 'Pending',
+  maintenance: 'Maintenance',
 };
 
 const PATTERN_KEYS: Record<SearchStatusFilter, string> = {
@@ -59,6 +71,7 @@ const PATTERN_KEYS: Record<SearchStatusFilter, string> = {
   error: 'stripes',
   down: 'stripes',
   pending: 'dots',
+  maintenance: 'crosshatch',
 };
 
 const PATTERN_DESCRIPTIONS: Record<SearchStatusFilter, string> = {
@@ -70,6 +83,7 @@ const PATTERN_DESCRIPTIONS: Record<SearchStatusFilter, string> = {
   error: 'diagonal stripes',
   down: 'diagonal stripes',
   pending: 'dot pattern',
+  maintenance: 'crosshatch pattern',
 };
 
 export function SearchInput({
@@ -80,6 +94,10 @@ export function SearchInput({
   selectedStatus = 'all',
   onStatusChange,
   statusOptions = DEFAULT_STATUS_OPTIONS,
+  statusCounts,
+  resultCount,
+  totalCount,
+  amount,
   className = '',
 }: SearchInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -102,12 +120,15 @@ export function SearchInput({
 
   return (
     <div
-      className={['search-input-container', className].filter(Boolean).join(' ')}
+      className={['search-input-container', 'numeric-tabular', 'tabular-nums', className]
+        .filter(Boolean)
+        .join(' ')}
       style={{
         display: 'flex',
         flexDirection: 'column',
         gap: '0.75rem',
         width: '100%',
+        fontVariantNumeric: 'tabular-nums',
       }}
     >
       <div
@@ -157,6 +178,7 @@ export function SearchInput({
           onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
+          className="search-input-field tabular-nums numeric-tabular"
           style={{
             background: 'transparent',
             border: 'none',
@@ -164,8 +186,47 @@ export function SearchInput({
             color: 'var(--text-primary, #f9fafb)',
             width: '100%',
             fontSize: '0.875rem',
+            fontVariantNumeric: 'tabular-nums',
           }}
         />
+
+        {typeof amount === 'number' && (
+          <span
+            className="search-input-amount tabular-nums numeric-tabular"
+            data-testid="search-amount-display"
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: 'var(--text-primary, #f9fafb)',
+              fontVariantNumeric: 'tabular-nums',
+              whiteSpace: 'nowrap',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              backgroundColor: 'var(--bg-chip, rgba(255, 255, 255, 0.05))',
+            }}
+          >
+            ${amount.toLocaleString()}
+          </span>
+        )}
+
+        {typeof resultCount === 'number' && (
+          <span
+            className="search-input-result-count tabular-nums numeric-tabular"
+            data-testid="search-result-count"
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              color: 'var(--text-secondary, #9ca3af)',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              backgroundColor: 'var(--bg-chip, rgba(255, 255, 255, 0.05))',
+              fontVariantNumeric: 'tabular-nums',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {resultCount} {resultCount === 1 ? 'result' : 'results'}
+          </span>
+        )}
 
         {value && (
           <button
@@ -223,12 +284,20 @@ export function SearchInput({
             const patternDesc = PATTERN_DESCRIPTIONS[st];
             const patternClass = st === 'all' ? '' : `sb-pattern-${st} search-status-pattern-${st}`;
 
+            const count =
+              statusCounts?.[st] ??
+              (st === 'all' ? (totalCount ?? statusCounts?.all) : undefined);
+
             return (
               <button
                 key={st}
                 type="button"
                 aria-pressed={isSelected}
-                aria-label={`Status filter: ${label}`}
+                aria-label={
+                  count !== undefined
+                    ? `Status filter: ${label} (${count})`
+                    : `Status filter: ${label}`
+                }
                 aria-description={
                   st === 'all'
                     ? 'Show all status items'
@@ -237,7 +306,13 @@ export function SearchInput({
                 data-status={st}
                 data-pattern={patternKey}
                 onClick={() => onStatusChange?.(st)}
-                className={['search-status-chip', patternClass, isSelected ? 'is-selected' : '']
+                className={[
+                  'search-status-chip',
+                  'numeric-tabular',
+                  'tabular-nums',
+                  patternClass,
+                  isSelected ? 'is-selected' : '',
+                ]
                   .filter(Boolean)
                   .join(' ')}
                 style={{
@@ -249,6 +324,7 @@ export function SearchInput({
                   fontSize: '0.75rem',
                   fontWeight: 600,
                   cursor: 'pointer',
+                  fontVariantNumeric: 'tabular-nums',
                   border: isSelected
                     ? '1.5px solid var(--accent-primary, #6366f1)'
                     : '1px solid var(--border-color, rgba(255, 255, 255, 0.15))',
@@ -280,6 +356,20 @@ export function SearchInput({
                   />
                 )}
                 <span>{label}</span>
+                {count !== undefined && (
+                  <span
+                    className="search-status-chip-count numeric-tabular tabular-nums"
+                    data-testid={`search-status-count-${st}`}
+                    style={{
+                      fontVariantNumeric: 'tabular-nums',
+                      fontSize: '0.7rem',
+                      opacity: 0.85,
+                      marginLeft: '0.15rem',
+                    }}
+                  >
+                    ({count})
+                  </span>
+                )}
               </button>
             );
           })}
@@ -290,3 +380,4 @@ export function SearchInput({
 }
 
 export default SearchInput;
+
