@@ -27,6 +27,7 @@ import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import PlanBadge from "../components/PlanBadge";
 import LiveRegion from "../components/LiveRegion";
+import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
 
 /**
  * ApiDetailPage

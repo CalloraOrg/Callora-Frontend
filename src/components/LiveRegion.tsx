@@ -54,7 +54,7 @@ export default function LiveRegion({
       aria-live={effectiveLive}
       aria-atomic="true"
       className={className}
-      data-testid="live-region"
+      data-testid={regionId ? `live-region-${regionId}` : "live-region"}
       aria-hidden={!message && !children ? "true" : undefined}
     >
       {message ?? children}

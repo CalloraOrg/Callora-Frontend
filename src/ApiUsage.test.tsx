@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import ApiUsage from './ApiUsage';
+import ApiUsage from './pages/ApiUsage';
 
 // Mock dependencies
 vi.mock('./hooks/useFetchTracker', () => ({
