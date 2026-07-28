@@ -364,6 +364,18 @@ describe('ApiUsage - prefers-reduced-motion', () => {
       expect(el.classList.contains('skeleton')).toBe(true);
     });
   });
+
+  it('button-spinner has CSS class targeted by prefers-reduced-motion: reduce rules', () => {
+    render(<ApiUsage />);
+    act(() => { vi.advanceTimersByTime(500); });
+    
+    // Trigger button loading state to show spinner
+    const makeTestCallButton = screen.getByRole('button', { name: /Make Test Call/i });
+    fireEvent.click(makeTestCallButton);
+    
+    const buttonSpinner = document.querySelector('.button-spinner');
+    expect(buttonSpinner).toBeTruthy();
+  });
   });
 
   describe('ApiUsage - Skeleton Parity', () => {

@@ -158,6 +158,28 @@ describe('ApiUsage - prefers-reduced-motion', () => {
 
      expect(screen.getByText('Call History')).toBeTruthy();
    });
+
+  it('button-spinner has CSS class targeted by prefers-reduced-motion: reduce rules', () => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    render(<ApiUsage />);
+    
+    // Trigger button loading state to show spinner
+    const makeTestCallButton = screen.getByRole('button', { name: /Make Test Call/i });
+    fireEvent.click(makeTestCallButton);
+    
+    const buttonSpinner = document.querySelector('.button-spinner');
+    expect(buttonSpinner).toBeTruthy();
+  });
  });
 
 describe('ApiUsage - Design Token Spacing (v7)', () => {
