@@ -234,7 +234,7 @@ export function DashboardOverview({
                   price: `$${formatPrice(api.pricePerCall ?? api.pricePerRequest)}`,
                   tags: api.tags,
                   metrics: [
-                    { label: 'Latency', value: `${api.latencyMs ?? 45}ms` },
+                    { label: 'Latency', value: `${api.avgLatencyMs ?? 45}ms` },
                     { label: 'Uptime', value: `${api.uptimePercent ?? 99.9}%` },
                   ],
                 };

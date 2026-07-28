@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
 import ApiUsage from "./pages/ApiUsage";
-import Dashboard from "./components/Dashboard";
+import DashboardPage from "./pages/DashboardPage";
 import MyApis from "./pages/MyApis";
 import PlanBadgePage from "./pages/PlanBadge";
 import RouteProgressBar from "./components/RouteProgressBar";
@@ -574,7 +574,7 @@ function App() {
 
             <Route path={APP_ROUTES.publish} element={<PublishApi />} />
 
-            <Route path={APP_ROUTES.dashboard} element={<Dashboard vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
+            <Route path={APP_ROUTES.dashboard} element={<DashboardPage vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
 
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
