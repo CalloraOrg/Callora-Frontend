@@ -140,6 +140,46 @@ describe("MarketplacePage", () => {
     expect(grid).toBeTruthy();
   });
 
+  describe("aria-live announcements (v7)", () => {
+    /** Helper: grab the page-level LiveRegion (last one in DOM order).
+     *  FiltersSidebar also renders a LiveRegion, so we must use getAllByTestId
+     *  to avoid ambiguity errors. */
+    function getPageLiveRegion() {
+      const regions = screen.getAllByTestId("live-region");
+      return regions[regions.length - 1];
+    }
+
+    it("renders a live region for screen reader announcements", () => {
+      renderMarketplacePage();
+      settleMarketplaceTimers();
+
+      const regions = screen.getAllByTestId("live-region");
+      expect(regions.length).toBeGreaterThanOrEqual(1);
+      const region = getPageLiveRegion();
+      expect(region.getAttribute("role")).toBe("status");
+      expect(region.getAttribute("aria-live")).toBe("polite");
+    });
+
+    it("announces when filters are cleared", () => {
+      renderMarketplacePage();
+      settleMarketplaceTimers();
+
+      // First apply a filter to enable clear
+      const weatherTag = screen.getByRole("button", {
+        name: "Filter marketplace by tag weather",
+      });
+      fireEvent.click(weatherTag);
+
+      expect(screen.getByText("Filtered by tag: #weather")).toBeTruthy();
+
+      // Now clear all filters
+      const clearBtn = screen.getByText("Clear filters");
+      fireEvent.click(clearBtn);
+
+      const liveRegion = getPageLiveRegion();
+      expect(liveRegion.textContent).toMatch(/All filters cleared/i);
+    });
+  });
   // ── tabular-nums (#476) ────────────────────────────────────────────────────
 
   it("wraps page-count numbers in .numeric-tabular spans for tabular-nums alignment", () => {
