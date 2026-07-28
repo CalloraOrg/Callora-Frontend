@@ -549,3 +549,87 @@ describe("ApiCard status badges and color-blind patterns", () => {
   });
 });
 
+
+// ── Issue #718: ApiCard skeleton shape-parity tests ─────────────────────────
+// These tests verify that the skeleton's padding, min-height, and border
+// use the same CSS custom properties as the live ApiCard so there is no
+// layout jump when the card transitions from loading → loaded.
+
+describe("ApiCard skeleton — shape parity (Issue #718)", () => {
+  it("uses CSS custom property for padding in comfortable mode (no hardcoded px)", () => {
+    const { container } = render(<ApiCard loading density="comfortable" />);
+    const card = container.querySelector(".api-card-skeleton") as HTMLElement;
+    // CSS vars resolve to their variable name in jsdom; we verify the var() syntax is present.
+    expect(card.style.padding).toContain("var(--mkt-card-padding)");
+  });
+
+  it("uses CSS custom property for padding in compact mode (no hardcoded px)", () => {
+    const { container } = render(<ApiCard loading density="compact" />);
+    const card = container.querySelector(".api-card-skeleton") as HTMLElement;
+    expect(card.style.padding).toContain("var(--mkt-card-compact-padding)");
+  });
+
+  it("uses CSS custom property for min-height in comfortable mode", () => {
+    const { container } = render(<ApiCard loading density="comfortable" />);
+    const card = container.querySelector(".api-card-skeleton") as HTMLElement;
+    expect(card.style.minHeight).toContain("var(--mkt-card-min-height)");
+  });
+
+  it("uses CSS custom property for min-height in compact mode", () => {
+    const { container } = render(<ApiCard loading density="compact" />);
+    const card = container.querySelector(".api-card-skeleton") as HTMLElement;
+    expect(card.style.minHeight).toContain("var(--mkt-card-compact-min-height)");
+  });
+
+  it("uses CSS custom property for gap in comfortable mode", () => {
+    const { container } = render(<ApiCard loading density="comfortable" />);
+    const card = container.querySelector(".api-card-skeleton") as HTMLElement;
+    expect(card.style.gap).toContain("var(--mkt-card-gap)");
+  });
+
+  it("uses CSS custom property for gap in compact mode", () => {
+    const { container } = render(<ApiCard loading density="compact" />);
+    const card = container.querySelector(".api-card-skeleton") as HTMLElement;
+    expect(card.style.gap).toContain("var(--mkt-card-compact-gap)");
+  });
+
+  it("uses CSS custom property for border color (var(--line-strong)) not hardcoded rgba", () => {
+    const { container } = render(<ApiCard loading />);
+    const card = container.querySelector(".api-card-skeleton") as HTMLElement;
+    // border should reference --line-strong token, not hardcoded rgba(255,255,255,0.03)
+    expect(card.style.border).toContain("var(--line-strong");
+  });
+
+  it("icon placeholder skeleton uses CSS custom property for dimensions", () => {
+    const { container } = render(<ApiCard loading />);
+    const skeletons = container.querySelectorAll<HTMLElement>(".skeleton--stellar");
+    // The icon skeleton should reference CSS vars for width/height
+    const iconSkeleton = Array.from(skeletons).find(
+      (el) =>
+        el.style.width.includes("var(--mkt-card-icon-size)") ||
+        el.style.height.includes("var(--mkt-card-icon-size)")
+    );
+    expect(iconSkeleton).toBeTruthy();
+  });
+
+  it("header gap inside skeleton uses CSS custom property", () => {
+    const { container } = render(<ApiCard loading />);
+    const header = container.querySelector(".api-marketplace-card-header") as HTMLElement;
+    expect(header?.style.gap).toContain("var(--mkt-space-lg)");
+  });
+
+  it("does not use raw pixel values for padding or minHeight in comfortable mode", () => {
+    const { container } = render(<ApiCard loading density="comfortable" />);
+    const card = container.querySelector(".api-card-skeleton") as HTMLElement;
+    // Ensure no raw '12px' or '220px' are present as inline values
+    expect(card.style.padding).not.toBe("12px");
+    expect(card.style.minHeight).not.toBe("220px");
+  });
+
+  it("does not use raw pixel values for padding or minHeight in compact mode", () => {
+    const { container } = render(<ApiCard loading density="compact" />);
+    const card = container.querySelector(".api-card-skeleton") as HTMLElement;
+    expect(card.style.padding).not.toBe("10px");
+    expect(card.style.minHeight).not.toBe("188px");
+  });
+});
