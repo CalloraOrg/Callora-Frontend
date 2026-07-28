@@ -2,7 +2,7 @@
 
 import { render, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { TagIcon, CheckIcon, WarningIcon, BoltIcon, ClockIcon } from "./index";
+import { TagIcon, CheckIcon, WarningIcon, BoltIcon, ClockIcon, InfoIcon } from "./index";
 
 const iconComponents = [
   { name: "TagIcon", Component: TagIcon },
@@ -10,6 +10,7 @@ const iconComponents = [
   { name: "WarningIcon", Component: WarningIcon },
   { name: "BoltIcon", Component: BoltIcon },
   { name: "ClockIcon", Component: ClockIcon },
+  { name: "InfoIcon", Component: InfoIcon },
 ];
 
 describe("Theme-Aware SVG Icon Set", () => {

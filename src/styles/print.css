@@ -55,4 +55,30 @@
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
+
+  /* SortMenu — hide chrome + expand collapsibles when printing */
+  .sort-menu__sort-row {
+    display: none !important;
+  }
+  .sort-menu::before {
+    content: "Sort Options";
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1a2332;
+  }
+  .sort-menu__current-state {
+    display: block !important;
+  }
+  .sort-menu__label {
+    font-weight: 600;
+    margin-right: 0.5rem;
+  }
+  .sort-menu__value {
+    color: #1a2332;
+  }
+  .sort-menu {
+    max-height: none !important;
+  }
 }

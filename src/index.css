@@ -286,6 +286,35 @@ input {
   gap: 16px;
 }
 
+/* ── SortMenu component styles ───────────────────────────────────────────── */
+.sort-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sort-menu__sort-row {
+  display: flex;
+  align-items: center;
+}
+
+.sort-menu__current-state {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.sort-menu__label {
+  font-weight: 500;
+}
+
+.sort-menu__value {
+  font-weight: 600;
+  color: var(--text);
+}
+
 .theme-playground__editor {
   padding: 20px;
   border-radius: var(--radius-lg);
@@ -2609,6 +2638,32 @@ code,
   background: transparent;
 }
 
+/* PlanNudge keyboard shortcut integration */
+.plan-nudge__upgrade-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-nudge__upgrade-link .kbd-hint--subtle {
+  margin-left: 4px;
+}
+
+/* Responsive keyboard hint for PlanNudge */
+@media (max-width: 480px) {
+  .plan-nudge__upgrade-link .kbd-hint--subtle {
+    font-size: 0.7rem;
+    gap: 3px;
+  }
+  
+  .plan-nudge__upgrade-link .kbd-hint--subtle .kbd-hint__key {
+    min-width: 14px;
+    padding: 1px 3px;
+    font-size: 0.65rem;
+  }
+}
+}
+
 /* QuotaBanner layout and styles */
 .quota-banner {
   display: flex;
@@ -4235,6 +4290,26 @@ code,
   }
 }
 
+/* ── ApiUsage — prefers-reduced-motion fallback (Issue #721) ───────────
+   When users prefer reduced motion, disable pulsing status dots, skeleton
+   shimmer animations, and chart-bar transitions in the ApiUsage section
+   so the UI stays completely static. */
+@media (prefers-reduced-motion: reduce) {
+  .api-usage-page .status-dot {
+    animation: none;
+    opacity: 1;
+  }
+
+  .api-usage-page .skeleton {
+    animation: none;
+    background: var(--surface-soft);
+  }
+
+  .api-usage-page .chart-bar {
+    transition: none;
+  }
+}
+
 @media (max-width: 768px) {
   .app-shell {
     padding: 20px 14px 32px;
@@ -5760,6 +5835,25 @@ code,
   }
 }
 
+.api-detail-toc__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.api-detail-toc__error svg {
+  flex-shrink: 0;
+}
+
+.api-detail-toc__error-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ─── Print stylesheet (ApiDetailPage docs printout) ─────────────────────
    Pure CSS. Hides chrome via .no-print, forces light theme, expands code,
    appends URLs after inline links. See src/print.test.ts for contract tests.
@@ -6849,6 +6943,32 @@ code,
     display: block !important;
   }
   .reviews-tab {
+    max-height: none !important;
+  }
+
+  /* SortMenu — hide chrome + expand collapsibles when printing */
+  .sort-menu__sort-row {
+    display: none !important;
+  }
+  .sort-menu::before {
+    content: "Sort Options";
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1a2332;
+  }
+  .sort-menu__current-state {
+    display: block !important;
+  }
+  .sort-menu__label {
+    font-weight: 600;
+    margin-right: 0.5rem;
+  }
+  .sort-menu__value {
+    color: #1a2332;
+  }
+  .sort-menu {
     max-height: none !important;
   }
 }

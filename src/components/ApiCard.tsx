@@ -15,13 +15,11 @@ import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import { useFavorites } from "../hooks/useFavorites";
 import type { APIItem } from "../data/mockApis";
-import { LiveRegion } from "./LiveRegion";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import { usePinnedApis, pinnedApisStore } from "../state/pinnedApis";
 import Sparkline from "./Sparkline";
 import type { Shortcut } from "../hooks/useGlobalShortcuts";
-import EmptyState from "./EmptyState";
 import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
 import { colorFromId } from "../utils/colorFromId";
@@ -268,7 +266,7 @@ interface FavoriteButtonProps {
   onStatusChange?: (message: string) => void;
 }
 
-function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion = false }: FavoriteButtonProps) {
+function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion = false, onStatusChange }: FavoriteButtonProps) {
   return (
     <CardActionButton
       isActive={isFavorite}
