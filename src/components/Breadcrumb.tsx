@@ -24,6 +24,15 @@ type BreadcrumbProps = {
    * @default 0 (no truncation)
    */
   maxLabelLength?: number;
+  /**
+   * Collapse middle breadcrumb items behind an ellipsis button when the
+   * path is long.  When enabled, items between the first and last are
+   * hidden from the main breadcrumb trail on all viewports and exposed
+   * via a popover triggered by the ellipsis button.
+   *
+   * @default false
+   */
+  middleEllipsis?: boolean;
 };
 
 /**
@@ -104,15 +113,14 @@ function BreadcrumbSeparator() {
   );
 }
 
-export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProps) {
+export default function Breadcrumb({ items, maxLabelLength = 0, middleEllipsis = false }: BreadcrumbProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const ellipsisButtonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const popoverId = useId();
   const middleItems = useMemo(() => items.slice(1, -1), [items]);
   const shouldCollapseMiddle = middleItems.length > 0;
-
-
+  const isMiddleEllipsis = middleEllipsis && shouldCollapseMiddle;
 
   useEffect(() => {
     if (!isPopoverOpen) return;
@@ -186,7 +194,7 @@ export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProp
   };
 
   return (
-    <nav aria-label="breadcrumb" className="breadcrumb-nav">
+    <nav aria-label="breadcrumb" className={isMiddleEllipsis ? "breadcrumb-nav breadcrumb-nav--middle-ellipsis" : "breadcrumb-nav"}>
       <style>
         {`
           .breadcrumb-nav {
@@ -341,6 +349,14 @@ export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProp
             .breadcrumb-current {
               max-width: min(38vw, 11rem);
             }
+          }
+
+          .breadcrumb-nav--middle-ellipsis .breadcrumb-middle {
+            display: none;
+          }
+
+          .breadcrumb-nav--middle-ellipsis .breadcrumb-collapsed {
+            display: flex;
           }
         `}
       </style>
