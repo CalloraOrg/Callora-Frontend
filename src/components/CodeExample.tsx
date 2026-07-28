@@ -10,10 +10,12 @@ import { getDefaultCodeLanguage, setDefaultCodeLanguage } from "../state/userPre
  * Desktop / tablet (>375 px):
  *   Header is a flex row: [tab strip (scrollable)] [copy button]
  *
- * Narrow mobile (≤375 px)  — Issue #724:
- *   Header stacks to a column layout: [tab strip full-width] [copy button right-aligned]
+ * Narrow mobile (≤375 px)  — Issue #684:
+ *   Header stacks to a column layout with a smooth CSS transition:
+ *   [tab strip full-width] [copy button right-aligned]
  *   Tap targets reach 44 × 44 px (WCAG 2.5.5).
  *   Code panel scrolls horizontally so long lines never overflow the page.
+ *   Tabs hint at scrollability via a right-edge fade mask.
  *
  * All layout, spacing, and breakpoint rules live in src/styles/code.css.
  * The component itself carries **no inline layout styles** so that @media
