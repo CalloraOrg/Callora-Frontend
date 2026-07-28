@@ -24,6 +24,7 @@ import A11yAudit from "./pages/A11yAudit";
 import RateLimitCard from "./pages/RateLimitCard";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
+import { InvoiceCard } from "./pages/InvoiceCard";
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -612,6 +613,8 @@ function App() {
                         <p>Deposits settle on Stellar. Network fee is shown before wallet approval.</p>
                       </article>
                     </div>
+
+                    <InvoiceCard invoiceNumber="INV-1001" amountDue="$4,200" dueDate="Due in 7 days" />
 
                     <div className="info-row">
                       <div className="info-card">
