@@ -450,7 +450,7 @@ export default function EmptyState({
   loading = false,
 }: EmptyStateProps) {
   const resolvedMessage = message ?? description;
-  const resolvedAction = action ?? (ctaLabel && onCta ? { label: ctaLabel, onClick: onCta } : undefined);
+  const resolvedAction = action;
 
   if (loading) {
     return (

@@ -30,9 +30,10 @@ import { useEffect, useRef } from "react";
 interface LiveRegionProps {
   message: string;
   assertive?: boolean;
+  regionId?: string;
 }
 
-export default function LiveRegion({ message, assertive = false }: LiveRegionProps) {
+export default function LiveRegion({ message, assertive = false, regionId }: LiveRegionProps) {
   const regionRef = useRef<HTMLDivElement>(null);
   const prevMessageRef = useRef(message);
 
@@ -62,36 +63,10 @@ export default function LiveRegion({ message, assertive = false }: LiveRegionPro
       aria-live={assertive ? "assertive" : "polite"}
       aria-atomic="true"
       className="sr-only"
-      data-testid="live-region"
+      data-testid={regionId ? `live-region-${regionId}` : "live-region"}
       aria-hidden={!message ? "true" : undefined}
     >
       {message}
-import { ReactNode } from "react";
-
-interface LiveRegionProps {
-  children?: ReactNode;
-  "aria-live"?: "polite" | "assertive" | "off";
-  role?: string;
-  className?: string;
-  id?: string;
-}
-
-export default function LiveRegion({
-  children,
-  "aria-live": ariaLive = "polite",
-  role = "status",
-  className = "sr-only",
-  id,
-}: LiveRegionProps) {
-  return (
-    <div
-      id={id}
-      className={className}
-      role={role}
-      aria-live={ariaLive}
-      aria-atomic="true"
-    >
-      {children}
     </div>
   );
 }

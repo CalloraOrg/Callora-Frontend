@@ -202,7 +202,7 @@ export default function FiltersSidebar({
     }
   }, [sheetOpen]);
 
-  // ── Aria-live announcements ─────────────────────────────────────────────
+  // ── Aria-live announcements for filter changes ────────────────────────
   // Track filter state to build descriptive announcements for screen readers.
   // Initialize refs with neutral defaults so the first effect run detects the
   // initial filter values and announces them.
@@ -211,8 +211,6 @@ export default function FiltersSidebar({
   const prevMaxRef = useRef<number | null>(null);
   const prevPopularityRef = useRef<string>("any");
   const prevFavoritesRef = useRef<boolean>(false);
-
-  const [announcement, setAnnouncement] = useState("");
 
   // Announce filter changes when any filter value changes.
   useEffect(() => {
@@ -258,8 +256,6 @@ export default function FiltersSidebar({
     clearFilters();
     setAnnouncement("All filters cleared. Showing all APIs.");
   }, [clearFilters]);
-
-
 
   // Announce zero results separately from filter changes.
   const prevResultCountRef = useRef<number | undefined>(undefined);

@@ -24,6 +24,7 @@ import type { Shortcut } from "../hooks/useGlobalShortcuts";
 import EmptyState from "./EmptyState";
 import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
+import { colorFromId } from "../utils/colorFromId";
 import { ClockIcon, BoltIcon } from "./icons";
 import StatusBadge from "./StatusBadge";
 
@@ -649,6 +650,11 @@ export default function ApiCard({
   const avgLatencyMs = api.avgLatencyMs;
   const uptimePercent = api.uptimePercent;
   const isCompact = density === "compact" || isMobile;
+
+  const [liveMessage, setLiveMessage] = useState("");
+  const announce = useCallback((msg: string) => {
+    setLiveMessage(msg);
+  }, []);
 
   const prefersReducedMotion = useMemo(() => {
     return typeof window !== "undefined" &&

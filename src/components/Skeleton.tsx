@@ -209,6 +209,119 @@ export function ApiUsageSkeleton() {
   );
 }
 
+export function EmptyStateSkeleton({ size = "default", hasAction = false }: { size?: "default" | "compact"; hasAction?: boolean }) {
+  const isCompact = size === "compact";
+  return (
+    <div
+      className={`empty-state-skeleton${isCompact ? " empty-state-skeleton--compact" : ""}`}
+      aria-busy="true"
+      aria-label="Loading empty state"
+      style={{
+        textAlign: "center",
+        padding: isCompact ? "16px 12px" : "48px 32px",
+        minHeight: isCompact ? "auto" : "300px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: isCompact ? "12px" : "16px",
+      }}
+    >
+      <Skeleton
+        tone="stellar"
+        width={isCompact ? 56 : 80}
+        height={isCompact ? 56 : 80}
+        borderRadius="50%"
+      />
+      <Skeleton tone="stellar" width="40%" height={isCompact ? 18 : 26} />
+      <Skeleton tone="stellar" width="60%" height={isCompact ? 14 : 16} />
+      {hasAction && (
+        <Skeleton
+          tone="stellar"
+          width={isCompact ? 120 : 160}
+          height={isCompact ? 36 : 44}
+          borderRadius={8}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * MarketplacePageSkeleton — loading placeholder for the marketplace page.
+ * Renders a simplified layout shell while API data is being fetched.
+ */
+export function MarketplacePageSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Marketplace loading"
+      style={{
+        display: "grid",
+        gap: 16,
+        padding: "24px 0",
+      }}
+    >
+      {/* Toolbar skeleton */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Skeleton tone="stellar" width="30%" height={24} />
+        <Skeleton tone="stellar" width={100} height={36} borderRadius={8} />
+      </div>
+
+      {/* Category pills skeleton */}
+      <div style={{ display: "flex", gap: 8 }}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} tone="stellar" width={80 + i * 10} height={32} borderRadius={8} />
+        ))}
+      </div>
+
+      {/* Tag filter skeleton */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} tone="stellar" width={60 + i * 8} height={32} borderRadius={8} />
+        ))}
+      </div>
+
+      {/* Grid skeleton */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 16,
+        }}
+      >
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              padding: 16,
+              border: "1px solid var(--line)",
+              borderRadius: 12,
+              display: "grid",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <Skeleton tone="stellar" width={48} height={48} borderRadius={10} />
+              <div style={{ flex: 1, display: "grid", gap: 6 }}>
+                <Skeleton tone="stellar" width="70%" height={16} />
+                <Skeleton tone="stellar" width="50%" height={12} />
+              </div>
+              <Skeleton tone="stellar" width={60} height={14} />
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {Array.from({ length: 3 }).map((_, j) => (
+                <Skeleton key={j} tone="stellar" width={50 + j * 10} height={24} borderRadius={6} />
+              ))}
+            </div>
+            <Skeleton tone="stellar" width="100%" height={40} borderRadius={6} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ApiDetailPageSkeleton({ onBack }: { onBack?: () => void }) {
   return (
     <div

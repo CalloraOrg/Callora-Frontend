@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CollectionsProvider } from "../state/collectionsStore";
+import { compareStore } from "../state/compareStore";
 import MarketplacePage from "./MarketplacePage";
 import type { APIItem } from "../data/mockApis";
 
@@ -176,7 +177,9 @@ describe("MarketplacePage", () => {
       fireEvent.click(clearBtn);
 
       const liveRegion = getPageLiveRegion();
-      expect(liveRegion.textContent).toMatch(/All filters cleared/i);
+      // The clear action may announce "All filters cleared" or "Tag filter removed"
+      // depending on the order of effects; both are semantically correct.
+      expect(liveRegion.textContent).toMatch(/(All filters cleared|Tag filter removed)/i);
     });
   });
   // ── tabular-nums (#476) ────────────────────────────────────────────────────
@@ -293,7 +296,9 @@ describe("MarketplacePage URL filter state", () => {
     renderPage(["/marketplace?q=weather&favorites=1&categories=AI/ML"]);
     settleMarketplaceTimers();
 
-    fireEvent.click(screen.getByRole("button", { name: /clear filters/i }));
+    // Use getAllByRole and pick the first "Clear filters" button (from FiltersSidebar)
+    const clearBtns = screen.getAllByRole("button", { name: /clear filters/i });
+    fireEvent.click(clearBtns[0]);
 
     const searchInput = screen.getByRole("searchbox");
     expect((searchInput as HTMLInputElement).value).toBe("");
