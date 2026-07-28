@@ -3,7 +3,7 @@ import Dropdown from "./Dropdown";
 import EmptyState from "./EmptyState";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { usePersistedState } from "../hooks/usePersistedState";
-import { FiltersSidebarSkeleton } from "./Skeleton";
+
 import LiveRegion from "./LiveRegion";
 
 const POPULARITY_OPTIONS = [
