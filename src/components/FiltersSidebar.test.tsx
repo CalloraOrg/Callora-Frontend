@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -53,6 +54,7 @@ describe("FiltersSidebar", () => {
     expect(screen.getByText("Categories")).toBeTruthy();
     expect(screen.getByText("Price range")).toBeTruthy();
     expect(screen.getByText("Popularity")).toBeTruthy();
+    expect(screen.getByText("Status")).toBeTruthy();
   });
 
   it("renders category checkboxes", () => {
@@ -279,9 +281,13 @@ describe("FiltersSidebar", () => {
       expect(screen.queryByTestId("filters-zero-results")).toBeNull();
     });
 
-    it("does NOT render zero-results block when resultCount is 0 but NO filters active", () => {
+    it("renders empty variant when resultCount=0 and NO filters active (genuine empty marketplace)", () => {
       render(<FiltersSidebar {...baseProps} resultCount={0} />);
-      expect(screen.queryByTestId("filters-zero-results")).toBeNull();
+      const block = screen.getByTestId("filters-zero-results");
+      expect(block).toBeTruthy();
+      expect(
+        block.querySelector('[data-testid="empty-state-empty"]'),
+      ).toBeTruthy();
     });
 
     it("renders zero-results illustration when resultCount=0 and categories selected", () => {
@@ -323,6 +329,20 @@ describe("FiltersSidebar", () => {
         <FiltersSidebar {...baseProps} favoritesOnly={true} resultCount={0} />,
       );
       expect(screen.getByTestId("filters-zero-results")).toBeTruthy();
+    });
+
+    it("renders filtered variant when resultCount=0 AND filters active", () => {
+      render(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["AI/ML"])}
+          resultCount={0}
+        />,
+      );
+      const block = screen.getByTestId("filters-zero-results");
+      expect(
+        block.querySelector('[data-testid="empty-state-filtered"]'),
+      ).toBeTruthy();
     });
 
     it("uses compact size EmptyState inside the sidebar", () => {
@@ -384,7 +404,7 @@ describe("FiltersSidebar", () => {
       );
       const block = screen.getByTestId("filters-zero-results") as HTMLElement;
       expect(block.style.borderTop).toMatch(/var\(--line\)/);
-      expect(block.style.paddingTop).toBe("12px");
+      expect(block.style.paddingTop).toMatch(/var\(--mkt-space-lg/);
     });
 
     it("zero-results wrapper keeps role='status' and aria-live='polite' for assistive tech", () => {
@@ -483,6 +503,9 @@ describe("FiltersSidebar", () => {
       expect(
         screen.getByRole("button", { name: "Favorites" }).style.transition,
       ).toBe("none");
+      expect(
+        screen.getByRole("button", { name: "Status" }).style.transition,
+      ).toBe("none");
     });
 
     it("preserves normal transitions when reduced motion is not active", () => {
@@ -499,6 +522,52 @@ describe("FiltersSidebar", () => {
       const header = screen.getByRole("button", { name: "Categories" });
       expect(header.style.transition).not.toBe("none");
       (window as any).matchMedia = origMatchMedia;
+    });
+  });
+
+  describe("aria-live announcements", () => {
+    it("renders a LiveRegion element for screen-reader announcements", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion.getAttribute("aria-live")).toBe("polite");
+      expect(liveRegion.getAttribute("role")).toBe("status");
+    });
+
+    it("announces when a category is selected", async () => {
+      render(<FiltersSidebar {...baseProps} selectedCategories={new Set(["AI/ML"])} />);
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toContain("AI/ML");
+      expect(liveRegion.textContent).toContain("Filters active");
+    });
+
+    it("announces when all filters are cleared", () => {
+      const clearFilters = vi.fn();
+      render(<FiltersSidebar {...baseProps} clearFilters={clearFilters} />);
+      fireEvent.click(screen.getByText("Clear filters"));
+      expect(clearFilters).toHaveBeenCalled();
+      // handleClearFilters calls setAnnouncement which triggers the effect
+    });
+
+    it("announces zero results message via the LiveRegion", async () => {
+      render(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["Data & Analytics"])}
+          resultCount={0}
+        />,
+      );
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toContain("No APIs match");
+    });
+
+    it("does not announce when resultCount transitions from undefined to 0 without active filters", async () => {
+      render(<FiltersSidebar {...baseProps} resultCount={0} />);
+      await new Promise((r) => setTimeout(r, 350));
+      const liveRegion = screen.getByTestId("live-region-filters-sidebar-announcements");
+      expect(liveRegion.textContent).toBe("");
     });
   });
 
@@ -526,6 +595,142 @@ describe("FiltersSidebar", () => {
       toggle.style.display = "inline-block";
       fireEvent.click(toggle);
       expect(screen.getByRole("dialog", { name: /Filters/i })).toBeTruthy();
+    });
+  });
+
+  describe("aria-live announcements (v7)", () => {
+    it("renders a live region element with correct aria attributes", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const region = screen.getByTestId("live-region");
+      expect(region.getAttribute("role")).toBe("status");
+      expect(region.getAttribute("aria-live")).toBe("polite");
+      expect(region.getAttribute("aria-atomic")).toBe("true");
+    });
+
+    it("announces when a category is selected (via prop change)", () => {
+      const { rerender } = render(<FiltersSidebar {...baseProps} />);
+      // Live region is always rendered but empty when no changes
+      expect(screen.getByTestId("live-region").textContent).toBe("");
+
+      // Re-render with a category selected
+      rerender(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["AI/ML"])}
+        />,
+      );
+      const liveRegion = screen.getByTestId("live-region");
+      expect(liveRegion.textContent).toMatch(/category selected/i);
+    });
+
+    it("clears announcement message after timeout", () => {
+      vi.useFakeTimers();
+      render(<FiltersSidebar {...baseProps} />);
+      // Initially empty
+      expect(screen.getByTestId("live-region").textContent).toBe("");
+
+      // Trigger a category change via rerender
+      const { rerender } = render(<FiltersSidebar {...baseProps} />);
+      rerender(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["AI/ML"])}
+        />,
+      );
+      expect(screen.getByTestId("live-region").textContent).toMatch(
+        /category selected/i,
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.getByTestId("live-region").textContent).toBe("");
+      vi.useRealTimers();
+    });
+  });
+
+  describe("keyboard shortcut hints", () => {
+    it("renders kbd-hint with filter shortcuts", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const kbdHint = screen.getByRole("complementary", { name: "Filter keyboard shortcuts" });
+      expect(kbdHint).toBeTruthy();
+      expect(kbdHint.querySelector(".kbd-hint__key")).toBeTruthy();
+    });
+
+    it("shows slash shortcut for focusing search", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      expect(screen.getByText("/")).toBeTruthy();
+      expect(screen.getByText("Focus search")).toBeTruthy();
+    });
+
+    it("shows Escape shortcut for closing filters", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      expect(screen.getByText("Esc")).toBeTruthy();
+      expect(screen.getByText("Close filters")).toBeTruthy();
+    });
+
+    it("has proper aria-label on kbd-hint", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const kbdHint = screen.getByRole("complementary", { name: "Filter keyboard shortcuts" });
+      expect(kbdHint.getAttribute("aria-label")).toBe("Filter keyboard shortcuts");
+    });
+  });
+
+  describe("status filter with color-blind patterns", () => {
+    it("renders all status options", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      expect(screen.getByLabelText(/operational/i)).toBeTruthy();
+      expect(screen.getByLabelText(/degraded/i)).toBeTruthy();
+      expect(screen.getByLabelText(/maintenance/i)).toBeTruthy();
+      expect(screen.getByLabelText(/down/i)).toBeTruthy();
+    });
+
+    it("calls toggleStatus when a status checkbox is clicked", () => {
+      const toggleStatus = vi.fn();
+      render(
+        <FiltersSidebar {...baseProps} toggleStatus={toggleStatus} />,
+      );
+      fireEvent.click(screen.getByLabelText(/operational/i));
+      expect(toggleStatus).toHaveBeenCalledWith("operational");
+    });
+
+    it("renders pattern swatch for each status option", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const statusValues = ["operational", "degraded", "maintenance", "down"];
+      statusValues.forEach((status) => {
+        const checkbox = screen.getByRole("checkbox", {
+          name: new RegExp(status, "i"),
+        });
+        const filterOption = checkbox.closest(".filter-option");
+        const swatch = filterOption?.querySelector(".filter-status-swatch");
+        expect(swatch).toBeTruthy();
+        expect(swatch?.classList.contains(`sb-pattern-${status}`)).toBe(true);
+      });
+    });
+
+    it("shows selected statuses as checked", () => {
+      const selectedStatuses = new Set(["operational", "down"]);
+      render(
+        <FiltersSidebar
+          {...baseProps}
+          selectedStatuses={selectedStatuses}
+        />,
+      );
+      expect(
+        (screen.getByLabelText(/operational/i) as HTMLInputElement).checked,
+      ).toBe(true);
+      expect(
+        (screen.getByLabelText(/degraded/i) as HTMLInputElement).checked,
+      ).toBe(false);
+      expect(
+        (screen.getByLabelText(/down/i) as HTMLInputElement).checked,
+      ).toBe(true);
+    });
+
+    it("has correct data-testid for the status filter panel", () => {
+      render(<FiltersSidebar {...baseProps} />);
+      const panel = screen.getByTestId("filter-panel-status");
+      expect(panel).toBeTruthy();
     });
   });
 });

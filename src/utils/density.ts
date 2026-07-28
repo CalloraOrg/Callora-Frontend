@@ -1,10 +1,8 @@
-export type DensityPreference = 'comfortable' | 'compact';
+export type DensityPreference = "comfortable" | "compact";
 
 export const DENSITY_STORAGE_KEY = 'callora.density';
 
 const VALID: DensityPreference[] = ['comfortable', 'compact'];
-
-export const DENSITY_STORAGE_KEY = 'callora.density';
 
 export function readDensityPreference(): DensityPreference {
   try {
@@ -15,7 +13,7 @@ export function readDensityPreference(): DensityPreference {
   } catch {
     // localStorage unavailable (SSR / private browsing)
   }
-  return 'comfortable';
+  return "comfortable";
 }
 
 export function persistDensityPreference(density: DensityPreference): void {

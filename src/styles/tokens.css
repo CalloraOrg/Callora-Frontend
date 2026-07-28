@@ -8,9 +8,9 @@
   --status-icon-size: 16px;
 
   /* ── Market spacing tokens ────────────────────────────────────────
-     Used by MarketplacePage and its children.  Named on a 4px grid
-     with explicit scale values so every hardcoded gap / padding /
-     margin in marketplace CSS is replaceable with var(--mkt-…). */
+     Used by MarketplacePage, ApiDetailPage, and their children.
+     Named on a 4px grid with explicit scale values so every hardcoded
+     gap / padding / margin is replaceable with var(--mkt-…). */
   --mkt-space-xs: 2px;
   --mkt-space-sm: 4px;
   --mkt-space-md: 8px;
@@ -19,17 +19,27 @@
   --mkt-space-2xl: 20px;
   --mkt-space-3xl: 24px;
   --mkt-space-4xl: 28px;
+  --mkt-space-5xl: 32px;
+  --mkt-space-6xl: 40px;
+  --mkt-space-7xl: 48px;
 
-  /* ── Market typography tokens ─────────────────────────────────────
-     Tight, readable defaults for the marketplace listing page. */
-  --mkt-font-size-sm: 0.8125rem;
-  --mkt-font-size-micro: 0.75rem;
-  --mkt-font-size-tag: 0.875rem;
+  /* ── Market / detail typography tokens ────────────────────────────
+     Tight, readable defaults consumed by marketplace + detail pages. */
+  --mkt-font-size-micro: 0.75rem;    /* 12px */
+  --mkt-font-size-sm: 0.8125rem;     /* 13px */
+  --mkt-font-size-tag: 0.875rem;     /* 14px */
+  --mkt-font-size-base: 1rem;        /* 16px */
+  --mkt-font-size-lg: 0.9375rem;     /* 15px */
+  --mkt-font-size-xl: 1.5rem;        /* 24px */
+  --mkt-font-size-2xl: 1.75rem;      /* 28px */
   --mkt-font-size-page-title: clamp(1.75rem, 3vw, 2.35rem);
   --mkt-line-height-tight: 1.05;
+  --mkt-line-height-normal: 1.5;
+  --mkt-line-height-relaxed: 1.6;
+  --mkt-line-height-loose: 2;
   --mkt-grid-min: 240px;
 
-  /* ── Market colour references ─────────────────────────────────────
+  /* ── Market colour references ──────────────────────────────────
      Replaces hardcoded hex / rgba values used by marketplace cards. */
   --mkt-card-border: rgba(255, 255, 255, 0.03);
   --mkt-card-hover-border: #4666ff;
@@ -37,12 +47,55 @@
   --mkt-card-compact-padding: 10px;
   --mkt-card-compact-gap: 6px;
   --mkt-card-compact-min-height: 188px;
+  --mkt-card-padding: 12px;
+  --mkt-card-gap: 8px;
+  --mkt-card-min-height: 220px;
+  --mkt-card-icon-radius: 10px;
+  --mkt-card-icon-size: 56px;
+  --mkt-card-icon-font-size: 20px;
+  --mkt-card-popover-radius: 12px;
+  --mkt-card-popover-width: 230px;
+  --mkt-card-compare-radius: 8px;
+  --mkt-card-tag-radius: 8px;
+  --mkt-card-margin-top-sm: 6px;
+  --mkt-card-price-padding-right: 36px;
+  --mkt-radius-sm: 6px;
 
   /* ── Market layout tokens ───────────────────────────────────────── */
   --mkt-page-padding: 20px;
   --mkt-page-padding-sm: 14px;
   --mkt-sidebar-padding-start: 8px;
   --mkt-drawer-offset: 80px;
+
+  /* ── ApiUsage spacing tokens ────────────────────────────────────────
+     Named on a 4px grid, following the same scale as --mkt-* tokens but
+     namespaced under --api- for the ApiUsage page.  Replaces hardcoded
+     padding / gap / margin values in the ApiUsage component styles. */
+  --api-space-xs: 2px;
+  --api-space-sm: 4px;
+  --api-space-md: 8px;
+  --api-space-lg: 12px;
+  --api-space-xl: 16px;
+  --api-space-2xl: 20px;
+  --api-space-3xl: 24px;
+  --api-space-4xl: 28px;
+  --api-space-5xl: 32px;
+  --api-space-6xl: 40px;
+
+  /* ── ApiUsage typography tokens ─────────────────────────────────────
+     Locked font sizes for the ApiUsage page sections. */
+  --api-font-size-xs: 0.6875rem;
+  --api-font-size-sm: 0.8125rem;
+  --api-font-size-md: 0.875rem;
+  --api-font-size-base: 0.9375rem;
+  --api-font-size-lg: 1.25rem;
+  --api-font-size-xl: 1.5rem;
+  --api-line-height-tight: 1.15;
+  --api-line-height-normal: 1.5;
+
+  /* ── ApiUsage surface tokens ──────────────────────────────────────── */
+  --api-card-min-height: 48px;
+  --api-border-radius: 18px;
 }
 
 /* Light-mode overrides for tokens whose contrast depends on the theme */
@@ -104,6 +157,11 @@
   --sb-pending-bg: rgba(78, 133, 255, 0.14);
   --sb-pending-fg: #4e85ff;
   --sb-pending-border: rgba(78, 133, 255, 0.35);
+
+  /* maintenance (alias of pending) */
+  --sb-maintenance-bg: var(--sb-pending-bg);
+  --sb-maintenance-fg: var(--sb-pending-fg);
+  --sb-maintenance-border: var(--sb-pending-border);
 }
 
 [data-theme="light"] {
@@ -134,4 +192,9 @@
   --sb-pending-bg: rgba(37, 99, 235, 0.1);
   --sb-pending-fg: #1e40af;
   --sb-pending-border: rgba(37, 99, 235, 0.25);
+
+  /* maintenance (alias of pending) */
+  --sb-maintenance-bg: var(--sb-pending-bg);
+  --sb-maintenance-fg: var(--sb-pending-fg);
+  --sb-maintenance-border: var(--sb-pending-border);
 }

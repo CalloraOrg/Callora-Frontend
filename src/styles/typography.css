@@ -1,8 +1,12 @@
 /* Numeric typography utilities
-   tabular-nums — fixed-width numerals so digits (especially in tables,
-   stats, and prices) don't shift as values change.  This meets a common
-   data-display requirement and improves readability of financial / metric
-   readouts across light and dark themes. */
+   numeric-tabular / tabular-nums — fixed-width numerals so digits (especially
+   in tables, stats, and prices) don't shift as values change.  This meets a
+   common data-display requirement and improves readability of financial and
+   metric readouts across light and dark themes.
+
+   Use `.numeric-tabular` (canonical name, matches the design system doc and
+   ApiCard).  `.tabular-nums` is kept as an alias for backwards compatibility. */
+.numeric-tabular,
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }

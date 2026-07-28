@@ -52,8 +52,81 @@ describe("@layer focus contract", () => {
     expect(focusCss).toMatch(/\.filter-input:focus-visible/);
   });
 
+  it("focus.css defines focus-visible rules for SubscribeButton interactive elements", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.subscribe-button:focus-visible/);
+    expect(focusCss).toMatch(/\.subscribe-button-confirm:focus-visible/);
+    expect(focusCss).toMatch(/\.subscribe-button-cancel:focus-visible/);
+  });
+
   it("Dropdown trigger no longer overrides :focus-visible with inline outline:none", () => {
     const dropdown = read("src/components/Dropdown.tsx");
     expect(dropdown).not.toMatch(/outline:\s*open\s*\?[^:]*:\s*["']none["']/);
+  });
+
+  it("focus.css defines focus-visible rules for MarketplacePage interactive elements", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.pill-bar__item:focus-visible/);
+    expect(focusCss).toMatch(/\.api-tag-filter__pill:focus-visible/);
+    expect(focusCss).toMatch(/\.density-toggle-button:focus-visible/);
+    expect(focusCss).toMatch(/\.marketplace-filter-button:focus-visible/);
+    expect(focusCss).toMatch(/\.pagination-button:focus-visible/);
+    expect(focusCss).toMatch(/\.page-size-select:focus-visible/);
+    expect(focusCss).toMatch(/\.recently-active-rail button:focus-visible/);
+    expect(focusCss).toMatch(/\.empty-state button:focus-visible/);
+    expect(focusCss).toMatch(/\.bottom-sheet__close:focus-visible/);
+    expect(focusCss).toMatch(/\.bottom-sheet__show-btn:focus-visible/);
+  });
+
+  it("focus.css uses accent token and 3px offset for MarketplacePage rules", () => {
+    const focusCss = read("src/styles/focus.css");
+    expect(focusCss).toMatch(/\.pill-bar__item:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)/);
+    expect(focusCss).toMatch(/\.pill-bar__item:focus-visible[\s\S]*?outline-offset:\s*3px/);
+    expect(focusCss).toMatch(/\.api-tag-filter__pill:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)/);
+    expect(focusCss).toMatch(/\.api-tag-filter__pill:focus-visible[\s\S]*?outline-offset:\s*3px/);
+    expect(focusCss).toMatch(/\.density-toggle-button:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)/);
+    expect(focusCss).toMatch(/\.density-toggle-button:focus-visible[\s\S]*?outline-offset:\s*3px/);
+  });
+
+  it("MarketplacePage components use :focus-visible, not bare :focus", () => {
+    const categoryPills = read("src/components/CategoryPills.tsx");
+    const apiTagFilter = read("src/pages/ApiTagFilter.tsx");
+    const marketplacePage = read("src/pages/MarketplacePage.tsx");
+    const recentlyActiveRail = read("src/components/RecentlyActiveRail.tsx");
+
+    expect(categoryPills).not.toMatch(/\.pill-bar__item:focus\s*\{/);
+    expect(apiTagFilter).not.toMatch(/\.api-tag-filter__pill:focus\s*\{/);
+    expect(marketplacePage).not.toMatch(/\.density-toggle-button:focus\s*\{/);
+    expect(marketplacePage).not.toMatch(/\.marketplace-filter-button:focus\s*\{/);
+    expect(recentlyActiveRail).not.toMatch(/button:focus\s*\{/);
+  });
+
+  // ── #699 — CommandPalette: unlayered outline:none permanently defeated the
+  // global *:focus-visible ring (unlayered CSS always beats @layer rules
+  // regardless of specificity, so nothing in @layer focus could restore it).
+  it("CommandPalette input no longer carries an unconditional outline:none", () => {
+    const css = read("src/components/CommandPalette.css");
+    // The old bug: `.command-palette-input { ... outline: none; ... }` with
+    // no accompanying :focus/:focus-visible split. Only a *conditional*
+    // `:focus { outline: none }` is allowed now.
+    expect(css).not.toMatch(/\.command-palette-input\s*\{[^}]*outline:\s*none/);
+  });
+
+  it("CommandPalette input restores a visible ring on :focus-visible", () => {
+    const css = read("src/components/CommandPalette.css");
+    expect(css).toMatch(
+      /\.command-palette-input:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)/,
+    );
+  });
+
+  it("CommandPalette input only suppresses outline on :focus, not unconditionally", () => {
+    const css = read("src/components/CommandPalette.css");
+    expect(css).toMatch(/\.command-palette-input:focus\s*\{\s*outline:\s*none;\s*\}/);
+  });
+
+  it("CommandPalette clear/close buttons have explicit focus-visible reinforcement", () => {
+    const css = read("src/components/CommandPalette.css");
+    expect(css).toMatch(/\.command-palette-clear-button:focus-visible/);
+    expect(css).toMatch(/\.command-palette-close-button:focus-visible/);
   });
 });

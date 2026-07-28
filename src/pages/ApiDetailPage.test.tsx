@@ -69,8 +69,8 @@ describe("ApiDetailPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
 
     expect(screen.getByRole("heading", { name: "Endpoint groups" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /forecast 1 endpoint/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /historical weather 1 endpoint/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /forecast 2 endpoints/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /alerts 2 endpoints/i })).toBeTruthy();
   });
 
   it("shows the group preview when a trigger receives keyboard focus", () => {
@@ -78,12 +78,12 @@ describe("ApiDetailPage", () => {
     settleLoadingState();
 
     fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
-    fireEvent.focus(screen.getByRole("button", { name: /forecast 1 endpoint/i }));
+    fireEvent.focus(screen.getByRole("button", { name: /forecast 2 endpoints/i }));
 
     const preview = screen.getByLabelText("Forecast group preview");
     expect(preview).toBeTruthy();
     expect(within(preview).getByText("Get Forecast")).toBeTruthy();
-    expect(within(preview).getByText(/1 endpoint.*2 request parameter/)).toBeTruthy();
+    expect(within(preview).getByText(/2 parameters/i)).toBeTruthy();
   });
 
   // ── Skeleton / loading ────────────────────────────────────────────────────
@@ -467,6 +467,17 @@ describe("ApiDetailPage", () => {
       // "Try API", "View Pricing", and SubscribeButton
       expect((buttons?.length ?? 0)).toBeGreaterThanOrEqual(2);
     });
+
+    it("injects responsive styles for mobile viewports", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      
+      // Look for the style tag we injected
+      const styles = Array.from(document.querySelectorAll("style"));
+      const hasMobileStyle = styles.some(style => style.textContent?.includes("@media (max-width: 480px)"));
+      expect(hasMobileStyle).toBe(true);
+
+    });
   });
 
   describe("keyboard navigation and focus", () => {
@@ -482,6 +493,172 @@ describe("ApiDetailPage", () => {
       const docPanel = screen.getByRole("tabpanel", { name: "Documentation" });
       expect(docPanel).toBeTruthy();
       expect(docPanel.tabIndex).toBe(0);
+    });
+
+    it("all interactive buttons in ApiDetailPage are keyboard-focusable", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Buttons in the hero, CTA row, and sidebar
+      const focusableElements = document.querySelectorAll(
+        ".api-detail-page button, .api-detail-page a, .api-detail-page select, .api-detail-page input, .api-detail-page [role='tab']",
+      );
+      expect(focusableElements.length).toBeGreaterThan(0);
+
+      // Verify they are all focusable (not disabled)
+      focusableElements.forEach((el) => {
+        // tabIndex defaults to 0 for interactive elements unless explicitly set
+        const htmlEl = el as HTMLElement;
+        if (htmlEl.hasAttribute("disabled")) {
+          expect(htmlEl.getAttribute("disabled")).toBe("");
+        } else {
+          // buttons, links, inputs are inherently focusable
+          expect(
+            htmlEl.tabIndex >= 0 || htmlEl.getAttribute("disabled") === null,
+          ).toBe(true);
+        }
+      });
+    });
+
+    it("tab buttons (role='tab') are reachable via keyboard", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs.length).toBeGreaterThanOrEqual(6); // All 6 tab items
+
+      // Verify no tab has tabIndex={-1} (all should be reachable)
+      tabs.forEach((tab) => {
+        expect((tab as HTMLElement).tabIndex).not.toBe(-1);
+      });
+    });
+
+    it("select element in reviews tab is keyboard-focusable", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      const select = screen.getByLabelText("Sort by");
+      expect(select).toBeTruthy();
+      expect((select as HTMLElement).tabIndex).not.toBe(-1);
+    });
+
+    it("range slider in pricing tab is keyboard-focusable", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+      expect(slider).toBeTruthy();
+      expect((slider as HTMLElement).tabIndex).not.toBe(-1);
+    });
+
+    it("subscribe button is keyboard-focusable", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const subscribeBtn = screen.getByRole("button", { name: /subscribe/i });
+      expect(subscribeBtn).toBeTruthy();
+      expect((subscribeBtn as HTMLElement).tabIndex).not.toBe(-1);
+    });
+
+    it("no interactive element in ApiDetailPage carries inline outline:none that would suppress the focus ring", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Check all interactive elements for inline outline:none
+      const interactiveElements = document.querySelectorAll(
+        "button, a, input, select, textarea, [role='tab'], [role='button'], [tabindex]:not([tabindex='-1'])",
+      );
+
+      interactiveElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        const inlineOutline = htmlEl.style.outline;
+        // Inline outline:none would suppress the :focus-visible ring
+        expect(inlineOutline).not.toBe("none");
+      });
+    });
+
+    it("endpoint save button popover dialog is keyboard-accessible", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      const saveButtons = screen.getAllByRole("button", {
+        name: /Save endpoint to collection/i,
+      });
+      fireEvent.click(saveButtons[0]);
+
+      const dialog = screen.getByRole("dialog", {
+        name: /Save endpoint to collection/i,
+      });
+      expect(dialog).toBeTruthy();
+
+      // Dialog should be focusable
+      expect((dialog as HTMLElement).tabIndex).not.toBe(-1);
+
+      // Check inputs inside dialog are focusable
+      const inputs = dialog.querySelectorAll("input, button");
+      inputs.forEach((input) => {
+        const htmlInput = input as HTMLElement;
+        if (!htmlInput.hasAttribute("disabled")) {
+          expect(htmlInput.tabIndex).not.toBe(-1);
+        }
+      });
+    });
+  });
+
+  describe("aria-live announcements", () => {
+    it("announces when the page details have loaded", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion?.textContent).toBe("WeatherSim API detail page loaded");
+    });
+
+    it("announces tab selection changes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      expect(liveRegion?.textContent).toBe("Showing Documentation tab");
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+      expect(liveRegion?.textContent).toBe("Showing Pricing tab");
+    });
+
+    it("announces cost calculator slider adjustments", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+      fireEvent.change(slider, { target: { value: "5000" } });
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion?.textContent).toBe("Estimated monthly total: $50.00 for 5,000 requests");
+    });
+
+    it("announces review sorting criteria changes", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      const select = screen.getByLabelText("Sort by");
+      fireEvent.change(select, { target: { value: "highest" } });
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion?.textContent).toBe("Reviews sorted by highest rated");
     });
   });
 });

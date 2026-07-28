@@ -1,26 +1,28 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import EmptyState from './components/EmptyState';
-import Skeleton, { SkeletonRow } from './components/Skeleton';
-import { formatPrice } from './utils/format';
-import type { JsonSchema } from './components/RequestBodyEditor';
-import CallHistoryRow from './components/CallHistoryRow';
-import Breadcrumb from './components/Breadcrumb';
-import RequestHistoryPanel from './components/RequestHistoryPanel';
-import ParamsBuilder from './components/ParamsBuilder';
-import { useFetchTracker } from './hooks/useFetchTracker';
-import { useQuota } from './hooks/useQuota';
-import PlanNudge from './components/PlanNudge';
-import CallsHeatmap from './components/CallsHeatmap';
-import Tabs from './components/Tabs';
-import { Icons } from './utils/icons';
-import { LinkIcon } from './components/icons';
+import EmptyState from '../components/EmptyState';
+import Skeleton, { ApiUsageSkeleton, SkeletonRow } from '../components/Skeleton';
+import { formatPrice } from '../utils/format';
+import type { JsonSchema } from '../components/RequestBodyEditor';
+import CallHistoryRow from '../components/CallHistoryRow';
+import Breadcrumb from '../components/Breadcrumb';
+import RequestHistoryPanel from '../components/RequestHistoryPanel';
+import ParamsBuilder from '../components/ParamsBuilder';
+import { useFetchTracker } from '../hooks/useFetchTracker';
+import { useQuota } from '../hooks/useQuota';
+import PlanNudge from '../components/PlanNudge';
+import CallsHeatmap from '../components/CallsHeatmap';
+import Tabs from '../components/Tabs';
+import { Icons } from '../utils/icons';
+import { LinkIcon } from '../components/icons';
+import KbdHint from '../components/KbdHint';
+import { SHORTCUTS } from '../hooks/useGlobalShortcuts';
 import {
   clearHistory,
   loadHistory,
   saveEntry,
   type HistoryEntry,
-} from './state/testCallHistory';
-import { copySnapshotUrl, parseSnapshotUrl } from './utils/snapshotUrl';
+} from '../state/testCallHistory';
+import { copySnapshotUrl, parseSnapshotUrl } from '../utils/snapshotUrl';
 
 const MOCK_USAGE_PERCENT = 80;
 const LOADING_DELAY_MS = 500;
@@ -194,6 +196,10 @@ curl -X GET "https://api.callora.com/v1/user/profile" \\
   -H "Content-Type: application/json"`
 };
 
+const API_USAGE_SHORTCUTS = SHORTCUTS.filter(
+  (s) => s.category === "ApiUsage",
+);
+
 
 
 function formatTime(ms: number) {
@@ -223,9 +229,10 @@ export default function ApiUsage() {
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
-  const [filterResetMessage, setFilterResetMessage] = useState('');
+  const [liveStatusMessage, setLiveStatusMessage] = useState('');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
   const [isTableLoading, setIsTableLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const toggleHistory = useCallback(() => setIsHistoryOpen(prev => !prev), []);
   const [historyEntries, setHistoryEntries] = useState<any[]>([]);
@@ -239,6 +246,7 @@ export default function ApiUsage() {
   useEffect(() => {
     const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
     const timer = setTimeout(() => {
+      setIsPageLoading(false);
       setIsTableLoading(false);
     }, delay);
     return () => clearTimeout(timer);
@@ -276,6 +284,7 @@ export default function ApiUsage() {
     });
     if (success) {
       setSnapshotted(true);
+      announceStatus(`Snapshot URL copied for ${selectedEndpoint.name}.`);
       setTimeout(() => setSnapshotted(false), 2000);
     }
   };
@@ -354,18 +363,24 @@ export default function ApiUsage() {
   // Whether any call-history filter differs from its default value.
   const filtersAreActive = statusFilter !== 'all' || selectedRange.preset !== '24h';
 
+  const announceStatus = useCallback((message: string) => {
+    setLiveStatusMessage('');
+    window.setTimeout(() => setLiveStatusMessage(message), 0);
+  }, []);
+
   // Reset all call-history filters to their defaults and announce the change
   // to assistive technology via the aria-live region below.
   const handleResetFilters = () => {
     setStatusFilter('all');
     setSelectedRange({ preset: '24h' });
-    setFilterResetMessage('Filters reset. Showing all calls from the last 24 hours.');
+    announceStatus('Filters reset. Showing all calls from the last 24 hours.');
   };
 
   const handleCopyApiKey = async () => {
     try {
       await navigator.clipboard.writeText(apiKey);
       setCopied(true);
+      announceStatus('API key copied to clipboard.');
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy API key');
@@ -375,6 +390,7 @@ export default function ApiUsage() {
   const handleRegenerateApiKey = () => {
     const newKey = 'ck_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     setApiKey(newKey);
+    announceStatus('API key regenerated.');
   };
 
   const handleMakeTestCall = async () => {
@@ -483,6 +499,7 @@ export default function ApiUsage() {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
+      announceStatus(`${selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)} code example copied to clipboard.`);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy code');
@@ -521,6 +538,10 @@ export default function ApiUsage() {
       a.click();
     }
   };
+
+  if (isPageLoading) {
+    return <ApiUsageSkeleton />;
+  }
 
   return (
     <div className="api-usage-page">
@@ -568,6 +589,8 @@ export default function ApiUsage() {
         </div>
       </div>
 
+      <KbdHint shortcuts={API_USAGE_SHORTCUTS} />
+
       {/* API Key Section */}
       <div className="surface api-key-section">
         <h2>API Key</h2>
@@ -614,6 +637,7 @@ export default function ApiUsage() {
                 const endpoint = MOCK_ENDPOINTS.find(ep => ep.id === e.target.value);
                 if (endpoint) {
                   setSelectedEndpoint(endpoint);
+                  announceStatus(`Selected endpoint: ${endpoint.method} ${endpoint.path}.`);
                   // Reset the request body when switching endpoints so stale
                   // JSON from a previous endpoint doesn't fail the new schema.
                   setRequestParams('{}');
@@ -756,8 +780,13 @@ export default function ApiUsage() {
               ]}
               activeTab={statusFilter}
               onChange={(id) => {
-                setStatusFilter(id as 'all' | 'success' | 'error');
-                setFilterResetMessage('');
+                const nextStatus = id as 'all' | 'success' | 'error';
+                setStatusFilter(nextStatus);
+                announceStatus(
+                  nextStatus === 'all'
+                    ? 'Showing all call statuses.'
+                    : `Showing ${nextStatus} calls.`
+                );
               }}
             />
             <button
@@ -777,9 +806,9 @@ export default function ApiUsage() {
           </div>
         </div>
 
-        {/* Screen-reader announcement for filter reset (WCAG 2.1 AA) */}
-        <p className="sr-only" role="status" aria-live="polite">
-          {filterResetMessage}
+        {/* Screen-reader announcement for ApiUsage state changes (WCAG 2.1 AA) */}
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {liveStatusMessage}
         </p>
 
         <div className="call-history-table" aria-busy={isLoading}>

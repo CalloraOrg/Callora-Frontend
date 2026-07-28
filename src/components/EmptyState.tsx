@@ -1,7 +1,16 @@
-import React from "react";
+import React, { useCallback } from "react";
 import ExternalLink from "./ExternalLink";
+import { useCopy } from "../hooks/useCopy";
+import { EmptyStateSkeleton } from "./Skeleton";
 
-export type EmptyStateVariant = "empty" | "api-detail" | "filtered" | "error";
+export type EmptyStateVariant =
+  | "empty"
+  | "api-detail"
+  | "filtered"
+  | "error"
+  | "plan-badge"
+  | "risk-gauge"
+  | "quota-banner";
 export type EmptyStateSize = "default" | "compact";
 
 export interface EmptyStateProps {
@@ -9,12 +18,21 @@ export interface EmptyStateProps {
   size?: EmptyStateSize;
   title?: string;
   message?: string;
+  /** @deprecated Use `message` instead */
+  description?: string;
   onClearFilters?: () => void;
   onRetry?: () => void | Promise<void>;
   action?: {
     label: string;
     onClick: () => void;
   };
+  secondaryAction?: {
+    label: string;
+    onClick: () => void;
+  };
+  loading?: boolean;
+  /** When true, renders a copy-to-clipboard button for the message text. */
+  copyable?: boolean;
 }
 
 /**
@@ -119,6 +137,41 @@ function EmptyIllustration({
     );
   }
 
+  if (variant === "api-card") {
+    return (
+      <svg
+        width={box}
+        height={box}
+        viewBox="0 0 64 64"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <rect
+          x="16"
+          y="16"
+          width="32"
+          height="32"
+          rx="4"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+          strokeDasharray="4 4"
+        />
+        <path
+          d="M24 32h16"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+        <path
+          d="M32 24v16"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+      </svg>
+    );
+  }
+
   if (variant === "filtered") {
     return (
       <svg
@@ -176,6 +229,222 @@ function EmptyIllustration({
     );
   }
 
+  if (variant === "plan-badge") {
+    // Illustration: a tiered medal/ribbon motif representing plan tiers,
+    // with an accent sparkle to suggest "upgrade potential".
+    // Uses --plan-free-bg, --plan-pro-fg, --plan-enterprise-fg tokens
+    // that are already defined by the PlanBadge component.
+    return (
+      <svg
+        width={box}
+        height={box}
+        viewBox="0 0 64 64"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {/* Medal circle */}
+        <circle
+          cx="32"
+          cy="30"
+          r="14"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+        />
+        {/* Inner medal ring (accent) */}
+        <circle
+          cx="32"
+          cy="30"
+          r="9"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+        {/* Ribbon left */}
+        <path
+          d="M26 43L20 54l6-2 4 4 3-8"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        {/* Ribbon right */}
+        <path
+          d="M38 43L44 54l-6-2-4 4-3-8"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        {/* Star / tier symbol in centre */}
+        <path
+          d="M32 23l1.5 4.5H38l-3.8 2.8 1.5 4.5L32 32l-3.7 2.8 1.5-4.5L26 27.5h4.5z"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+          fill="none"
+        />
+        {/* Decorative sparkle dots — tier-colour accents */}
+        <circle cx="14" cy="16" r="1.5" fill="var(--accent)" stroke="none" />
+        <circle cx="50" cy="13" r="1.25" fill="var(--accent)" stroke="none" />
+        {/* Subtle top dashes — upgrade-path metaphor */}
+        <path
+          d="M10 10h12M18 6h8"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.7}
+          strokeDasharray={size === "compact" ? "2 2" : "3 3"}
+          opacity="0.5"
+        />
+      </svg>
+    );
+  }
+
+  if (variant === "risk-gauge") {
+    const cx = 32;
+    const cy = 34;
+    const r = 20;
+    const startAngle = -210;
+    const endAngle = 30;
+
+    function polar(angle: number, radius: number) {
+      const rad = ((angle - 90) * Math.PI) / 180;
+      return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+    }
+
+    const arcStart = polar(startAngle, r);
+    const arcEnd = polar(endAngle, r);
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+
+    return (
+      <svg
+        width={box}
+        height={box}
+        viewBox="0 0 64 64"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {/* Gauge arc track */}
+        <path
+          d={`M ${arcStart.x} ${arcStart.y} A ${r} ${r} 0 ${largeArc} 1 ${arcEnd.x} ${arcEnd.y}`}
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.7}
+          opacity="0.35"
+        />
+        {/* Gauge arc fill (lower half — safer zone) */}
+        <path
+          d={`M ${cx} ${cy} L ${arcStart.x} ${arcStart.y} A ${r} ${r} 0 0 1 ${cx} ${cy + 6} Z`}
+          stroke="var(--accent)"
+          strokeWidth={accentStroke * 0.5}
+          opacity="0.5"
+        />
+        {/* Needle */}
+        <line
+          x1={cx}
+          y1={cy}
+          x2={cx + 3}
+          y2={cy - r + 4}
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+        <circle cx={cx} cy={cy} r={3} stroke="var(--accent)" strokeWidth={accentStroke} />
+        {/* Shield outline behind the gauge */}
+        <path
+          d="M32 6l14 7v12c0 10.5-5.6 19.2-14 23-8.4-3.8-14-12.5-14-23V13l14-7z"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.8}
+          opacity="0.6"
+        />
+        {/* Decorative sparkle dots */}
+        <circle cx="16" cy="12" r="1.5" fill="var(--accent)" stroke="none" />
+        <circle cx="48" cy="14" r="1.25" fill="var(--accent)" stroke="none" />
+        <path
+          d="M52 48l2 2M54 52l1.5 1.5"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+      </svg>
+    );
+  }
+
+  if (variant === "quota-banner") {
+    return (
+      <svg
+        width={box}
+        height={box}
+        viewBox="0 0 64 64"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {/* Gauge arc — quota meter */}
+        <path
+          d="M14 38 A 14 14 0 0 1 36 38"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+        />
+        <path
+          d="M18 38 A 10 10 0 0 1 32 38"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+          opacity="0.6"
+        />
+        {/* Needle pointing at ~60% */}
+        <line
+          x1="25" y1="38" x2="21" y2="29"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+        <circle cx="25" cy="38" r="2" fill="var(--accent)" stroke="none" />
+
+        {/* Vertical divider */}
+        <line
+          x1="42" y1="14" x2="42" y2="52"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.5}
+          opacity="0.3"
+          strokeDasharray="2 3"
+        />
+
+        {/* Usage bar chart */}
+        <rect
+          x="46" y="26" width="5" height="24" rx="1.5"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.85}
+        />
+        <rect
+          x="53" y="34" width="5" height="16" rx="1.5"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.85}
+        />
+        <rect
+          x="46" y="36" width="5" height="14" rx="1.5"
+          fill="var(--accent)"
+          fillOpacity="0.2"
+          stroke="none"
+        />
+
+        {/* Baseline */}
+        <line
+          x1="46" y1="50" x2="58" y2="50"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.5}
+          opacity="0.4"
+        />
+
+        {/* Decorative sparkle dots */}
+        <circle cx="10" cy="12" r="1.5" fill="var(--accent)" stroke="none" />
+        <circle cx="56" cy="14" r="1.25" fill="var(--accent)" stroke="none" />
+        <path
+          d="M8 8h4"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.6}
+          strokeDasharray="1.5 2"
+          opacity="0.5"
+        />
+      </svg>
+    );
+  }
+
   return (
     <svg
       width={box}
@@ -214,14 +483,127 @@ function EmptyIllustration({
 }
 
 /**
- * EmptyState component with three distinct variants for different marketplace states.
+ * Compact copy-to-clipboard line rendered alongside the EmptyState message.
+ * Provides success feedback for assistive technology via aria-live.
+ */
+function MessageWithCopy({
+  message,
+  isCompact,
+}: {
+  message: string;
+  isCompact: boolean;
+}) {
+  const { copy, copied, supported } = useCopy();
+  const [liveFeedback, setLiveFeedback] = React.useState("");
+
+  const handleCopy = useCallback(() => {
+    if (!supported) return;
+    copy(message).then((ok) => {
+      if (ok) {
+        setLiveFeedback("Message copied.");
+        setTimeout(() => setLiveFeedback(""), 2000);
+      }
+    });
+  }, [copy, message, supported]);
+
+  const containerStyle: React.CSSProperties = {
+    display: "flex",
+    gap: isCompact ? "6px" : "8px",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    maxWidth: isCompact ? "240px" : "320px",
+  };
+
+  const messageStyle: React.CSSProperties = isCompact
+    ? {
+        margin: 0,
+        color: "var(--muted)",
+        fontSize: "0.8125rem",
+        lineHeight: 1.4,
+      }
+    : {
+        margin: "0 0 24px 0",
+        color: "var(--muted)",
+        fontSize: "0.9375rem",
+        lineHeight: 1.5,
+      };
+
+  const btnStyle: React.CSSProperties = {
+    flexShrink: 0,
+    background: "none",
+    border: "1px solid var(--line)",
+    borderRadius: "4px",
+    cursor: "pointer",
+    padding: "2px 6px",
+    fontSize: isCompact ? "0.7rem" : "0.75rem",
+    color: "var(--accent)",
+    lineHeight: 1.4,
+    whiteSpace: "nowrap",
+    marginTop: isCompact ? 0 : "2px",
+    transition: "color 0.15s ease, border-color 0.15s ease",
+  };
+
+  if (!supported) {
+    return (
+      <p
+        style={messageStyle}
+        data-testid="empty-state-message"
+      >
+        {message}
+      </p>
+    );
+  }
+
+  return (
+    <div style={containerStyle}>
+      <p style={messageStyle} data-testid="empty-state-message">
+        {message}
+      </p>
+      <button
+        type="button"
+        style={btnStyle}
+        onClick={handleCopy}
+        aria-label={`Copy "${message}"`}
+        data-testid="empty-state-copy-button"
+      >
+        {copied ? "Copied!" : "Copy"}
+      </button>
+      {/* Screen-reader announcement for copy feedback (WCAG 4.1.3) */}
+      {liveFeedback && (
+        <span
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {liveFeedback}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * EmptyState component with distinct variants for different marketplace states.
  *
  * Variants:
- * - empty:    Default state when no APIs exist in the marketplace.
+ * - empty:      Default state when no APIs exist in the marketplace.
  * - api-detail: A requested API listing is unavailable. Uses an API-card illustration.
- * - filtered: Active filters yield zero results. Shows a "Clear all filters" CTA.
- *             Used inline inside FiltersSidebar (compact) and the results grid (default).
- * - error:    Network/fetch failure. Shows a "Retry" button plus a status link.
+ * - filtered:   Active filters yield zero results. Shows a "Clear all filters" CTA.
+ *               Used inline inside FiltersSidebar (compact) and the results grid (default).
+ * - error:      Network/fetch failure. Shows a "Retry" button plus a status link.
+ * - plan-badge: No plan/tier is attached to the current API or account.
+ *               Shows a medal-and-ribbon illustration with a "Choose a plan" CTA
+ *               so users can select a tier (free/pro/enterprise) and begin receiving
+ *               calls.  Used by the PlanBadge page (issue #529).
+ * - risk-gauge: No risk assessment data is available yet.
+ *               Shows a shield-and-gauge illustration with a "Run assessment" CTA
+ *               so users can evaluate their API risk profile.  Used by the
+ *               RiskGauge page (issue #664).
+ * - quota-banner: No quota data is configured yet.
+ *                 Shows a gauge-and-bars illustration with a "Set up quota" CTA
+ *                 so users can configure usage limits.  Used by the QuotaBanner
+ *                 component (issue #742).
  *
  * Sizes:
  * - default:  Full-size layout for result areas (48px padding, 80px illustration).
@@ -249,10 +631,26 @@ export default function EmptyState({
   size = "default",
   title,
   message,
+  description,
   onClearFilters,
   onRetry,
   action,
+  secondaryAction,
+  loading = false,
+  copyable = false,
 }: EmptyStateProps) {
+  const resolvedMessage = message ?? description;
+  const resolvedAction = action;
+  const { copied, handleCopy } = useCopy();
+
+  if (loading) {
+    return (
+      <EmptyStateSkeleton
+        size={size}
+        hasAction={!!resolvedAction || (variant === "filtered" && !!onClearFilters) || (variant === "error" && !!onRetry)}
+      />
+    );
+  }
   const defaults = {
     empty: {
       title: "No APIs available",
@@ -261,6 +659,10 @@ export default function EmptyState({
     "api-detail": {
       title: "API not found",
       message: "This API may have moved or is no longer available.",
+    },
+    "api-card": {
+      title: "API unavailable",
+      message: "This API could not be loaded or is currently unavailable.",
     },
     filtered: {
       title: "No results found",
@@ -276,10 +678,46 @@ export default function EmptyState({
           ? "Error loading results. Please retry."
           : "We encountered an error fetching the marketplace. Please try again.",
     },
+    /**
+     * plan-badge variant — shown on the PlanBadge page when no plan data
+     * is associated with the current account/API.  The CTA guides users
+     * toward choosing a plan (issue #529).
+     */
+    "plan-badge": {
+      title: "No plan selected",
+      message:
+        size === "compact"
+          ? "Choose a plan to unlock API access."
+          : "This API doesn't have a plan attached yet. Select a plan tier to set rate limits and start receiving calls.",
+    },
+    /**
+     * risk-gauge variant — shown on the RiskGauge page when no risk
+     * assessment data is available yet.  The CTA guides users toward
+     * running their first risk assessment (issue #664).
+     */
+    "risk-gauge": {
+      title: "No risk data yet",
+      message:
+        size === "compact"
+          ? "Run an assessment to evaluate your API risk profile."
+          : "Run a risk assessment to evaluate your API's security, reliability, and compliance posture.",
+    },
+    /**
+     * quota-banner variant — shown on the QuotaBanner component when no
+     * quota data is configured yet.  The CTA guides users to set up their
+     * first quota (issue #742).
+     */
+    "quota-banner": {
+      title: "No quota configured",
+      message:
+        size === "compact"
+          ? "Set a quota to track your API usage limits."
+          : "No quota has been configured for this API yet. Set a quota to track and manage your usage limits.",
+    },
   };
 
   const finalTitle = title ?? defaults[variant].title;
-  const finalMessage = message ?? defaults[variant].message;
+  const finalMessage = resolvedMessage ?? defaults[variant].message;
   const [isRetrying, setIsRetrying] = React.useState(false);
 
   const handleRetry = async () => {
@@ -389,16 +827,58 @@ export default function EmptyState({
 
       <HeadingTag style={headingStyle}>{finalTitle}</HeadingTag>
 
-      <p style={messageStyle}>{finalMessage}</p>
+      <MessageWithCopy message={finalMessage} isCompact={isCompact} />
 
-      {action && (
+      {copyable && finalMessage && (
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => handleCopy(finalMessage)}
+            aria-label="Copy message to clipboard"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.375rem",
+              fontSize: isCompact ? "0.75rem" : "0.8125rem",
+              padding: isCompact ? "0.25rem 0.5rem" : "0.3125rem 0.75rem",
+              color: copied ? "var(--success, #10b981)" : "var(--muted)",
+              minHeight: "36px",
+            }}
+          >
+            <span aria-hidden="true">
+              {copied ? "✓" : "⧉"}
+            </span>
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <span
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              position: "absolute",
+              width: "1px",
+              height: "1px",
+              margin: "-1px",
+              padding: 0,
+              overflow: "hidden",
+              clip: "rect(0 0 0 0)",
+              whiteSpace: "nowrap",
+              border: 0,
+            }}
+          >
+            {copied ? "Message copied to clipboard" : ""}
+          </span>
+        </div>
+      )}
+
+      {resolvedAction && (
         <button
           className={isCompact ? "ghost-button" : "primary-button"}
-          onClick={action.onClick}
+          onClick={resolvedAction.onClick}
           style={buttonStyle}
           type="button"
         >
-          {action.label}
+          {resolvedAction.label}
         </button>
       )}
 

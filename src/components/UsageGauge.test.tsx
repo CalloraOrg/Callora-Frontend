@@ -54,4 +54,24 @@ describe('UsageGauge', () => {
     );
     expect(screen.getByText('No limit configured')).toBeTruthy();
   });
+
+  it('exposes aria-label on the section and progressbar', () => {
+    render(<UsageGauge label="API usage this cycle" used={25} limit={100} unit="USDC" />);
+
+    const section = screen.getByRole('region', { name: 'API usage this cycle' });
+    expect(section).toBeTruthy();
+
+    const gauge = screen.getByRole('progressbar', { name: 'API usage this cycle' });
+    expect(gauge.getAttribute('aria-label')).toBe('API usage this cycle');
+  });
+
+  it('defaults aria-label to "Usage" when no label prop is provided', () => {
+    render(<UsageGauge used={10} limit={50} />);
+
+    const section = screen.getByRole('region', { name: 'Usage' });
+    expect(section).toBeTruthy();
+
+    const gauge = screen.getByRole('progressbar', { name: 'Usage' });
+    expect(gauge.getAttribute('aria-label')).toBe('Usage');
+  });
 });

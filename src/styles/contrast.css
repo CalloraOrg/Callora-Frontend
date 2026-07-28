@@ -1,0 +1,53 @@
+/* src/styles/contrast.css — High-contrast mode overrides (Issue #735)
+ *
+ * Supports `prefers-contrast: more` by providing explicit border and text-
+ * colour overrides for components that rely on subtle colour differences.
+ * These rules are intentionally scoped to the relevant component selectors
+ * so they don't pollute the global cascade.
+ *
+ * WCAG 2.1:  1.4.6 Contrast (Enhanced) — AAA ratio guidance
+ *            1.4.11 Non-text Contrast     — UI component borders
+ *            1.4.12 Text Spacing          — preserved
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/* ── TagChip high-contrast overrides ────────────────────────────────────
+   Normal mode uses var(--muted) text and var(--line) borders which may
+   fall below the 7:1 contrast ratio for AAA.  In high-contrast mode we
+   switch to stronger text and thicker, opaque borders. */
+@media (prefers-contrast: more) {
+  /* Default (inactive) TagChip — ensure readable contrast. */
+  .tag-chip {
+    color: var(--text);
+    border: 2px solid var(--line);
+    /* Remove the colour-mix hover background — it can produce unpredictable
+       results under forced-contrast / high-contrast schemes.  Fall back to
+       a simple background with a more distinct border instead. */
+    background: var(--surface);
+  }
+
+  .tag-chip:hover,
+  .tag-chip:focus-visible {
+    color: var(--text);
+    border-color: var(--accent-strong, var(--accent));
+    background: var(--surface-soft);
+    /* Disable the translateY transform under high-contrast — motion can
+       be disorienting when contrast is already elevated. */
+    transform: none;
+  }
+
+  /* Active TagChip — ensure the white text on accent background meets
+     AAA contrast.  If the accent colour is too light, fall back to a
+     darker shade via the --accent-strong token. */
+  .tag-chip--active {
+    color: #ffffff;
+    border: 2px solid var(--accent-strong, var(--accent));
+    background: var(--accent-strong, var(--accent));
+  }
+
+  .tag-chip--active:hover,
+  .tag-chip--active:focus-visible {
+    background: var(--accent-strong, var(--accent));
+    color: #ffffff;
+    transform: none;
+  }
+}
