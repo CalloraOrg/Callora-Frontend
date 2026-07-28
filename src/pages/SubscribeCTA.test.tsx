@@ -1,5 +1,5 @@
-import { render, screen, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import SubscribeCTA from "./SubscribeCTA";
 
 // Mock IntersectionObserver
@@ -20,6 +20,12 @@ Object.defineProperty(window, "IntersectionObserver", {
 });
 
 describe("SubscribeCTA Component", () => {
+  afterEach(() => {
+    cleanup();
+    // Remove dummy CTA elements added during tests
+    document.querySelectorAll(".api-hero__cta--detail").forEach((el) => el.remove());
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     observerCallback = null;
@@ -30,7 +36,7 @@ describe("SubscribeCTA Component", () => {
   });
 
   it("renders API details and the subscribe button correctly", () => {
-    render(
+    const { container } = render(
       <SubscribeCTA
         apiName="WeatherSim API"
         pricePerRequest={0.01}
@@ -39,7 +45,7 @@ describe("SubscribeCTA Component", () => {
     );
 
     expect(screen.getByText("WeatherSim API")).toBeTruthy();
-    expect(screen.getByText("$0.01")).toBeTruthy();
+    expect(container.querySelector(".subscribe-cta-bar__price")?.textContent).toMatch(/\$0\.01/);
     expect(screen.getByRole("button", { name: /Subscribe to WeatherSim API/i })).toBeTruthy();
   });
 
@@ -86,5 +92,117 @@ describe("SubscribeCTA Component", () => {
       observerCallback([{ isIntersecting: true }]);
     });
     expect(ctaBar?.classList.contains("subscribe-cta-bar--visible")).toBe(false);
+  });
+
+  // ── Tooltip Primitive Integration (issue #746) ────────────────────────────
+
+  describe("Tooltip primitive on icon buttons", () => {
+    function setup() {
+      const utils = render(
+        <SubscribeCTA
+          apiName="WeatherSim API"
+          pricePerRequest={0.01}
+          observeElementSelector=".api-hero__cta--detail"
+        />
+      );
+      const copyButton = screen.getByRole("button", { name: /copy link/i });
+      return { ...utils, copyButton };
+    }
+
+    it("tooltip is hidden by default", () => {
+      setup();
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("shows tooltip on hover (after hover delay) and hides on leave", () => {
+      vi.useFakeTimers();
+      const { copyButton } = setup();
+
+      fireEvent.mouseEnter(copyButton);
+      // Not visible before delay elapses
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+
+      fireEvent.mouseLeave(copyButton);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      vi.useRealTimers();
+    });
+
+    it("shows tooltip on keyboard focus and links via aria-describedby", () => {
+      const { copyButton } = setup();
+
+      fireEvent.focus(copyButton);
+      const tip = screen.getByRole("tooltip");
+      expect(copyButton.getAttribute("aria-describedby")).toBe(tip.id);
+    });
+
+    it("dismisses tooltip on Escape", () => {
+      vi.useFakeTimers();
+      const { copyButton } = setup();
+
+      fireEvent.mouseEnter(copyButton);
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      vi.useRealTimers();
+    });
+
+    it("respects hoverDelayMs before showing tooltip", () => {
+      vi.useFakeTimers();
+      const { copyButton } = setup();
+
+      fireEvent.mouseEnter(copyButton);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+
+      vi.useRealTimers();
+    });
+
+    it("cancels hover delay if mouse leaves before timer finishes", () => {
+      vi.useFakeTimers();
+      const { copyButton } = setup();
+
+      fireEvent.mouseEnter(copyButton);
+      act(() => {
+        vi.advanceTimersByTime(150);
+      });
+      fireEvent.mouseLeave(copyButton);
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      vi.useRealTimers();
+    });
+
+    it("opens tooltip on touch long-press", () => {
+      vi.useFakeTimers();
+      const { copyButton } = setup();
+
+      fireEvent.touchStart(copyButton);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(screen.getByRole("tooltip")).toBeTruthy();
+
+      vi.useRealTimers();
+    });
   });
 });
