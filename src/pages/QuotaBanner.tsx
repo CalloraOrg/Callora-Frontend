@@ -1,3 +1,4 @@
+import EmptyState from '../components/EmptyState';
 import FormField from '../components/FormField';
 import './QuotaBanner.css';
 
@@ -13,6 +14,8 @@ export type QuotaBannerProps = {
   value?: string;
   onChange?: (value: string) => void;
   statusOptions?: FieldStatus;
+  showEmptyState?: boolean;
+  onSetupQuota?: () => void;
 };
 
 export type FieldStatus = 'idle' | 'error' | 'success';
@@ -27,7 +30,25 @@ export default function QuotaBanner({
   value = '',
   onChange,
   statusOptions = 'idle',
+  showEmptyState = false,
+  onSetupQuota,
 }: QuotaBannerProps) {
+  if (showEmptyState && onSetupQuota) {
+    return (
+      <section
+        className="quota-banner"
+        aria-labelledby="quota-banner-title"
+      >
+        <EmptyState
+          variant="quota-banner"
+          title="No quota configured"
+          message="No quota has been configured for this API yet. Set a quota to track and manage your usage limits."
+          action={{ label: "Set up quota", onClick: onSetupQuota }}
+        />
+      </section>
+    );
+  }
+
   const statusLabels: Record<QuotaStatus, string> = {
     ok: 'Active',
     warn: 'Warning',

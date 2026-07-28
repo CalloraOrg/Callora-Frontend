@@ -93,40 +93,43 @@ describe('QuotaBanner', () => {
     expect(fieldContainer?.querySelector('.ff-field')).toBeTruthy();
   });
 
-  it('renders primary action button with KbdHint shortcut chip', () => {
-    render(<QuotaBanner primaryActionLabel="Save Quota" shortcutKey="Ctrl+Enter" />);
+  // ── Empty state (issue #742) ───────────────────────────────────────────────
 
-    const button = screen.getByRole('button', { name: /Save Quota/i });
-    expect(button).toBeTruthy();
-    expect(button.classList.contains('primary-button')).toBe(true);
-
-    const kbd = screen.getByText('Ctrl+Enter');
-    expect(kbd).toBeTruthy();
-    expect(kbd.tagName.toLowerCase()).toBe('kbd');
+  it('shows the empty state when showEmptyState is true and onSetupQuota is provided', () => {
+    const onSetupQuota = vi.fn();
+    render(<QuotaBanner showEmptyState onSetupQuota={onSetupQuota} />);
+    expect(screen.getByText('No quota configured')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Set up quota/i })).toBeTruthy();
   });
 
-  it('triggers onSave callback when primary action button is clicked', () => {
-    const handleSave = vi.fn();
-    render(<QuotaBanner initialQuota="100" onSave={handleSave} />);
-
-    const input = screen.getByRole('textbox');
-    fireEvent.change(input, { target: { value: '250' } });
-
-    const button = screen.getByRole('button', { name: /Save Quota/i });
-    fireEvent.click(button);
-
-    expect(handleSave).toHaveBeenCalledTimes(1);
-    expect(handleSave).toHaveBeenCalledWith('250');
+  it('renders the quota-banner illustration SVG in empty state', () => {
+    const onSetupQuota = vi.fn();
+    const { container } = render(<QuotaBanner showEmptyState onSetupQuota={onSetupQuota} />);
+    const svg = container.querySelector('svg');
+    expect(svg).toBeTruthy();
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('triggers onSave callback when Ctrl+Enter keyboard shortcut is pressed', () => {
-    const handleSave = vi.fn();
-    render(<QuotaBanner initialQuota="500" onSave={handleSave} />);
+  it('calls onSetupQuota when the CTA button is clicked', () => {
+    const onSetupQuota = vi.fn();
+    render(<QuotaBanner showEmptyState onSetupQuota={onSetupQuota} />);
+    fireEvent.click(screen.getByRole('button', { name: /Set up quota/i }));
+    expect(onSetupQuota).toHaveBeenCalledTimes(1);
+  });
 
-    fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
+  it('does not show empty state when showEmptyState is false (default)', () => {
+    const onSetupQuota = vi.fn();
+    render(<QuotaBanner onSetupQuota={onSetupQuota} />);
+    expect(screen.queryByText('No quota configured')).toBeNull();
+    // Normal form should render
+    expect(screen.getByRole('textbox')).toBeTruthy();
+  });
 
-    expect(handleSave).toHaveBeenCalledTimes(1);
-    expect(handleSave).toHaveBeenCalledWith('500');
+  it('does not show empty state when onSetupQuota is omitted even if showEmptyState is true', () => {
+    render(<QuotaBanner showEmptyState />);
+    expect(screen.queryByText('No quota configured')).toBeNull();
+    // Normal form should render
+    expect(screen.getByRole('textbox')).toBeTruthy();
   });
 });
 
