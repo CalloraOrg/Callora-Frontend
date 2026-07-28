@@ -6011,6 +6011,32 @@ code,
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
+
+  /* ReviewsTab — hide chrome + expand collapsibles when printing */
+  .reviews-tab__sort-row {
+    display: none !important;
+  }
+  .reviews-tab .api-detail-reviews-header {
+    display: none !important;
+  }
+  .reviews-tab::before {
+    content: "Developer Reviews";
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1a2332;
+  }
+  .reviews-tab__card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .reviews-tab__list {
+    display: block !important;
+  }
+  .reviews-tab {
+    max-height: none !important;
+  }
 }
 
 /* Share Snapshot Button */
