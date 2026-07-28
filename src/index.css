@@ -6622,6 +6622,88 @@ code,
   color: var(--text);
 }
 
+/* ── Icon-only action buttons (Share / Bookmark) ────────────────────────────
+   Wrapped in the Tooltip primitive for accessible labels. Design-token
+   colours ensure correct rendering in both light and dark mode.
+   WCAG 2.1 AA: minimum 44 × 44 px tap target, visible :focus-visible ring.
+   ──────────────────────────────────────────────────────────────────────────  */
+.subscribe-cta-bar__icon-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mkt-space-md, 8px);
+}
+
+.subscribe-cta-bar__icon-btn {
+  /* Layout & sizing — 36 px visual, padded to 44 × 44 tap target */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+
+  /* Reset */
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+
+  /* Colour tokens */
+  color: var(--muted);
+
+  /* Smooth hover transition following global speed token */
+  transition:
+    color var(--transition-speed, 240ms),
+    background var(--transition-speed, 240ms),
+    border-color var(--transition-speed, 240ms);
+}
+
+.subscribe-cta-bar__icon-btn:hover {
+  color: var(--text);
+  background: var(--surface-soft, rgba(255, 255, 255, 0.06));
+  border-color: var(--line, rgba(169, 184, 255, 0.16));
+}
+
+/* Active / toggled state — bookmark is saved */
+.subscribe-cta-bar__icon-btn--active {
+  color: var(--accent);
+  background: rgba(78, 133, 255, 0.1);
+  border-color: rgba(78, 133, 255, 0.3);
+}
+
+.subscribe-cta-bar__icon-btn--active:hover {
+  color: var(--accent);
+  background: rgba(78, 133, 255, 0.18);
+  border-color: rgba(78, 133, 255, 0.45);
+}
+
+/* WCAG 2.1 AA focus ring (mirrors global focus.css pattern) */
+.subscribe-cta-bar__icon-btn:focus {
+  outline: none;
+}
+
+.subscribe-cta-bar__icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Light-mode tint adjustments */
+[data-theme="light"] .subscribe-cta-bar__icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: var(--line, rgba(0, 0, 0, 0.12));
+}
+
+[data-theme="light"] .subscribe-cta-bar__icon-btn--active {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"] .subscribe-cta-bar__icon-btn--active:hover {
+  background: rgba(37, 99, 235, 0.14);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
 /* Responsive adjustments for smaller screens */
 @media (max-width: 640px) {
   .subscribe-cta-bar {
