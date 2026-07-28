@@ -3,21 +3,10 @@ import { WarningIcon } from './icons/WarningIcon';
 import { CheckIcon } from './icons/CheckIcon';
 
 interface PlanNudgeProps {
-  /** Quota usage as a number from 0–100. Banner only renders at >=80. */
   usagePercent: number;
-  /** Called when the user dismisses the banner. */
   onDismiss: () => void;
 }
 
-/**
- * PlanNudge – a theme-aware, WCAG 2.1 AA compliant upgrade nudge banner.
- *
- * Displays at >=80% quota usage and is hidden when dismissed (for 24h via
- * the useQuota hook in the parent). Shows a distinct message at >=95%.
- *
- * Part of GrantFox FWC26 campaign UI/UX requirements. Uses design tokens
- * instead of hardcoded hex colors so it respects the active theme.
- */
 export default function PlanNudge({ usagePercent, onDismiss }: PlanNudgeProps) {
   if (usagePercent < 80) return null;
 
@@ -35,6 +24,31 @@ export default function PlanNudge({ usagePercent, onDismiss }: PlanNudgeProps) {
       aria-label={label}
       className={`plan-nudge${isCritical ? ' plan-nudge--critical' : ''}`}
     >
+      <div className="plan-nudge__illustration" aria-hidden="true">
+        <picture>
+          <source
+            srcSet="/images/plan-upgrade-sm.svg"
+            media="(max-width: 480px)"
+          />
+          <source
+            srcSet="/images/plan-upgrade-md.svg"
+            media="(max-width: 960px)"
+          />
+          <source
+            srcSet="/images/plan-upgrade-lg.svg"
+            media="(min-width: 961px)"
+          />
+          <img
+            src="/images/plan-upgrade-md.svg"
+            alt=""
+            className="plan-nudge__img"
+            loading="lazy"
+            width="200"
+            height="160"
+          />
+        </picture>
+      </div>
+
       <div className="plan-nudge__content">
         <span className="plan-nudge__icon" aria-hidden="true">
           {isCritical ? (
