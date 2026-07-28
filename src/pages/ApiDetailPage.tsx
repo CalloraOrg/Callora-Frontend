@@ -672,7 +672,8 @@ print(response.json())`;
                       ].map(({ label, value, color }) => (
                         <div key={label} className="stat-card">
                           <div style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
-                          <div style={{ fontSize: "var(--mkt-font-size-xl)", fontWeight: 700, marginTop: "var(--mkt-space-md)", color }}>{value}</div>
+                          {/* tabular-nums prevents digit-width jitter on live-updating stats (#466) */}
+                          <div className="tabular-nums stat-card__value" style={{ fontSize: "var(--mkt-font-size-xl)", fontWeight: 700, marginTop: "var(--mkt-space-md)", color }}>{value}</div>
                         </div>
                       ))}
                     </div>
@@ -813,7 +814,8 @@ print(response.json())`;
                       {/* Standard plan */}
                       <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", border: "2px solid var(--accent)" }}>
                         <PlanBadge tier="pro" />
-                        <div className="api-detail-plan-price">
+                        {/* tabular-nums prevents digit-width jitter on formatted prices (#466) */}
+                        <div className="api-detail-plan-price tabular-nums">
                           {`$${formatPrice(api.pricePerRequest ?? 0)}`} <span style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>/ call</span>
                         </div>
                         <p style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>Perfect for startups and scaling applications. Pay only for what you use.</p>
@@ -869,7 +871,8 @@ print(response.json())`;
                         <div className="api-detail-calculator-total">
                           <div>
                             <div style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)" }}>Estimated Monthly Total</div>
-                            <div style={{ fontSize: "var(--mkt-font-size-2xl)", fontWeight: 800, color: "var(--text)" }}>{estimatedCost(requests)}</div>
+                            {/* tabular-nums prevents layout shift as the slider moves (#466) */}
+                            <div className="tabular-nums api-detail-calculator-total__amount" style={{ fontSize: "var(--mkt-font-size-2xl)", fontWeight: 800, color: "var(--text)" }}>{estimatedCost(requests)}</div>
                           </div>
                           <div style={{ textAlign: "right", fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)" }}>
                             * Volume discounts apply automatically

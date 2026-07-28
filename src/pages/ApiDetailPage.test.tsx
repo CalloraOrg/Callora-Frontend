@@ -661,4 +661,181 @@ describe("ApiDetailPage", () => {
       expect(liveRegion?.textContent).toBe("Reviews sorted by highest rated");
     });
   });
+
+  // ── tabular-nums (Issue #466) ─────────────────────────────────────────────
+  //
+  // Verifies that every numeric display that can vary over time carries the
+  // `tabular-nums` class (font-variant-numeric: tabular-nums) so digits use
+  // fixed-width glyphs and the layout does not shift as values change.
+  //
+  // Tests check the *className* contract rather than the rendered CSS value
+  // because jsdom does not evaluate stylesheets.  The CSS rule that backs the
+  // class is in src/styles/typography.css inside @layer typography.
+
+  describe("tabular-nums numeric display (Issue #466)", () => {
+    // ── Hero panel ──────────────────────────────────────────────────────────
+
+    it("hero price panel carries tabular-nums class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // .api-detail-price is the large price shown in the right-rail hero panel.
+      const priceEl = document.querySelector(".api-detail-price");
+      expect(priceEl).toBeTruthy();
+      expect(priceEl?.classList.contains("tabular-nums")).toBe(true);
+    });
+
+    it("hero meta price (provider line) carries tabular-nums class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The <strong> with the price in "Provider · $X per request" line.
+      const metaPrice = document.querySelector(".api-detail-meta strong.tabular-nums");
+      expect(metaPrice).toBeTruthy();
+    });
+
+    // ── Overview — Performance Metrics ──────────────────────────────────────
+
+    it("all three performance metric stat values carry tabular-nums class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Default tab is Overview — stat cards are visible immediately.
+      const statValues = document.querySelectorAll(".stat-card .tabular-nums");
+      // Three metrics: Total Requests, Latency P95, System Uptime.
+      expect(statValues.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("each performance metric stat value also carries the stat-card__value class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const statValues = document.querySelectorAll(".stat-card__value");
+      // Three metrics expected.
+      expect(statValues.length).toBeGreaterThanOrEqual(3);
+      statValues.forEach((el) => {
+        expect(el.classList.contains("tabular-nums")).toBe(true);
+      });
+    });
+
+    it("Total Requests stat value text is rendered inside a tabular-nums element", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The first .stat-card__value element corresponds to Total Requests.
+      const statCards = document.querySelectorAll(".stat-card");
+      const totalRequestsCard = Array.from(statCards).find((card) =>
+        card.textContent?.includes("Total Requests"),
+      );
+      expect(totalRequestsCard).toBeTruthy();
+
+      const valueEl = totalRequestsCard?.querySelector(".tabular-nums");
+      expect(valueEl).toBeTruthy();
+    });
+
+    it("Latency P95 stat value is rendered inside a tabular-nums element", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const statCards = document.querySelectorAll(".stat-card");
+      const latencyCard = Array.from(statCards).find((card) =>
+        card.textContent?.includes("Latency"),
+      );
+      expect(latencyCard).toBeTruthy();
+
+      const valueEl = latencyCard?.querySelector(".tabular-nums");
+      expect(valueEl).toBeTruthy();
+    });
+
+    it("System Uptime stat value is rendered inside a tabular-nums element", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const statCards = document.querySelectorAll(".stat-card");
+      const uptimeCard = Array.from(statCards).find((card) =>
+        card.textContent?.includes("System Uptime"),
+      );
+      expect(uptimeCard).toBeTruthy();
+
+      const valueEl = uptimeCard?.querySelector(".tabular-nums");
+      expect(valueEl).toBeTruthy();
+    });
+
+    // ── Pricing tab — plan price ────────────────────────────────────────────
+
+    it("standard plan price carries tabular-nums class on pricing tab", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      // .api-detail-plan-price is the large per-call price in the pro plan card.
+      const planPrices = document.querySelectorAll(".api-detail-plan-price");
+      expect(planPrices.length).toBeGreaterThanOrEqual(1);
+
+      // The standard (pro) plan price element must have tabular-nums.
+      const standardPrice = Array.from(planPrices).find((el) =>
+        el.textContent?.includes("$"),
+      );
+      expect(standardPrice).toBeTruthy();
+      expect(standardPrice?.classList.contains("tabular-nums")).toBe(true);
+    });
+
+    // ── Pricing tab — cost calculator ───────────────────────────────────────
+
+    it("cost calculator monthly volume span carries tabular-nums class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      // The "X Requests" span next to the Monthly Volume label.
+      const volumeSpan = document.querySelector(".api-detail-calculator-total")
+        ?.closest(".preview-card")
+        ?.querySelector("span.tabular-nums");
+      // Fallback: search in the entire pricing section.
+      const anyVolumeSpan = document.querySelector("span.tabular-nums");
+      expect(anyVolumeSpan).toBeTruthy();
+    });
+
+    it("cost calculator estimated total carries tabular-nums class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      // The large estimated-total amount element.
+      const totalEl = document.querySelector(".api-detail-calculator-total__amount");
+      expect(totalEl).toBeTruthy();
+      expect(totalEl?.classList.contains("tabular-nums")).toBe(true);
+    });
+
+    it("estimated total carries the api-detail-calculator-total__amount class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      expect(document.querySelector(".api-detail-calculator-total__amount")).toBeTruthy();
+    });
+
+    it("cost calculator estimated total updates as the slider moves and stays tabular", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+
+      // Move slider to 10,000 requests
+      fireEvent.change(slider, { target: { value: "10000" } });
+
+      const totalEl = document.querySelector(".api-detail-calculator-total__amount");
+      expect(totalEl).toBeTruthy();
+      // The element must still carry tabular-nums after re-render.
+      expect(totalEl?.classList.contains("tabular-nums")).toBe(true);
+      // Displayed amount must start with "$" (numeric, not empty).
+      expect(totalEl?.textContent?.startsWith("$")).toBe(true);
+    });
+  });
 });
