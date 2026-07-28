@@ -1,5 +1,6 @@
 import Breadcrumb from "../components/Breadcrumb";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import useCopy from "../hooks/useCopy";
 
 /**
  * RateLimitCard – GrantFox FWC26 campaign "Stellar Wave" (issue #567)
@@ -94,6 +95,34 @@ const PLAN_PATTERNS: Record<string, { class: string; description: string }> = {
   Enterprise: { class: "enterprise", description: "crosshatch pattern" },
 };
 
+type CopyableLimitValueProps = {
+  copyKey: string;
+  label: string;
+  value: number;
+};
+
+function CopyableLimitValue({ copyKey, label, value }: CopyableLimitValueProps) {
+  const { copiedKey, copy, status } = useCopy();
+  const displayValue = value.toLocaleString();
+  const isCopied = status === "copied" && copiedKey === copyKey;
+
+  return (
+    <span className="rate-limit-copy-value">
+      <span>{displayValue}</span>
+      <button
+        type="button"
+        className="rate-limit-copy-button"
+        aria-label={`${isCopied ? "Copied" : "Copy"} ${label}: ${displayValue}`}
+        onClick={() => {
+          void copy(String(value), copyKey);
+        }}
+      >
+        {isCopied ? "Copied" : "Copy"}
+      </button>
+    </span>
+  );
+}
+
 export default function RateLimitCard() {
   useDocumentTitle(
     "Rate Limit Configuration – Callora",
@@ -172,6 +201,34 @@ export default function RateLimitCard() {
           color: var(--accent);
         }
 
+        .rate-limit-copy-value {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 108px;
+        }
+
+        .rate-limit-copy-button {
+          appearance: none;
+          border: 1px solid var(--border, rgba(0, 0, 0, 0.16));
+          border-radius: 6px;
+          background: var(--surface);
+          color: var(--muted);
+          cursor: pointer;
+          font: inherit;
+          font-size: 0.75rem;
+          line-height: 1;
+          padding: 5px 8px;
+          min-width: 48px;
+        }
+
+        .rate-limit-copy-button:hover,
+        .rate-limit-copy-button:focus-visible {
+          border-color: var(--accent);
+          color: var(--accent);
+          outline: none;
+        }
+
         .rate-limit-note {
           margin-top: 20px;
           padding: 12px 16px;
@@ -222,9 +279,27 @@ export default function RateLimitCard() {
                     {tier.plan}
                   </span>
                 </td>
-                <td>{tier.requestsPerMinute.toLocaleString()}</td>
-                <td>{tier.burstLimit.toLocaleString()}</td>
-                <td>{tier.concurrentConnections.toLocaleString()}</td>
+                <td>
+                  <CopyableLimitValue
+                    copyKey={`${tier.plan}-requests`}
+                    label={`${tier.plan} requests per minute`}
+                    value={tier.requestsPerMinute}
+                  />
+                </td>
+                <td>
+                  <CopyableLimitValue
+                    copyKey={`${tier.plan}-burst`}
+                    label={`${tier.plan} burst limit`}
+                    value={tier.burstLimit}
+                  />
+                </td>
+                <td>
+                  <CopyableLimitValue
+                    copyKey={`${tier.plan}-connections`}
+                    label={`${tier.plan} concurrent connections`}
+                    value={tier.concurrentConnections}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import RateLimitCard from "./RateLimitCard";
 
@@ -34,6 +34,7 @@ function renderPage() {
 describe("RateLimitCard", () => {
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   // ── Page structure ────────────────────────────────────────────────────────
@@ -140,6 +141,44 @@ describe("RateLimitCard", () => {
     // so we confirm it is present at least once in the table.
     const cells = screen.getAllByText("10");
     expect(cells.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders copy affordances for displayed rate-limit values", () => {
+    renderPage();
+    expect(
+      screen.getByRole("button", {
+        name: /copy free requests per minute: 10/i,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: /copy enterprise burst limit: 10,000/i,
+      }),
+    ).toBeTruthy();
+  });
+
+  it("copies a rate-limit value and shows success feedback", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    renderPage();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /copy developer requests per minute: 120/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith("120");
+    });
+    expect(
+      screen.getByRole("button", {
+        name: /copied developer requests per minute: 120/i,
+      }),
+    ).toBeTruthy();
   });
 
   it("renders the throttle note below the table", () => {
