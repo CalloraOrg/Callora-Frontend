@@ -1,5 +1,6 @@
 import React from "react";
 import ExternalLink from "./ExternalLink";
+import useCopy from "../hooks/useCopy";
 
 export type EmptyStateVariant =
   | "empty"
@@ -29,6 +30,8 @@ export interface EmptyStateProps {
     onClick: () => void;
   };
   loading?: boolean;
+  /** When true, renders a copy-to-clipboard button for the message text. */
+  copyable?: boolean;
 }
 
 /**
@@ -532,9 +535,11 @@ export default function EmptyState({
   action,
   secondaryAction,
   loading = false,
+  copyable = false,
 }: EmptyStateProps) {
   const resolvedMessage = message ?? description;
   const resolvedAction = action;
+  const { copied, handleCopy } = useCopy();
 
   if (loading) {
     return (
@@ -721,6 +726,48 @@ export default function EmptyState({
       <HeadingTag style={headingStyle}>{finalTitle}</HeadingTag>
 
       <p style={messageStyle}>{finalMessage}</p>
+
+      {copyable && finalMessage && (
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => handleCopy(finalMessage)}
+            aria-label="Copy message to clipboard"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.375rem",
+              fontSize: isCompact ? "0.75rem" : "0.8125rem",
+              padding: isCompact ? "0.25rem 0.5rem" : "0.3125rem 0.75rem",
+              color: copied ? "var(--success, #10b981)" : "var(--muted)",
+              minHeight: "36px",
+            }}
+          >
+            <span aria-hidden="true">
+              {copied ? "✓" : "⧉"}
+            </span>
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <span
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              position: "absolute",
+              width: "1px",
+              height: "1px",
+              margin: "-1px",
+              padding: 0,
+              overflow: "hidden",
+              clip: "rect(0 0 0 0)",
+              whiteSpace: "nowrap",
+              border: 0,
+            }}
+          >
+            {copied ? "Message copied to clipboard" : ""}
+          </span>
+        </div>
+      )}
 
       {resolvedAction && (
         <button
