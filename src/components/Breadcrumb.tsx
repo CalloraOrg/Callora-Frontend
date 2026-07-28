@@ -63,7 +63,11 @@ function BreadcrumbLink({
   if (item.isCurrent) {
     return (
       <span
-        className="breadcrumb-current"
+        className={
+          isTruncated
+            ? "breadcrumb-current breadcrumb-current--middle-ellipsis"
+            : "breadcrumb-current"
+        }
         aria-current="page"
         // Always expose the full label to assistive technology and on hover.
         title={item.label}
@@ -78,7 +82,11 @@ function BreadcrumbLink({
 
   return (
     <a
-      className="breadcrumb-link link-nav"
+      className={
+        isTruncated
+          ? "breadcrumb-link link-nav breadcrumb-link--middle-ellipsis"
+          : "breadcrumb-link link-nav"
+      }
       href={item.href}
       title={item.label}
       {...(isTruncated ? { "aria-label": item.label } : {})}
@@ -231,7 +239,8 @@ export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProp
            * but the primary visual treatment is the JS-computed "start…end" string.
            */
           .breadcrumb-link--middle-ellipsis,
-          .breadcrumb-current--middle-ellipsis {
+          .breadcrumb-current--middle-ellipsis,
+          .breadcrumb-popover-link--middle-ellipsis {
             /* Allow the truncated text to breathe – no hard CSS cut-off needed
                because JS already shortened it. Disable the CSS ellipsis so we
                never see a double-truncation artefact ("start…en…"). */
@@ -403,7 +412,11 @@ export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProp
                           return (
                             <li key={middleItem.href} role="none">
                               <a
-                                className="breadcrumb-popover-link link-nav"
+                                className={
+                                  isTruncated
+                                    ? "breadcrumb-popover-link link-nav breadcrumb-popover-link--middle-ellipsis"
+                                    : "breadcrumb-popover-link link-nav"
+                                }
                                 href={middleItem.href}
                                 role="menuitem"
                                 title={middleItem.label}
