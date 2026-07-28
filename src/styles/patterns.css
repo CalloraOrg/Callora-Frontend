@@ -101,3 +101,34 @@
   background-blend-mode: overlay;
   flex-shrink: 0;
 }
+
+/* ── Rate-limit plan badge patterns ──────────────────────────────────────────
+   Each plan tier gets a unique SVG texture so the badges are distinguishable
+   without relying on colour alone (WCAG 1.4.1 Use of Color).
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Free: no pattern — solid color baseline */
+.rate-limit-badge.free {
+  background-image: none;
+}
+
+/* Developer: small dot grid */
+.rate-limit-badge.developer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1' fill='currentColor' fill-opacity='0.3'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+
+/* Pro: diagonal stripes ╲ */
+.rate-limit-badge.pro {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3C/svg%3E");
+  background-size: 6px 6px;
+  background-repeat: repeat;
+}
+
+/* Enterprise: crosshatch ╳ */
+.rate-limit-badge.enterprise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M0 0L8 8M8 0L0 8' stroke='currentColor' stroke-width='0.75' stroke-opacity='0.25'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}

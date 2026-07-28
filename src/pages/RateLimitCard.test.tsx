@@ -12,7 +12,16 @@ import RateLimitCard from "./RateLimitCard";
  *  1. Page structure and accessibility
  *  2. Breadcrumb presence and middle-ellipsis truncation
  *  3. Rate-limit table content
+ *  4. Color-blind safe patterns on plan badges
  */
+
+/** Expected pattern class for each plan. */
+const PLAN_PATTERN_CLASSES: Record<string, string> = {
+  Free: "free",
+  Developer: "developer",
+  Pro: "pro",
+  Enterprise: "enterprise",
+};
 
 function renderPage() {
   return render(
@@ -138,5 +147,26 @@ describe("RateLimitCard", () => {
     expect(
       screen.getByText(/rolling 60-second window/i),
     ).toBeTruthy();
+  });
+
+  // ── Color-blind safe patterns ─────────────────────────────────────────────
+
+  it.each(["Free", "Developer", "Pro", "Enterprise"])(
+    `%s badge has a distinct pattern class for color-blind safety`,
+    (plan) => {
+      renderPage();
+      const badge = screen.getByText(plan);
+      const expectedClass = PLAN_PATTERN_CLASSES[plan];
+      expect(badge.classList.contains("rate-limit-badge")).toBe(true);
+      expect(badge.classList.contains(expectedClass)).toBe(true);
+    },
+  );
+
+  it("each plan badge carries a data-pattern attribute describing the texture", () => {
+    renderPage();
+    for (const plan of ["Free", "Developer", "Pro", "Enterprise"]) {
+      const badge = screen.getByText(plan);
+      expect(badge.getAttribute("data-pattern")).toBeTruthy();
+    }
   });
 });
