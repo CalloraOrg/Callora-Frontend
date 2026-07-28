@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useCallback } from "react";
 import ExternalLink from "./ExternalLink";
+import { useCopy } from "../hooks/useCopy";
+import { EmptyStateSkeleton } from "./Skeleton";
 
 export type EmptyStateVariant =
   | "empty"
@@ -479,6 +481,107 @@ function EmptyIllustration({
 }
 
 /**
+ * Compact copy-to-clipboard line rendered alongside the EmptyState message.
+ * Provides success feedback for assistive technology via aria-live.
+ */
+function MessageWithCopy({
+  message,
+  isCompact,
+}: {
+  message: string;
+  isCompact: boolean;
+}) {
+  const { copy, copied, supported } = useCopy();
+  const [liveFeedback, setLiveFeedback] = React.useState("");
+
+  const handleCopy = useCallback(() => {
+    if (!supported) return;
+    copy(message).then((ok) => {
+      if (ok) {
+        setLiveFeedback("Message copied.");
+        setTimeout(() => setLiveFeedback(""), 2000);
+      }
+    });
+  }, [copy, message, supported]);
+
+  const containerStyle: React.CSSProperties = {
+    display: "flex",
+    gap: isCompact ? "6px" : "8px",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    maxWidth: isCompact ? "240px" : "320px",
+  };
+
+  const messageStyle: React.CSSProperties = isCompact
+    ? {
+        margin: 0,
+        color: "var(--muted)",
+        fontSize: "0.8125rem",
+        lineHeight: 1.4,
+      }
+    : {
+        margin: "0 0 24px 0",
+        color: "var(--muted)",
+        fontSize: "0.9375rem",
+        lineHeight: 1.5,
+      };
+
+  const btnStyle: React.CSSProperties = {
+    flexShrink: 0,
+    background: "none",
+    border: "1px solid var(--line)",
+    borderRadius: "4px",
+    cursor: "pointer",
+    padding: "2px 6px",
+    fontSize: isCompact ? "0.7rem" : "0.75rem",
+    color: "var(--accent)",
+    lineHeight: 1.4,
+    whiteSpace: "nowrap",
+    marginTop: isCompact ? 0 : "2px",
+    transition: "color 0.15s ease, border-color 0.15s ease",
+  };
+
+  if (!supported) {
+    return (
+      <p
+        style={messageStyle}
+        data-testid="empty-state-message"
+      >
+        {message}
+      </p>
+    );
+  }
+
+  return (
+    <div style={containerStyle}>
+      <p style={messageStyle} data-testid="empty-state-message">
+        {message}
+      </p>
+      <button
+        type="button"
+        style={btnStyle}
+        onClick={handleCopy}
+        aria-label={`Copy "${message}"`}
+        data-testid="empty-state-copy-button"
+      >
+        {copied ? "Copied!" : "Copy"}
+      </button>
+      {/* Screen-reader announcement for copy feedback (WCAG 4.1.3) */}
+      {liveFeedback && (
+        <span
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {liveFeedback}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * EmptyState component with distinct variants for different marketplace states.
  *
  * Variants:
@@ -720,7 +823,7 @@ export default function EmptyState({
 
       <HeadingTag style={headingStyle}>{finalTitle}</HeadingTag>
 
-      <p style={messageStyle}>{finalMessage}</p>
+      <MessageWithCopy message={finalMessage} isCompact={isCompact} />
 
       {resolvedAction && (
         <button

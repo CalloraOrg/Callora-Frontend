@@ -133,6 +133,95 @@ describe("EmptyState", () => {
     });
   });
 
+  describe("copy-to-clipboard affordance (Issue #733)", () => {
+    const originalClipboard = navigator.clipboard;
+
+    beforeEach(() => {
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+      });
+    });
+
+    afterEach(() => {
+      Object.assign(navigator, { clipboard: originalClipboard });
+    });
+
+    it("renders a copy button next to the message when clipboard is supported", () => {
+      render(<EmptyState variant="error" message="Something went wrong" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      expect(copyBtn).toBeTruthy();
+      expect(copyBtn.textContent).toBe("Copy");
+    });
+
+    it("copies the message text to clipboard on button click", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<EmptyState variant="error" message="Error details to copy" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      fireEvent.click(copyBtn);
+
+      // Wait for microtask
+      await vi.waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith("Error details to copy");
+      });
+    });
+
+    it("shows 'Copied!' feedback after successful copy", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<EmptyState variant="error" message="test message" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      fireEvent.click(copyBtn);
+
+      await vi.waitFor(() => {
+        expect(copyBtn.textContent).toBe("Copied!");
+      });
+    });
+
+    it("has an accessible aria-label on the copy button", () => {
+      render(<EmptyState variant="filtered" message="Copy this text" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      expect(copyBtn.getAttribute("aria-label")).toBe('Copy "Copy this text"');
+    });
+
+    it("does not render copy button when clipboard API is unsupported", () => {
+      Object.assign(navigator, { clipboard: undefined });
+      render(<EmptyState variant="error" message="Unsupported" />);
+      expect(screen.queryByTestId("empty-state-copy-button")).toBeNull();
+    });
+
+    it("renders copy button in compact size as well", () => {
+      render(
+        <EmptyState
+          variant="filtered"
+          size="compact"
+          message="Compact copy"
+        />,
+      );
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      expect(copyBtn).toBeTruthy();
+      expect(copyBtn.textContent).toBe("Copy");
+    });
+
+    it("announces copy status to screen readers via aria-live region", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<EmptyState variant="error" message="Announce this" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      fireEvent.click(copyBtn);
+
+      await vi.waitFor(() => {
+        const status = screen.getByRole("status");
+        expect(status.textContent).toBe("Message copied.");
+      });
+    });
+  });
+
   describe("error variant — onRetry", () => {
     it("renders retry button when onRetry is provided", () => {
       const onRetry = vi.fn();
