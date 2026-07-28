@@ -1,3 +1,5 @@
+import "../styles/contrast.css";
+
 type TagChipProps = {
   tag: string;
   active?: boolean;
