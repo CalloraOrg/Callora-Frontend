@@ -162,3 +162,72 @@ describe("ReviewsTab @media print CSS rules", () => {
     expect(printCss).toMatch(/\.reviews-tab__card/);
   });
 });
+
+// ── SortMenu print contract (issue #580) ─────────────────────────────────────
+
+describe("SortMenu print markup contract", () => {
+  const source = read("src/pages/SortMenu.tsx");
+
+  it("wraps the panel in a section with class 'sort-menu'", () => {
+    // The .sort-menu class is required by the @media print block in index.css
+    // to inject the section heading and scope all SortMenu-specific rules.
+    expect(source).toMatch(/className="sort-menu"/);
+  });
+
+  it("marks the sort-row with both sort-menu__sort-row and no-print", () => {
+    // The sort dropdown must be hidden in print media.
+    expect(source).toMatch(/sort-menu__sort-row no-print/);
+  });
+
+  it("marks the current state display with sort-menu__current-state", () => {
+    // The current sort state should be visible when printing.
+    expect(source).toMatch(/sort-menu__current-state/);
+  });
+
+  it("marks the label with sort-menu__label", () => {
+    // The label for the current sort state.
+    expect(source).toMatch(/sort-menu__label/);
+  });
+
+  it("marks the value with sort-menu__value", () => {
+    // The value showing the current sort option.
+    expect(source).toMatch(/sort-menu__value/);
+  });
+});
+
+describe("SortMenu @media print CSS rules", () => {
+  const css = read("src/index.css");
+
+  it("hides .sort-menu__sort-row in print", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.sort-menu__sort-row[\s\S]*?display:\s*none\s*!important/,
+    );
+  });
+
+  it("injects a ::before heading on .sort-menu", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.sort-menu::before[\s\S]*?content:\s*"Sort Options"/,
+    );
+  });
+
+  it("displays .sort-menu__current-state in print", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.sort-menu__current-state[\s\S]*?display:\s*block\s*!important/,
+    );
+  });
+
+  it("sets max-height: none on .sort-menu to expand collapsibles", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.sort-menu[\s\S]*?max-height:\s*none\s*!important/,
+    );
+  });
+
+  it("mirrors the SortMenu rules in src/styles/print.css as documentation", () => {
+    // The print.css file is the human-readable source of truth; it must define
+    // the same key selectors (even though it is not imported by main.tsx).
+    const printCss = read("src/styles/print.css");
+    expect(printCss).toMatch(/\.sort-menu__sort-row/);
+    expect(printCss).toMatch(/\.sort-menu::before/);
+    expect(printCss).toMatch(/\.sort-menu__current-state/);
+  });
+});
