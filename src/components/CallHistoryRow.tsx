@@ -22,7 +22,7 @@
  * --diff-unchanged-bg / --diff-unchanged-fg / --diff-unchanged-gutter-bg
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { formatPrice } from '../utils/format';
 import { diffJson, hasDifferences } from '../utils/diff';
@@ -209,6 +209,17 @@ export default function CallHistoryRow({
   // Keep viewMode in sync if compareWith is removed after mount
   const effectiveMode = compareWith ? viewMode : 'raw';
 
+  // ── Aria-live announcement for status changes (Issue #683) ───────────────
+  const [announcement, setAnnouncement] = useState('');
+  const previousStatusRef = useRef(call.status);
+
+  useEffect(() => {
+    if (previousStatusRef.current !== call.status) {
+      setAnnouncement(`Call status updated to ${call.status}.`);
+      previousStatusRef.current = call.status;
+    }
+  }, [call.status]);
+
   return (
     <>
       <div className="table-row">
@@ -236,6 +247,11 @@ export default function CallHistoryRow({
           </button>
         </span>
       </div>
+
+      {/* Screen reader polite announcement for status changes (WCAG 4.1.3) */}
+      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </span>
 
       {expanded && (
         <div
