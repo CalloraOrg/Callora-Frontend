@@ -494,8 +494,7 @@ export default function FiltersSidebar({
          The wrapper is aria-live="polite" so screen readers announce the
          zero-results state when filters narrow the count to 0. */}
       {typeof resultCount === "number" &&
-        resultCount === 0 &&
-        hasActiveFilters && (
+        resultCount === 0 && (
           <div
             data-testid="filters-zero-results"
             style={{
@@ -507,7 +506,7 @@ export default function FiltersSidebar({
             aria-live="polite"
           >
             <EmptyState
-              variant="filtered"
+              variant={hasActiveFilters ? "filtered" : "empty"}
               size="compact"
               onClearFilters={hasActiveFilters ? handleClearFilters : undefined}
             />
