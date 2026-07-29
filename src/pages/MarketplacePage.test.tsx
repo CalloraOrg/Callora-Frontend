@@ -568,3 +568,183 @@ describe("MarketplacePage loading skeleton transition", () => {
     expect(document.querySelector(".marketplace-grid")).toBeTruthy();
   });
 });
+
+
+describe("MarketplacePage empty state", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("renders 'No results found' empty state when filters match no APIs", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    // Search for a term that matches no API
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "zzz_nonexistent_api_xyz" } });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // Empty state should be displayed
+    const emptyState = screen.getByTestId("empty-state-filtered");
+    expect(emptyState).toBeTruthy();
+
+    // Title should indicate no results
+    expect(screen.getByText("No results found")).toBeTruthy();
+
+    // Helpful descriptive text should be present
+    expect(
+      screen.getByText(
+        /Try adjusting your filters or clear them to see all available APIs/i,
+      ),
+    ).toBeTruthy();
+  });
+
+  it("renders 'No favorites yet' empty state when favorites filter is active with no favorites", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    // Enable favorites only filter
+    const favCheckbox = screen.getByRole("checkbox", { name: /favorites only/i });
+    fireEvent.click(favCheckbox);
+
+    const emptyState = screen.getByTestId("empty-state-filtered");
+    expect(emptyState).toBeTruthy();
+    expect(screen.getByText("No favorites yet")).toBeTruthy();
+  });
+
+  it("empty state is hidden when listings exist (default render)", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    // Grid should be visible with API cards
+    const grid = document.querySelector(".marketplace-grid");
+    expect(grid).toBeTruthy();
+
+    // Empty state should NOT be present
+    expect(screen.queryByTestId("empty-state-filtered")).toBeNull();
+    expect(screen.queryByTestId("empty-state-empty")).toBeNull();
+    expect(screen.queryByTestId("empty-state-error")).toBeNull();
+  });
+
+  it("CTA 'Clear filters' button appears and works in empty state", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    // Apply a filter that yields zero results
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "zzz_no_match_xyz" } });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // Find clear filters button via text (from EmptyState component)
+    const clearBtn = screen.getByText("Clear all filters");
+    expect(clearBtn).toBeTruthy();
+
+    // Click the button
+    fireEvent.click(clearBtn);
+
+    // The grid should now be visible again
+    const grid = document.querySelector(".marketplace-grid");
+    expect(grid).toBeTruthy();
+  });
+
+  it("empty state CTA renders a 'Browse all APIs' link when filters are active", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    // Apply a filter that yields zero results
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "zzz_no_match_xyz" } });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // Should have a secondary action button
+    const browseBtn = screen.getByText("Browse all APIs");
+    expect(browseBtn).toBeTruthy();
+
+    // Click it to clear filters
+    fireEvent.click(browseBtn);
+    const grid = document.querySelector(".marketplace-grid");
+    expect(grid).toBeTruthy();
+  });
+
+  it("empty state illustration wrapper is aria-hidden (WCAG 1.1.1)", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    // Trigger empty state
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "zzz_nonexistent_aria_check" } });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const emptyState = screen.getByTestId("empty-state-filtered");
+    const ariaHiddenDiv = emptyState.querySelector('[aria-hidden="true"]');
+    expect(ariaHiddenDiv).toBeTruthy();
+    expect(ariaHiddenDiv?.querySelector("svg")).toBeTruthy();
+  });
+
+  it("shows count '0 of 0' when no APIs match filters", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "zzz_nonexistent" } });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const count = document.querySelector(".marketplace-count");
+    expect(count).toBeTruthy();
+    expect(count?.textContent).toMatch(/Showing.*0.*of.*0/);
+  });
+
+  it("clearing filters from empty state restores the grid", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    // Search for non-matching term
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "zzz_nonexistent" } });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // Verify empty state is shown
+    expect(screen.getByTestId("empty-state-filtered")).toBeTruthy();
+
+    // Clear filters via the sidebar button (first "Clear filters" button)
+    const clearBtns = screen.getAllByRole("button", { name: /clear filters/i });
+    fireEvent.click(clearBtns[0]);
+
+    // Grid should be restored
+    const grid = document.querySelector(".marketplace-grid");
+    expect(grid).toBeTruthy();
+
+    // Empty state should be gone
+    expect(screen.queryByTestId("empty-state-filtered")).toBeNull();
+  });
+});
