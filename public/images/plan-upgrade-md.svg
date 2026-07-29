@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160" fill="none">
+  <rect width="200" height="160" rx="16" fill="var(--surface-soft, #f0f4f8)"/>
+  <path d="M100 20l25 50-25-10-25 10 25-50z" fill="var(--accent, #6366f1)" opacity="0.8"/>
+  <rect x="90" y="80" width="20" height="40" rx="4" fill="var(--accent, #6366f1)" opacity="0.3"/>
+  <rect x="60" y="105" width="80" height="6" rx="3" fill="var(--accent, #6366f1)" opacity="0.2"/>
+  <path d="M145 45l8 20-8-4-8 4 8-20z" fill="var(--accent, #6366f1)" opacity="0.5"/>
+  <path d="M55 55l6 15-6-3-6 3 6-15z" fill="var(--accent, #6366f1)" opacity="0.5"/>
+  <circle cx="100" cy="50" r="6" fill="var(--accent, #6366f1)" opacity="0.6"/>
+</svg>

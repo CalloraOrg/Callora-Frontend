@@ -1,0 +1,84 @@
+/* Print styles for Callora Frontend */
+@media print {
+  /* Hide interactive components and chrome */
+  .no-print,
+  .topbar,
+  .app-footer,
+  .primary-button,
+  .ghost-button,
+  .icon-button,
+  button.endpoint-summary-trigger .chevron-icon {
+    display: none !important;
+  }
+
+  /* Force light theme tokens */
+  :root,
+  html,
+  body {
+    --page-bg: #f5f7fa !important;
+    --surface: #ffffff !important;
+    --text: #1a2332 !important;
+    --muted: #64748b !important;
+    background: #ffffff !important;
+    color: #1a2332 !important;
+  }
+
+  /* Force all collapsible summaries to expand on print */
+  .endpoint-summary-content--collapsed {
+    display: block !important;
+  }
+
+  /* Prevent page breaks inside cards */
+  .endpoint-summary-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Clean table formatting */
+  .endpoint-table-wrap table {
+    width: 100% !important;
+  }
+
+  /* ReviewsTab — hide chrome + expand collapsibles when printing */
+  .reviews-tab__sort-row {
+    display: none !important;
+  }
+  .reviews-tab::before {
+    content: "Developer Reviews";
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1a2332;
+  }
+  .reviews-tab__card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* SortMenu — hide chrome + expand collapsibles when printing */
+  .sort-menu__sort-row {
+    display: none !important;
+  }
+  .sort-menu::before {
+    content: "Sort Options";
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1a2332;
+  }
+  .sort-menu__current-state {
+    display: block !important;
+  }
+  .sort-menu__label {
+    font-weight: 600;
+    margin-right: 0.5rem;
+  }
+  .sort-menu__value {
+    color: #1a2332;
+  }
+  .sort-menu {
+    max-height: none !important;
+  }
+}

@@ -18,12 +18,16 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - Pinned APIs on the dashboard for fast access to saved marketplace APIs
 - Billing (USDC deposit, Stellar settlement, transaction tracking)
 - API Usage analytics view
+- `ApiUsage` screen-reader status announcements for endpoint, filter, and copy actions via a centralized `aria-live` region
 - 500 error page with retry flow
 - 404 catch-all page
 - Theme playground for previewing primary/accent/surface tokens live
 - Dev proxy to backend at `http://localhost:3000` for `/api`
 - **Global Command Palette**: Instantly jump to views, search APIs by name, cycle/toggle light & dark themes, or trigger vault deposits. Use `Cmd+K` on macOS or `Ctrl+K` on Windows/Linux to open.
 - **Pattern-based status badges**: Status indicators now use distinct textures in addition to color so they remain understandable for color-blind users and in grayscale displays.
+- **Response diff highlighting**: Pass a `compareWith` prop to `CallHistoryRow` to show a line-by-line diff between two call responses, with added (green), removed (red), and unchanged context lines. Includes a Diff/Raw toggle, before/after call labels, and full WCAG 2.1 AA accessibility. See [docs/ResponseDiff.md](docs/ResponseDiff.md).
+- **Smooth theme transition**: Light/dark switches animate color tokens (background, text, border) over 240 ms instead of snapping. The transition is gated behind a `theme-transitions-ready` class that ThemeProvider adds after the first paint, preventing any flash on load. Animated elements (toasts, skeletons, spinners) are automatically excluded. Use the `.no-theme-transition` escape hatch on any element that must opt out.
+- **Endpoint hover preview**: On the API Detail documentation tab, hovering or focusing an individual endpoint card header reveals a compact floating panel showing the HTTP method badge, endpoint URL, parameter table (name / type / required), and an optional response-shape snippet. Keyboard accessible (Escape dismisses); all colours from design tokens. See `src/components/EndpointPreview.tsx`.
 
 ## Keyboard shortcuts
 
@@ -60,6 +64,10 @@ Key principles:
 
 The dashboard includes an accessible usage gauge that summarizes API spend for the current cycle. It exposes `role="progressbar"`, numeric ARIA values, and a human-readable usage state such as “Within limit”, “Approaching limit”, “Critical usage”, “Limit reached”, or “No limit configured” so screen-reader users receive the same status information as sighted users.
 
+
+**ApiDetailPage keyboard focus (WCAG 2.1 AA, Issue #411):** All interactive elements on `ApiDetailPage` — buttons, links, inputs, selects, icon buttons, tab panels, and the pricing range slider — display a WCAG-compliant `:focus-visible` outline. The focus ring uses the theme-aware `--accent` token (2 px solid, 3 px offset), which meets the 3:1 non-text contrast requirement against both dark (`#4e85ff` on `#0b1020`) and light (`#2563eb` on `#f5f7fa`) backgrounds. Styles live in `src/styles/focus.css` inside `@layer focus` so they are always lower-priority than intentional page overrides. No mouse-triggered focus rings are shown (`outline: none` on `:focus`, restored on `:focus-visible`).
+
+**Plan Badge empty state (WCAG 2.1 AA, Issue #529):** The `EmptyState` `"plan-badge"` variant illustration is `aria-hidden`; meaning is carried exclusively by the heading and paragraph text (WCAG 1.1.1). Accent colour is a subordinate decorative detail — the state is never communicated by colour alone (WCAG 1.4.1). Both CTA buttons carry explicit accessible names via `aria-label`. All colours reference design tokens so contrast is maintained in both light and dark themes.
 ## Scripts
 
 | Command           | Description                         |
@@ -77,6 +85,8 @@ The dashboard includes an accessible usage gauge that summarizes API spend for t
 | `/marketplace`      | API marketplace                           |
 | `/billing`          | USDC deposit and settlements              |
 | `/api-usage`        | API usage analytics                       |
+| `/apis/my-apis`     | Published APIs management                 |
+| `/apis/plan-badge`  | Plan-tier badge assignment and empty state |
 | `/theme-playground` | Live theme token playground for designers |
 | `/500`              | Server error page                         |
 | `*`                 | 404 not found                             |
@@ -104,6 +114,8 @@ callora-frontend/
 │   │   ├── CommandPalette_MANUAL_TEST_PLAN.md
 │   │   ├── Dashboard.tsx
 │   │   ├── EmptyState.tsx
+│   │   ├── EndpointGroupHover.tsx
+│   │   ├── EndpointPreview.tsx
 │   │   ├── FiltersSidebar.tsx
 │   │   ├── NotFound.tsx
 │   │   ├── SearchBar.tsx
@@ -112,16 +124,19 @@ callora-frontend/
 │   │   └── Skeleton.tsx
 │   ├── pages/               # Standalone page components
 │   │   ├── ApiDetailPage.tsx
-│   │   └── MarketplacePage.tsx
+│   │   ├── MarketplacePage.tsx
+│   │   └── RateLimitCard.tsx  # (Issue #537) Rate-limit quota card with middle-ellipsis breadcrumb
 │   ├── hooks/               # Custom React hooks
 │   │   └── useDebounce.ts
 │   ├── data/                # Static and mock data
 │   │   └── mockApis.ts
 │   ├── utils/               # Utility functions
+│   │   ├── diff.ts          # Line-level diff engine (computeDiff, diffJson, hasDifferences)
 │   │   └── format.ts        # Currency formatters (formatUsdc, formatUsdShortcut, formatPrice)
 │   └── vite-env.d.ts
 ├── docs/
-│   └── UI-Design-System.md
+│   ├── UI-Design-System.md
+│   └── ResponseDiff.md      # Response diff highlighting (CallHistoryRow)
 ├── index.html
 ├── package.json
 ├── tsconfig.json

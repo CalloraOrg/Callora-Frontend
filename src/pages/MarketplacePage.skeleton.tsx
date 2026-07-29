@@ -9,37 +9,7 @@
  */
 import Skeleton from "../components/Skeleton";
 import { ApiCardSkeleton } from "../components/ApiCard";
-
-/**
- * Mirrors the FiltersSidebar structure:
- * - heading placeholder
- * - 4 filter groups (label + input)
- * - price range row
- * - apply button
- */
-function FilterBlockSkeleton() {
-  return (
-    <section
-      className="filters-sidebar"
-      aria-hidden="true"
-      style={{ display: "grid", gap: 16 }}
-    >
-      {/* Section heading */}
-      <Skeleton width="55%" height={22} />
-      {/* Filter groups */}
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} style={{ display: "grid", gap: 8 }}>
-          <Skeleton width="40%" height={14} />
-          <Skeleton width="100%" height={40} borderRadius={10} />
-        </div>
-      ))}
-      {/* Price range label */}
-      <Skeleton width="48%" height={14} />
-      {/* Apply / clear button */}
-      <Skeleton width="100%" height={44} borderRadius={12} />
-    </section>
-  );
-}
+import { FiltersSidebarSkeleton } from "../components/Skeleton";
 
 export default function MarketplacePageSkeleton() {
   return (
@@ -73,8 +43,8 @@ export default function MarketplacePageSkeleton() {
 
       {/* ── Main layout ── */}
       <div className="marketplace-layout">
-        <aside className="marketplace-sidebar">
-          <FilterBlockSkeleton />
+        <aside className="marketplace-sidebar filters-sidebar">
+          <FiltersSidebarSkeleton />
         </aside>
 
         <main className="marketplace-results">

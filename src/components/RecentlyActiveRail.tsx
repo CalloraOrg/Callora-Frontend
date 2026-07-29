@@ -132,7 +132,7 @@ export default function RecentlyActiveRail({
                     background: "currentColor",
                   }}
                 />
-                {relativeUsage(api)}
+                <span className="numeric-tabular">{relativeUsage(api)}</span>
               </span>
               <span
                 style={{

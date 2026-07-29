@@ -24,6 +24,11 @@ describe("Skeleton Component", () => {
     expect(style.borderRadius).toBe("8px");
   });
 
+  it("adds the Stellar themed skeleton class when requested", () => {
+    const { container } = render(<Skeleton tone="stellar" />);
+    expect(container.querySelector(".skeleton--stellar")).toBeTruthy();
+  });
+
   it("renders SkeletonRow with correct number of rows and elements", () => {
     const { container } = render(<SkeletonRow rows={3} />);
     const rows = container.querySelectorAll(".table-row");
@@ -31,7 +36,7 @@ describe("Skeleton Component", () => {
 
     rows.forEach((row) => {
       const cells = row.querySelectorAll(".skeleton");
-      expect(cells.length).toBe(6);
+      expect(cells.length).toBe(7);
     });
   });
 });
