@@ -1,0 +1,30 @@
+.copy-key-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: var(--text-sm, 0.6875rem);
+  padding: 0.3125rem 0.75rem;
+  cursor: pointer;
+  transition: color var(--transition-speed, 240ms) ease;
+}
+
+.copy-key-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.copy-key-button--idle {
+  color: var(--muted, #64748b);
+}
+
+.copy-key-button--idle:hover {
+  color: var(--accent, #2563eb);
+}
+
+.copy-key-button--copied {
+  color: var(--success, #10b981);
+}
+
+.copy-key-button--error {
+  color: var(--danger, #ef4444);
+}
