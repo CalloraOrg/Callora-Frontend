@@ -11,6 +11,7 @@ import {
   type ReactNode,
   type TouchEvent,
 } from "react";
+import "./Tooltip.css";
 
 /**
  * Tooltip — an accessible tooltip that opens on hover (optional delay),
@@ -171,6 +172,7 @@ export default function Tooltip({
         <span
           role="tooltip"
           id={tooltipId}
+          className="tooltip-content"
           style={{
             position: "absolute",
             bottom: "calc(100% + 6px)",
