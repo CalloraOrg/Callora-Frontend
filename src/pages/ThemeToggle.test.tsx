@@ -19,6 +19,20 @@ function buildMatchMediaMock() {
   }));
 }
 
+// ── IntersectionObserver mock ────────────────────────────────────────────────
+let observerCallback: IntersectionObserverCallback;
+
+const buildIntersectionObserverMock = () => {
+  return vi.fn().mockImplementation((callback: IntersectionObserverCallback) => {
+    observerCallback = callback;
+    return {
+      observe: vi.fn(),
+      unobserve: vi.fn(),
+      disconnect: vi.fn(),
+    };
+  });
+};
+
 // ── localStorage mock ────────────────────────────────────────────────────────
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -61,14 +75,29 @@ describe('ThemeToggle & Sticky Bottom Action Bar (#691 / b#014)', () => {
       writable: true,
       value: buildMatchMediaMock(),
     });
-    Object.defineProperty(window, 'scrollY', {
+    Object.defineProperty(window, 'IntersectionObserver', {
       writable: true,
       configurable: true,
-      value: 0,
+      value: buildIntersectionObserverMock(),
     });
   });
 
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  const revealStickyBar = () => {
+    act(() => {
+      observerCallback([{ isIntersecting: false } as IntersectionObserverEntry], {} as IntersectionObserver);
+    });
+  };
+
+  const hideStickyBar = () => {
+    act(() => {
+      observerCallback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+    });
+  };
 
   it('renders inline toggle button and sticky bottom action bar', () => {
     renderThemeToggle();
@@ -82,7 +111,7 @@ describe('ThemeToggle & Sticky Bottom Action Bar (#691 / b#014)', () => {
     expect(stickyBar.getAttribute('aria-label')).toBe('Theme controls');
   });
 
-  it('hides sticky bottom action bar when window.scrollY <= 120', () => {
+  it('hides sticky bottom action bar initially', () => {
     renderThemeToggle();
 
     const stickyBar = screen.getByTestId('theme-sticky-bar');
@@ -90,28 +119,35 @@ describe('ThemeToggle & Sticky Bottom Action Bar (#691 / b#014)', () => {
     expect(stickyBar.getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('reveals sticky bottom action bar when window.scrollY > 120', () => {
+  it('reveals sticky bottom action bar when primary action area scrolls out of view', () => {
     renderThemeToggle();
 
     const stickyBar = screen.getByTestId('theme-sticky-bar');
     expect(stickyBar.classList.contains('theme-sticky-bar--visible')).toBe(false);
 
-    act(() => {
-      Object.defineProperty(window, 'scrollY', { value: 150, configurable: true });
-      fireEvent.scroll(window);
-    });
+    revealStickyBar();
 
     expect(stickyBar.classList.contains('theme-sticky-bar--visible')).toBe(true);
     expect(stickyBar.getAttribute('aria-hidden')).toBe('false');
   });
 
+  it('hides sticky bottom action bar when primary action area scrolls back into view', () => {
+    renderThemeToggle();
+
+    const stickyBar = screen.getByTestId('theme-sticky-bar');
+
+    revealStickyBar();
+    expect(stickyBar.classList.contains('theme-sticky-bar--visible')).toBe(true);
+
+    hideStickyBar();
+    expect(stickyBar.classList.contains('theme-sticky-bar--visible')).toBe(false);
+    expect(stickyBar.getAttribute('aria-hidden')).toBe('true');
+  });
+
   it('cycles theme mode when sticky primary cycle button is clicked', () => {
     renderThemeToggle();
 
-    act(() => {
-      Object.defineProperty(window, 'scrollY', { value: 200, configurable: true });
-      fireEvent.scroll(window);
-    });
+    revealStickyBar();
 
     const cycleBtn = screen.getByTestId('theme-sticky-cycle');
     expect(cycleBtn).toBeTruthy();
@@ -123,10 +159,7 @@ describe('ThemeToggle & Sticky Bottom Action Bar (#691 / b#014)', () => {
   it('resets to system theme preference when sticky reset button is clicked', () => {
     renderThemeToggle();
 
-    act(() => {
-      Object.defineProperty(window, 'scrollY', { value: 200, configurable: true });
-      fireEvent.scroll(window);
-    });
+    revealStickyBar();
 
     const resetBtn = screen.getByTestId('theme-sticky-reset');
     expect(resetBtn).toBeTruthy();
@@ -134,6 +167,24 @@ describe('ThemeToggle & Sticky Bottom Action Bar (#691 / b#014)', () => {
     fireEvent.click(resetBtn);
     expect(resetBtn.getAttribute('aria-pressed')).toBe('true');
     expect(getPref('theme')).toBe('system');
+  });
+
+  it('has proper accessibility attributes on sticky bar and buttons', () => {
+    renderThemeToggle();
+
+    revealStickyBar();
+
+    const stickyBar = screen.getByTestId('theme-sticky-bar');
+    expect(stickyBar.getAttribute('role')).toBe('toolbar');
+    expect(stickyBar.getAttribute('aria-label')).toBe('Theme controls');
+
+    const cycleBtn = screen.getByTestId('theme-sticky-cycle');
+    expect(cycleBtn.getAttribute('aria-label')).toBeTruthy();
+    expect(cycleBtn.getAttribute('aria-pressed')).toBe('true');
+
+    const resetBtn = screen.getByTestId('theme-sticky-reset');
+    expect(resetBtn.getAttribute('aria-label')).toBeTruthy();
+    expect(resetBtn.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('renders full ThemeTogglePage with heading and overview', () => {
