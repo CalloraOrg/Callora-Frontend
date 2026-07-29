@@ -5,6 +5,7 @@ import { EmptyStateSkeleton } from "./Skeleton";
 
 export type EmptyStateVariant =
   | "empty"
+  | "api-card"
   | "api-detail"
   | "filtered"
   | "error"
