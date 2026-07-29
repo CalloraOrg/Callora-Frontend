@@ -309,10 +309,11 @@ size tailored specifically for inline use inside FiltersSidebar.
 
 | Prop              | Type                                     | Default     | Description                                                               |
 | ----------------- | ---------------------------------------- | ----------- | ------------------------------------------------------------------------- |
-| `variant?`        | `"empty" \| "filtered" \| "error"`       | `"empty"`   | Which semantic state to render.                                           |
+| `variant?`        | `"empty" \| "api-detail" \| "filtered" \| "error" \| "plan-badge" \| "risk-gauge" \| "quota-banner"` | `"empty"`   | Which semantic state to render.                                           |
 | `size?`           | `"default" \| "compact"`                 | `"default"` | Full-size (marketplace results) vs condensed (FiltersSidebar inline).     |
 | `title?`          | `string`                                 | per variant | Override the default heading.                                             |
 | `message?`        | `string`                                 | per variant | Override the default subtitle.                                            |
+| `headingId?`      | `string`                                 | —           | Optional `id` on the heading for parent `aria-labelledby` wiring.         |
 | `onClearFilters?` | `() => void`                             | —           | Shown only when `variant === "filtered"`. Renders the Clear CTA.          |
 | `onRetry?`        | `() => void \| Promise<void>`            | —           | Shown only when `variant === "error"`. Handles async loading + aria-busy. |
 | `action?`         | `{ label: string; onClick: () => void }` | —           | Optional custom CTA button rendered before any variant-specific actions.  |
@@ -324,6 +325,9 @@ size tailored specifically for inline use inside FiltersSidebar.
   - `api-detail`: API card with a plug motif → "requested API is unavailable"
   - `filtered`: Funnel shape + magnifier-with-slash focal motif, accent tag pills → "filters exclude everything"
   - `error`: Warning triangle with accent-marked exclamation caret, dashed baseline → "something went wrong"
+  - `plan-badge`: Medal/ribbon with tier star → "no plan selected"
+  - `risk-gauge`: Shield + gauge needle → "no risk assessment data"
+  - `quota-banner`: Gauge meter + usage bars → "no quota configured" (issue #702 / b#025)
 - All strokes use `var(--muted)` (primary) and `var(--accent)` (subordinate accents). **No hardcoded hex.**
 - Stroke caps/joins are `round` for a modern, friendly feel.
 - Illustrations are wrapped in a circular container:
@@ -347,6 +351,9 @@ size tailored specifically for inline use inside FiltersSidebar.
 | api-detail | "API not found"     | "This API may have moved or is no longer available." | same (compact not typical)               |
 | filtered | "No results found"    | "Your filters are too narrow. Try adjusting them."  | "Adjust filters or clear to see results." |
 | error    | "Failed to load APIs" | "We encountered an error fetching the marketplace…" | "Error loading results. Please retry."    |
+| plan-badge | "No plan selected"  | "This API doesn't have a plan attached yet…"        | "Choose a plan to unlock API access."     |
+| risk-gauge | "No risk data yet"  | "Run a risk assessment to evaluate your API's…"     | "Run an assessment to evaluate…"          |
+| quota-banner | "No quota configured" | "No quota has been configured for this API yet…" | "Set a quota to track your API usage limits." |
 
 **States:**
 

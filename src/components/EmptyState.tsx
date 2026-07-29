@@ -20,6 +20,11 @@ export interface EmptyStateProps {
   message?: string;
   /** @deprecated Use `message` instead */
   description?: string;
+  /**
+   * Optional `id` applied to the heading so parent regions can wire
+   * `aria-labelledby` (WCAG 1.3.1 / 4.1.2). Used by QuotaBanner empty state.
+   */
+  headingId?: string;
   onClearFilters?: () => void;
   onRetry?: () => void | Promise<void>;
   action?: {
@@ -366,6 +371,10 @@ function EmptyIllustration({
   }
 
   if (variant === "quota-banner") {
+    // Illustration: quota meter (gauge + needle) beside usage bars —
+    // metaphor for "usage limits not yet configured". Accent marks are
+    // decorative only (WCAG 1.4.1); title + message carry meaning.
+    // All strokes/fills use design tokens for light/dark consistency.
     return (
       <svg
         width={box}
@@ -376,12 +385,13 @@ function EmptyIllustration({
         strokeLinejoin="round"
         aria-hidden="true"
       >
-        {/* Gauge arc — quota meter */}
+        {/* Gauge arc — quota meter track */}
         <path
           d="M14 38 A 14 14 0 0 1 36 38"
           stroke="var(--muted)"
           strokeWidth={strokeWidth}
         />
+        {/* Partial fill arc — unused capacity hint */}
         <path
           d="M18 38 A 10 10 0 0 1 32 38"
           stroke="var(--accent)"
@@ -396,7 +406,7 @@ function EmptyIllustration({
         />
         <circle cx="25" cy="38" r="2" fill="var(--accent)" stroke="none" />
 
-        {/* Vertical divider */}
+        {/* Vertical divider between meter and bars */}
         <line
           x1="42" y1="14" x2="42" y2="52"
           stroke="var(--muted)"
@@ -405,7 +415,7 @@ function EmptyIllustration({
           strokeDasharray="2 3"
         />
 
-        {/* Usage bar chart */}
+        {/* Usage bar chart — empty / unfilled quota metaphor */}
         <rect
           x="46" y="26" width="5" height="24" rx="1.5"
           stroke="var(--muted)"
@@ -423,7 +433,7 @@ function EmptyIllustration({
           stroke="none"
         />
 
-        {/* Baseline */}
+        {/* Baseline under bars */}
         <line
           x1="46" y1="50" x2="58" y2="50"
           stroke="var(--muted)"
@@ -431,7 +441,7 @@ function EmptyIllustration({
           opacity="0.4"
         />
 
-        {/* Decorative sparkle dots */}
+        {/* Decorative sparkle dots — Stellar Wave accent */}
         <circle cx="10" cy="12" r="1.5" fill="var(--accent)" stroke="none" />
         <circle cx="56" cy="14" r="1.25" fill="var(--accent)" stroke="none" />
         <path
@@ -603,7 +613,9 @@ function MessageWithCopy({
  * - quota-banner: No quota data is configured yet.
  *                 Shows a gauge-and-bars illustration with a "Set up quota" CTA
  *                 so users can configure usage limits.  Used by the QuotaBanner
- *                 component (issue #742).
+ *                 component (issue #702 / b#025; also #742).
+ *                 Supports optional `headingId` so the parent region can wire
+ *                 `aria-labelledby` to the empty-state heading.
  *
  * Sizes:
  * - default:  Full-size layout for result areas (48px padding, 80px illustration).
@@ -632,6 +644,7 @@ export default function EmptyState({
   title,
   message,
   description,
+  headingId,
   onClearFilters,
   onRetry,
   action,
@@ -705,7 +718,7 @@ export default function EmptyState({
     /**
      * quota-banner variant — shown on the QuotaBanner component when no
      * quota data is configured yet.  The CTA guides users to set up their
-     * first quota (issue #742).
+     * first quota (issue #702 / b#025).
      */
     "quota-banner": {
       title: "No quota configured",
@@ -825,7 +838,9 @@ export default function EmptyState({
         <EmptyIllustration variant={variant} size={size} />
       </div>
 
-      <HeadingTag style={headingStyle}>{finalTitle}</HeadingTag>
+      <HeadingTag id={headingId} style={headingStyle}>
+        {finalTitle}
+      </HeadingTag>
 
       <MessageWithCopy message={finalMessage} isCompact={isCompact} />
 
