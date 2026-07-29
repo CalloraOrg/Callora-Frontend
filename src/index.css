@@ -5768,6 +5768,125 @@ code,
   }
 }
 
+/* ─── BillingHistory ─────────────────────────────────────────────────────────
+   Hover-triggered / keyboard-accessible billing history rows.
+   GrantFox FWC26 campaign (Issue #692) — matches DashboardOverview pattern.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.billing-history {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.billing-history__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.billing-history__title {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+  color: var(--text);
+}
+
+.billing-history__subtitle {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.billing-history__list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.billing-history__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.billing-history__item:hover {
+  border-color: var(--accent, #6366f1);
+  box-shadow: var(--focus-ring);
+}
+
+.billing-history__item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.billing-history__item-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.billing-history__item-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.billing-history__item-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.billing-history__item-amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.billing-history__item-amount--credit {
+  color: var(--success, #10b981);
+}
+
+.billing-history__item-amount--debit {
+  color: var(--text);
+}
+
+.billing-history__empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .billing-history__item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .billing-history__item-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 /* ─── ApiDetailStickyTOC ────────────────────────────────────────────────────
    Sticky right-rail TOC inside the documentation tab. Tokens only — no
    hardcoded hex values. Transition respects prefers-reduced-motion.
