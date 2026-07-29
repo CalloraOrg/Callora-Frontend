@@ -71,7 +71,7 @@ export default function PlanNudge({ usagePercent, onDismiss }: PlanNudgeProps) {
           Upgrade plan
           <KbdHint
             shortcut={{ key: 'u', description: 'Upgrade', category: 'Plan' }}
-            variant="subtle"
+            variant="chip"
             label="Upgrade keyboard shortcut"
           />
         </a>
