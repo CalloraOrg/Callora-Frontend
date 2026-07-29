@@ -17,7 +17,7 @@ describe('InvoiceCard sticky action bar', () => {
 
     const bar = screen.getByTestId('invoice-card-action-bar');
     expect(bar).toBeInTheDocument();
-    expect(bar.classList.contains('invoice-card-action-bar--visible')).toBe(false);
+    expect(bar.classList.contains('theme-sticky-bar--visible')).toBe(false);
     expect(bar).toHaveAttribute('aria-hidden', 'true');
   });
 
@@ -36,7 +36,7 @@ describe('InvoiceCard sticky action bar', () => {
     });
 
     const bar = screen.getByTestId('invoice-card-action-bar');
-    expect(bar.classList.contains('invoice-card-action-bar--visible')).toBe(true);
+    expect(bar.classList.contains('theme-sticky-bar--visible')).toBe(true);
     expect(bar).toHaveAttribute('aria-hidden', 'false');
 
     const payButton = screen.getByRole('button', { name: /pay now/i });
