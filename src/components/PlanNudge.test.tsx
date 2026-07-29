@@ -60,4 +60,20 @@ describe('PlanNudge', () => {
     const link = screen.getByRole('link', { name: /upgrade your plan/i });
     expect(link).toHaveAttribute('href', '/billing/upgrade');
   });
+
+  it('renders a keyboard shortcut hint on the upgrade link', () => {
+    renderNudge();
+    const link = screen.getByRole('link', { name: /upgrade your plan/i });
+    const kbdHint = link.querySelector('.kbd-hint--subtle');
+    expect(kbdHint).toBeInTheDocument();
+    expect(kbdHint).toHaveAttribute('aria-label', 'Upgrade keyboard shortcut');
+  });
+
+  it('renders the correct keyboard shortcut key', () => {
+    renderNudge();
+    const link = screen.getByRole('link', { name: /upgrade your plan/i });
+    const kbdKey = link.querySelector('.kbd-hint__key');
+    expect(kbdKey).toBeInTheDocument();
+    expect(kbdKey).toHaveTextContent('u');
+  });
 });

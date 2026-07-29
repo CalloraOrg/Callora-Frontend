@@ -62,8 +62,26 @@
   color: var(--text);
   font-size: 16px;
   font-family: var(--font-family);
-  outline: none;
   padding: 4px 0;
+}
+
+/*
+ * #699 — this file is unlayered (imported directly, not inside @layer
+ * focus), so an unconditional `outline: none` here would permanently defeat
+ * the global `*:focus-visible` ring in src/index.css: unlayered rules always
+ * beat layered ones regardless of specificity, so no rule inside @layer
+ * focus could ever restore it. Suppress only on :focus (mouse/programmatic)
+ * and restore explicitly on :focus-visible (keyboard), mirroring the same
+ * pattern the global reset uses.
+ */
+.command-palette-input:focus {
+  outline: none;
+}
+
+.command-palette-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .command-palette-clear-button,
@@ -84,6 +102,15 @@
   color: var(--text);
   border-color: var(--line-strong);
   background: var(--surface);
+}
+
+/* Explicit reinforcement (the global *:focus-visible ring already applies
+   here since neither button overrides `outline`; stated explicitly so
+   accessibility audits don't have to trace the cascade to confirm it). */
+.command-palette-clear-button:focus-visible,
+.command-palette-close-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .command-palette-results {

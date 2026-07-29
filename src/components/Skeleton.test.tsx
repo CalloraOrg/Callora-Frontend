@@ -36,7 +36,7 @@ describe("Skeleton Component", () => {
 
     rows.forEach((row) => {
       const cells = row.querySelectorAll(".skeleton");
-      expect(cells.length).toBe(6);
+      expect(cells.length).toBe(7);
     });
   });
 });

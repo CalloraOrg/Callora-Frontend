@@ -1,6 +1,6 @@
 /* ==========================================================================
    code.css — CodeExample component styles
-   Issue #724: Polish layout for narrow (mobile) viewports ≤375 px
+   Issue #684: Polish layout for narrow (mobile) viewports ≤375 px
 
    Breakpoint strategy
    ───────────────────
@@ -10,7 +10,10 @@
    ≥ 481 px   — Default (full) layout
    376–480 px — Intermediate: slightly larger tap targets
    ≤ 375 px   — Narrow mobile: stacked column header, 44 px tap targets,
-                 horizontal-scroll panel, right-aligned copy button
+                horizontal-scroll panel, right-aligned copy button
+
+   The header flex-direction change at ≤375 px is animated via a smooth
+   transition so the visual switch is not jarring when the user resizes.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -61,6 +64,11 @@
   /* Prevent the header from growing wider than the container when code
      lines are very long inside the panel. */
   min-width: 0;
+
+  /* Smooth transition when the breakpoint toggles flex-direction
+     between "row" and "column". Applied here on the base class so it
+     is active across all viewports (Issue #684). */
+  transition: flex-direction 200ms ease, gap 200ms ease, padding 200ms ease;
 }
 
 /* --------------------------------------------------------------------------
@@ -151,7 +159,7 @@
 
 /* --------------------------------------------------------------------------
    Code panel — always horizontally scrollable so long lines never force the
-   page to overflow on any viewport width (Issue #724 requirement).
+   page to overflow on any viewport width (Issue #684 requirement).
    -------------------------------------------------------------------------- */
 .code-sample__panel {
   /* overflow-x: auto ensures code lines longer than the viewport scroll
@@ -212,7 +220,7 @@
 
 /* --------------------------------------------------------------------------
    ≤ 375 px  (narrow mobile — iPhone SE, Galaxy A series, etc.)
-   Issue #724: stack header column, full-width tab rail, 44 px tap targets,
+   Issue #684: stack header column, full-width tab rail, 44 px tap targets,
    right-aligned copy button.
    -------------------------------------------------------------------------- */
 @media (max-width: 375px) {

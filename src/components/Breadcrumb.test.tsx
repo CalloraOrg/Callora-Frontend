@@ -351,6 +351,103 @@ describe("Breadcrumb – middle-ellipsis (maxLabelLength)", () => {
     // No aria-label override needed
     expect(current?.getAttribute("aria-label")).toBeNull();
   });
+
+  // ── #750 — modifier class prevents double-truncation on narrow containers ──
+  //
+  // The stylesheet defines `--middle-ellipsis` modifier classes specifically
+  // to disable the CSS-level `text-overflow: ellipsis` once JS has already
+  // shortened a label — without them, a JS-truncated string that still
+  // doesn't fit its container (e.g. a very narrow viewport) gets ellipsized
+  // a second time by CSS, producing a "start…en…" artefact. These tests
+  // confirm the modifier is actually wired to the elements it was designed
+  // for, not just present as unused CSS.
+
+  it("applies the middle-ellipsis modifier class to a truncated first-crumb link", () => {
+    const items = [
+      { label: "A Very Long Root Segment Name", href: "/root" },
+      { label: "Short", href: "/root/short", isCurrent: true },
+    ];
+    render(<Breadcrumb items={items} maxLabelLength={16} />);
+
+    const link = screen.getByRole("link", {
+      name: "A Very Long Root Segment Name",
+    });
+    expect(link.classList.contains("breadcrumb-link--middle-ellipsis")).toBe(
+      true,
+    );
+  });
+
+  it("does not apply the middle-ellipsis modifier class when the link label is not truncated", () => {
+    const items = [
+      { label: "Home", href: "/" },
+      { label: "Short", href: "/short", isCurrent: true },
+    ];
+    render(<Breadcrumb items={items} maxLabelLength={28} />);
+
+    const link = screen.getByRole("link", { name: "Home" });
+    expect(link.classList.contains("breadcrumb-link--middle-ellipsis")).toBe(
+      false,
+    );
+  });
+
+  it("applies the middle-ellipsis modifier class to a truncated current-page crumb", () => {
+    const items = [
+      { label: "Marketplace", href: "/marketplace" },
+      {
+        label: "A Very Long Current Page Title Indeed",
+        href: "/current",
+        isCurrent: true,
+      },
+    ];
+    render(<Breadcrumb items={items} maxLabelLength={20} />);
+
+    const current = document.querySelector<HTMLSpanElement>(
+      '[aria-current="page"]',
+    );
+    expect(
+      current?.classList.contains("breadcrumb-current--middle-ellipsis"),
+    ).toBe(true);
+  });
+
+  it("does not apply the middle-ellipsis modifier class to a current-page crumb that fits", () => {
+    const items = [
+      { label: "Home", href: "/" },
+      { label: "Short", href: "/short", isCurrent: true },
+    ];
+    render(<Breadcrumb items={items} maxLabelLength={28} />);
+
+    const current = document.querySelector<HTMLSpanElement>(
+      '[aria-current="page"]',
+    );
+    expect(
+      current?.classList.contains("breadcrumb-current--middle-ellipsis"),
+    ).toBe(false);
+  });
+
+  it("applies the middle-ellipsis modifier class to truncated popover links", () => {
+    const { container } = render(
+      <Breadcrumb items={truncatedBreadcrumb} maxLabelLength={28} />,
+    );
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+    if (!button) throw new Error("Expected ellipsis button");
+    fireEvent.click(button);
+
+    const menuItems = Array.from(
+      container.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]'),
+    );
+
+    expect(menuItems.length).toBeGreaterThan(0);
+    for (const menuItem of menuItems) {
+      expect(
+        menuItem.classList.contains(
+          "breadcrumb-popover-link--middle-ellipsis",
+        ),
+      ).toBe(true);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
