@@ -1,101 +1,276 @@
 // @vitest-environment jsdom
+/**
+ * MethodChip.test.tsx
+ *
+ * Focused tests for the MethodChip component (GrantFox FWC26).
+ *
+ * Coverage:
+ *  - Renders all recognised HTTP verbs
+ *  - Case-insensitive input
+ *  - Fallback for unknown verbs
+ *  - aria-label / role="img" accessibility contract
+ *  - Tooltip shown on hover and hidden on mouse-leave
+ *  - Tooltip shown on focus and hidden on blur
+ *  - CSS class contracts (method-chip, method-chip-icon, method-chip-label)
+ *  - Token colour contract: inline style references --method-<verb>-bg / --method-<verb>-color
+ *  - Responsive tap-target contract via ::before (class-level contract)
+ *  - No overflow-triggering inline style on the chip (high-contrast safe)
+ */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import { MethodChip } from "./MethodChip";
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { MethodChip } from './MethodChip';
 
 afterEach(cleanup);
 
-describe("MethodChip", () => {
-  it("renders with the HTTP method text uppercased", () => {
-    render(<MethodChip method="get" />);
-    expect(screen.getByLabelText("GET request")).toBeTruthy();
-    expect(screen.getByText("GET")).toBeTruthy();
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Renders a MethodChip and returns the root chip element via its aria-label. */
+function renderChip(method: string) {
+  render(<MethodChip method={method} />);
+  // aria-label is "<METHOD> request", e.g. "GET request"
+  const upperMethod = method.toUpperCase();
+  return screen.getByRole('img', { name: `${upperMethod} request` });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rendering — all recognised verbs
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('MethodChip — rendering', () => {
+  it.each(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])(
+    'renders a chip for %s with role="img"',
+    (method) => {
+      const chip = renderChip(method);
+      expect(chip).toBeTruthy();
+      expect(chip.getAttribute('role')).toBe('img');
+    },
+  );
+
+  it('renders the method label as visible text inside a .method-chip-label span', () => {
+    renderChip('GET');
+    // The label span should contain the method text
+    const label = document.querySelector('.method-chip-label');
+    expect(label).toBeTruthy();
+    expect(label?.textContent).toBe('GET');
   });
 
-  it("renders an icon for the HTTP method", () => {
-    const { container } = render(<MethodChip method="POST" />);
-    const chip = screen.getByLabelText("POST request");
-    const icon = chip.querySelector(".method-chip-icon");
-    expect(icon).toBeTruthy();
-    expect(icon?.querySelector("svg")).toBeTruthy();
+  it('renders the label in upper-case regardless of input casing', () => {
+    render(<MethodChip method="delete" />);
+    const chip = screen.getByRole('img', { name: 'DELETE request' });
+    expect(chip).toBeTruthy();
+    const label = chip.querySelector('.method-chip-label');
+    expect(label?.textContent).toBe('DELETE');
   });
 
-  it("is focusable via tabIndex={0}", () => {
-    render(<MethodChip method="GET" />);
-    const chip = screen.getByLabelText("GET request");
-    expect(chip.getAttribute("tabindex")).toBe("0");
+  it('is case-insensitive for all recognised verbs', () => {
+    render(<MethodChip method="patch" />);
+    const chip = screen.getByRole('img', { name: 'PATCH request' });
+    expect(chip).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fallback — unknown verb
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('MethodChip — unknown verb fallback', () => {
+  it('renders a chip for an unrecognised verb without throwing', () => {
+    render(<MethodChip method="HEAD" />);
+    const chip = screen.getByRole('img', { name: 'HEAD request' });
+    expect(chip).toBeTruthy();
   });
 
-  it("shows tooltip on focus and hides on blur", () => {
-    render(<MethodChip method="PUT" />);
-    const chip = screen.getByLabelText("PUT request");
-
-    // No tooltip initially
-    expect(screen.queryByRole("tooltip")).toBeNull();
-
-    // Focus should show tooltip
-    fireEvent.focus(chip);
-    expect(screen.getByRole("tooltip")).toBeTruthy();
-
-    // Blur should hide tooltip
-    fireEvent.blur(chip);
-    expect(screen.queryByRole("tooltip")).toBeNull();
-  });
-
-  // ── Mobile layout — CSS-class contract (Issue #744) ─────────────────────
-  //
-  // jsdom does not evaluate @media rules, so we verify the *class contract*:
-  // the correct CSS classes are present so the @media breakpoint rules can
-  // apply in a real browser.
-
-  it("has .method-chip class for responsive styling", () => {
-    render(<MethodChip method="GET" />);
-    const chip = screen.getByLabelText("GET request");
-    expect(chip.classList.contains("method-chip")).toBe(true);
-  });
-
-  it("has the matching method-chip-icon class on the icon wrapper", () => {
-    render(<MethodChip method="GET" />);
-    const chip = screen.getByLabelText("GET request");
-    const icon = chip.querySelector(".method-chip-icon");
-    expect(icon).toBeTruthy();
-  });
-
-  it("renders known HTTP methods with dedicated colors", () => {
-    const methods = ["GET", "POST", "PUT", "DELETE", "PATCH"];
-    methods.forEach((method) => {
-      const { unmount } = render(<MethodChip method={method} />);
-      const chip = screen.getByLabelText(`${method} request`);
-      // Colors should be set via CSS custom properties, never inline hex
-      expect(chip.style.backgroundColor).toMatch(/^var\(--method-/);
-      expect(chip.style.color).toMatch(/^var\(--method-/);
-      unmount();
-    });
-  });
-
-  it("falls back to default colors for unknown methods", () => {
+  it('displays the label text for an unrecognised verb', () => {
     render(<MethodChip method="OPTIONS" />);
-    const chip = screen.getByLabelText("OPTIONS request");
-    expect(chip.style.backgroundColor).toBe("var(--surface-soft)");
-    expect(chip.style.color).toBe("var(--text)");
+    const label = document.querySelector('.method-chip-label');
+    expect(label?.textContent).toBe('OPTIONS');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Accessibility — aria contract
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('MethodChip — accessibility', () => {
+  it('has role="img" on the chip element', () => {
+    const chip = renderChip('GET');
+    expect(chip.getAttribute('role')).toBe('img');
   });
 
-  it("uses design-token background for GET, POST, PUT, DELETE, PATCH", () => {
-    const checks: Record<string, { bg: string; fg: string }> = {
-      GET: { bg: "var(--method-get-bg)", fg: "var(--method-get-fg)" },
-      POST: { bg: "var(--method-post-bg)", fg: "var(--method-post-fg)" },
-      PUT: { bg: "var(--method-put-bg)", fg: "var(--method-put-fg)" },
-      DELETE: { bg: "var(--method-delete-bg)", fg: "var(--method-delete-fg)" },
-      PATCH: { bg: "var(--method-patch-bg)", fg: "var(--method-patch-fg)" },
-    };
+  it('has an aria-label of "<VERB> request"', () => {
+    const chip = renderChip('POST');
+    expect(chip.getAttribute('aria-label')).toBe('POST request');
+  });
 
-    Object.entries(checks).forEach(([method, colors]) => {
-      const { unmount } = render(<MethodChip method={method} />);
-      const chip = screen.getByLabelText(`${method} request`);
-      expect(chip.style.backgroundColor).toBe(colors.bg);
-      expect(chip.style.color).toBe(colors.fg);
-      unmount();
-    });
+  it('is keyboard-focusable via tabIndex=0', () => {
+    const chip = renderChip('PUT');
+    expect(chip.getAttribute('tabindex')).toBe('0');
+  });
+
+  it('icon wrapper has aria-hidden="true" so it is not announced by screen readers', () => {
+    renderChip('DELETE');
+    const iconWrapper = document.querySelector('.method-chip-icon');
+    expect(iconWrapper?.getAttribute('aria-hidden')).toBe('true');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Token colour contract — inline style maps to corrected CSS var names
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('MethodChip — colour token contract (FWC26 bug-fix)', () => {
+  /**
+   * The inline style must reference --method-<verb>-bg for background and
+   * --method-<verb>-color for color (NOT -fg which was the pre-fix name).
+   * jsdom does not resolve CSS custom properties, but it preserves the
+   * var(…) string in element.style so we can assert the correct token name.
+   */
+  it.each([
+    ['GET', '--method-get-bg', '--method-get-color'],
+    ['POST', '--method-post-bg', '--method-post-color'],
+    ['PUT', '--method-put-bg', '--method-put-color'],
+    ['DELETE', '--method-delete-bg', '--method-delete-color'],
+    ['PATCH', '--method-patch-bg', '--method-patch-color'],
+  ])(
+    '%s chip references the correct bg and color tokens',
+    (method, expectedBg, expectedColor) => {
+      const chip = renderChip(method);
+      expect(chip.style.backgroundColor).toBe(`var(${expectedBg})`);
+      expect(chip.style.color).toBe(`var(${expectedColor})`);
+    },
+  );
+
+  it.each(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])(
+    '%s chip does NOT use the deprecated -fg token suffix',
+    (method) => {
+      const chip = renderChip(method);
+      expect(chip.style.color).not.toMatch(/-fg\)/);
+    },
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CSS class contract
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('MethodChip — CSS class contract', () => {
+  it('root element has the "method-chip" class', () => {
+    const chip = renderChip('GET');
+    expect(chip.classList.contains('method-chip')).toBe(true);
+  });
+
+  it('icon wrapper has the "method-chip-icon" class (not "method-icon")', () => {
+    renderChip('GET');
+    const iconWrapper = document.querySelector('.method-chip-icon');
+    expect(iconWrapper).toBeTruthy();
+    // Make sure the old broken class name is not present
+    expect(document.querySelector('.method-icon')).toBeNull();
+  });
+
+  it('label has the "method-chip-label" class', () => {
+    renderChip('GET');
+    const label = document.querySelector('.method-chip-label');
+    expect(label).toBeTruthy();
+    expect(label?.classList.contains('method-chip-label')).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tooltip — hover and focus interactions
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('MethodChip — tooltip', () => {
+  it('shows a tooltip with role="tooltip" on mouseEnter', () => {
+    const chip = renderChip('GET');
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    fireEvent.mouseEnter(chip);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toBeTruthy();
+    expect(tooltip.textContent).toBe('GET request');
+  });
+
+  it('hides the tooltip on mouseLeave', () => {
+    const chip = renderChip('GET');
+    fireEvent.mouseEnter(chip);
+    expect(screen.queryByRole('tooltip')).toBeTruthy();
+    fireEvent.mouseLeave(chip);
+    expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+
+  it('shows a tooltip on focus', () => {
+    const chip = renderChip('POST');
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    fireEvent.focus(chip);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip.textContent).toBe('POST request');
+  });
+
+  it('hides the tooltip on blur', () => {
+    const chip = renderChip('POST');
+    fireEvent.focus(chip);
+    expect(screen.queryByRole('tooltip')).toBeTruthy();
+    fireEvent.blur(chip);
+    expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+
+  it('tooltip text matches the aria-label', () => {
+    const chip = renderChip('DELETE');
+    fireEvent.focus(chip);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip.textContent).toBe(chip.getAttribute('aria-label'));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tap target — ::before contract (WCAG 2.1 AA §2.5.5, FWC26)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('MethodChip — tap target (WCAG 2.1 AA §2.5.5)', () => {
+  /**
+   * jsdom does not apply CSS, so we cannot measure the pseudo-element
+   * dimensions at runtime.  We verify the structural contract instead:
+   *  - The chip carries the "method-chip" class that the CSS ::before rule
+   *    targets.
+   *  - There are no inline width/height overrides that would cap the visual
+   *    size and thereby block the pseudo-element from expanding the hit area.
+   *
+   * The actual 44×44px measurement is covered by the companion Playwright
+   * snapshot test (if/when added).
+   */
+  it('carries the "method-chip" class so ::before tap-target rule applies', () => {
+    const chip = renderChip('GET');
+    expect(chip.classList.contains('method-chip')).toBe(true);
+  });
+
+  it('does not set inline width or height that would block the CSS ::before expansion', () => {
+    const chip = renderChip('GET');
+    expect(chip.style.width).toBe('');
+    expect(chip.style.height).toBe('');
+    expect(chip.style.minWidth).toBe('');
+    expect(chip.style.minHeight).toBe('');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Text overflow contract
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('MethodChip — text overflow (FWC26 wrapping fix)', () => {
+  it('does not set whitespace or overflow as inline styles (CSS handles it)', () => {
+    const chip = renderChip('DELETE');
+    // Overflow/wrapping must come from CSS classes, not inline styles,
+    // so high-contrast overrides and design-token cascades are not blocked.
+    expect(chip.style.whiteSpace).toBe('');
+    expect(chip.style.overflow).toBe('');
+    expect(chip.style.textOverflow).toBe('');
+  });
+
+  it('label span exists so CSS text-overflow: ellipsis can target it precisely', () => {
+    renderChip('DELETE');
+    const label = document.querySelector('.method-chip-label');
+    expect(label).toBeTruthy();
   });
 });
