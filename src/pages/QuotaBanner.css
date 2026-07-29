@@ -8,6 +8,13 @@
   background: var(--surface-soft);
 }
 
+/* Empty state: let EmptyState own internal padding; keep surface + border. */
+.quota-banner--empty {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
 .quota-banner__header {
   display: flex;
   align-items: baseline;

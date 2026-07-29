@@ -49,6 +49,65 @@ describe("EmptyState", () => {
       expect(screen.getByText("Custom Title")).toBeTruthy();
       expect(screen.getByText("Custom message body")).toBeTruthy();
     });
+
+    it("applies headingId to the title element for aria-labelledby wiring", () => {
+      render(
+        <EmptyState
+          variant="quota-banner"
+          headingId="quota-banner-empty-heading"
+        />,
+      );
+      const heading = document.getElementById("quota-banner-empty-heading");
+      expect(heading).toBeTruthy();
+      expect(heading?.tagName.toLowerCase()).toBe("h2");
+      expect(heading?.textContent).toMatch(/No quota configured/i);
+    });
+  });
+
+  describe("quota-banner variant (issue #702 / b#025)", () => {
+    it("uses design-token strokes and fills — no hardcoded hex", () => {
+      const { container } = render(
+        <EmptyState variant="quota-banner" size="default" />,
+      );
+      const svg = container.querySelector("svg");
+      expect(svg).toBeTruthy();
+      expect(/#[0-9a-f]{3,8}/i.test(svg?.outerHTML ?? "")).toBe(false);
+      expect(
+        (svg?.querySelectorAll('[stroke="var(--muted)"]').length ?? 0) >= 2,
+      ).toBe(true);
+      expect(
+        (svg?.querySelectorAll('[stroke="var(--accent)"]').length ?? 0) +
+          (svg?.querySelectorAll('[fill="var(--accent)"]').length ?? 0) >=
+          1,
+      ).toBe(true);
+    });
+
+    it("renders gauge + bar motifs for the quota empty metaphor", () => {
+      const { container } = render(<EmptyState variant="quota-banner" />);
+      const svg = container.querySelector("svg");
+      expect(svg?.querySelectorAll("path").length).toBeGreaterThanOrEqual(2);
+      expect(svg?.querySelectorAll("rect").length).toBeGreaterThanOrEqual(2);
+      expect(svg?.querySelector("line")).toBeTruthy();
+    });
+
+    it("uses compact default message when size is compact", () => {
+      render(<EmptyState variant="quota-banner" size="compact" />);
+      expect(
+        screen.getByText(/Set a quota to track your API usage limits/i),
+      ).toBeTruthy();
+    });
+
+    it("fires the custom Set up quota action", () => {
+      const onClick = vi.fn();
+      render(
+        <EmptyState
+          variant="quota-banner"
+          action={{ label: "Set up quota", onClick }}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Set up quota/i }));
+      expect(onClick).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("size prop", () => {
