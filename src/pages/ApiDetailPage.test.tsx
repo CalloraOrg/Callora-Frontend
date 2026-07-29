@@ -101,6 +101,180 @@ describe("ApiDetailPage", () => {
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
   });
 
+  // ── Skeleton parity (issue #410) ──────────────────────────────────────────
+  //
+  // Each test below pins the structural contract introduced by the parity fix
+  // so regressions are caught before they ship.  jsdom does not evaluate CSS,
+  // so tests validate class names and inline style properties rather than
+  // computed pixel values.
+  //
+  // Mismatch reference (see Step-1 report):
+  //   M1  logo: 64×64 / 50% radius
+  //   M4  status badge placeholder present
+  //   M5  provider row placeholder present
+  //   M7  CTA row present in skeleton
+  //   M9  tab bar uses CSS class margin (no inline marginBottom override)
+  //   M10 metrics grid uses CSS class layout (no inline display:flex override)
+  //   M11 metrics cards use .stat-card (real class, not nonexistent variant)
+  //   M12 sidebar panels use .stat-card / .preview-card (real classes)
+
+  describe("skeleton parity (issue #410)", () => {
+    // Render the skeleton state (before timers fire)
+    function renderSkeleton() {
+      return renderWithProviders(<ApiDetailPage />);
+      // Do NOT call settleLoadingState() — we want the skeleton
+    }
+
+    it("M1 – logo skeleton is 64×64 with 50% border-radius (circle, not rounded rect)", () => {
+      const { container } = renderSkeleton();
+
+      // The logo skeleton is the first .skeleton inside .api-detail-brand
+      const brand = container.querySelector(".api-detail-brand");
+      expect(brand).toBeTruthy();
+
+      const logoSkel = brand!.querySelector(".skeleton") as HTMLElement;
+      expect(logoSkel).toBeTruthy();
+
+      // width/height passed as props end up as inline style values
+      expect(logoSkel.style.width).toBe("64px");
+      expect(logoSkel.style.height).toBe("64px");
+      // borderRadius must be 50% (circle), not a fixed-px value
+      expect(logoSkel.style.borderRadius).toBe("50%");
+    });
+
+    it("M4 – status-badge placeholder (3rd skeleton in .api-detail-title) is present", () => {
+      const { container } = renderSkeleton();
+
+      const title = container.querySelector(".api-detail-title");
+      expect(title).toBeTruthy();
+
+      // There must be at least 3 skeleton blocks inside api-detail-title:
+      // [0] h1 title, [1] meta row, [2] status badge
+      const skels = title!.querySelectorAll(".skeleton");
+      expect(skels.length).toBeGreaterThanOrEqual(3);
+
+      // Status badge (index 2) should be shorter than the title (index 0)
+      const titleSkel = skels[0] as HTMLElement;
+      const badgeSkel = skels[2] as HTMLElement;
+      // Badge height should be 24px
+      expect(badgeSkel.style.height).toBe("24px");
+      // Title height should be taller
+      expect(parseInt(titleSkel.style.height ?? "0")).toBeGreaterThan(
+        parseInt(badgeSkel.style.height ?? "0"),
+      );
+    });
+
+    it("M5 – provider-row placeholder (4th skeleton in .api-detail-title) is present", () => {
+      const { container } = renderSkeleton();
+
+      const title = container.querySelector(".api-detail-title");
+      expect(title).toBeTruthy();
+
+      const skels = title!.querySelectorAll(".skeleton");
+      // [0] title, [1] meta, [2] badge, [3] provider
+      expect(skels.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it("M7 – CTA row skeleton is present between hero and content grid", () => {
+      const { container } = renderSkeleton();
+
+      // The skeleton must include the CTA row with both modifier classes
+      const ctaRow = container.querySelector(".api-hero__cta--detail");
+      expect(ctaRow).toBeTruthy();
+      expect(ctaRow!.classList.contains("no-print")).toBe(true);
+
+      // Must contain skeleton blocks for the 3 CTA buttons
+      const ctaSkels = ctaRow!.querySelectorAll(".skeleton");
+      expect(ctaSkels.length).toBe(3);
+    });
+
+    it("M9 – tab bar has no inline marginBottom that would override CSS (should be 32px via class)", () => {
+      const { container } = renderSkeleton();
+
+      const tabBar = container.querySelector(".api-detail-tabs") as HTMLElement;
+      expect(tabBar).toBeTruthy();
+      // Inline style must not override the CSS-class marginBottom
+      expect(tabBar.style.marginBottom).toBe("");
+    });
+
+    it("M9 – tab bar renders one skeleton block per real tab (6 tabs)", () => {
+      const { container } = renderSkeleton();
+
+      const tabBar = container.querySelector(".api-detail-tabs");
+      expect(tabBar).toBeTruthy();
+
+      const tabSkels = tabBar!.querySelectorAll(".skeleton");
+      // Real page has 6 tabs: Overview / Documentation / Pricing / Examples / Reviews / Embed
+      expect(tabSkels.length).toBe(6);
+    });
+
+    it("M10 – metrics grid has no inline display:flex override (CSS class must drive layout)", () => {
+      const { container } = renderSkeleton();
+
+      const metricsGrid = container.querySelector(".api-detail-metrics") as HTMLElement;
+      expect(metricsGrid).toBeTruthy();
+      // Inline display must be empty so CSS grid rule applies
+      expect(metricsGrid.style.display).toBe("");
+    });
+
+    it("M11 – metrics stat-cards use the real .stat-card class (not a nonexistent variant)", () => {
+      const { container } = renderSkeleton();
+
+      const metricsGrid = container.querySelector(".api-detail-metrics");
+      expect(metricsGrid).toBeTruthy();
+
+      const cards = metricsGrid!.querySelectorAll(".stat-card");
+      expect(cards.length).toBe(3);
+
+      // The nonexistent class must not appear
+      expect(metricsGrid!.querySelector(".stat-card-skeleton")).toBeNull();
+    });
+
+    it("M12 – sidebar first panel uses real .stat-card class", () => {
+      const { container } = renderSkeleton();
+
+      const sidebarInner = container.querySelector(".api-detail-sidebar-inner");
+      expect(sidebarInner).toBeTruthy();
+
+      // First child is the API Health panel — must be .stat-card
+      const firstPanel = sidebarInner!.querySelector(".stat-card");
+      expect(firstPanel).toBeTruthy();
+      expect(sidebarInner!.querySelector(".stat-card-skeleton")).toBeNull();
+    });
+
+    it("M12 – sidebar second panel uses real .preview-card class", () => {
+      const { container } = renderSkeleton();
+
+      const sidebarInner = container.querySelector(".api-detail-sidebar-inner");
+      expect(sidebarInner).toBeTruthy();
+
+      const previewCard = sidebarInner!.querySelector(".preview-card");
+      expect(previewCard).toBeTruthy();
+      expect(sidebarInner!.querySelector(".preview-card-skeleton")).toBeNull();
+    });
+
+    it("skeleton shell is not interactive – no focusable skeleton blocks", () => {
+      const { container } = renderSkeleton();
+
+      // All .skeleton elements must have aria-hidden and role=presentation
+      const skels = container.querySelectorAll(".skeleton");
+      skels.forEach((skel) => {
+        expect(skel.getAttribute("aria-hidden")).toBe("true");
+        expect(skel.getAttribute("role")).toBe("presentation");
+        // Must not have a tabIndex that makes them reachable by keyboard
+        expect((skel as HTMLElement).tabIndex).toBeLessThan(0);
+      });
+    });
+
+    it("skeleton shell carries aria-busy=true and aria-label for screen readers", () => {
+      const { container } = renderSkeleton();
+
+      const shell = container.querySelector(".api-detail-page") as HTMLElement;
+      expect(shell.getAttribute("aria-busy")).toBe("true");
+      expect(shell.getAttribute("aria-label")).toBe("API detail loading shell");
+    });
+  });
+
   // ── Not found / Empty state ───────────────────────────────────────────────
 
   it("shows the EmptyState when API is not found", () => {
