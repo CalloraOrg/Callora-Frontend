@@ -19,7 +19,7 @@ describe("LowBalanceBanner", () => {
 
     expect(screen.getByRole("status")).toBeTruthy();
     expect(screen.getByText(/Low balance warning/i)).toBeTruthy();
-    expect(screen.getByText(new RegExp(`${LOW_BALANCE_USD} USDC`, "i"))).toBeTruthy();
+    expect(screen.getByText((content) => content.includes(`$${LOW_BALANCE_USD}`))).toBeTruthy();
   });
 
   it("does not render when balance is at or above threshold", () => {

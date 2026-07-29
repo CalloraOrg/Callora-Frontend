@@ -646,6 +646,9 @@ describe("FiltersSidebar", () => {
       });
       expect(screen.getByTestId("live-region").textContent).toBe("");
       vi.useRealTimers();
+    });
+  });
+
   describe("keyboard shortcut hints", () => {
     it("renders kbd-hint with filter shortcuts", () => {
       render(<FiltersSidebar {...baseProps} />);

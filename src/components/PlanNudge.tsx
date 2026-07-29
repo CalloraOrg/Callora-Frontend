@@ -1,6 +1,7 @@
 import React from 'react';
 import { WarningIcon } from './icons/WarningIcon';
 import { CheckIcon } from './icons/CheckIcon';
+import KbdHint from './KbdHint';
 
 interface PlanNudgeProps {
   usagePercent: number;
@@ -68,6 +69,11 @@ export default function PlanNudge({ usagePercent, onDismiss }: PlanNudgeProps) {
         >
           <CheckIcon size={16} aria-hidden="true" />
           Upgrade plan
+          <KbdHint
+            shortcut={{ key: 'u', description: 'Upgrade', category: 'Plan' }}
+            variant="subtle"
+            label="Upgrade keyboard shortcut"
+          />
         </a>
         <button
           type="button"

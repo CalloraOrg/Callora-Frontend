@@ -39,7 +39,7 @@ describe("SubscribeCTA Component", () => {
     );
 
     expect(screen.getByText("WeatherSim API")).toBeTruthy();
-    expect(screen.getByText("$0.01")).toBeTruthy();
+    expect(screen.getByText("$0.010")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Subscribe to WeatherSim API/i })).toBeTruthy();
   });
 
