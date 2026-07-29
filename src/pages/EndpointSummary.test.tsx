@@ -64,4 +64,68 @@ describe("EndpointSummary Page", () => {
     expect(printSpy).toHaveBeenCalled();
     printSpy.mockRestore();
   });
+
+  describe("aria-live announcements", () => {
+    it("renders a live region for screen-reader announcements", () => {
+      render(
+        <MemoryRouter>
+          <EndpointSummary />
+        </MemoryRouter>
+      );
+
+      const liveRegion = screen.getByTestId("live-region-endpoint-summary");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion.getAttribute("aria-live")).toBe("polite");
+      expect(liveRegion.getAttribute("aria-atomic")).toBe("true");
+    });
+
+    it("announces when an endpoint card is expanded", () => {
+      render(
+        <MemoryRouter>
+          <EndpointSummary />
+        </MemoryRouter>
+      );
+
+      const triggers = screen.getAllByRole("button");
+      const endpointTrigger = triggers.find((btn) =>
+        btn.classList.contains("endpoint-summary-trigger") && btn.getAttribute("aria-expanded") === "false"
+      );
+      expect(endpointTrigger).toBeTruthy();
+      if (!endpointTrigger) return;
+
+      const liveRegion = screen.getByTestId("live-region-endpoint-summary");
+
+      fireEvent.click(endpointTrigger);
+
+      expect(liveRegion.textContent).toMatch(/Expanded/);
+    });
+
+    it("announces when an endpoint card is collapsed", () => {
+      render(
+        <MemoryRouter>
+          <EndpointSummary />
+        </MemoryRouter>
+      );
+
+      const triggers = screen.getAllByRole("button");
+      const endpointTrigger = triggers.find((btn) =>
+        btn.classList.contains("endpoint-summary-trigger")
+      );
+      expect(endpointTrigger).toBeTruthy();
+      if (!endpointTrigger) return;
+
+      const liveRegion = screen.getByTestId("live-region-endpoint-summary");
+
+      // First expand
+      const initialExpanded = endpointTrigger.getAttribute("aria-expanded") === "true";
+      if (!initialExpanded) {
+        fireEvent.click(endpointTrigger);
+      }
+
+      // Now collapse
+      fireEvent.click(endpointTrigger);
+
+      expect(liveRegion.textContent).toMatch(/Collapsed/);
+    });
+  });
 });

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { MOCK_APIS } from "../data/mockApis";
 import { API_BASE_URL } from "../config/constants";
+import LiveRegion from "../components/LiveRegion";
 
 export default function EndpointSummary(): JSX.Element {
   useDocumentTitle(
@@ -21,6 +22,33 @@ export default function EndpointSummary(): JSX.Element {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     new Set(allEndpoints.slice(0, 3).map((ep) => ep.id)) // Expand first 3 by default
   );
+
+  // Screen-reader announcement state
+  const [announcement, setAnnouncement] = useState("");
+  const prevExpandedIdsRef = useRef(expandedIds);
+
+  useEffect(() => {
+    const prev = prevExpandedIdsRef.current;
+    const endpointMap = new Map(allEndpoints.map((ep) => [ep.id, ep]));
+
+    for (const id of expandedIds) {
+      if (!prev.has(id)) {
+        const ep = endpointMap.get(id);
+        setAnnouncement(`Expanded ${ep?.title ?? id} details`);
+        prevExpandedIdsRef.current = expandedIds;
+        return;
+      }
+    }
+    for (const id of prev) {
+      if (!expandedIds.has(id)) {
+        const ep = endpointMap.get(id);
+        setAnnouncement(`Collapsed ${ep?.title ?? id} details`);
+        prevExpandedIdsRef.current = expandedIds;
+        return;
+      }
+    }
+    prevExpandedIdsRef.current = expandedIds;
+  }, [expandedIds, allEndpoints]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -67,6 +95,10 @@ export default function EndpointSummary(): JSX.Element {
         >
           Print Summary
         </button>
+        <LiveRegion
+          message={announcement}
+          regionId="endpoint-summary"
+        />
       </header>
 
       <section style={{ display: "grid", gap: "16px" }}>
