@@ -9,7 +9,7 @@ This change adds `prefers-reduced-motion` fallback support for ApiUsage page ani
 ## Changes Made
 
 ### CSS Changes (`src/index.css`)
-Extended the existing `@media (prefers-reduced-motion: reduce)` block for the ApiUsage page to include the button spinner animation:
+Extended the existing `@media (prefers-reduced-motion: reduce)` block for the ApiUsage page to include button spinner animation and disable hover/focus transitions on all interactive button elements:
 
 ```css
 @media (prefers-reduced-motion: reduce) {
@@ -31,11 +31,31 @@ Extended the existing `@media (prefers-reduced-motion: reduce)` block for the Ap
   .api-usage-page .chart-bar {
     transition: none;
   }
+
+  .api-usage-page .tab-button {
+    transition: none;
+  }
+
+  .api-usage-page .danger-button {
+    transition: none;
+  }
+
+  .api-usage-page .primary-button {
+    transition: none;
+  }
+
+  .api-usage-page .secondary-button {
+    transition: none;
+  }
+
+  .api-usage-page .ghost-button {
+    transition: none;
+  }
 }
 ```
 
 ### Test Changes
-Added focused tests in both `src/pages/ApiUsage.test.tsx` and `src/ApiUsage.test.tsx` to verify that the button-spinner element has the CSS class targeted by the reduced-motion rules.
+Added focused tests in `src/pages/ApiUsage.test.tsx` to verify that each button element (`.tab-button`, `.danger-button`, `.primary-button`, `.secondary-button`, `.ghost-button`) has the CSS class targeted by the reduced-motion transition rules.
 
 ## API/Visible Changes
 
@@ -45,6 +65,8 @@ Added focused tests in both `src/pages/ApiUsage.test.tsx` and `src/ApiUsage.test
   - Static skeleton loaders (no shimmer animation)
   - Static button spinners (no rotation animation)
   - Instant chart bar transitions (no animation delay)
+  - Static button hover/focus effects (no background, opacity, or transform transitions)
+  - Static language tab hover/active transitions
 - **Users without reduced-motion preference** will see no change in behavior
 
 ### API Changes
