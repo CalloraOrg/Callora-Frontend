@@ -1,7 +1,24 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import SubscribeButton from "../components/SubscribeButton";
+import Tooltip from "../components/Tooltip";
+import { LinkIcon } from "../components/icons/LinkIcon";
 import { formatPrice } from "../utils/format";
 
+/**
+ * SubscribeCTA — a sticky bottom bar that appears when the hero CTA scrolls
+ * out of view.
+ *
+ * Accessibility (WCAG 2.1 AA):
+ * - Icon-only buttons (copy link) are wrapped in the shared {@link Tooltip}
+ *   primitive so every user gets a visible label.
+ * - Tooltips open on hover (300 ms delay), on keyboard focus, and on touch
+ *   long-press (500 ms) — consistent with Breadcrumb #726 and ApiTagFilter #533.
+ * - `aria-describedby` connects the trigger to the tooltip content.
+ * - Escape dismisses an open tooltip.
+ * - Colours come from design tokens so they work in both light and dark mode.
+ *
+ * Part of GrantFox FWC26 campaign (issue #746).
+ */
 type Props = {
   /** Name of the API. */
   apiName: string;
@@ -20,6 +37,17 @@ export default function SubscribeCTA({
   observeElementSelector = ".api-hero__cta",
 }: Props): JSX.Element {
   const [isVisible, setIsVisible] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // Fallback for environments without clipboard API
+    }
+  }, []);
 
   useEffect(() => {
     const target = document.querySelector(observeElementSelector);
@@ -64,6 +92,23 @@ export default function SubscribeCTA({
             <div className="subscribe-cta-bar__price">
               ${formatPrice(pricePerRequest)}
             </div>
+          </div>
+
+          <div className="subscribe-cta-bar__icon-group">
+            <Tooltip
+              content={linkCopied ? "Link copied!" : "Copy link"}
+              hoverDelayMs={300}
+              longPressMs={500}
+            >
+              <button
+                type="button"
+                className="subscribe-cta-bar__icon-button"
+                aria-label={linkCopied ? "Link copied!" : "Copy link to this API"}
+                onClick={handleCopyLink}
+              >
+                <LinkIcon size={16} aria-hidden="true" />
+              </button>
+            </Tooltip>
           </div>
 
           <SubscribeButton
