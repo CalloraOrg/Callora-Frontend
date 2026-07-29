@@ -7028,6 +7028,96 @@ code,
     color: #444;
   }
 
+  /* ── ReviewsTab: hide chrome, expand collapsibles ────────────────────
+     FWC26 — When printing the reviews section:
+     1. .reviews-sort-controls (.no-print) is already hidden by the generic
+        .no-print rule above; this comment preserves intent for reviewers.
+     2. Every review card (data-reviews-section .preview-card) is forced
+        visible and fully expanded so no content is clipped on paper.
+     3. The RatingHistogram bars use inline `width` — overflow:visible
+        ensures they are never cut off.
+     4. The collapsed-content pattern used elsewhere in the app
+        ([aria-hidden="true"], [hidden], details/summary) is expanded so
+        any future collapsible that lands inside the reviews panel prints
+        in full without JS intervention.
+     ─────────────────────────────────────────────────────────────────── */
+
+  /* Force every review card to be fully visible and expanded */
+  [data-reviews-section] .preview-card {
+    display: block !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Expand any aria-hidden collapsible regions inside the reviews panel */
+  [data-reviews-section] [aria-hidden="true"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Expand <details> elements that may appear in reviews */
+  [data-reviews-section] details {
+    display: block !important;
+  }
+
+  [data-reviews-section] details > * {
+    display: block !important;
+  }
+
+  /* Expand hidden elements inside the reviews panel */
+  [data-reviews-section] [hidden] {
+    display: block !important;
+  }
+
+  /* Rating histogram: allow bars to render at full width without overflow clip */
+  [data-reviews-section] .rating-histogram,
+  [data-reviews-section] .rating-histogram__bar-track,
+  [data-reviews-section] .rating-histogram__bar-fill {
+    overflow: visible !important;
+    max-width: 100% !important;
+  }
+
+  /* Review list grid: single column, consistent spacing */
+  [data-reviews-section] .reviews-list {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Review cards: avoid splitting across page breaks */
+  [data-reviews-section] .preview-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
+/* Share Snapshot Button */
+.share-snapshot-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+/* ─── Category Pills ──────────────────────────────────────────────────────── */
+.pill-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  scrollbar-width: thin;
+}
+
+.pill-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
   /* Expand EndpointSummary collapsibles when printing */
   .endpoint-summary-content--collapsed {
     display: block !important;

@@ -919,10 +919,17 @@ print(response.json())`;
                  * any runtime JS.  See issue #580 and src/styles/print.css.
                  */}
                 {tab === "reviews" && (
-                  <section id="panel-reviews" role="tabpanel" aria-labelledby="tab-reviews" tabIndex={0}>
+                  <section
+                    id="panel-reviews"
+                    role="tabpanel"
+                    aria-labelledby="tab-reviews"
+                    tabIndex={0}
+                    data-reviews-section
+                  >
                     <div className="api-detail-reviews-header">
                       <h3 style={{ margin: 0 }}>Developer Feedback</h3>
-                      <button className="secondary-button">Write a Review</button>
+                      {/* Write a Review button: not meaningful on paper */}
+                      <button className="secondary-button no-print">Write a Review</button>
                     </div>
 
                     {rawReviews.length === 0 ? (
@@ -937,6 +944,12 @@ print(response.json())`;
                           <RatingHistogram rating={averageRating} distribution={ratingDistribution} />
                         </div>
 
+                        {/* Sort controls: hidden when printing — sort order is irrelevant on paper */}
+                        <div
+                          className="reviews-sort-controls no-print"
+                          style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}
+                        >
+                          <label htmlFor="review-sort" style={{ fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-lg)", marginBottom: "var(--mkt-space-xl)", flexWrap: "wrap" }}>
                           <label htmlFor="review-sort" style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)", whiteSpace: "nowrap" }}>
                             Sort by
@@ -966,6 +979,7 @@ print(response.json())`;
                           </select>
                         </div>
 
+                        <div className="reviews-list" style={{ display: "grid", gap: 16 }}>
                         <div style={{ display: "grid", gap: "var(--mkt-space-xl)" }}>
                           {sortedReviews.map((review) => (
                             <div key={review.id} className="preview-card" style={{ padding: "var(--mkt-space-2xl)" }}>
