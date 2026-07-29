@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import MOCK_APIS from "../data/mockApis";
+import Skeleton from "../components/Skeleton";
 import { TagIcon } from "../components/icons";
 import Tooltip from "../components/Tooltip";
+import KbdHint from "../components/KbdHint";
+import type { Shortcut } from "../hooks/useGlobalShortcuts";
 
 /**
  * Extracts all unique tags from the mock API data, sorted alphabetically.
@@ -30,6 +33,8 @@ export interface ApiTagFilterProps {
   hoverDelayMs?: number;
   /** Optional touch long-press duration in ms for tooltips. Defaults to 500. */
   longPressMs?: number;
+  /** Show skeleton loading state instead of tags. */
+  isLoading?: boolean;
 }
 
 /**
@@ -57,22 +62,48 @@ export interface ApiTagFilterProps {
  * custom properties from `tokens.css`.  Dark / light themes are
  * automatically supported.
  */
+/**
+ * Skeleton placeholder shown while tags are loading.
+ * Renders pill-shaped skeleton elements matching the component's layout
+ * so the transition to the real filter is seamless.
+ */
+export function ApiTagFilterSkeleton() {
+  return (
+    <div
+      className="api-tag-filter"
+      role="group"
+      aria-label="Loading tag filter"
+      aria-busy="true"
+    >
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Skeleton
+          key={i}
+          width={i === 0 ? 48 : 80 + i * 12}
+          height={36}
+          borderRadius={999}
+          className="api-tag-filter__pill-skeleton"
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Keyboard shortcuts for the ApiTagFilter */
+export const TAG_FILTER_SHORTCUTS: readonly Shortcut[] = [
+  { key: "Tab", description: "Navigate between tags", category: "Marketplace" },
+  { key: "Enter", description: "Toggle tag selection", category: "Marketplace" },
+];
+
 export default function ApiTagFilter({
   tags,
   selectedTag,
   onTagChange,
   hoverDelayMs = 0,
   longPressMs = 500,
+  isLoading = false,
 }: ApiTagFilterProps) {
   const isAllSelected = selectedTag === null;
 
-  /**
-   * Compute result counts per tag so users can see which tags are
-   * available and how many APIs match each one.  This is memoised
-   * because it walks the full mock list on every render — it only
-   * needs to change when `tags` change (which is effectively never
-   * at runtime for the current demo dataset).
-   */
   const tagCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const api of MOCK_APIS) {
@@ -129,6 +160,16 @@ export default function ApiTagFilter({
           </Tooltip>
         );
       })}
+
+      {/* Keyboard shortcut hint bubble — subtle chip variant but
+          rendered as <aside> so it retains the complementary landmark role
+          for screen readers. */}
+      <KbdHint
+        shortcuts={TAG_FILTER_SHORTCUTS}
+        variant="chip"
+        as="aside"
+        label="Tag filter keyboard shortcuts"
+      />
     </div>
   );
 }

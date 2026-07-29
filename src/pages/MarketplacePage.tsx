@@ -8,7 +8,7 @@ import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import CategoryPills from "../components/CategoryPills";
 import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
-import FiltersSidebar, { ALL_CATEGORIES, STATUS_OPTIONS } from "../components/FiltersSidebar";
+import FiltersSidebar, { ALL_CATEGORIES } from "../components/FiltersSidebar";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import EmptyState from "../components/EmptyState";
@@ -22,12 +22,12 @@ import {
   persistDensityPreference,
   type DensityPreference,
 } from "../utils/density";
-import CompareDrawer from "../components/CompareDrawer";
+
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
 import LiveRegion from "../components/LiveRegion";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
 import { useCompareStore } from "../state/compareStore";
-import { MarketplacePageSkeleton } from "../components/Skeleton";
+import MarketplacePageSkeleton from "./MarketplacePage.skeleton";
 
 export default function MarketplacePage(): JSX.Element {
   const { apis } = useCompareStore();
@@ -498,6 +498,10 @@ export default function MarketplacePage(): JSX.Element {
   const startItem = (validCurrentPage - 1) * pageSize + 1;
   const endItem = Math.min(validCurrentPage * pageSize, filtered.length);
 
+  if (isLoading) {
+    return <MarketplacePageSkeleton density={density} />;
+  }
+
   return (
     <div className="marketplace-page">
       {/* Top row: title + search only */}
@@ -617,7 +621,7 @@ export default function MarketplacePage(): JSX.Element {
                 Filters
                 {activeFilterCount > 0 && (
                   <span
-                    className="marketplace-filter-badge"
+                    className="marketplace-filter-badge numeric-tabular"
                     aria-label={`${activeFilterCount} active filter${activeFilterCount !== 1 ? "s" : ""}`}
                   >
                     {activeFilterCount}
@@ -642,8 +646,6 @@ export default function MarketplacePage(): JSX.Element {
 
           {fetchError ? (
             <EmptyState variant="error" onRetry={handleRetryFetch} />
-          ) : isLoading ? (
-            <MarketplacePageSkeleton />
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}

@@ -3,7 +3,7 @@ import Dropdown from "./Dropdown";
 import EmptyState from "./EmptyState";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { usePersistedState } from "../hooks/usePersistedState";
-import { FiltersSidebarSkeleton } from "./Skeleton";
+
 import LiveRegion from "./LiveRegion";
 
 const POPULARITY_OPTIONS = [
@@ -202,7 +202,7 @@ export default function FiltersSidebar({
     }
   }, [sheetOpen]);
 
-  // ── Aria-live announcements ─────────────────────────────────────────────
+  // ── Aria-live announcements for filter changes ────────────────────────
   // Track filter state to build descriptive announcements for screen readers.
   // Initialize refs with neutral defaults so the first effect run detects the
   // initial filter values and announces them.
@@ -211,8 +211,6 @@ export default function FiltersSidebar({
   const prevMaxRef = useRef<number | null>(null);
   const prevPopularityRef = useRef<string>("any");
   const prevFavoritesRef = useRef<boolean>(false);
-
-  const [announcement, setAnnouncement] = useState("");
 
   // Announce filter changes when any filter value changes.
   useEffect(() => {
@@ -258,8 +256,6 @@ export default function FiltersSidebar({
     clearFilters();
     setAnnouncement("All filters cleared. Showing all APIs.");
   }, [clearFilters]);
-
-
 
   // Announce zero results separately from filter changes.
   const prevResultCountRef = useRef<number | undefined>(undefined);
@@ -498,8 +494,7 @@ export default function FiltersSidebar({
          The wrapper is aria-live="polite" so screen readers announce the
          zero-results state when filters narrow the count to 0. */}
       {typeof resultCount === "number" &&
-        resultCount === 0 &&
-        hasActiveFilters && (
+        resultCount === 0 && (
           <div
             data-testid="filters-zero-results"
             style={{
@@ -511,7 +506,7 @@ export default function FiltersSidebar({
             aria-live="polite"
           >
             <EmptyState
-              variant="filtered"
+              variant={hasActiveFilters ? "filtered" : "empty"}
               size="compact"
               onClearFilters={hasActiveFilters ? handleClearFilters : undefined}
             />

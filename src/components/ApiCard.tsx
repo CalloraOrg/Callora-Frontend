@@ -15,17 +15,16 @@ import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import { useFavorites } from "../hooks/useFavorites";
 import type { APIItem } from "../data/mockApis";
-import { LiveRegion } from "./LiveRegion";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import { usePinnedApis, pinnedApisStore } from "../state/pinnedApis";
 import Sparkline from "./Sparkline";
 import type { Shortcut } from "../hooks/useGlobalShortcuts";
-import EmptyState from "./EmptyState";
 import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
+import { colorFromId } from "../utils/colorFromId";
 import { ClockIcon, BoltIcon } from "./icons";
-import StatusBadge from "./StatusBadge";
+
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -38,12 +37,12 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
       aria-busy="true"
       aria-label="Loading API"
       style={{
-        padding: isCompact ? 10 : 12,
+        padding: isCompact ? "var(--mkt-card-compact-padding, 10px)" : "var(--mkt-card-padding, 12px)",
         display: "flex",
         flexDirection: "column",
-        minHeight: isCompact ? 188 : 220,
-        gap: isCompact ? 6 : 8,
-        border: "1px solid rgba(255,255,255,0.03)",
+        minHeight: isCompact ? "var(--mkt-card-compact-min-height, 188px)" : "var(--mkt-card-min-height, 220px)",
+        gap: isCompact ? "var(--mkt-card-compact-gap, 6px)" : "var(--mkt-card-gap, 8px)",
+        border: "1px solid var(--line, rgba(255,255,255,0.05))",
         pointerEvents: "none",
         position: "relative",
       }}
@@ -59,7 +58,7 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
           left: 0,
           width: 4,
           height: "100%",
-          borderRadius: "var(--radius-lg) 0 0 var(--radius-lg)",
+          borderRadius: "var(--radius-lg, 12px) 0 0 var(--radius-lg, 12px)",
           background: "color-mix(in srgb, var(--accent) 12%, transparent)",
         }}
       />
@@ -87,8 +86,8 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
       <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <Skeleton tone="stellar" width={56} height={56} borderRadius={10} />
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--mkt-space-md)" }}>
-          <div style={{ display: "flex", gap: "var(--mkt-space-md)", alignItems: "baseline" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--mkt-space-md, 8px)" }}>
+          <div style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", alignItems: "baseline" }}>
             <Skeleton tone="stellar" width="60%" height={18} />
             <Skeleton tone="stellar" width="20%" height={12} />
           </div>
@@ -109,7 +108,7 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-end",
-            gap: "var(--mkt-space-sm)"
+            gap: "var(--mkt-space-sm, 4px)"
           }}
         >
           <Skeleton tone="stellar" width={50} height={12} />
@@ -123,8 +122,7 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
         <Skeleton tone="stellar" width={40} height={24} borderRadius={8} />
       </div>
 
-      {/* WhyApi placeholder — matches the real card's rationale section
-          that appears in comfortable mode. */}
+      {/* WhyApi placeholder — matches the real card's rationale section in comfortable mode */}
       {!isCompact && (
         <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 4 }}>
           <Skeleton tone="stellar" width="35%" height={14} />
@@ -132,8 +130,7 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
         </div>
       )}
 
-      {/* Sparkline section — matches the real card's 24h sparkline
-          that appears between tags and stats. */}
+      {/* Sparkline section placeholder */}
       <div
         style={{
           display: "flex",
@@ -153,7 +150,7 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
           marginTop: "auto",
           display: "flex",
           flexDirection: "column",
-          gap: "var(--mkt-space-lg)",
+          gap: "var(--mkt-space-lg, 12px)",
         }}
       >
         <div className="api-card__stats" aria-hidden="true">
@@ -267,7 +264,7 @@ interface FavoriteButtonProps {
   onStatusChange?: (message: string) => void;
 }
 
-function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion = false }: FavoriteButtonProps) {
+function FavoriteButton({ endpointId, isFavorite, onToggle, prefersReducedMotion = false, onStatusChange }: FavoriteButtonProps) {
   return (
     <CardActionButton
       isActive={isFavorite}
@@ -649,6 +646,11 @@ export default function ApiCard({
   const avgLatencyMs = api.avgLatencyMs;
   const uptimePercent = api.uptimePercent;
   const isCompact = density === "compact" || isMobile;
+
+  const [liveMessage, setLiveMessage] = useState("");
+  const announce = useCallback((msg: string) => {
+    setLiveMessage(msg);
+  }, []);
 
   const prefersReducedMotion = useMemo(() => {
     return typeof window !== "undefined" &&

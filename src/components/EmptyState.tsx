@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useCallback } from "react";
 import ExternalLink from "./ExternalLink";
+import { useCopy } from "../hooks/useCopy";
 import { EmptyStateSkeleton } from "./Skeleton";
 
 export type EmptyStateVariant =
@@ -8,7 +9,8 @@ export type EmptyStateVariant =
   | "filtered"
   | "error"
   | "plan-badge"
-  | "risk-gauge";
+  | "risk-gauge"
+  | "quota-banner";
 export type EmptyStateSize = "default" | "compact";
 
 export interface EmptyStateProps {
@@ -29,6 +31,8 @@ export interface EmptyStateProps {
     onClick: () => void;
   };
   loading?: boolean;
+  /** When true, renders a copy-to-clipboard button for the message text. */
+  copyable?: boolean;
 }
 
 /**
@@ -361,6 +365,86 @@ function EmptyIllustration({
     );
   }
 
+  if (variant === "quota-banner") {
+    return (
+      <svg
+        width={box}
+        height={box}
+        viewBox="0 0 64 64"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {/* Gauge arc — quota meter */}
+        <path
+          d="M14 38 A 14 14 0 0 1 36 38"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+        />
+        <path
+          d="M18 38 A 10 10 0 0 1 32 38"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+          opacity="0.6"
+        />
+        {/* Needle pointing at ~60% */}
+        <line
+          x1="25" y1="38" x2="21" y2="29"
+          stroke="var(--accent)"
+          strokeWidth={accentStroke}
+        />
+        <circle cx="25" cy="38" r="2" fill="var(--accent)" stroke="none" />
+
+        {/* Vertical divider */}
+        <line
+          x1="42" y1="14" x2="42" y2="52"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.5}
+          opacity="0.3"
+          strokeDasharray="2 3"
+        />
+
+        {/* Usage bar chart */}
+        <rect
+          x="46" y="26" width="5" height="24" rx="1.5"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.85}
+        />
+        <rect
+          x="53" y="34" width="5" height="16" rx="1.5"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.85}
+        />
+        <rect
+          x="46" y="36" width="5" height="14" rx="1.5"
+          fill="var(--accent)"
+          fillOpacity="0.2"
+          stroke="none"
+        />
+
+        {/* Baseline */}
+        <line
+          x1="46" y1="50" x2="58" y2="50"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.5}
+          opacity="0.4"
+        />
+
+        {/* Decorative sparkle dots */}
+        <circle cx="10" cy="12" r="1.5" fill="var(--accent)" stroke="none" />
+        <circle cx="56" cy="14" r="1.25" fill="var(--accent)" stroke="none" />
+        <path
+          d="M8 8h4"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth * 0.6}
+          strokeDasharray="1.5 2"
+          opacity="0.5"
+        />
+      </svg>
+    );
+  }
+
   return (
     <svg
       width={box}
@@ -399,6 +483,106 @@ function EmptyIllustration({
 }
 
 /**
+ * Compact copy-to-clipboard line rendered alongside the EmptyState message.
+ * Provides success feedback for assistive technology via aria-live.
+ */
+function MessageWithCopy({
+  message,
+  isCompact,
+}: {
+  message: string;
+  isCompact: boolean;
+}) {
+  const { handleCopy: copyToClipboard, copied, supported } = useCopy();
+  const [liveFeedback, setLiveFeedback] = React.useState("");
+
+  const handleCopy = useCallback(() => {
+    copyToClipboard(message).then((ok) => {
+      if (ok) {
+        setLiveFeedback("Message copied.");
+        setTimeout(() => setLiveFeedback(""), 2000);
+      }
+    });
+  }, [copyToClipboard, message]);
+
+  const containerStyle: React.CSSProperties = {
+    display: "flex",
+    gap: isCompact ? "6px" : "8px",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    maxWidth: isCompact ? "240px" : "320px",
+  };
+
+  const messageStyle: React.CSSProperties = isCompact
+    ? {
+        margin: 0,
+        color: "var(--muted)",
+        fontSize: "0.8125rem",
+        lineHeight: 1.4,
+      }
+    : {
+        margin: "0 0 24px 0",
+        color: "var(--muted)",
+        fontSize: "0.9375rem",
+        lineHeight: 1.5,
+      };
+
+  const btnStyle: React.CSSProperties = {
+    flexShrink: 0,
+    background: "none",
+    border: "1px solid var(--line)",
+    borderRadius: "4px",
+    cursor: "pointer",
+    padding: "2px 6px",
+    fontSize: isCompact ? "0.7rem" : "0.75rem",
+    color: "var(--accent)",
+    lineHeight: 1.4,
+    whiteSpace: "nowrap",
+    marginTop: isCompact ? 0 : "2px",
+    transition: "color 0.15s ease, border-color 0.15s ease",
+  };
+
+  if (!supported) {
+    return (
+      <p
+        style={messageStyle}
+        data-testid="empty-state-message"
+      >
+        {message}
+      </p>
+    );
+  }
+
+  return (
+    <div style={containerStyle}>
+      <p style={messageStyle} data-testid="empty-state-message">
+        {message}
+      </p>
+      <button
+        type="button"
+        style={btnStyle}
+        onClick={handleCopy}
+        aria-label={`Copy "${message}"`}
+        data-testid="empty-state-copy-button"
+      >
+        {copied ? "Copied!" : "Copy"}
+      </button>
+      {/* Screen-reader announcement for copy feedback (WCAG 4.1.3) */}
+      {liveFeedback && (
+        <span
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {liveFeedback}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * EmptyState component with distinct variants for different marketplace states.
  *
  * Variants:
@@ -415,6 +599,10 @@ function EmptyIllustration({
  *               Shows a shield-and-gauge illustration with a "Run assessment" CTA
  *               so users can evaluate their API risk profile.  Used by the
  *               RiskGauge page (issue #664).
+ * - quota-banner: No quota data is configured yet.
+ *                 Shows a gauge-and-bars illustration with a "Set up quota" CTA
+ *                 so users can configure usage limits.  Used by the QuotaBanner
+ *                 component (issue #742).
  *
  * Sizes:
  * - default:  Full-size layout for result areas (48px padding, 80px illustration).
@@ -448,9 +636,11 @@ export default function EmptyState({
   action,
   secondaryAction,
   loading = false,
+  copyable = false,
 }: EmptyStateProps) {
   const resolvedMessage = message ?? description;
-  const resolvedAction = action ?? (ctaLabel && onCta ? { label: ctaLabel, onClick: onCta } : undefined);
+  const resolvedAction = action;
+  const { copy: handleCopy, copied } = useCopy();
 
   if (loading) {
     return (
@@ -510,6 +700,18 @@ export default function EmptyState({
         size === "compact"
           ? "Run an assessment to evaluate your API risk profile."
           : "Run a risk assessment to evaluate your API's security, reliability, and compliance posture.",
+    },
+    /**
+     * quota-banner variant — shown on the QuotaBanner component when no
+     * quota data is configured yet.  The CTA guides users to set up their
+     * first quota (issue #742).
+     */
+    "quota-banner": {
+      title: "No quota configured",
+      message:
+        size === "compact"
+          ? "Set a quota to track your API usage limits."
+          : "No quota has been configured for this API yet. Set a quota to track and manage your usage limits.",
     },
   };
 
@@ -624,7 +826,49 @@ export default function EmptyState({
 
       <HeadingTag style={headingStyle}>{finalTitle}</HeadingTag>
 
-      <p style={messageStyle}>{finalMessage}</p>
+      <MessageWithCopy message={finalMessage} isCompact={isCompact} />
+
+      {copyable && finalMessage && (
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => handleCopy(finalMessage)}
+            aria-label="Copy message to clipboard"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.375rem",
+              fontSize: isCompact ? "0.75rem" : "0.8125rem",
+              padding: isCompact ? "0.25rem 0.5rem" : "0.3125rem 0.75rem",
+              color: copied ? "var(--success, #10b981)" : "var(--muted)",
+              minHeight: "36px",
+            }}
+          >
+            <span aria-hidden="true">
+              {copied ? "✓" : "⧉"}
+            </span>
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <span
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              position: "absolute",
+              width: "1px",
+              height: "1px",
+              margin: "-1px",
+              padding: 0,
+              overflow: "hidden",
+              clip: "rect(0 0 0 0)",
+              whiteSpace: "nowrap",
+              border: 0,
+            }}
+          >
+            {copied ? "Message copied to clipboard" : ""}
+          </span>
+        </div>
+      )}
 
       {resolvedAction && (
         <button

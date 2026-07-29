@@ -6,15 +6,25 @@
  * status is distinguishable by texture as well as by color. This satisfies
  * WCAG 1.4.1 (Use of Color) and helps users with deuteranopia/protanopia.
  *
+ * Each status belongs to a "pattern group" — related severity levels share
+ * a texture so users learn the relationship between patterns and meaning:
+ *   Baseline (solid)    → success, operational
+ *   Diagonal stripes ╲  → error, down
+ *   Opposite stripes ╱  → warning, degraded
+ *   Dots               → pending
+ *   Crosshatch ╳       → maintenance
+ *
  * Usage:
  *   <StatusBadge status="operational" />
  *   <StatusBadge status="error" label="API Error" />
  *
  * Props:
- *   status  — one of the six supported variants (see StatusVariant below)
- *   label   — optional override for the visible text; defaults to the
- *             capitalised status name
- *   className — passed through to the root element for layout composition
+ *   status       — one of the eight supported variants (see StatusVariant)
+ *   label        — optional override for the visible text; defaults to
+ *                  the capitalised status name
+ *   className    — passed through to the root element
+ *   showPattern  — set to false to hide the texture pattern (default: true)
+ *   patternStyle — "default" | "dense" | "high-contrast" (default: "default")
  */
 
 import React from "react";
@@ -148,6 +158,7 @@ export function StatusBadge({
       data-pattern={patternKey}
       data-pattern-enabled={showPattern}
       data-pattern-style={patternStyle}
+      data-pattern-description={showPattern ? patternDescription : "none"}
       style={{
         display: "inline-flex",
         alignItems: "center",

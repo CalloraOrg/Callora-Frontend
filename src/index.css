@@ -286,6 +286,35 @@ input {
   gap: 16px;
 }
 
+/* ── SortMenu component styles ───────────────────────────────────────────── */
+.sort-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sort-menu__sort-row {
+  display: flex;
+  align-items: center;
+}
+
+.sort-menu__current-state {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.sort-menu__label {
+  font-weight: 500;
+}
+
+.sort-menu__value {
+  font-weight: 600;
+  color: var(--text);
+}
+
 .theme-playground__editor {
   padding: 20px;
   border-radius: var(--radius-lg);
@@ -2177,6 +2206,7 @@ code,
   color: var(--text);
   font-size: 1rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 1.3;
   white-space: nowrap;
 }
@@ -2607,6 +2637,31 @@ code,
   font-size: 0.68rem;
   border-color: var(--line);
   background: transparent;
+}
+
+/* PlanNudge keyboard shortcut integration */
+.plan-nudge__upgrade-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-nudge__upgrade-link .kbd-hint--subtle {
+  margin-left: 4px;
+}
+
+/* Responsive keyboard hint for PlanNudge */
+@media (max-width: 480px) {
+  .plan-nudge__upgrade-link .kbd-hint--subtle {
+    font-size: 0.7rem;
+    gap: 3px;
+  }
+  
+  .plan-nudge__upgrade-link .kbd-hint--subtle .kbd-hint__key {
+    min-width: 14px;
+    padding: 1px 3px;
+    font-size: 0.65rem;
+  }
 }
 
 /* QuotaBanner layout and styles */
@@ -4235,6 +4290,31 @@ code,
   }
 }
 
+/* ── ApiUsage — prefers-reduced-motion fallback (Issue #721) ───────────
+   When users prefer reduced motion, disable pulsing status dots, skeleton
+   shimmer animations, button spinner, and chart-bar transitions in the ApiUsage section
+   so the UI stays completely static. */
+@media (prefers-reduced-motion: reduce) {
+  .api-usage-page .status-dot {
+    animation: none;
+    opacity: 1;
+  }
+
+  .api-usage-page .skeleton {
+    animation: none;
+    background: var(--surface-soft);
+  }
+
+  .api-usage-page .button-spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .api-usage-page .chart-bar {
+    transition: none;
+  }
+}
+
 @media (max-width: 768px) {
   .app-shell {
     padding: 20px 14px 32px;
@@ -5693,6 +5773,125 @@ code,
   }
 }
 
+/* ─── BillingHistory ─────────────────────────────────────────────────────────
+   Hover-triggered / keyboard-accessible billing history rows.
+   GrantFox FWC26 campaign (Issue #692) — matches DashboardOverview pattern.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.billing-history {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.billing-history__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.billing-history__title {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+  color: var(--text);
+}
+
+.billing-history__subtitle {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.billing-history__list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.billing-history__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.billing-history__item:hover {
+  border-color: var(--accent, #6366f1);
+  box-shadow: var(--focus-ring);
+}
+
+.billing-history__item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.billing-history__item-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.billing-history__item-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.billing-history__item-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.billing-history__item-amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.billing-history__item-amount--credit {
+  color: var(--success, #10b981);
+}
+
+.billing-history__item-amount--debit {
+  color: var(--text);
+}
+
+.billing-history__empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .billing-history__item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .billing-history__item-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 /* ─── ApiDetailStickyTOC ────────────────────────────────────────────────────
    Sticky right-rail TOC inside the documentation tab. Tokens only — no
    hardcoded hex values. Transition respects prefers-reduced-motion.
@@ -5760,6 +5959,25 @@ code,
   }
 }
 
+.api-detail-toc__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.api-detail-toc__error svg {
+  flex-shrink: 0;
+}
+
+.api-detail-toc__error-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ─── Print stylesheet (ApiDetailPage docs printout) ─────────────────────
    Pure CSS. Hides chrome via .no-print, forces light theme, expands code,
    appends URLs after inline links. See src/print.test.ts for contract tests.
@@ -5770,274 +5988,6 @@ code,
   size: auto;
 }
 
-@media print {
-  /* ── Chrome hide utility ───────────────────────────────────────────────── */
-  .no-print {
-    display: none !important;
-  }
-
-  /* ── Force light theme (black on white) ──────────────────────────────── */
-  html,
-  html[data-theme="dark"],
-  html[data-theme="light"] {
-    --page-bg: #f5f7fa !important;
-    --surface: #ffffff !important;
-    --surface-strong: rgba(255, 255, 255, 0.92) !important;
-    --surface-soft: rgba(0, 0, 0, 0.06) !important;
-    --line: rgba(0, 0, 0, 0.08) !important;
-    --line-soft: rgba(0, 0, 0, 0.06) !important;
-    --line-strong: rgba(0, 0, 0, 0.12) !important;
-    --text: #1a2332 !important;
-    --muted: #64748b !important;
-    --accent: #2563eb !important;
-    --accent-strong: #059669 !important;
-    --danger: #dc2626 !important;
-    --success: #10b981 !important;
-    --shadow: none !important;
-    --ambient-a: transparent !important;
-    --ambient-b: transparent !important;
-    --backdrop: transparent !important;
-    --modal-bg: #ffffff !important;
-
-    --method-get-color: #1e40af !important;
-    --method-post-color: #065f46 !important;
-    --method-put-color: #92400e !important;
-    --method-delete-color: #991b1b !important;
-    --method-patch-color: #5b21b6 !important;
-
-    color-scheme: light !important;
-  }
-
-  /* ── Remove decorative / background effects ──────────────────────────── */
-  .ambient,
-  .api-detail-hero {
-    backdrop-filter: none !important;
-  }
-
-  * {
-    backdrop-filter: none !important;
-    box-shadow: none !important;
-    text-shadow: none !important;
-  }
-
-  body {
-    background: #ffffff !important;
-    color: #1a2332 !important;
-  }
-
-  /* ── Hide non-markup chrome (decorative / modal overlays) ────────────── */
-  .skip-link,
-  .modal-backdrop,
-  .skeleton,
-  .ambient,
-  .button-spinner,
-  input[type="range"],
-  .route-progress-bar {
-    display: none !important;
-  }
-
-  /* ── Single-column layout ────────────────────────────────────────────── */
-  .api-detail-content-grid {
-    grid-template-columns: 1fr !important;
-    gap: 0 !important;
-  }
-
-  .api-detail-hero {
-    grid-template-columns: 1fr !important;
-    padding: 0 0 12px 0 !important;
-  }
-
-  .api-detail-price-panel {
-    text-align: left !important;
-    border-top: 1px solid var(--line);
-    padding-top: 12px !important;
-    margin-top: 12px;
-  }
-
-  .api-detail-price {
-    font-size: 1.25rem !important;
-  }
-
-  .api-detail-two-column,
-  .api-detail-pricing-grid,
-  .api-detail-metrics {
-    grid-template-columns: 1fr !important;
-  }
-
-  .endpoint-section-header,
-  .endpoint-card-header,
-  .api-detail-calculator-total,
-  .api-detail-reviews-header {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-  }
-
-  .api-detail-sidebar-inner {
-    position: static !important;
-  }
-
-  .content-left {
-    max-width: 100% !important;
-  }
-
-  /* ── Page-break avoidance ──────────────────────────────────────────── */
-  .preview-card,
-  .stat-card,
-  .stat-card-skeleton,
-  .preview-card-skeleton,
-  .endpoint-section-header,
-  .endpoint-card-header,
-  .endpoint-table-wrap,
-  .api-detail-pricing-grid > *,
-  .api-detail-calculator-total,
-  .api-detail-plan-price,
-  .api-detail-two-column > *,
-  .api-detail-metrics > *,
-  .tab-content section,
-  .billing-panel,
-  .prototype-panel,
-  .vault-balance-card,
-  .info-card,
-  .marketplace-sidebar,
-  .filters-sidebar,
-  .marketplace-results,
-  .lp-section,
-  .lp-card,
-  h2,
-  h3,
-  h4,
-  table {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-
-  /* ── Content polish ──────────────────────────────────────────────────── */
-  .tab-content {
-    animation: none !important;
-  }
-
-  .tab-content section {
-    display: block !important;
-    margin-bottom: 24px;
-  }
-
-  .preview-card {
-    border: 1px solid #ddd !important;
-    background: #ffffff !important;
-    border-radius: 8px !important;
-    overflow: visible !important;
-  }
-
-  .api-detail-logo {
-    background: rgba(0, 0, 0, 0.04) !important;
-    color: #1a2332 !important;
-  }
-
-  .endpoint-card-header {
-    background: rgba(0, 0, 0, 0.03) !important;
-  }
-
-  .endpoint-table-wrap {
-    overflow: visible !important;
-  }
-
-  .endpoint-table-wrap table {
-    min-width: auto !important;
-    width: 100% !important;
-  }
-
-  .api-detail-calculator-total {
-    background: rgba(0, 0, 0, 0.03) !important;
-    border-radius: 8px !important;
-  }
-
-  .api-detail-metrics .stat-card {
-    background: rgba(0, 0, 0, 0.03) !important;
-    border-radius: 8px !important;
-  }
-
-  .api-detail-sidebar-inner > * {
-    margin-bottom: 0 !important;
-  }
-
-  /* ── Code samples: expand and wrap (no horizontal clip) ──────────────── */
-  .code-block,
-  pre,
-  code,
-  .response-json,
-  .endpoint-url {
-    background: #f4f4f5 !important;
-    border: 1px solid #ddd !important;
-    color: #1a2332 !important;
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
-    overflow: visible !important;
-    overflow-x: visible !important;
-    max-width: 100% !important;
-  }
-
-  .api-detail-page {
-    padding: 0 !important;
-  }
-
-  .api-detail-container {
-    max-width: 100% !important;
-  }
-
-  .breadcrumb {
-    margin-bottom: 8px !important;
-  }
-
-  /* ── Links: show full URL after anchor text ──────────────────────────── */
-  a {
-    color: #1a2332 !important;
-    text-decoration: underline !important;
-  }
-
-  a[href]:not([href=""]):not([href^="#"]):not([href^="javascript:"]):after {
-    content: " (" attr(href) ")";
-    font-size: 0.85em;
-    color: #444;
-  }
-
-  /* Expand EndpointSummary collapsibles when printing */
-  .endpoint-summary-content--collapsed {
-    display: block !important;
-  }
-  .endpoint-summary-trigger .chevron-icon {
-    display: none !important;
-  }
-  .endpoint-summary-card {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  /* ReviewsTab — hide chrome + expand collapsibles when printing */
-  .reviews-tab__sort-row {
-    display: none !important;
-  }
-  .reviews-tab .api-detail-reviews-header {
-    display: none !important;
-  }
-  .reviews-tab::before {
-    content: "Developer Reviews";
-    display: block;
-    font-size: 1.25rem;
-    font-weight: 700;
-    margin-bottom: 1rem;
-    color: #1a2332;
-  }
-  .reviews-tab__card {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-  .reviews-tab__list {
-    display: block !important;
-  }
-  .reviews-tab {
-    max-height: none !important;
-  }
-}
 
 /* Share Snapshot Button */
 .share-snapshot-button {
@@ -6374,6 +6324,8 @@ code,
     flex-direction: column;
     gap: 4px;
   }
+}
+
 /* ============================================================
    ApiTagFilter — responsive tag filter bar
    BEM block: .api-tag-filter
@@ -6794,6 +6746,88 @@ code,
   color: var(--text);
 }
 
+/* ── Icon-only action buttons (Share / Bookmark) ────────────────────────────
+   Wrapped in the Tooltip primitive for accessible labels. Design-token
+   colours ensure correct rendering in both light and dark mode.
+   WCAG 2.1 AA: minimum 44 × 44 px tap target, visible :focus-visible ring.
+   ──────────────────────────────────────────────────────────────────────────  */
+.subscribe-cta-bar__icon-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mkt-space-md, 8px);
+}
+
+.subscribe-cta-bar__icon-btn {
+  /* Layout & sizing — 36 px visual, padded to 44 × 44 tap target */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+
+  /* Reset */
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+
+  /* Colour tokens */
+  color: var(--muted);
+
+  /* Smooth hover transition following global speed token */
+  transition:
+    color var(--transition-speed, 240ms),
+    background var(--transition-speed, 240ms),
+    border-color var(--transition-speed, 240ms);
+}
+
+.subscribe-cta-bar__icon-btn:hover {
+  color: var(--text);
+  background: var(--surface-soft, rgba(255, 255, 255, 0.06));
+  border-color: var(--line, rgba(169, 184, 255, 0.16));
+}
+
+/* Active / toggled state — bookmark is saved */
+.subscribe-cta-bar__icon-btn--active {
+  color: var(--accent);
+  background: rgba(78, 133, 255, 0.1);
+  border-color: rgba(78, 133, 255, 0.3);
+}
+
+.subscribe-cta-bar__icon-btn--active:hover {
+  color: var(--accent);
+  background: rgba(78, 133, 255, 0.18);
+  border-color: rgba(78, 133, 255, 0.45);
+}
+
+/* WCAG 2.1 AA focus ring (mirrors global focus.css pattern) */
+.subscribe-cta-bar__icon-btn:focus {
+  outline: none;
+}
+
+.subscribe-cta-bar__icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Light-mode tint adjustments */
+[data-theme="light"] .subscribe-cta-bar__icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: var(--line, rgba(0, 0, 0, 0.12));
+}
+
+[data-theme="light"] .subscribe-cta-bar__icon-btn--active {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"] .subscribe-cta-bar__icon-btn--active:hover {
+  background: rgba(37, 99, 235, 0.14);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
 /* Responsive adjustments for smaller screens */
 @media (max-width: 640px) {
   .subscribe-cta-bar {
@@ -6814,4 +6848,531 @@ code,
     justify-content: space-between;
   }
 }
+
+@media print {
+  /* ── Chrome hide utility ───────────────────────────────────────────────── */
+  .no-print {
+    display: none !important;
+  }
+
+  /* ── Force light theme (black on white) ──────────────────────────────── */
+  html,
+  html[data-theme="dark"],
+  html[data-theme="light"] {
+    --page-bg: #f5f7fa !important;
+    --surface: #ffffff !important;
+    --surface-strong: rgba(255, 255, 255, 0.92) !important;
+    --surface-soft: rgba(0, 0, 0, 0.06) !important;
+    --line: rgba(0, 0, 0, 0.08) !important;
+    --line-soft: rgba(0, 0, 0, 0.06) !important;
+    --line-strong: rgba(0, 0, 0, 0.12) !important;
+    --text: #1a2332 !important;
+    --muted: #64748b !important;
+    --accent: #2563eb !important;
+    --accent-strong: #059669 !important;
+    --danger: #dc2626 !important;
+    --success: #10b981 !important;
+    --shadow: none !important;
+    --ambient-a: transparent !important;
+    --ambient-b: transparent !important;
+    --backdrop: transparent !important;
+    --modal-bg: #ffffff !important;
+
+    --method-get-color: #1e40af !important;
+    --method-post-color: #065f46 !important;
+    --method-put-color: #92400e !important;
+    --method-delete-color: #991b1b !important;
+    --method-patch-color: #5b21b6 !important;
+
+    color-scheme: light !important;
+  }
+
+  /* ── Remove decorative / background effects ──────────────────────────── */
+  .ambient,
+  .api-detail-hero {
+    backdrop-filter: none !important;
+  }
+
+  * {
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #1a2332 !important;
+  }
+
+  /* ── Hide non-markup chrome (decorative / modal overlays) ────────────── */
+  .skip-link,
+  .modal-backdrop,
+  .skeleton,
+  .ambient,
+  .button-spinner,
+  input[type="range"],
+  .route-progress-bar {
+    display: none !important;
+  }
+
+  /* ── Single-column layout ────────────────────────────────────────────── */
+  .api-detail-content-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+  }
+
+  .api-detail-hero {
+    grid-template-columns: 1fr !important;
+    padding: 0 0 12px 0 !important;
+  }
+
+  .api-detail-price-panel {
+    text-align: left !important;
+    border-top: 1px solid var(--line);
+    padding-top: 12px !important;
+    margin-top: 12px;
+  }
+
+  .api-detail-price {
+    font-size: 1.25rem !important;
+  }
+
+  .api-detail-two-column,
+  .api-detail-pricing-grid,
+  .api-detail-metrics {
+    grid-template-columns: 1fr !important;
+  }
+
+  .endpoint-section-header,
+  .endpoint-card-header,
+  .api-detail-calculator-total,
+  .api-detail-reviews-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .api-detail-sidebar-inner {
+    position: static !important;
+  }
+
+  .content-left {
+    max-width: 100% !important;
+  }
+
+  /* ── Page-break avoidance ──────────────────────────────────────────── */
+  .preview-card,
+  .stat-card,
+  .stat-card-skeleton,
+  .preview-card-skeleton,
+  .endpoint-section-header,
+  .endpoint-card-header,
+  .endpoint-table-wrap,
+  .api-detail-pricing-grid > *,
+  .api-detail-calculator-total,
+  .api-detail-plan-price,
+  .api-detail-two-column > *,
+  .api-detail-metrics > *,
+  .tab-content section,
+  .billing-panel,
+  .prototype-panel,
+  .vault-balance-card,
+  .info-card,
+  .marketplace-sidebar,
+  .filters-sidebar,
+  .marketplace-results,
+  .lp-section,
+  .lp-card,
+  h2,
+  h3,
+  h4,
+  table {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ── Content polish ──────────────────────────────────────────────────── */
+  .tab-content {
+    animation: none !important;
+  }
+
+  .tab-content section {
+    display: block !important;
+    margin-bottom: 24px;
+  }
+
+  .preview-card {
+    border: 1px solid #ddd !important;
+    background: #ffffff !important;
+    border-radius: 8px !important;
+    overflow: visible !important;
+  }
+
+  .api-detail-logo {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: #1a2332 !important;
+  }
+
+  .endpoint-card-header {
+    background: rgba(0, 0, 0, 0.03) !important;
+  }
+
+  .endpoint-table-wrap {
+    overflow: visible !important;
+  }
+
+  .endpoint-table-wrap table {
+    min-width: auto !important;
+    width: 100% !important;
+  }
+
+  .api-detail-calculator-total {
+    background: rgba(0, 0, 0, 0.03) !important;
+    border-radius: 8px !important;
+  }
+
+  .api-detail-metrics .stat-card {
+    background: rgba(0, 0, 0, 0.03) !important;
+    border-radius: 8px !important;
+  }
+
+  .api-detail-sidebar-inner > * {
+    margin-bottom: 0 !important;
+  }
+
+  /* ── Code samples: expand and wrap (no horizontal clip) ──────────────── */
+  .code-block,
+  pre,
+  code,
+  .response-json,
+  .endpoint-url {
+    background: #f4f4f5 !important;
+    border: 1px solid #ddd !important;
+    color: #1a2332 !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    max-width: 100% !important;
+  }
+
+  .api-detail-page {
+    padding: 0 !important;
+  }
+
+  .api-detail-container {
+    max-width: 100% !important;
+  }
+
+  .breadcrumb {
+    margin-bottom: 8px !important;
+  }
+
+  /* ── Links: show full URL after anchor text ──────────────────────────── */
+  a {
+    color: #1a2332 !important;
+    text-decoration: underline !important;
+  }
+
+  a[href]:not([href=""]):not([href^="#"]):not([href^="javascript:"]):after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    color: #444;
+  }
+
+  /* ── ReviewsTab: hide chrome, expand collapsibles ────────────────────
+     FWC26 — When printing the reviews section:
+     1. .reviews-sort-controls (.no-print) is already hidden by the generic
+        .no-print rule above; this comment preserves intent for reviewers.
+     2. Every review card (data-reviews-section .preview-card) is forced
+        visible and fully expanded so no content is clipped on paper.
+     3. The RatingHistogram bars use inline `width` — overflow:visible
+        ensures they are never cut off.
+     4. The collapsed-content pattern used elsewhere in the app
+        ([aria-hidden="true"], [hidden], details/summary) is expanded so
+        any future collapsible that lands inside the reviews panel prints
+        in full without JS intervention.
+     ─────────────────────────────────────────────────────────────────── */
+
+  /* Force every review card to be fully visible and expanded */
+  [data-reviews-section] .preview-card {
+    display: block !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Expand any aria-hidden collapsible regions inside the reviews panel */
+  [data-reviews-section] [aria-hidden="true"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Expand <details> elements that may appear in reviews */
+  [data-reviews-section] details {
+    display: block !important;
+  }
+
+  [data-reviews-section] details > * {
+    display: block !important;
+  }
+
+  /* Expand hidden elements inside the reviews panel */
+  [data-reviews-section] [hidden] {
+    display: block !important;
+  }
+
+  /* Rating histogram: allow bars to render at full width without overflow clip */
+  [data-reviews-section] .rating-histogram,
+  [data-reviews-section] .rating-histogram__bar-track,
+  [data-reviews-section] .rating-histogram__bar-fill {
+    overflow: visible !important;
+    max-width: 100% !important;
+  }
+
+  /* Review list grid: single column, consistent spacing */
+  [data-reviews-section] .reviews-list {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Review cards: avoid splitting across page breaks */
+  [data-reviews-section] .preview-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
+/* Share Snapshot Button */
+.share-snapshot-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+/* ─── Category Pills ──────────────────────────────────────────────────────── */
+.pill-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  scrollbar-width: thin;
+}
+
+.pill-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
+  /* Expand EndpointSummary collapsibles when printing */
+  .endpoint-summary-content--collapsed {
+    display: block !important;
+  }
+  .endpoint-summary-trigger .chevron-icon {
+    display: none !important;
+  }
+  .endpoint-summary-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* ReviewsTab — hide chrome + expand collapsibles when printing */
+  .reviews-tab__sort-row {
+    display: none !important;
+  }
+  .reviews-tab .api-detail-reviews-header {
+    display: none !important;
+  }
+  .reviews-tab::before {
+    content: "Developer Reviews";
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1a2332;
+  }
+  .reviews-tab__card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .reviews-tab__list {
+    display: block !important;
+  }
+  .reviews-tab {
+    max-height: none !important;
+  }
+
+  /* SortMenu — hide chrome + expand collapsibles when printing */
+  .sort-menu__sort-row {
+    display: none !important;
+  }
+  .sort-menu::before {
+    content: "Sort Options";
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1a2332;
+  }
+  .sort-menu__current-state {
+    display: block !important;
+  }
+  .sort-menu__label {
+    font-weight: 600;
+    margin-right: 0.5rem;
+  }
+  .sort-menu__value {
+    color: #1a2332;
+  }
+  .sort-menu {
+    max-height: none !important;
+  }
+}
+
+/* ── LatencyChart page (GrantFox FWC26) ───────────────────────────────────────
+   Responsive latency dashboard with bar chart and HelpPopover. Uses design
+   tokens for light/dark mode consistency. */
+.latency-chart-page {
+  display: grid;
+  gap: 24px;
+  padding: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.latency-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.latency-chart-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.latency-chart-title-group h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  line-height: 1.1;
+}
+
+.latency-chart-subtitle {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.latency-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.latency-stat-card {
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(169, 184, 255, 0.12);
+  background: var(--surface-soft);
+}
+
+.latency-stat-label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.latency-stat-value {
+  display: block;
+  font-size: 1.35rem;
+}
+
+.latency-chart-container {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  min-height: 260px;
+}
+
+.latency-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 220px;
+}
+
+.latency-chart-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.latency-chart-bar {
+  width: 100%;
+  max-width: 48px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 70%, var(--accent-strong)));
+  transition: opacity 180ms ease;
+  cursor: pointer;
+}
+
+.latency-chart-bar--peak {
+  background: linear-gradient(180deg, var(--danger), color-mix(in srgb, var(--danger) 70%, var(--warning)));
+}
+
+.latency-chart-bar-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.latency-chart-caption {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .latency-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .latency-chart-bars {
+    gap: 4px;
+  }
+
+  .latency-chart-bar-label {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .latency-chart-page {
+    padding: 14px;
+  }
+
+  .latency-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .latency-chart-bars {
+    height: 160px;
+  }
+}
+
 

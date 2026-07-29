@@ -59,18 +59,62 @@ export function SkeletonRow({ rows = 5 }: { rows?: number }) {
 
 export function FiltersSidebarSkeleton() {
   return (
-    <div className="filters-sidebar filters-sidebar-skeleton" aria-hidden="true" style={{ display: "grid", gap: 16 }}>
-      {/* Section heading */}
-      <Skeleton width="55%" height={22} />
-      <Skeleton width="55%" height={22} />
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} style={{ display: "grid", gap: 8 }}>
-          <Skeleton width="40%" height={14} />
-          <Skeleton width="100%" height={40} borderRadius={10} />
+    <div
+      className="filters-sidebar filters-sidebar-skeleton"
+      aria-hidden="true"
+      style={{ display: "grid", gap: 16 }}
+    >
+      {/* Categories Group Skeleton */}
+      <div style={{ display: "grid", gap: 8 }}>
+        <Skeleton width="40%" height={16} />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Skeleton width={16} height={16} borderRadius={4} />
+            <Skeleton width="65%" height={14} />
+          </div>
+        ))}
+      </div>
+
+      {/* Price Range Group Skeleton */}
+      <div style={{ display: "grid", gap: 8 }}>
+        <Skeleton width="45%" height={16} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Skeleton width={28} height={14} />
+          <Skeleton width="100%" height={36} borderRadius={8} />
         </div>
-      ))}
-      <Skeleton width="48%" height={14} />
-      <Skeleton width="100%" height={44} borderRadius={12} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Skeleton width={28} height={14} />
+          <Skeleton width="100%" height={36} borderRadius={8} />
+        </div>
+      </div>
+
+      {/* Status Group Skeleton */}
+      <div style={{ display: "grid", gap: 8 }}>
+        <Skeleton width="35%" height={16} />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Skeleton width={16} height={16} borderRadius={4} />
+            <Skeleton width="55%" height={14} />
+          </div>
+        ))}
+      </div>
+
+      {/* Popularity Group Skeleton */}
+      <div style={{ display: "grid", gap: 8 }}>
+        <Skeleton width="40%" height={16} />
+        <Skeleton width="100%" height={38} borderRadius={8} />
+      </div>
+
+      {/* Favorites Group Skeleton */}
+      <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Skeleton width={16} height={16} borderRadius={4} />
+          <Skeleton width="60%" height={14} />
+        </div>
+      </div>
+
+      {/* Clear Filters Button Skeleton */}
+      <Skeleton width="100%" height={40} borderRadius={10} style={{ marginTop: 8 }} />
     </div>
   );
 }
@@ -208,6 +252,47 @@ export function ApiUsageSkeleton() {
     </div>
   );
 }
+
+export function EmptyStateSkeleton({ size = "default", hasAction = false }: { size?: "default" | "compact"; hasAction?: boolean }) {
+  const isCompact = size === "compact";
+  return (
+    <div
+      className={`empty-state-skeleton${isCompact ? " empty-state-skeleton--compact" : ""}`}
+      aria-busy="true"
+      aria-label="Loading empty state"
+      style={{
+        textAlign: "center",
+        padding: isCompact ? "16px 12px" : "48px 32px",
+        minHeight: isCompact ? "auto" : "300px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: isCompact ? "12px" : "16px",
+      }}
+    >
+      <Skeleton
+        tone="stellar"
+        width={isCompact ? 56 : 80}
+        height={isCompact ? 56 : 80}
+        borderRadius="50%"
+      />
+      <Skeleton tone="stellar" width="40%" height={isCompact ? 18 : 26} />
+      <Skeleton tone="stellar" width="60%" height={isCompact ? 14 : 16} />
+      {hasAction && (
+        <Skeleton
+          tone="stellar"
+          width={isCompact ? 120 : 160}
+          height={isCompact ? 36 : 44}
+          borderRadius={8}
+        />
+      )}
+    </div>
+  );
+}
+
+import MarketplacePageSkeleton from "../pages/MarketplacePage.skeleton";
+export { MarketplacePageSkeleton };
 
 export function ApiDetailPageSkeleton({ onBack }: { onBack?: () => void }) {
   /*

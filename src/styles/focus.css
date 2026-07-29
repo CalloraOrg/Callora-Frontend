@@ -97,6 +97,19 @@
     outline-offset: 3px;
   }
 
+  /* ── HelpPopover trigger (info icon) ──────────────────────────────────── */
+  .help-popover-trigger {
+    color: var(--muted);
+    transition: color 180ms ease;
+  }
+
+  .help-popover-trigger:hover,
+  .help-popover-trigger:focus-visible {
+    color: var(--accent);
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
   /* ── ApiDetailPage: icon buttons (Postman / Insomnia / Save) ────────────── */
   .api-detail-page .icon-button:focus-visible,
   .endpoint-client-buttons .icon-button:focus-visible {
@@ -272,52 +285,76 @@
     outline-offset: 3px;
     box-shadow: var(--focus-ring);
   }
-}
 
-.marketplace-page *:focus-visible,
-.api-detail-page [role="tabpanel"]:focus-visible,
-.api-detail-page *:focus-visible {
-  outline: 2px solid var(--accent, #4e85ff);
-  outline-offset: 4px;
-}
+  /* ── ApiDetailPage global catch-all ──────────────────────────────
+     Every interactive element inside ApiDetailPage gets a visible
+     focus ring via the global *:focus-visible rule in index.css, but
+     we reinforce the ring here at the same cascade level so that
+     component-level rules (above) can still win by specificity.
+     The 4px offset provides slightly more breathing room around
+     card-like containers and closely packed controls.           */
+  .api-detail-page *:focus-visible,
+  .api-detail-page [role="tabpanel"]:focus-visible {
+    outline: 2px solid var(--accent, #4e85ff);
+    outline-offset: 4px;
+  }
 
-/* ── ApiUsage focus-visible overrides ──────────────────────────────────
-   The global @layer focus provides *:focus-visible { outline: 2px solid
-   var(--accent); outline-offset: 3px; } for all interactive elements.
-   These page-level rules ensure ApiUsage-specific controls get an
-   equally visible ring, including those with custom styling that might
-   otherwise clip or obscure the global outline.
+  /* ── MarketplacePage global catch-all ────────────────────────────
+     Same rationale as the ApiDetailPage rule above: reinforce the
+     global *:focus-visible ring so that all marketplace interactive
+     elements are covered at the layer cascade level.              */
+  .marketplace-page *:focus-visible {
+    outline: 2px solid var(--accent, #4e85ff);
+    outline-offset: 4px;
+  }
 
-   - .tab-button: language-tab toggle (custom button)
-   - .chart-bar:  clickable bar-chart column
-   - .response-display: aria-live region that can receive focus
-   - .api-key-card, .test-call-form: composite containers
-   ────────────────────────────────────────────────────────────────────── */
-.api-usage-page .tab-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-color: var(--accent);
-}
+  /* ── ApiUsage focus-visible overrides ────────────────────────────
+     The global @layer focus provides *:focus-visible { outline: 2px solid
+     var(--accent); outline-offset: 3px; } for all interactive elements.
+     These page-level rules ensure ApiUsage-specific controls get an
+     equally visible ring, including those with custom styling that might
+     otherwise clip or obscure the global outline.
 
-.api-usage-page .chart-bar:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  background: var(--accent);
-}
+     - .tab-button: language-tab toggle (custom button)
+     - .chart-bar:  clickable bar-chart column
+     - .response-display: aria-live region that can receive focus
+     - .api-key-card, .test-call-form: composite containers
+     ──────────────────────────────────────────────────────────────── */
+  .api-usage-page .tab-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-color: var(--accent);
+  }
 
-.api-usage-page .response-display:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
+  .api-usage-page .chart-bar:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    background: var(--accent);
+  }
 
-.api-usage-page .documentation-link a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
+  .api-usage-page .response-display:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 
-.api-usage-page .section-header .tabs-tab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  .api-usage-page .documentation-link a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .api-usage-page .section-header .tabs-tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ── LatencyChart focus-visible overrides ────────────────────────────
+     Chart bars are interactive elements that receive pointer + keyboard
+     events. They need a visible focus ring for WCAG 2.4.7. */
+  .latency-chart-page .latency-chart-bar:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    background: var(--accent);
+  }
 }
 
 /* ── reduced-motion: suppress transition on focus for ApiUsage controls ── */

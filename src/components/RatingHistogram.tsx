@@ -180,7 +180,13 @@ export default function RatingHistogram({
               marginBottom: "12px",
             }}
           >
-            <strong style={{ fontSize: "1.5rem", color: "var(--text)" }}>
+            <strong
+              style={{
+                fontSize: "1.5rem",
+                color: "var(--text)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
               {rating.toFixed(1)}
             </strong>
             <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
@@ -192,6 +198,7 @@ export default function RatingHistogram({
                   marginLeft: "auto",
                   color: "var(--muted)",
                   fontSize: "0.75rem",
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
                 {total} {total === 1 ? "review" : "reviews"}
@@ -220,6 +227,7 @@ export default function RatingHistogram({
                       textAlign: "right",
                       color: "var(--text)",
                       whiteSpace: "nowrap",
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {star} ★
@@ -248,6 +256,7 @@ export default function RatingHistogram({
                       width: "28px",
                       textAlign: "right",
                       color: "var(--muted)",
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {count}

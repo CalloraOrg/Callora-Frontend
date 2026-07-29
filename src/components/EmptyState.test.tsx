@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EmptyState from "./EmptyState";
 import type { EmptyStateSize, EmptyStateVariant } from "./EmptyState";
@@ -15,7 +15,7 @@ describe("EmptyState", () => {
   });
 
   describe("variants", () => {
-    const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge"];
+    const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
 
     it.each(variants)("renders the %s variant illustration", (variant) => {
       render(<EmptyState variant={variant} />);
@@ -33,6 +33,7 @@ describe("EmptyState", () => {
         error: /Failed to load APIs/i,
         "plan-badge": /No plan selected/i,
         "risk-gauge": /No risk data yet/i,
+        "quota-banner": /No quota configured/i,
       };
       expect(screen.getByText(titles[variant])).toBeTruthy();
     });
@@ -132,6 +133,95 @@ describe("EmptyState", () => {
     });
   });
 
+  describe("copy-to-clipboard affordance (Issue #733)", () => {
+    const originalClipboard = navigator.clipboard;
+
+    beforeEach(() => {
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+      });
+    });
+
+    afterEach(() => {
+      Object.assign(navigator, { clipboard: originalClipboard });
+    });
+
+    it("renders a copy button next to the message when clipboard is supported", () => {
+      render(<EmptyState variant="error" message="Something went wrong" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      expect(copyBtn).toBeTruthy();
+      expect(copyBtn.textContent).toBe("Copy");
+    });
+
+    it("copies the message text to clipboard on button click", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<EmptyState variant="error" message="Error details to copy" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      fireEvent.click(copyBtn);
+
+      // Wait for microtask
+      await vi.waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith("Error details to copy");
+      });
+    });
+
+    it("shows 'Copied!' feedback after successful copy", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<EmptyState variant="error" message="test message" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      fireEvent.click(copyBtn);
+
+      await vi.waitFor(() => {
+        expect(copyBtn.textContent).toBe("Copied!");
+      });
+    });
+
+    it("has an accessible aria-label on the copy button", () => {
+      render(<EmptyState variant="filtered" message="Copy this text" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      expect(copyBtn.getAttribute("aria-label")).toBe('Copy "Copy this text"');
+    });
+
+    it("does not render copy button when clipboard API is unsupported", () => {
+      Object.assign(navigator, { clipboard: undefined });
+      render(<EmptyState variant="error" message="Unsupported" />);
+      expect(screen.queryByTestId("empty-state-copy-button")).toBeNull();
+    });
+
+    it("renders copy button in compact size as well", () => {
+      render(
+        <EmptyState
+          variant="filtered"
+          size="compact"
+          message="Compact copy"
+        />,
+      );
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      expect(copyBtn).toBeTruthy();
+      expect(copyBtn.textContent).toBe("Copy");
+    });
+
+    it("announces copy status to screen readers via aria-live region", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<EmptyState variant="error" message="Announce this" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      fireEvent.click(copyBtn);
+
+      await vi.waitFor(() => {
+        const status = screen.getByRole("status");
+        expect(status.textContent).toBe("Message copied.");
+      });
+    });
+  });
+
   describe("error variant — onRetry", () => {
     it("renders retry button when onRetry is provided", () => {
       const onRetry = vi.fn();
@@ -199,7 +289,7 @@ describe("EmptyState", () => {
     });
 
     it("nested SVG illustrations also carry aria-hidden (WCAG 1.1.1 Non-text Content)", () => {
-      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
       variants.forEach((variant) => {
         const { container, unmount } = render(<EmptyState variant={variant} />);
         const svgs = container.querySelectorAll("svg");
@@ -211,7 +301,7 @@ describe("EmptyState", () => {
     });
 
     it("SVG illustrations use strokeLinecap='round' for consistent v7 line-art style", () => {
-      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
       variants.forEach((variant) => {
         const { container, unmount } = render(
           <EmptyState variant={variant} size="default" />,
@@ -312,7 +402,7 @@ describe("EmptyState", () => {
     });
 
     it("no illustration contains hardcoded hex colors — all strokes/fills reference design tokens", () => {
-      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
       const hexRe = /#[0-9a-f]{3,8}/i;
       variants.forEach((variant) => {
         const { container, unmount } = render(<EmptyState variant={variant} />);
@@ -360,6 +450,107 @@ describe("EmptyState", () => {
       );
       const withActionSkeletonsCount = withAction.querySelectorAll(".skeleton").length;
       expect(withActionSkeletonsCount).toBe(initialSkeletonsCount + 1);
+    });
+  });
+
+  describe("copy-to-clipboard", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("renders copy button when copyable is true and message is present", () => {
+      render(<EmptyState copyable message="Copy this text" />);
+      expect(screen.getByLabelText("Copy message to clipboard")).toBeTruthy();
+    });
+
+    it("does not render copy button when copyable is false (default)", () => {
+      render(<EmptyState message="No copy here" />);
+      expect(screen.queryByLabelText("Copy message to clipboard")).toBeNull();
+    });
+
+    it("copies the message text to clipboard on click", async () => {
+      render(<EmptyState copyable message="Test message" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Test message");
+    });
+
+    it("shows 'Copied' feedback after clicking", async () => {
+      render(<EmptyState copyable message="Some text" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(btn.textContent).toMatch(/Copied/);
+    });
+
+    it("announces copy success via aria-live region", async () => {
+      render(<EmptyState copyable message="Announce this" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      const liveRegion = screen.getByText("Message copied to clipboard");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion.getAttribute("aria-live")).toBe("polite");
+    });
+
+    it("reverts 'Copied' feedback after 2 seconds", async () => {
+      render(<EmptyState copyable message="Revert test" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(btn.textContent).toMatch(/Copied/);
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(btn.textContent).toMatch(/Copy/);
+    });
+
+    it("copies the resolved message (message prop takes precedence over description)", async () => {
+      render(
+        <EmptyState
+          copyable
+          message="Primary message"
+          description="Deprecated description"
+        />,
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Copy message to clipboard"));
+      });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Primary message");
+    });
+
+    it("copies the default message when no custom message is provided", async () => {
+      render(<EmptyState variant="empty" copyable />);
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Copy message to clipboard"));
+      });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        "Check back soon for new integrations.",
+      );
+    });
+
+    it("renders copy button with compact size styling", () => {
+      render(<EmptyState copyable size="compact" message="Compact copy" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      expect(btn).toBeTruthy();
+      expect(btn.style.fontSize).toBe("0.75rem");
     });
   });
 });

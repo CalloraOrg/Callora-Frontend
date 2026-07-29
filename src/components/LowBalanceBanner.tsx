@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { LOW_BALANCE_USD } from '../config/constants';
 import { WarningIcon } from './icons/WarningIcon';
 import { BoltIcon } from './icons/BoltIcon';
+import { formatUsdShortcut } from '../utils/format';
 
 interface LowBalanceBannerProps {
   balance: number;

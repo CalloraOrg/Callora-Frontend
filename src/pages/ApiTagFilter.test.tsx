@@ -310,6 +310,70 @@ describe("ApiTagFilter", () => {
     expect(skeletonPills.length).toBeGreaterThan(0);
   });
 
+  // ── Keyboard shortcut hints (issue #444) ──────────────────────────────────
+
+  describe("keyboard shortcut hints", () => {
+    it("renders KbdHint with tag filter shortcuts", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      const hint = screen.getByRole("complementary", { name: "Tag filter keyboard shortcuts" });
+      expect(hint).toBeTruthy();
+    });
+
+    it("shows Tab shortcut for navigating between tags", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      expect(screen.getByText("Tab")).toBeTruthy();
+      expect(screen.getByText("Navigate between tags")).toBeTruthy();
+    });
+
+    it("shows Enter shortcut for toggling tag selection", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      expect(screen.getByText("Enter")).toBeTruthy();
+      expect(screen.getByText("Toggle tag selection")).toBeTruthy();
+    });
+
+    it("uses chip variant for the kbd hint", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      const hint = screen.getByRole("complementary", { name: "Tag filter keyboard shortcuts" });
+      expect(hint.classList.contains("kbd-hint--chip")).toBe(true);
+    });
+
+    it("has correct aria-label on kbd-hint", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      const hint = screen.getByRole("complementary", { name: "Tag filter keyboard shortcuts" });
+      expect(hint.getAttribute("aria-label")).toBe("Tag filter keyboard shortcuts");
+    });
+  });
+
   // ── Tooltip primitive integration (issue #533) ───────────────────────────
 
   describe("Tooltip primitive integration", () => {

@@ -100,4 +100,33 @@ describe("@layer focus contract", () => {
     expect(marketplacePage).not.toMatch(/\.marketplace-filter-button:focus\s*\{/);
     expect(recentlyActiveRail).not.toMatch(/button:focus\s*\{/);
   });
+
+  // ── #699 — CommandPalette: unlayered outline:none permanently defeated the
+  // global *:focus-visible ring (unlayered CSS always beats @layer rules
+  // regardless of specificity, so nothing in @layer focus could restore it).
+  it("CommandPalette input no longer carries an unconditional outline:none", () => {
+    const css = read("src/components/CommandPalette.css");
+    // The old bug: `.command-palette-input { ... outline: none; ... }` with
+    // no accompanying :focus/:focus-visible split. Only a *conditional*
+    // `:focus { outline: none }` is allowed now.
+    expect(css).not.toMatch(/\.command-palette-input\s*\{[^}]*outline:\s*none/);
+  });
+
+  it("CommandPalette input restores a visible ring on :focus-visible", () => {
+    const css = read("src/components/CommandPalette.css");
+    expect(css).toMatch(
+      /\.command-palette-input:focus-visible[\s\S]*?outline:\s*2px solid var\(--accent\)/,
+    );
+  });
+
+  it("CommandPalette input only suppresses outline on :focus, not unconditionally", () => {
+    const css = read("src/components/CommandPalette.css");
+    expect(css).toMatch(/\.command-palette-input:focus\s*\{\s*outline:\s*none;\s*\}/);
+  });
+
+  it("CommandPalette clear/close buttons have explicit focus-visible reinforcement", () => {
+    const css = read("src/components/CommandPalette.css");
+    expect(css).toMatch(/\.command-palette-clear-button:focus-visible/);
+    expect(css).toMatch(/\.command-palette-close-button:focus-visible/);
+  });
 });

@@ -24,6 +24,15 @@ type BreadcrumbProps = {
    * @default 0 (no truncation)
    */
   maxLabelLength?: number;
+  /**
+   * Collapse middle breadcrumb items behind an ellipsis button when the
+   * path is long.  When enabled, items between the first and last are
+   * hidden from the main breadcrumb trail on all viewports and exposed
+   * via a popover triggered by the ellipsis button.
+   *
+   * @default false
+   */
+  middleEllipsis?: boolean;
 };
 
 /**
@@ -63,7 +72,11 @@ function BreadcrumbLink({
   if (item.isCurrent) {
     return (
       <span
-        className="breadcrumb-current"
+        className={
+          isTruncated
+            ? "breadcrumb-current breadcrumb-current--middle-ellipsis"
+            : "breadcrumb-current"
+        }
         aria-current="page"
         // Always expose the full label to assistive technology and on hover.
         title={item.label}
@@ -78,7 +91,11 @@ function BreadcrumbLink({
 
   return (
     <a
-      className="breadcrumb-link link-nav"
+      className={
+        isTruncated
+          ? "breadcrumb-link link-nav breadcrumb-link--middle-ellipsis"
+          : "breadcrumb-link link-nav"
+      }
       href={item.href}
       title={item.label}
       {...(isTruncated ? { "aria-label": item.label } : {})}
@@ -96,15 +113,14 @@ function BreadcrumbSeparator() {
   );
 }
 
-export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProps) {
+export default function Breadcrumb({ items, maxLabelLength = 0, middleEllipsis = false }: BreadcrumbProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const ellipsisButtonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const popoverId = useId();
   const middleItems = useMemo(() => items.slice(1, -1), [items]);
   const shouldCollapseMiddle = middleItems.length > 0;
-
-
+  const isMiddleEllipsis = middleEllipsis && shouldCollapseMiddle;
 
   useEffect(() => {
     if (!isPopoverOpen) return;
@@ -178,7 +194,7 @@ export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProp
   };
 
   return (
-    <nav aria-label="breadcrumb" className="breadcrumb-nav">
+    <nav aria-label="breadcrumb" className={isMiddleEllipsis ? "breadcrumb-nav breadcrumb-nav--middle-ellipsis" : "breadcrumb-nav"}>
       <style>
         {`
           .breadcrumb-nav {
@@ -231,7 +247,8 @@ export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProp
            * but the primary visual treatment is the JS-computed "start…end" string.
            */
           .breadcrumb-link--middle-ellipsis,
-          .breadcrumb-current--middle-ellipsis {
+          .breadcrumb-current--middle-ellipsis,
+          .breadcrumb-popover-link--middle-ellipsis {
             /* Allow the truncated text to breathe – no hard CSS cut-off needed
                because JS already shortened it. Disable the CSS ellipsis so we
                never see a double-truncation artefact ("start…en…"). */
@@ -333,6 +350,14 @@ export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProp
               max-width: min(38vw, 11rem);
             }
           }
+
+          .breadcrumb-nav--middle-ellipsis .breadcrumb-middle {
+            display: none;
+          }
+
+          .breadcrumb-nav--middle-ellipsis .breadcrumb-collapsed {
+            display: flex;
+          }
         `}
       </style>
 
@@ -403,7 +428,11 @@ export default function Breadcrumb({ items, maxLabelLength = 0 }: BreadcrumbProp
                           return (
                             <li key={middleItem.href} role="none">
                               <a
-                                className="breadcrumb-popover-link link-nav"
+                                className={
+                                  isTruncated
+                                    ? "breadcrumb-popover-link link-nav breadcrumb-popover-link--middle-ellipsis"
+                                    : "breadcrumb-popover-link link-nav"
+                                }
                                 href={middleItem.href}
                                 role="menuitem"
                                 title={middleItem.label}

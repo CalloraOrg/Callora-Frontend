@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
 import ApiUsage from "./pages/ApiUsage";
-import Dashboard from "./components/Dashboard";
+import DashboardPage from "./pages/DashboardPage";
 import MyApis from "./pages/MyApis";
 import PlanBadgePage from "./pages/PlanBadge";
 import RouteProgressBar from "./components/RouteProgressBar";
@@ -22,9 +22,11 @@ import ThemePlayground from "./pages/ThemePlayground";
 import DesignSystemDocs from "./pages/DesignSystemDocs";
 import A11yAudit from "./pages/A11yAudit";
 import RateLimitCard from "./pages/RateLimitCard";
+import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 import { InvoiceCard } from "./pages/InvoiceCard";
+import BillingHistory from "./pages/BillingHistory";
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -117,12 +119,14 @@ const APP_ROUTES = {
   planBadge: "/apis/plan-badge",
   apiUsage: "/api-usage",
   billing: "/billing",
+  billingHistory: "/billing/history",
   documentation: "/documentation",
   status: "/status",
   themePlayground: "/theme-playground",
   designSystem: "/design-system/docs",
   serverError: "/500",
   rateLimitCard: "/rate-limit",
+  slaCard: "/marketplace/grantfox-wave-compute/sla",
 } as const;
 
 function createMockHash() {
@@ -277,6 +281,7 @@ function App() {
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
     [APP_ROUTES.myApis]: "My APIs – Callora",
     [APP_ROUTES.billing]: "Billing – Callora",
+    [APP_ROUTES.billingHistory]: "Billing History – Callora",
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
     [APP_ROUTES.endpointSummary]: "Endpoint Summary – Callora",
@@ -285,6 +290,7 @@ function App() {
     [APP_ROUTES.marketplace]: "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
     [APP_ROUTES.dashboard]: "Your Callora dashboard showing balances, recent activity and quick actions.",
     [APP_ROUTES.billing]: "Manage your USDC vault, deposit funds, and view transaction status.",
+    [APP_ROUTES.billingHistory]: "View your full USDC transaction history with on-chain details, filters, and hover previews.",
     "/api-usage": "Monitor API usage, request stats, and view call history.",
     [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
     [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
@@ -554,6 +560,9 @@ function App() {
               <NavLink to={APP_ROUTES.billing} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
                 Billing
               </NavLink>
+              <NavLink to={APP_ROUTES.billingHistory} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+                Billing History
+              </NavLink>
               <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
                 Theme Playground
               </NavLink>
@@ -574,7 +583,7 @@ function App() {
 
             <Route path={APP_ROUTES.publish} element={<PublishApi />} />
 
-            <Route path={APP_ROUTES.dashboard} element={<Dashboard vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
+            <Route path={APP_ROUTES.dashboard} element={<DashboardPage vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
 
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
@@ -684,6 +693,9 @@ function App() {
             <Route path="/a11y-audit" element={<A11yAudit />} />
 
             <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
+
+            {/* ── Billing History (FWC26) ──────────────────────────────── */}
+            <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
           </Routes>

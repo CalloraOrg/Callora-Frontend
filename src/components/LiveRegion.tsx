@@ -1,44 +1,64 @@
-/**
- * LiveRegion — a reusable screen-reader-only aria-live region for announcing
- * dynamic state changes to assistive technology.
- *
- * Usage:
- *   <LiveRegion>{announcementText}</LiveRegion>
- *
- * Accessibility notes:
- *   - The element is visually hidden (.sr-only) but remains available to
- *     the accessibility tree.
- *   - `aria-live="polite"` is the default — it queues the announcement
- *     behind the current speech queue.
- *   - `aria-atomic="true"` ensures the entire message is read as one unit.
- */
+import { useEffect, useRef, type ReactNode } from "react";
 
-import { ReactNode } from "react";
-
-interface LiveRegionProps {
+export interface LiveRegionProps {
+  message?: string;
+  assertive?: boolean;
   children?: ReactNode;
   "aria-live"?: "polite" | "assertive" | "off";
   role?: string;
   className?: string;
   id?: string;
+  regionId?: string;
 }
 
 export default function LiveRegion({
+  message,
+  assertive = false,
   children,
-  "aria-live": ariaLive = "polite",
-  role = "status",
+  "aria-live": ariaLive,
+  role,
   className = "sr-only",
   id,
+  regionId,
 }: LiveRegionProps) {
+  const regionRef = useRef<HTMLDivElement>(null);
+  const prevMessageRef = useRef(message);
+
+  const effectiveLive = ariaLive ?? (assertive ? "assertive" : "polite");
+  const effectiveRole = role ?? (assertive ? "alert" : "status");
+  const effectiveId = id ?? regionId;
+
+  useEffect(() => {
+    if (!message) return;
+    const el = regionRef.current;
+    if (!el) return;
+
+    // If the new message is identical to the previous one, append a
+    // non-rendering space to force re-announcement.
+    if (message === prevMessageRef.current) {
+      el.textContent = message + "\u200A";
+      requestAnimationFrame(() => {
+        if (el) el.textContent = message;
+      });
+    } else {
+      el.textContent = message;
+    }
+    prevMessageRef.current = message;
+  }, [message]);
+
   return (
     <div
-      id={id}
-      className={className}
-      role={role}
-      aria-live={ariaLive}
+      id={effectiveId}
+      ref={regionRef}
+      role={effectiveRole}
+      aria-live={effectiveLive}
       aria-atomic="true"
+      className={className}
+      data-testid={regionId ? `live-region-${regionId}` : "live-region"}
+      aria-hidden={!message && !children ? "true" : undefined}
     >
-      {children}
+      {message}
     </div>
   );
 }
+

@@ -351,11 +351,291 @@ describe("Breadcrumb – middle-ellipsis (maxLabelLength)", () => {
     // No aria-label override needed
     expect(current?.getAttribute("aria-label")).toBeNull();
   });
+
+  // ── #750 — modifier class prevents double-truncation on narrow containers ──
+  //
+  // The stylesheet defines `--middle-ellipsis` modifier classes specifically
+  // to disable the CSS-level `text-overflow: ellipsis` once JS has already
+  // shortened a label — without them, a JS-truncated string that still
+  // doesn't fit its container (e.g. a very narrow viewport) gets ellipsized
+  // a second time by CSS, producing a "start…en…" artefact. These tests
+  // confirm the modifier is actually wired to the elements it was designed
+  // for, not just present as unused CSS.
+
+  it("applies the middle-ellipsis modifier class to a truncated first-crumb link", () => {
+    const items = [
+      { label: "A Very Long Root Segment Name", href: "/root" },
+      { label: "Short", href: "/root/short", isCurrent: true },
+    ];
+    render(<Breadcrumb items={items} maxLabelLength={16} />);
+
+    const link = screen.getByRole("link", {
+      name: "A Very Long Root Segment Name",
+    });
+    expect(link.classList.contains("breadcrumb-link--middle-ellipsis")).toBe(
+      true,
+    );
+  });
+
+  it("does not apply the middle-ellipsis modifier class when the link label is not truncated", () => {
+    const items = [
+      { label: "Home", href: "/" },
+      { label: "Short", href: "/short", isCurrent: true },
+    ];
+    render(<Breadcrumb items={items} maxLabelLength={28} />);
+
+    const link = screen.getByRole("link", { name: "Home" });
+    expect(link.classList.contains("breadcrumb-link--middle-ellipsis")).toBe(
+      false,
+    );
+  });
+
+  it("applies the middle-ellipsis modifier class to a truncated current-page crumb", () => {
+    const items = [
+      { label: "Marketplace", href: "/marketplace" },
+      {
+        label: "A Very Long Current Page Title Indeed",
+        href: "/current",
+        isCurrent: true,
+      },
+    ];
+    render(<Breadcrumb items={items} maxLabelLength={20} />);
+
+    const current = document.querySelector<HTMLSpanElement>(
+      '[aria-current="page"]',
+    );
+    expect(
+      current?.classList.contains("breadcrumb-current--middle-ellipsis"),
+    ).toBe(true);
+  });
+
+  it("does not apply the middle-ellipsis modifier class to a current-page crumb that fits", () => {
+    const items = [
+      { label: "Home", href: "/" },
+      { label: "Short", href: "/short", isCurrent: true },
+    ];
+    render(<Breadcrumb items={items} maxLabelLength={28} />);
+
+    const current = document.querySelector<HTMLSpanElement>(
+      '[aria-current="page"]',
+    );
+    expect(
+      current?.classList.contains("breadcrumb-current--middle-ellipsis"),
+    ).toBe(false);
+  });
+
+  it("applies the middle-ellipsis modifier class to truncated popover links", () => {
+    const { container } = render(
+      <Breadcrumb items={truncatedBreadcrumb} maxLabelLength={28} />,
+    );
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+    if (!button) throw new Error("Expected ellipsis button");
+    fireEvent.click(button);
+
+    const menuItems = Array.from(
+      container.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]'),
+    );
+
+    expect(menuItems.length).toBeGreaterThan(0);
+    for (const menuItem of menuItems) {
+      expect(
+        menuItem.classList.contains(
+          "breadcrumb-popover-link--middle-ellipsis",
+        ),
+      ).toBe(true);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
-// Focused tests for #726 — Tooltip primitive wired to Breadcrumb icon buttons
+// Breadcrumb – middleEllipsis (collapses middle items on all viewports)
 // ---------------------------------------------------------------------------
+const ELLIPSIS_ITEMS = [
+  { label: "Home", href: "/" },
+  { label: "Very Long First Middle Segment Name", href: "/home/middleware" },
+  { label: "Another Extended Segment", href: "/home/middleware/data" },
+  { label: "Target Page", href: "/home/middleware/data/target", isCurrent: true },
+];
+
+describe("Breadcrumb – middleEllipsis", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("does not hide middle items when middleEllipsis is false (default)", () => {
+    const { container } = render(<Breadcrumb items={ELLIPSIS_ITEMS} />);
+
+    const middleItems = container.querySelectorAll(".breadcrumb-middle");
+    expect(middleItems.length).toBe(2);
+    for (const item of middleItems) {
+      expect(item).not.toHaveStyle("display: none");
+    }
+  });
+
+  it("hides middle items when middleEllipsis is true", () => {
+    const { container } = render(
+      <Breadcrumb items={ELLIPSIS_ITEMS} middleEllipsis={true} />,
+    );
+
+    const nav = container.querySelector(".breadcrumb-nav--middle-ellipsis");
+    expect(nav).not.toBeNull();
+
+    const middleItems = nav?.querySelectorAll(".breadcrumb-middle");
+    expect(middleItems?.length).toBe(2);
+    for (const item of middleItems ?? []) {
+      expect(window.getComputedStyle(item).display).toBe("none");
+    }
+  });
+
+  it("renders the ellipsis button inside the first item when middleEllipsis is true", () => {
+    const { container } = render(
+      <Breadcrumb items={ELLIPSIS_ITEMS} middleEllipsis={true} />,
+    );
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+    expect(button).not.toBeNull();
+    expect(button?.textContent).toBe("...");
+    expect(button?.getAttribute("aria-label")).toBe(
+      "Show collapsed breadcrumb items",
+    );
+    expect(button?.getAttribute("aria-haspopup")).toBe("menu");
+    expect(button?.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("opens the popover when the ellipsis button is clicked with middleEllipsis", () => {
+    const { container } = render(
+      <Breadcrumb items={ELLIPSIS_ITEMS} middleEllipsis={true} />,
+    );
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+    if (!button) throw new Error("Expected ellipsis button");
+
+    fireEvent.click(button);
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+
+    const popover = container.querySelector('[role="menu"]');
+    expect(popover).not.toBeNull();
+  });
+
+  it("shows all middle items in the popover when opened with middleEllipsis", () => {
+    const { container } = render(
+      <Breadcrumb items={ELLIPSIS_ITEMS} middleEllipsis={true} />,
+    );
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+    if (!button) throw new Error("Expected ellipsis button");
+    fireEvent.click(button);
+
+    const menuItems = Array.from(
+      container.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]'),
+    );
+    expect(menuItems.length).toBe(2);
+    expect(menuItems[0].textContent).toBe(
+      "Very Long First Middle Segment Name",
+    );
+    expect(menuItems[1].textContent).toBe("Another Extended Segment");
+  });
+
+  it("closes the popover with Escape when middleEllipsis is active", () => {
+    const { container } = render(
+      <Breadcrumb items={ELLIPSIS_ITEMS} middleEllipsis={true} />,
+    );
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+    if (!button) throw new Error("Expected ellipsis button");
+
+    fireEvent.click(button);
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("does not render the ellipsis button or modifier class when there are no middle items (even with middleEllipsis)", () => {
+    const shortItems = [
+      { label: "Home", href: "/" },
+      { label: "Settings", href: "/settings", isCurrent: true },
+    ];
+    const { container } = render(
+      <Breadcrumb items={shortItems} middleEllipsis={true} />,
+    );
+
+    expect(container.querySelector(".breadcrumb-ellipsis")).toBeNull();
+    expect(container.querySelector(".breadcrumb-nav--middle-ellipsis")).toBeNull();
+  });
+
+  it("shows the first crumb link and the current page with middleEllipsis active", () => {
+    render(
+      <Breadcrumb items={ELLIPSIS_ITEMS} middleEllipsis={true} />,
+    );
+
+    expect(screen.getByRole("link", { name: "Home" })).toBeTruthy();
+    expect(
+      screen.getByText("Target Page").getAttribute("aria-current"),
+    ).toBe("page");
+  });
+
+  it("collapses middle items on desktop viewport when middleEllipsis is true", () => {
+    const { container } = render(
+      <Breadcrumb items={ELLIPSIS_ITEMS} middleEllipsis={true} />,
+    );
+
+    const nav = container.querySelector<HTMLElement>(
+      ".breadcrumb-nav--middle-ellipsis",
+    );
+    expect(nav).not.toBeNull();
+
+    const middleItems = nav?.querySelectorAll(".breadcrumb-middle");
+    expect(middleItems?.length).toBe(2);
+    for (const item of middleItems ?? []) {
+      expect(window.getComputedStyle(item).display).toBe("none");
+    }
+
+    const collapsed = nav?.querySelector(".breadcrumb-collapsed");
+    expect(collapsed).not.toBeNull();
+    expect(window.getComputedStyle(collapsed!).display).toBe("flex");
+  });
+
+  it("maintains keyboard navigation within the popover when middleEllipsis is active", () => {
+    const { container } = render(
+      <Breadcrumb items={ELLIPSIS_ITEMS} middleEllipsis={true} />,
+    );
+
+    const button = container.querySelector<HTMLButtonElement>(
+      ".breadcrumb-ellipsis",
+    );
+    if (!button) throw new Error("Expected ellipsis button");
+    fireEvent.click(button);
+
+    const menuItems = Array.from(
+      container.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]'),
+    );
+    expect(menuItems.length).toBe(2);
+
+    expect(document.activeElement).toBe(menuItems[0]);
+
+    fireEvent.keyDown(menuItems[0].parentElement!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(menuItems[1]);
+
+    fireEvent.keyDown(menuItems[1].parentElement!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(menuItems[0]);
+
+    fireEvent.keyDown(menuItems[0].parentElement!, { key: "Escape" });
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+  });
+});
 describe("Breadcrumb — Tooltip on ellipsis button", () => {
   afterEach(() => {
     vi.useRealTimers();
