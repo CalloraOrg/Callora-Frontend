@@ -2206,6 +2206,7 @@ code,
   color: var(--text);
   font-size: 1rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 1.3;
   white-space: nowrap;
 }
@@ -2661,7 +2662,6 @@ code,
     padding: 1px 3px;
     font-size: 0.65rem;
   }
-}
 }
 
 /* QuotaBanner layout and styles */
@@ -4292,7 +4292,7 @@ code,
 
 /* ── ApiUsage — prefers-reduced-motion fallback (Issue #721) ───────────
    When users prefer reduced motion, disable pulsing status dots, skeleton
-   shimmer animations, and chart-bar transitions in the ApiUsage section
+   shimmer animations, button spinner, and chart-bar transitions in the ApiUsage section
    so the UI stays completely static. */
 @media (prefers-reduced-motion: reduce) {
   .api-usage-page .status-dot {
@@ -4303,6 +4303,11 @@ code,
   .api-usage-page .skeleton {
     animation: none;
     background: var(--surface-soft);
+  }
+
+  .api-usage-page .button-spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.3);
   }
 
   .api-usage-page .chart-bar {
@@ -5768,6 +5773,125 @@ code,
   }
 }
 
+/* ─── BillingHistory ─────────────────────────────────────────────────────────
+   Hover-triggered / keyboard-accessible billing history rows.
+   GrantFox FWC26 campaign (Issue #692) — matches DashboardOverview pattern.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.billing-history {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.billing-history__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.billing-history__title {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+  color: var(--text);
+}
+
+.billing-history__subtitle {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.billing-history__list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.billing-history__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.billing-history__item:hover {
+  border-color: var(--accent, #6366f1);
+  box-shadow: var(--focus-ring);
+}
+
+.billing-history__item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.billing-history__item-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.billing-history__item-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.billing-history__item-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.billing-history__item-amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.billing-history__item-amount--credit {
+  color: var(--success, #10b981);
+}
+
+.billing-history__item-amount--debit {
+  color: var(--text);
+}
+
+.billing-history__empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .billing-history__item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .billing-history__item-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 /* ─── ApiDetailStickyTOC ────────────────────────────────────────────────────
    Sticky right-rail TOC inside the documentation tab. Tokens only — no
    hardcoded hex values. Transition respects prefers-reduced-motion.
@@ -6622,6 +6746,88 @@ code,
   color: var(--text);
 }
 
+/* ── Icon-only action buttons (Share / Bookmark) ────────────────────────────
+   Wrapped in the Tooltip primitive for accessible labels. Design-token
+   colours ensure correct rendering in both light and dark mode.
+   WCAG 2.1 AA: minimum 44 × 44 px tap target, visible :focus-visible ring.
+   ──────────────────────────────────────────────────────────────────────────  */
+.subscribe-cta-bar__icon-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mkt-space-md, 8px);
+}
+
+.subscribe-cta-bar__icon-btn {
+  /* Layout & sizing — 36 px visual, padded to 44 × 44 tap target */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+
+  /* Reset */
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+
+  /* Colour tokens */
+  color: var(--muted);
+
+  /* Smooth hover transition following global speed token */
+  transition:
+    color var(--transition-speed, 240ms),
+    background var(--transition-speed, 240ms),
+    border-color var(--transition-speed, 240ms);
+}
+
+.subscribe-cta-bar__icon-btn:hover {
+  color: var(--text);
+  background: var(--surface-soft, rgba(255, 255, 255, 0.06));
+  border-color: var(--line, rgba(169, 184, 255, 0.16));
+}
+
+/* Active / toggled state — bookmark is saved */
+.subscribe-cta-bar__icon-btn--active {
+  color: var(--accent);
+  background: rgba(78, 133, 255, 0.1);
+  border-color: rgba(78, 133, 255, 0.3);
+}
+
+.subscribe-cta-bar__icon-btn--active:hover {
+  color: var(--accent);
+  background: rgba(78, 133, 255, 0.18);
+  border-color: rgba(78, 133, 255, 0.45);
+}
+
+/* WCAG 2.1 AA focus ring (mirrors global focus.css pattern) */
+.subscribe-cta-bar__icon-btn:focus {
+  outline: none;
+}
+
+.subscribe-cta-bar__icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Light-mode tint adjustments */
+[data-theme="light"] .subscribe-cta-bar__icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: var(--line, rgba(0, 0, 0, 0.12));
+}
+
+[data-theme="light"] .subscribe-cta-bar__icon-btn--active {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"] .subscribe-cta-bar__icon-btn--active:hover {
+  background: rgba(37, 99, 235, 0.14);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
 /* Responsive adjustments for smaller screens */
 @media (max-width: 640px) {
   .subscribe-cta-bar {
@@ -6873,6 +7079,96 @@ code,
     color: #444;
   }
 
+  /* ── ReviewsTab: hide chrome, expand collapsibles ────────────────────
+     FWC26 — When printing the reviews section:
+     1. .reviews-sort-controls (.no-print) is already hidden by the generic
+        .no-print rule above; this comment preserves intent for reviewers.
+     2. Every review card (data-reviews-section .preview-card) is forced
+        visible and fully expanded so no content is clipped on paper.
+     3. The RatingHistogram bars use inline `width` — overflow:visible
+        ensures they are never cut off.
+     4. The collapsed-content pattern used elsewhere in the app
+        ([aria-hidden="true"], [hidden], details/summary) is expanded so
+        any future collapsible that lands inside the reviews panel prints
+        in full without JS intervention.
+     ─────────────────────────────────────────────────────────────────── */
+
+  /* Force every review card to be fully visible and expanded */
+  [data-reviews-section] .preview-card {
+    display: block !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Expand any aria-hidden collapsible regions inside the reviews panel */
+  [data-reviews-section] [aria-hidden="true"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Expand <details> elements that may appear in reviews */
+  [data-reviews-section] details {
+    display: block !important;
+  }
+
+  [data-reviews-section] details > * {
+    display: block !important;
+  }
+
+  /* Expand hidden elements inside the reviews panel */
+  [data-reviews-section] [hidden] {
+    display: block !important;
+  }
+
+  /* Rating histogram: allow bars to render at full width without overflow clip */
+  [data-reviews-section] .rating-histogram,
+  [data-reviews-section] .rating-histogram__bar-track,
+  [data-reviews-section] .rating-histogram__bar-fill {
+    overflow: visible !important;
+    max-width: 100% !important;
+  }
+
+  /* Review list grid: single column, consistent spacing */
+  [data-reviews-section] .reviews-list {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Review cards: avoid splitting across page breaks */
+  [data-reviews-section] .preview-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
+/* Share Snapshot Button */
+.share-snapshot-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+/* ─── Category Pills ──────────────────────────────────────────────────────── */
+.pill-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  scrollbar-width: thin;
+}
+
+.pill-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
   /* Expand EndpointSummary collapsibles when printing */
   .endpoint-summary-content--collapsed {
     display: block !important;
@@ -6935,6 +7231,147 @@ code,
   }
   .sort-menu {
     max-height: none !important;
+  }
+}
+
+/* ── LatencyChart page (GrantFox FWC26) ───────────────────────────────────────
+   Responsive latency dashboard with bar chart and HelpPopover. Uses design
+   tokens for light/dark mode consistency. */
+.latency-chart-page {
+  display: grid;
+  gap: 24px;
+  padding: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.latency-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.latency-chart-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.latency-chart-title-group h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  line-height: 1.1;
+}
+
+.latency-chart-subtitle {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.latency-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.latency-stat-card {
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(169, 184, 255, 0.12);
+  background: var(--surface-soft);
+}
+
+.latency-stat-label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.latency-stat-value {
+  display: block;
+  font-size: 1.35rem;
+}
+
+.latency-chart-container {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  min-height: 260px;
+}
+
+.latency-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 220px;
+}
+
+.latency-chart-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.latency-chart-bar {
+  width: 100%;
+  max-width: 48px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 70%, var(--accent-strong)));
+  transition: opacity 180ms ease;
+  cursor: pointer;
+}
+
+.latency-chart-bar--peak {
+  background: linear-gradient(180deg, var(--danger), color-mix(in srgb, var(--danger) 70%, var(--warning)));
+}
+
+.latency-chart-bar-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.latency-chart-caption {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .latency-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .latency-chart-bars {
+    gap: 4px;
+  }
+
+  .latency-chart-bar-label {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .latency-chart-page {
+    padding: 14px;
+  }
+
+  .latency-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .latency-chart-bars {
+    height: 160px;
   }
 }
 

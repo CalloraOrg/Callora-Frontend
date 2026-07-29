@@ -8,7 +8,7 @@ import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import CategoryPills from "../components/CategoryPills";
 import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
-import FiltersSidebar, { ALL_CATEGORIES, STATUS_OPTIONS } from "../components/FiltersSidebar";
+import FiltersSidebar, { ALL_CATEGORIES } from "../components/FiltersSidebar";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import EmptyState from "../components/EmptyState";
@@ -22,7 +22,7 @@ import {
   persistDensityPreference,
   type DensityPreference,
 } from "../utils/density";
-import CompareDrawer from "../components/CompareDrawer";
+
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
 import LiveRegion from "../components/LiveRegion";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
@@ -498,6 +498,10 @@ export default function MarketplacePage(): JSX.Element {
   const startItem = (validCurrentPage - 1) * pageSize + 1;
   const endItem = Math.min(validCurrentPage * pageSize, filtered.length);
 
+  if (isLoading) {
+    return <MarketplacePageSkeleton density={density} />;
+  }
+
   return (
     <div className="marketplace-page">
       {/* Top row: title + search only */}
@@ -642,8 +646,6 @@ export default function MarketplacePage(): JSX.Element {
 
           {fetchError ? (
             <EmptyState variant="error" onRetry={handleRetryFetch} />
-          ) : isLoading ? (
-            <MarketplacePageSkeleton />
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}

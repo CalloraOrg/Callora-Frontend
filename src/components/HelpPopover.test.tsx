@@ -109,4 +109,14 @@ describe("HelpPopover", () => {
     const btn = screen.getByRole("button", { name: "Help" });
     expect(btn.className).toContain("help-popover-trigger");
   });
+
+  it("forwards an additional className to the trigger button", () => {
+    render(
+      <HelpPopover content="Class test" className="custom-class" />
+    );
+
+    const btn = screen.getByRole("button", { name: "Help" });
+    expect(btn.className).toContain("help-popover-trigger");
+    expect(btn.className).toContain("custom-class");
+  });
 });

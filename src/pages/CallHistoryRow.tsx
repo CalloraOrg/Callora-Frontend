@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatPrice } from '../utils/format';
 
-type CallRecord = {
+export type CallRecord = {
   id: string;
   timestamp: Date;
   endpoint: string;
   status: 'success' | 'error';
   responseTime: number;
   cost: number;
-  request?: any;
-  response?: any;
+  request?: unknown;
+  response?: unknown;
 };
 
 type CallHistoryRowProps = {
@@ -33,6 +33,7 @@ function formatTimestamp(date: Date) {
 }
 
 export default function CallHistoryRow({ call, isExpanded, onToggle }: CallHistoryRowProps) {
+  // Aria-live polite announcement for status changes (WCAG 4.1.3)
   const [announcement, setAnnouncement] = useState('');
   const previousStatusRef = useRef(call.status);
 

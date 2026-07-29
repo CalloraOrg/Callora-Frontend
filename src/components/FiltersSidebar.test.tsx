@@ -391,6 +391,50 @@ describe("FiltersSidebar", () => {
       expect(within(dialog).getByTestId("filters-zero-results")).toBeTruthy();
       expect(within(dialog).getByTestId("empty-state-filtered")).toBeTruthy();
     });
+
+    it("renders EmptyState when resultCount=0 and no filters active (genuine empty marketplace)", () => {
+      render(<FiltersSidebar {...baseProps} resultCount={0} />);
+      const block = screen.getByTestId("filters-zero-results");
+      expect(block).toBeTruthy();
+      expect(
+        block.querySelector('[data-testid="empty-state-empty"]'),
+      ).toBeTruthy();
+    });
+
+    it("does not render clear-filters CTA when no filters are active", () => {
+      render(<FiltersSidebar {...baseProps} resultCount={0} />);
+      expect(screen.queryByTestId("empty-state-clear-filters")).toBeNull();
+    });
+
+    it("renders sidebar controls normally when resultCount > 0", () => {
+      render(<FiltersSidebar {...baseProps} resultCount={10} />);
+      expect(screen.getByText("Categories")).toBeTruthy();
+      expect(screen.getByText("Price range")).toBeTruthy();
+      expect(screen.queryByTestId("filters-zero-results")).toBeNull();
+    });
+
+    it("renders EmptyState illustration for empty variant inside sidebar", () => {
+      render(<FiltersSidebar {...baseProps} resultCount={0} />);
+      const emptyState = screen.getByTestId("empty-state-empty");
+      expect(emptyState.querySelector("svg")).toBeTruthy();
+      expect(emptyState.getAttribute("data-size")).toBe("compact");
+    });
+
+    it("uses compact size for both empty and filtered variants inside sidebar", () => {
+      const { rerender } = render(
+        <FiltersSidebar {...baseProps} resultCount={0} />,
+      );
+      expect(screen.getByTestId("empty-state-empty").getAttribute("data-size")).toBe("compact");
+
+      rerender(
+        <FiltersSidebar
+          {...baseProps}
+          selectedCategories={new Set(["AI/ML"])}
+          resultCount={0}
+        />,
+      );
+      expect(screen.getByTestId("empty-state-filtered").getAttribute("data-size")).toBe("compact");
+    });
   });
 
   describe("empty-state illustration (v7) visual refinements", () => {

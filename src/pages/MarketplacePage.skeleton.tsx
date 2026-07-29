@@ -2,16 +2,23 @@
  * MarketplacePage.skeleton.tsx
  *
  * Loading shell for the Marketplace page.
- * Uses ApiCardSkeleton (from ApiCard.tsx) to keep skeleton shapes in
- * exact parity with the real cards — dimensions, layout structure, and
- * spacing all mirror the final rendered output so the CLS shift on load
- * is minimal.
+ * Mirrors the exact layout, spacing, components, and responsive grid structure of
+ * MarketplacePage to ensure minimal cumulative layout shift (CLS) on data hydration.
+ *
+ * Accessibility (WCAG 2.1 AA):
+ * - Container carries aria-busy="true" and aria-label="Marketplace loading shell".
+ * - Inner placeholders carry aria-hidden="true" to avoid screen-reader noise.
  */
-import Skeleton from "../components/Skeleton";
+import Skeleton, { FiltersSidebarSkeleton } from "../components/Skeleton";
 import { ApiCardSkeleton } from "../components/ApiCard";
-import { FiltersSidebarSkeleton } from "../components/Skeleton";
+import { ApiTagFilterSkeleton } from "./ApiTagFilter";
+import type { DensityPreference } from "../utils/density";
 
-export default function MarketplacePageSkeleton() {
+export default function MarketplacePageSkeleton({
+  density = "comfortable",
+}: {
+  density?: DensityPreference;
+}) {
   return (
     <div
       className="marketplace-page"
@@ -20,53 +27,106 @@ export default function MarketplacePageSkeleton() {
     >
       {/* ── Header row ── */}
       <div className="marketplace-header">
-        {/* Page title */}
-        <Skeleton width={240} height={42} />
-
-        {/* Search + density toggle */}
+        <h1>API Marketplace</h1>
         <div className="marketplace-search-row">
-          <Skeleton width="100%" height={48} borderRadius={12} />
-
+          <div className="marketplace-search">
+            <Skeleton width="100%" height={44} borderRadius={10} />
+          </div>
           <div
             className="marketplace-density-toggle"
+            role="group"
+            aria-label="Results density"
             aria-hidden="true"
-            style={{ display: "flex", gap: 8 }}
           >
-            <Skeleton width={118} height={40} borderRadius={999} />
-            <Skeleton width={88} height={40} borderRadius={999} />
+            <Skeleton width={110} height={38} borderRadius={8} />
+            <Skeleton width={88} height={38} borderRadius={8} />
           </div>
         </div>
+        <Skeleton width={170} height={40} borderRadius={10} />
+      </div>
 
-        {/* Sort dropdown */}
-        <Skeleton width={170} height={40} borderRadius={12} />
+      {/* ── Recently Active Rail Placeholder ── */}
+      <div
+        className="recently-active-rail-skeleton"
+        aria-hidden="true"
+        style={{
+          display: "flex",
+          gap: 12,
+          overflowX: "hidden",
+          padding: "12px 0",
+          marginBottom: 16,
+        }}
+      >
+        {Array.from({ length: 5 }).map((_, index) => (
+          <Skeleton
+            key={index}
+            width={200}
+            height={72}
+            borderRadius={12}
+            style={{ flexShrink: 0 }}
+          />
+        ))}
       </div>
 
       {/* ── Main layout ── */}
       <div className="marketplace-layout">
-        <aside className="marketplace-sidebar filters-sidebar">
+        <aside className="marketplace-sidebar">
           <FiltersSidebarSkeleton />
         </aside>
 
         <main className="marketplace-results">
           {/* Toolbar: result count + actions */}
           <div className="marketplace-toolbar">
-            <Skeleton width="42%" height={18} />
+            <div className="marketplace-count">
+              <Skeleton width={180} height={20} />
+            </div>
             <div className="marketplace-actions" aria-hidden="true">
-              {/* Sort dropdown placeholder */}
-              <Skeleton width={142} height={40} borderRadius={10} />
-              {/* Filters button placeholder */}
-              <Skeleton width={110} height={40} borderRadius={10} />
+              <Skeleton width={140} height={38} borderRadius={8} />
+              <Skeleton width={90} height={38} borderRadius={8} />
             </div>
           </div>
 
-          {/*
-           * Card grid — ApiCardSkeleton is kept in sync with the real ApiCard
-           * layout automatically, so any future card changes are reflected here.
-           */}
-          <div className="marketplace-grid">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <ApiCardSkeleton key={index} />
+          {/* Category Pills placeholder */}
+          <div
+            className="pill-bar"
+            aria-hidden="true"
+            style={{ display: "flex", gap: 8, margin: "12px 0" }}
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                width={70 + (i % 3) * 20}
+                height={34}
+                borderRadius={999}
+              />
             ))}
+          </div>
+
+          {/* Tag filter placeholder */}
+          <div style={{ marginBottom: 16 }}>
+            <ApiTagFilterSkeleton />
+          </div>
+
+          {/* Grid skeleton */}
+          <div className="marketplace-grid">
+            {Array.from({ length: 12 }).map((_, index) => (
+              <ApiCardSkeleton key={index} density={density} />
+            ))}
+          </div>
+
+          {/* Bottom pagination placeholder */}
+          <div
+            aria-hidden="true"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 24,
+              paddingTop: 16,
+            }}
+          >
+            <Skeleton width={120} height={36} borderRadius={8} />
+            <Skeleton width={200} height={36} borderRadius={8} />
           </div>
         </main>
       </div>

@@ -307,16 +307,20 @@ size tailored specifically for inline use inside FiltersSidebar.
 
 **Props:**
 
-| Prop              | Type                                     | Default     | Description                                                               |
-| ----------------- | ---------------------------------------- | ----------- | ------------------------------------------------------------------------- |
-| `variant?`        | `"empty" \| "api-detail" \| "filtered" \| "error" \| "plan-badge" \| "risk-gauge" \| "quota-banner"` | `"empty"`   | Which semantic state to render.                                           |
-| `size?`           | `"default" \| "compact"`                 | `"default"` | Full-size (marketplace results) vs condensed (FiltersSidebar inline).     |
-| `title?`          | `string`                                 | per variant | Override the default heading.                                             |
-| `message?`        | `string`                                 | per variant | Override the default subtitle.                                            |
-| `headingId?`      | `string`                                 | —           | Optional `id` on the heading for parent `aria-labelledby` wiring.         |
-| `onClearFilters?` | `() => void`                             | —           | Shown only when `variant === "filtered"`. Renders the Clear CTA.          |
-| `onRetry?`        | `() => void \| Promise<void>`            | —           | Shown only when `variant === "error"`. Handles async loading + aria-busy. |
-| `action?`         | `{ label: string; onClick: () => void }` | —           | Optional custom CTA button rendered before any variant-specific actions.  |
+| Prop               | Type                                                                 | Default     | Description                                                               |
+| ------------------ | -------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------- |
+| `variant?`         | `"empty" \| "api-detail" \| "filtered" \| "error" \| "plan-badge" \| "risk-gauge" \| "quota-banner"` | `"empty"`   | Which semantic state to render.                                           |
+| `size?`            | `"default" \| "compact"`                                             | `"default"` | Full-size (marketplace results) vs condensed (FiltersSidebar inline).     |
+| `title?`           | `string`                                                             | per variant | Override the default heading.                                             |
+| `message?`         | `string`                                                             | per variant | Override the default subtitle.                                            |
+| `description?`     | `string`                                                             | —           | Deprecated: use `message` instead.                                        |
+| `headingId?`       | `string`                                                             | —           | Optional `id` on the heading for parent `aria-labelledby` wiring.         |
+| `onClearFilters?`  | `() => void`                                                         | —           | Shown only when `variant === "filtered"`. Renders the Clear CTA.          |
+| `onRetry?`         | `() => void \| Promise<void>`                                        | —           | Shown only when `variant === "error"`. Handles async loading + aria-busy. |
+| `action?`          | `{ label: string; onClick: () => void }`                             | —           | Optional custom CTA button rendered before any variant-specific actions.  |
+| `secondaryAction?` | `{ label: string; onClick: () => void }`                             | —           | Optional secondary CTA button rendered after the primary action.          |
+| `loading?`         | `boolean`                                                            | `false`     | Renders the loading skeleton variant.                                     |
+| `copyable?`        | `boolean`                                                            | `false`     | When true, renders a copy-to-clipboard button for the message text.       |
 
 **Visual Spec (v7):**
 
@@ -345,15 +349,15 @@ size tailored specifically for inline use inside FiltersSidebar.
 
 **Default copy per variant:**
 
-| Variant  | Default title         | Default message (default)                           | Default message (compact)                 |
-| -------- | --------------------- | --------------------------------------------------- | ----------------------------------------- |
-| empty    | "No APIs available"   | "Check back soon for new integrations."             | same (compact not typical)                |
-| api-detail | "API not found"     | "This API may have moved or is no longer available." | same (compact not typical)               |
-| filtered | "No results found"    | "Your filters are too narrow. Try adjusting them."  | "Adjust filters or clear to see results." |
-| error    | "Failed to load APIs" | "We encountered an error fetching the marketplace…" | "Error loading results. Please retry."    |
-| plan-badge | "No plan selected"  | "This API doesn't have a plan attached yet…"        | "Choose a plan to unlock API access."     |
-| risk-gauge | "No risk data yet"  | "Run a risk assessment to evaluate your API's…"     | "Run an assessment to evaluate…"          |
-| quota-banner | "No quota configured" | "No quota has been configured for this API yet…" | "Set a quota to track your API usage limits." |
+| Variant      | Default title         | Default message (default)                            | Default message (compact)                     |
+| ------------ | --------------------- | ---------------------------------------------------- | --------------------------------------------- |
+| empty        | "No APIs available"   | "Check back soon for new integrations."              | same (compact not typical)                    |
+| api-detail   | "API not found"       | "This API may have moved or is no longer available." | same (compact not typical)                    |
+| filtered     | "No results found"    | "Your filters are too narrow. Try adjusting them."   | "Adjust filters or clear to see results."     |
+| error        | "Failed to load APIs" | "We encountered an error fetching the marketplace…"  | "Error loading results. Please retry."        |
+| plan-badge   | "No plan selected"    | "This API doesn't have a plan attached yet…"         | "Choose a plan to unlock API access."         |
+| risk-gauge   | "No risk data yet"    | "Run a risk assessment to evaluate your API's…"      | "Run an assessment to evaluate…"              |
+| quota-banner | "No quota configured" | "No quota has been configured for this API yet…"     | "Set a quota to track your API usage limits." |
 
 **States:**
 
@@ -385,10 +389,14 @@ size tailored specifically for inline use inside FiltersSidebar.
   /* Marketplace results area */
 }
 {
-  filteredApis.length === 0 && Object.keys(activeFilters).length === 0 && <EmptyState variant="empty" />;
+  filteredApis.length === 0 && Object.keys(activeFilters).length === 0 && (
+    <EmptyState variant="empty" />
+  );
 }
 {
-  filteredApis.length === 0 && Object.keys(activeFilters).length > 0 && <EmptyState variant="filtered" onClearFilters={resetFilters} />;
+  filteredApis.length === 0 && Object.keys(activeFilters).length > 0 && (
+    <EmptyState variant="filtered" onClearFilters={resetFilters} />
+  );
 }
 {
   fetchError && <EmptyState variant="error" onRetry={refetch} />;
@@ -398,7 +406,13 @@ size tailored specifically for inline use inside FiltersSidebar.
   /* FiltersSidebar inline zero-results notice */
 }
 {
-  resultCount === 0 && hasActiveFilters && <EmptyState variant="filtered" size="compact" onClearFilters={clearFilters} />;
+  resultCount === 0 && hasActiveFilters && (
+    <EmptyState
+      variant="filtered"
+      size="compact"
+      onClearFilters={clearFilters}
+    />
+  );
 }
 ```
 
@@ -467,10 +481,10 @@ Complements `EndpointGroupHover` (group-level overview) by providing **schema-le
 
 **Props:**
 
-| Prop       | Type                    | Description                                                                                  |
-| ---------- | ----------------------- | -------------------------------------------------------------------------------------------- |
-| `endpoint` | `EndpointPreviewData`   | The endpoint whose schema should be previewed. See type definition below.                    |
-| `children` | `React.ReactNode`       | Content that acts as the hover/focus trigger — typically an endpoint card header row.        |
+| Prop       | Type                  | Description                                                                           |
+| ---------- | --------------------- | ------------------------------------------------------------------------------------- |
+| `endpoint` | `EndpointPreviewData` | The endpoint whose schema should be previewed. See type definition below.             |
+| `children` | `React.ReactNode`     | Content that acts as the hover/focus trigger — typically an endpoint card header row. |
 
 **`EndpointPreviewData` type:**
 
@@ -479,13 +493,13 @@ type EndpointPreviewData = {
   id: string;
   title: string;
   url: string;
-  method: string;           // e.g. "GET", "POST"
+  method: string; // e.g. "GET", "POST"
   params: {
     name: string;
     type: string;
     required?: boolean;
   }[];
-  response?: string;        // Optional JSON response-shape snippet
+  response?: string; // Optional JSON response-shape snippet
   group?: string;
 };
 ```
@@ -521,22 +535,26 @@ type EndpointPreviewData = {
 import EndpointPreview from "../components/EndpointPreview";
 
 // Inside a documentation endpoint list:
-{endpoints.map((ep) => (
-  <div key={ep.id} className="preview-card">
-    <EndpointPreview endpoint={ep}>
-      {/* This content becomes the hover/focus trigger */}
-      <div className="endpoint-card-header">
-        <span className={`method-badge method-badge--${ep.method.toLowerCase()}`}>
-          {ep.method}
-        </span>
-        <strong>{ep.title}</strong>
-      </div>
-    </EndpointPreview>
+{
+  endpoints.map((ep) => (
+    <div key={ep.id} className="preview-card">
+      <EndpointPreview endpoint={ep}>
+        {/* This content becomes the hover/focus trigger */}
+        <div className="endpoint-card-header">
+          <span
+            className={`method-badge method-badge--${ep.method.toLowerCase()}`}
+          >
+            {ep.method}
+          </span>
+          <strong>{ep.title}</strong>
+        </div>
+      </EndpointPreview>
 
-    {/* Full parameter table below, as before */}
-    <div style={{ padding: 24 }}>…</div>
-  </div>
-))}
+      {/* Full parameter table below, as before */}
+      <div style={{ padding: 24 }}>…</div>
+    </div>
+  ));
+}
 ```
 
 **Files:**
@@ -555,20 +573,20 @@ Enhanced in v7 with an inline, context-aware **zero-results EmptyState** that ap
 
 **Props:**
 
-| Prop                   | Type                          | Default | Description                                                                                               |
-| ---------------------- | ----------------------------- | ------- | --------------------------------------------------------------------------------------------------------- |
-| `selectedCategories`   | `Set<string>`                 | (req)   | Currently selected category checkboxes.                                                                   |
-| `toggleCategory`       | `(c: string) => void`         | (req)   | Toggle a category checkbox.                                                                               |
-| `minPrice`             | `number \| null`              | (req)   | Minimum price filter value.                                                                               |
-| `maxPrice`             | `number \| null`              | (req)   | Maximum price filter value.                                                                               |
-| `setMinPrice`          | `(v: number \| null) => void` | (req)   | Update minimum price (pass `null` to clear).                                                              |
-| `setMaxPrice`          | `(v: number \| null) => void` | (req)   | Update maximum price (pass `null` to clear).                                                              |
-| `popularity`           | `string`                      | (req)   | Popularity sort: `"any"` \| `"mostUsed"` \| `"newest"`.                                                   |
-| `setPopularity`        | `(p: string) => void`         | (req)   | Update popularity sort.                                                                                   |
-| `clearFilters`         | `() => void`                  | (req)   | Reset every filter to its default/empty state.                                                            |
-| `favoritesOnly?`       | `boolean`                     | `false` | Whether the "Favorites only" toggle is checked.                                                           |
-| `toggleFavoritesOnly?` | `() => void`                  | no-op   | Toggle the `favoritesOnly` state.                                                                         |
-| `resultCount?`         | `number`                      | —       | **(v7)** Live count of results after filtering. When `0` + active filters, renders the inline EmptyState. |
+| Prop                   | Type                          | Default | Description                                                                                                                            |
+| ---------------------- | ----------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `selectedCategories`   | `Set<string>`                 | (req)   | Currently selected category checkboxes.                                                                                                |
+| `toggleCategory`       | `(c: string) => void`         | (req)   | Toggle a category checkbox.                                                                                                            |
+| `minPrice`             | `number \| null`              | (req)   | Minimum price filter value.                                                                                                            |
+| `maxPrice`             | `number \| null`              | (req)   | Maximum price filter value.                                                                                                            |
+| `setMinPrice`          | `(v: number \| null) => void` | (req)   | Update minimum price (pass `null` to clear).                                                                                           |
+| `setMaxPrice`          | `(v: number \| null) => void` | (req)   | Update maximum price (pass `null` to clear).                                                                                           |
+| `popularity`           | `string`                      | (req)   | Popularity sort: `"any"` \| `"mostUsed"` \| `"newest"`.                                                                                |
+| `setPopularity`        | `(p: string) => void`         | (req)   | Update popularity sort.                                                                                                                |
+| `clearFilters`         | `() => void`                  | (req)   | Reset every filter to its default/empty state.                                                                                         |
+| `favoritesOnly?`       | `boolean`                     | `false` | Whether the "Favorites only" toggle is checked.                                                                                        |
+| `toggleFavoritesOnly?` | `() => void`                  | no-op   | Toggle the `favoritesOnly` state.                                                                                                      |
+| `resultCount?`         | `number`                      | —       | **(v7)** Live count of results after filtering. When `0`, renders the inline EmptyState (filtered if filters active, empty otherwise). |
 
 **Visual Spec:**
 
@@ -577,7 +595,7 @@ Enhanced in v7 with an inline, context-aware **zero-results EmptyState** that ap
 - Price range: Two `<input type="number">` fields with a `WarningIcon` + error message when `min > max`.
 - Popularity: Accessible `Dropdown` component.
 - **Zero-results inline block (v7):** Wrapped in a `12px` padding-top + `1px solid var(--line)` top-border separator so it visually groups with "results feedback" rather than the Favorites controls above. Contains:
-  - `<EmptyState variant="filtered" size="compact" onClearFilters={clearFilters} />`
+  - `<EmptyState variant={hasActiveFilters ? "filtered" : "empty"} size="compact" onClearFilters={hasActiveFilters ? clearFilters : undefined} />`
   - Wrapper carries `role="status"` + `aria-live="polite"` for assistive-tech announcements.
 - Clear button: Ghost button style, always present at the bottom.
 
@@ -586,7 +604,9 @@ Enhanced in v7 with an inline, context-aware **zero-results EmptyState** that ap
 - Default: All filter sections expanded.
 - Collapsed: Section header shows rotated chevron; panel is `hidden`.
 - Price error: Both price inputs gain `filter-input--invalid` class; alert paragraph appears with `role="alert"`.
-- **Zero-results (v7):** When `resultCount === 0` AND at least one filter is active (categories, price bounds, non-any popularity, or favorites-only), the inline EmptyState mounts with a token-based top-border separator above it.
+- **Zero-results (v7):** When `resultCount === 0`:
+  - AND at least one filter is active → renders `variant="filtered"` with a "Clear filters" CTA.
+  - AND no filters are active → renders `variant="empty"` with the generic "No APIs available" message.
 - Focused: Standard focus ring on all inputs and buttons.
 
 **Responsive Behavior:**
@@ -703,19 +723,20 @@ Full-page marketplace listing with two-way URL filter state synchronization.
 
 **URL Query Parameters:**
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `q` | `string` | Search query, populates the search input |
-| `categories` | `string` | Comma-separated category slugs |
-| `tag` | `string` | Active tag filter |
-| `minPrice` | `number` | Minimum price filter |
-| `maxPrice` | `number` | Maximum price filter |
-| `popularity` | `string` | Popularity filter (`mostUsed`, `newest`, or omitted) |
-| `favorites` | `1` | Favorites-only toggle when set to `1` |
-| `sort` | `SortValue` | Sort order (`popularity`, `price-asc`, `latency-asc`, `newest`) |
-| `page` | `number` | Current pagination page (clamped to valid range) |
+| Param        | Type        | Description                                                     |
+| ------------ | ----------- | --------------------------------------------------------------- |
+| `q`          | `string`    | Search query, populates the search input                        |
+| `categories` | `string`    | Comma-separated category slugs                                  |
+| `tag`        | `string`    | Active tag filter                                               |
+| `minPrice`   | `number`    | Minimum price filter                                            |
+| `maxPrice`   | `number`    | Maximum price filter                                            |
+| `popularity` | `string`    | Popularity filter (`mostUsed`, `newest`, or omitted)            |
+| `favorites`  | `1`         | Favorites-only toggle when set to `1`                           |
+| `sort`       | `SortValue` | Sort order (`popularity`, `price-asc`, `latency-asc`, `newest`) |
+| `page`       | `number`    | Current pagination page (clamped to valid range)                |
 
 **Behaviour:**
+
 - All filter state is derived from URL search params on mount, so filtered views are fully shareable and bookmarkable.
 - Changing a filter updates the corresponding URL param with `replace: true` (no history entry per keystroke).
 - Changing filters resets `?page=1`. Navigating pages writes `?page=<n>` to the URL.
@@ -723,6 +744,7 @@ Full-page marketplace listing with two-way URL filter state synchronization.
 - "Clear Filters" removes all filter params from the URL and resets sort/popularity to defaults.
 
 **Accessibility:**
+
 - Filter badge shows active count with `aria-label`
 - Mobile filter trigger uses `aria-haspopup="dialog"` and `aria-expanded`
 
@@ -798,7 +820,10 @@ Displays a tooltip with a 5-star rating distribution breakdown upon hovering or 
 **Usage Example:**
 
 ```tsx
-<RatingHistogram rating={4.5} distribution={{ 5: 100, 4: 50, 3: 10, 2: 5, 1: 0 }}>
+<RatingHistogram
+  rating={4.5}
+  distribution={{ 5: 100, 4: 50, 3: 10, 2: 5, 1: 0 }}
+>
   <span>⭐ 4.5</span>
 </RatingHistogram>
 ```
@@ -843,7 +868,14 @@ Accessible context menu for `ApiCard`. Triggered by right-click on desktop or a 
 
 ```tsx
 {
-  menuPos && <ContextMenu x={menuPos.x} y={menuPos.y} onClose={() => setMenuPos(null)} actions={contextActions} />;
+  menuPos && (
+    <ContextMenu
+      x={menuPos.x}
+      y={menuPos.y}
+      onClose={() => setMenuPos(null)}
+      actions={contextActions}
+    />
+  );
 }
 ```
 
@@ -938,10 +970,10 @@ When consuming an `APIItem` from the data layer, its `status` field is one of
 it to a `StatusVariant` before passing it to `<StatusBadge>`:
 
 ```tsx
-import { StatusBadge, apiStatusToVariant } from '../components/StatusBadge';
+import { StatusBadge, apiStatusToVariant } from "../components/StatusBadge";
 
 // api.status: "operational" | "degraded" | "maintenance" | undefined
-<StatusBadge status={apiStatusToVariant(api.status)} />
+<StatusBadge status={apiStatusToVariant(api.status)} />;
 ```
 
 Mapping table:
@@ -958,15 +990,15 @@ Mapping table:
 ```css
 /* dark theme — maintenance variant (purple) */
 [data-theme="dark"] {
-  --sb-maintenance-bg:     rgba(167, 139, 250, 0.14);
-  --sb-maintenance-fg:     #a78bfa;
+  --sb-maintenance-bg: rgba(167, 139, 250, 0.14);
+  --sb-maintenance-fg: #a78bfa;
   --sb-maintenance-border: rgba(167, 139, 250, 0.35);
 }
 
 /* light theme */
 [data-theme="light"] {
-  --sb-maintenance-bg:     rgba(124, 58, 237, 0.1);
-  --sb-maintenance-fg:     #5b21b6;
+  --sb-maintenance-bg: rgba(124, 58, 237, 0.1);
+  --sb-maintenance-fg: #5b21b6;
   --sb-maintenance-border: rgba(124, 58, 237, 0.25);
 }
 ```
@@ -979,8 +1011,8 @@ The crosshatch (╳) is rendered as two overlaid SVG line sets via
 ```css
 .sb-pattern-maintenance {
   background-image:
-    url("data:image/svg+xml,…"),  /* ╲ diagonal pass */
-    url("data:image/svg+xml,…");  /* ╱ diagonal pass */
+    url("data:image/svg+xml,…"),
+    /* ╲ diagonal pass */ url("data:image/svg+xml,…"); /* ╱ diagonal pass */
   background-size: 8px 8px;
   background-repeat: repeat;
 }
@@ -1083,7 +1115,11 @@ Search input with clear button and keyboard shortcuts.
 **Usage Example:**
 
 ```tsx
-<SearchBar value={searchQuery} onChange={setSearchQuery} onSearch={handleSearch} />
+<SearchBar
+  value={searchQuery}
+  onChange={setSearchQuery}
+  onSearch={handleSearch}
+/>
 ```
 
 ---
@@ -1125,7 +1161,12 @@ Server error display with retry functionality.
 **Usage Example:**
 
 ```tsx
-<ServerError onRetry={fetchData} requestId="req_abc123" title="Connection failed" description="Unable to reach the server. Please check your connection." />
+<ServerError
+  onRetry={fetchData}
+  requestId="req_abc123"
+  title="Connection failed"
+  description="Unable to reach the server. Please check your connection."
+/>
 ```
 
 ---
@@ -1214,19 +1255,19 @@ switch feels intentional rather than jarring.
 ### How it works
 
 1. **`src/styles/theme-transition.css`** — Applies `transition: background-color,
-   border-color, color, fill, stroke, outline-color` to every semantic HTML element
-   and SVG shape.  The transition is guarded by the `.theme-transitions-ready` class
+border-color, color, fill, stroke, outline-color` to every semantic HTML element
+   and SVG shape. The transition is guarded by the `.theme-transitions-ready` class
    on `<html>`, which `ThemeProvider` adds via `requestAnimationFrame` after the
-   very first paint.  This prevents the initial page load from animating into the
+   very first paint. This prevents the initial page load from animating into the
    user's saved theme (which would look like a flash).
 
 2. **`ThemeProvider`** (`src/ThemeContext.tsx`) — Sets `.theme-transitions-ready`
    after the first paint and exposes two helpers to consumers:
    - `THEME_TRANSITION_MS` (number, `240`) — matches the `--transition-speed` CSS
-     token.  Import it when you need to delay or coordinate JS-side changes with
+     token. Import it when you need to delay or coordinate JS-side changes with
      the CSS animation.
    - `isTransitioning` (boolean) — `true` from the moment `data-theme` changes
-     until `THEME_TRANSITION_MS` has elapsed.  Useful for suppressing or
+     until `THEME_TRANSITION_MS` has elapsed. Useful for suppressing or
      coordinating secondary UI updates during the switch.
 
 3. **`ThemeToggle`** (`src/ThemeToggle.tsx`) — Adds
@@ -1265,7 +1306,7 @@ switches always get them.
   `background-color`, `color`, or `border-color`, add `.no-theme-transition` to
   that component's root element or add its class to the exclusion list in
   `theme-transition.css`.
-- Never hardcode the 240 ms duration in JS.  Use the exported
+- Never hardcode the 240 ms duration in JS. Use the exported
   `THEME_TRANSITION_MS` constant from `ThemeContext` instead.
 
 ---
