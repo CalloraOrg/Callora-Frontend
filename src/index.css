@@ -1686,6 +1686,50 @@ code,
   color: #ffffff;
 }
 
+/*
+ * Reduced-motion static state — GrantFox FWC26
+ *
+ * When `prefers-reduced-motion: reduce` is set the user has expressed a
+ * preference for minimal animation.  The `.tag-chip--no-motion` modifier is
+ * applied by the `ApiTagFilter` component (via the `useReducedMotion` hook)
+ * and here we strip out every animated property so chips jump directly to
+ * their final state with no easing or positional shift.
+ *
+ * Two coverage paths:
+ *  1. CSS-only: `@media (prefers-reduced-motion: reduce)` targets any
+ *     `.tag-chip` element regardless of JS, providing a CSS-level safety net.
+ *  2. JS modifier: `.tag-chip--no-motion` is applied by the React component so
+ *     the override is also effective in environments where the media query may
+ *     not cascade correctly (e.g. CSS-in-JS isolation, shadow DOM).
+ */
+@media (prefers-reduced-motion: reduce) {
+  .tag-chip {
+    transition: none;
+    transform: none;
+  }
+
+  .tag-chip:hover,
+  .tag-chip:focus-visible {
+    transform: none;
+  }
+}
+
+/* JS-side modifier mirror — applied by useReducedMotion hook in ApiTagFilter. */
+.tag-chip--no-motion,
+.tag-chip--no-motion:hover,
+.tag-chip--no-motion:focus-visible {
+  transition: none;
+  transform: none;
+}
+
+/* ApiTagFilter wrapper */
+.api-tag-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .api-card__stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
