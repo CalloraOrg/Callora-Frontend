@@ -1,12 +1,15 @@
-/* MethodChip.css */
+/* MethodChip.css — Issue #744: mobile responsive layout */
+
+/* ── Base (desktop/tablet) ─────────────────────────────────────────────── */
 .method-chip {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 8px;
-  margin: 2px;
-  min-width: 60px; /* uniform width */
+  padding: 4px 10px;
+  margin: 3px;
+  min-width: 64px; /* uniform width */
+  min-height: 32px;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -23,9 +26,14 @@
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
-.method-icon {
+/* Icon inside the chip.  Note: the component uses "method-chip-icon", not
+   the bare "method-icon" class — fixed in Issue #744. */
+.method-chip-icon {
   margin-right: 4px;
   font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 .method-tooltip {
   position: absolute;
@@ -52,4 +60,29 @@
   border-width: 5px 5px 0 5px;
   border-style: solid;
   border-color: var(--tooltip-bg, #333) transparent transparent transparent;
+}
+
+/* ── Narrow mobile (≤375 px) — Issue #744 ────────────────────────────────
+   Enlarged tap targets, additional spacing, and responsive wrapping so chips
+   don't overflow the viewport.  WCAG 2.5.5 minimum 44 × 44 px touch target. */
+@media (max-width: 375px) {
+  .method-chip {
+    padding: 10px 14px;
+    margin: 4px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 0.8125rem;
+    border-radius: 6px;
+  }
+
+  .method-chip-icon {
+    margin-right: 6px;
+    font-size: 1rem;
+  }
+
+  .method-tooltip {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    top: 115%;
+  }
 }
