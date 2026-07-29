@@ -78,3 +78,7 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+.numeric-tabular {
+  font-variant-numeric: tabular-nums;
+}
