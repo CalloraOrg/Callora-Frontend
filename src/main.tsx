@@ -14,6 +14,7 @@ import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
 import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
 import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
+import LatencyChart from "./pages/LatencyChart";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -71,6 +72,11 @@ async function renderRoute() {
       )
     );
     stopRouteLoading();
+    return;
+  }
+
+  if (pathname.startsWith("/latency-chart")) {
+    root.render(wrap(<LatencyChart />));
     return;
   }
 

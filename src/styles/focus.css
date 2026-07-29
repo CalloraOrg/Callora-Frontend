@@ -347,72 +347,13 @@
     outline-offset: 2px;
   }
 
-  /* ── OnboardingTour: interactive elements (WCAG 2.1 AA, FWC26) ─────────
-     The tour contains six categories of interactive elements:
-       1. .onboarding-tour__skip       — skip-tour anchor
-       2. .tour-step-tab               — WAI-ARIA tab dots (stepper)
-       3. .onboarding-tour__panel      — tabpanel (receives programmatic focus)
-       4. .tour-nav-button             — Back / Next / Finish navigation buttons
-       5. .tour-done-button            — "Go to Dashboard" CTA on complete screen
-       6. .tour-restart-link           — "Restart tour" secondary action
-
-     All rules use the 2px solid var(--accent) ring and 3px offset that the
-     rest of the codebase uses.  No bare :focus rules are set here; the
-     global *:focus { outline: none } in index.css suppresses mouse-triggered
-     rings and :focus-visible restores them for keyboard navigation.
-     ─────────────────────────────────────────────────────────────────────── */
-
-  /* Skip-tour link */
-  .onboarding-tour__skip:focus-visible {
+  /* ── LatencyChart focus-visible overrides ────────────────────────────
+     Chart bars are interactive elements that receive pointer + keyboard
+     events. They need a visible focus ring for WCAG 2.4.7. */
+  .latency-chart-page .latency-chart-bar:focus-visible {
     outline: 2px solid var(--accent);
-    outline-offset: 3px;
-    border-radius: 2px;
-  }
-
-  /* Stepper tab dots */
-  .tour-step-tab:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 3px;
-    box-shadow: var(--focus-ring);
-  }
-
-  /* Step tabpanel — receives programmatic focus on step change */
-  .onboarding-tour__panel:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 4px;
-    border-radius: 4px;
-  }
-
-  /* Navigation buttons: Back, Next, Finish */
-  .tour-nav-button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 3px;
-    box-shadow: var(--focus-ring);
-  }
-
-  /* "Go to Dashboard" CTA on the completion screen */
-  .tour-done-button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 3px;
-    box-shadow: var(--focus-ring);
-  }
-
-  /* "Restart tour" secondary action (rendered as <button>) */
-  .tour-restart-link:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 3px;
-    box-shadow: var(--focus-ring);
-  }
-
-  /* ── OnboardingTour global catch-all ─────────────────────────────
-     Belt-and-braces rule that ensures any additional interactive
-     elements added to the tour in future iterations automatically
-     inherit a visible focus ring.  Specificity is intentionally
-     low (one class + pseudo-class) so individual per-element overrides
-     above can still win.                                           */
-  .onboarding-tour *:focus-visible {
-    outline: 2px solid var(--accent, #4e85ff);
-    outline-offset: 3px;
+    outline-offset: 2px;
+    background: var(--accent);
   }
 }
 
