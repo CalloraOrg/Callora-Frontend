@@ -13,3 +13,5 @@ export {
 } from "../components/ApiDetailStickyTOC";
 
 export { ApiDetailStickyTOC as default } from "../components/ApiDetailStickyTOC";
+
+export { StickyTocErrorBoundary } from "../components/StickyTocErrorBoundary";

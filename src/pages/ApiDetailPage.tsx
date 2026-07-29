@@ -15,9 +15,11 @@ import EndpointGroupHover, { type EndpointGroupPreview } from "../components/End
 import EndpointPreview from "../components/EndpointPreview";
 import RatingHistogram from "../components/RatingHistogram";
 import { ApiDetailStickyTOC, type TocSection } from "../components/ApiDetailStickyTOC";
+import { StickyTocErrorBoundary } from "../components/StickyTocErrorBoundary";
 import { CheckIcon } from "../components/icons";
 import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
 import SubscribeButton from "../components/SubscribeButton";
+import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
 import SubscribeCTA from "./SubscribeCTA";
 import { useToast } from "../components/Toast";
 import { useCollections } from "../state/collectionsStore";
@@ -27,6 +29,7 @@ import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import PlanBadge from "../components/PlanBadge";
 import LiveRegion from "../components/LiveRegion";
+import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
 
 /**
  * ApiDetailPage
@@ -796,7 +799,9 @@ print(response.json())`;
                     </div>
 
                     {/* Sticky TOC — hidden below 1100 px via CSS */}
-                    <ApiDetailStickyTOC sections={DOC_TOC_SECTIONS} />
+                    <StickyTocErrorBoundary>
+                      <ApiDetailStickyTOC sections={DOC_TOC_SECTIONS} />
+                    </StickyTocErrorBoundary>
                   </section>
                 )}
 
