@@ -22,6 +22,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - 500 error page with retry flow
 - 404 catch-all page
 - Theme playground for previewing primary/accent/surface tokens live
+- Sticky bottom action bar on the theme toggle that surfaces primary theme actions after scrolling
 - Dev proxy to backend at `http://localhost:3000` for `/api`
 - **Global Command Palette**: Instantly jump to views, search APIs by name, cycle/toggle light & dark themes, or trigger vault deposits. Use `Cmd+K` on macOS or `Ctrl+K` on Windows/Linux to open.
 - **Pattern-based status badges**: Status indicators now use distinct textures in addition to color so they remain understandable for color-blind users and in grayscale displays.

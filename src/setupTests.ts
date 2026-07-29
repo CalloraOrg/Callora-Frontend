@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import { vi } from "vitest";
 
 // Mock matchMedia for components that use it (e.g., Tabs)
 // Use Object.defineProperty to properly set it on window
@@ -50,5 +51,19 @@ Object.defineProperty(window, "localStorage", {
 Object.defineProperty(globalThis, "localStorage", {
   value: localStorageMock,
   writable: true,
+});
+
+// Mock IntersectionObserver for components that use it (e.g., ThemeToggle sticky bar)
+const mockIntersectionObserver = vi.fn().mockImplementation((callback: IntersectionObserverCallback) => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+  trigger: (entries: IntersectionObserverEntry[]) => callback(entries, {} as IntersectionObserver),
+}));
+
+Object.defineProperty(window, "IntersectionObserver", {
+  value: mockIntersectionObserver,
+  writable: true,
+  configurable: true,
 });
 

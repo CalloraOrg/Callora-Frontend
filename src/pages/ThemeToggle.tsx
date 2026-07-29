@@ -44,18 +44,27 @@ export function ThemeToggle() {
   }, [theme]);
 
   // ── Scroll detection for sticky action bar ────────────────────────────────
-  const SCROLL_THRESHOLD = 120;
   const [isScrolled, setIsScrolled] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const onScroll = () => {
-      setIsScrolled(window.scrollY > SCROLL_THRESHOLD);
+    const toggle = toggleRef.current;
+    if (!toggle) return;
+
+    const handleIntersection = (entries: IntersectionObserverEntry[]) => {
+      const [entry] = entries;
+      setIsScrolled(!entry.isIntersecting);
     };
 
-    onScroll();
+    const observer = new IntersectionObserver(handleIntersection, {
+      threshold: 0,
+    });
 
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    observer.observe(toggle);
+
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   // ── Theme cycle logic ─────────────────────────────────────────────────────
@@ -136,6 +145,7 @@ export function ThemeToggle() {
     <>
       {/* ── Inline header toggle ── */}
       <button
+        ref={toggleRef}
         type="button"
         className="theme-toggle"
         onClick={cycleTheme}

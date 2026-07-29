@@ -1275,6 +1275,46 @@ border-color, color, fill, stroke, outline-color` to every semantic HTML element
    transition (`THEME_TRANSITION_MS / 2` ms), hiding the outgoing SVG with an
    opacity fade so the icon swap feels deliberate (fade-out → swap → fade-in).
 
+4. **`ThemeToggle` Sticky Action Bar** (`src/ThemeToggle.tsx`) — A fixed bottom
+   action bar that surfaces the page's primary theme actions once the user has
+   scrolled past the inline toggle button. The bar uses `IntersectionObserver`
+   to detect when the primary action area leaves the viewport, keeping it
+   hidden on short pages and avoiding expensive scroll listeners.
+
+   **Structure:**
+   - `.theme-sticky-bar` — Fixed wrapper with entrance animation and safe-area
+     inset padding.
+   - `.theme-sticky-bar__inner` — Centred pill container (`max-width: 480px`).
+   - `.theme-sticky-bar__btn` — Individual action buttons (min 48px touch target).
+   - `.theme-sticky-bar__btn--primary` — Accent-gradient primary CTA.
+   - `.theme-sticky-bar__btn--active` — Active-state variant for the reset button.
+
+   **Visibility Behavior:**
+   - Hidden by default (`opacity: 0`, `transform: translateY(100%)`).
+   - Appears when the inline toggle button is no longer intersecting the
+     viewport.
+   - Disappears when the toggle button scrolls back into view.
+   - Uses `aria-hidden` and `inert` when hidden so it is transparent to
+     assistive technology.
+
+   **Accessibility:**
+   - `role="toolbar"` with `aria-label="Theme controls"`.
+   - Buttons carry `aria-label`, `aria-pressed`, and `title` attributes.
+   - Min 48px touch targets with WCAG-compliant `:focus-visible` outline.
+   - Animations respect `prefers-reduced-motion: reduce`.
+
+   **Design Tokens:**
+   - Background: `var(--surface-strong)`
+   - Border: `var(--line)`
+   - Text: `var(--text)`, `var(--muted)`
+   - Accent: `var(--accent)`
+   - Shadow: `var(--shadow)`
+   - Radius: `var(--radius-xl)`
+   - Transition: `var(--transition-speed)`
+
+   **No public API changes.** The sticky action bar is internal to
+   `ThemeToggle` and does not expose new props or components.
+
 ### Opting out
 
 Any element (or its subtree) that must not participate in the theme transition —
