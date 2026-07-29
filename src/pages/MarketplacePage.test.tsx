@@ -517,3 +517,54 @@ describe("MarketplacePage tabular-nums (FWC26)", () => {
     }
   });
 });
+
+describe("MarketplacePage loading skeleton transition", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("renders MarketplacePageSkeleton while loading before timers settle", () => {
+    renderPage();
+
+    // Before timers settle, page should render MarketplacePageSkeleton
+    const loadingShell = screen.getByLabelText("Marketplace loading shell");
+    expect(loadingShell).toBeTruthy();
+    expect(loadingShell.getAttribute("aria-busy")).toBe("true");
+
+    const cards = document.querySelectorAll(".api-marketplace-card");
+    expect(cards.length).toBe(12);
+  });
+
+  it("transitions smoothly from MarketplacePageSkeleton to loaded content when timers settle", () => {
+    renderPage();
+
+    // Verify initial loading shell
+    expect(screen.getByLabelText("Marketplace loading shell")).toBeTruthy();
+
+    // Advance timers to complete loading
+    settleMarketplaceTimers();
+
+    // Verify loaded page elements
+    expect(screen.queryByLabelText("Marketplace loading shell")).toBeNull();
+    expect(screen.getByRole("heading", { name: "API Marketplace", level: 1 })).toBeTruthy();
+    expect(document.querySelector(".marketplace-grid")).toBeTruthy();
+  });
+});
