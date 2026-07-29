@@ -60,6 +60,18 @@ Added a `middleEllipsis` prop to the `Breadcrumb` component and created a new `H
 | --------------- | --------- | ------- | ------------------------------------------------------------------ |
 | `middleEllipsis` | `boolean` | `false` | Collapse middle breadcrumb items behind an ellipsis popover on all viewports. |
 
+### CSS changes (overflow / flex-shrink polish)
+
+- **`.topbar-actions`** (`src/index.css`): Added `min-width: 0` so the actions container can shrink below its content size when the parent `.topbar` flex container is constrained, preventing breadcrumb overflow on narrow viewports.
+- **`.breadcrumb-nav`** (`Breadcrumb.tsx`): Added `min-width: 0` so the nav element participates in flex/grid shrink calculations within its parent container.
+
+### Overflow tests added
+
+- **`src/pages/Header.test.tsx`**: Added 3 overflow-polish tests:
+  - `"contains the breadcrumb inside .topbar-actions"` — structural containment check.
+  - `"allows the breadcrumb nav to shrink within its flex container"` — verifies `min-width: 0` and `max-width: 100%` are on the nav element.
+  - `"renders the middle-ellipsis collapsed layout with a very long path"` — validates the middle-ellipsis modifier class, first/last crumb visibility, middle items hidden, and ellipsis button rendered.
+
 ### HeaderProps (new component)
 
 | Prop               | Type                                         | Required | Description                        |

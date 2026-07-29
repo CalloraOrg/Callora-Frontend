@@ -202,6 +202,7 @@ export default function Breadcrumb({ items, maxLabelLength = 0, middleEllipsis =
             font-size: 0.875rem;
             padding-left: 32px;
             max-width: 100%;
+            min-width: 0;
           }
 
           .breadcrumb-list,
