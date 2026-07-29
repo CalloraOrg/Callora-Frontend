@@ -135,7 +135,7 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
                   {feature.included ? (
                     <CheckIcon size={20} style={{ color: "var(--accent)" }} />
                   ) : (
-                    <XIcon style={{ color: "var(--muted)" }} />
+                    <XIcon />
                   )}
                   <span style={{ fontSize: 14 }}>{feature.label}</span>
                 </div>
@@ -151,7 +151,7 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
             </button>
             {tier.isRecommended && (
               <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
-                <KbdHint shortcuts={PRIMARY_SHORTCUT} style={{ padding: 0 }} />
+                <KbdHint shortcuts={PRIMARY_SHORTCUT} variant="chip" className="mt-2 opacity-80" />
               </div>
             )}
           </div>
@@ -222,7 +222,7 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
                 {feature.included ? (
                   <CheckIcon size={20} style={{ color: "var(--accent)" }} />
                 ) : (
-                  <XIcon style={{ color: "var(--muted)" }} />
+                  <XIcon />
                 )}
                 <span style={{ color: feature.included ? "var(--text-main)" : "var(--muted)" }}>
                   {feature.label}
@@ -241,7 +241,7 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
 
           {tier.isRecommended && (
             <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
-              <KbdHint shortcuts={PRIMARY_SHORTCUT} style={{ padding: 0 }} />
+              <KbdHint shortcuts={PRIMARY_SHORTCUT} variant="chip" className="mt-2 opacity-80" />
             </div>
           )}
         </div>
@@ -249,4 +249,3 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
     </div>
   );
 }
-
