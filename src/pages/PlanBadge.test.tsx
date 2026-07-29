@@ -228,9 +228,11 @@ describe("PlanBadgePage", () => {
       expect(mockNavigate).toHaveBeenCalledWith("/marketplace");
     });
 
-    it("does NOT navigate to /billing when 'Choose a plan' is clicked (optimistic behavior)", () => {
+    it("does NOT navigate to /billing when 'Choose a plan' is clicked (optimistic behavior)", async () => {
       renderPage();
-      fireEvent.click(screen.getByRole("button", { name: /Choose a plan/i }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /Choose a plan/i }));
+      });
       expect(mockNavigate).not.toHaveBeenCalledWith("/billing");
     });
   });
@@ -354,15 +356,17 @@ describe("PlanBadgePage", () => {
   // ── Keyboard interaction ─────────────────────────────────────────────────
 
   describe("keyboard interaction", () => {
-    it("activates the primary action via Enter key", () => {
+    it("activates the primary action via Enter key", async () => {
       renderPage({ onChoosePlan: () => Promise.resolve() });
 
       const cta = screen.getByRole("button", { name: /Choose a plan/i });
       cta.focus();
 
-      // Simulate Enter key on the button.
-      fireEvent.keyDown(cta, { key: "Enter", code: "Enter" });
-      fireEvent.click(cta);
+      await act(async () => {
+        // Simulate Enter key on the button.
+        fireEvent.keyDown(cta, { key: "Enter", code: "Enter" });
+        fireEvent.click(cta);
+      });
 
       // Optimistic update should appear.
       expect(
@@ -370,15 +374,17 @@ describe("PlanBadgePage", () => {
       ).toBeNull();
     });
 
-    it("activates the primary action via Space key", () => {
+    it("activates the primary action via Space key", async () => {
       renderPage({ onChoosePlan: () => Promise.resolve() });
 
       const cta = screen.getByRole("button", { name: /Choose a plan/i });
       cta.focus();
 
-      // Simulate Space key on the button.
-      fireEvent.keyDown(cta, { key: " ", code: "Space" });
-      fireEvent.click(cta);
+      await act(async () => {
+        // Simulate Space key on the button.
+        fireEvent.keyDown(cta, { key: " ", code: "Space" });
+        fireEvent.click(cta);
+      });
 
       expect(
         screen.queryByTestId("empty-state-plan-badge")
