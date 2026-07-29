@@ -15,6 +15,27 @@
    fall below the 7:1 contrast ratio for AAA.  In high-contrast mode we
    switch to stronger text and thicker, opaque borders. */
 @media (prefers-contrast: more) {
+  /* StatusIndicator — ensure the badge remains readable when colour-only
+     cues are intensified.  We use explicit border and text values instead of
+     relying on the low-opacity success tint. */
+  .status-indicator {
+    color: var(--text);
+    border: 2px solid var(--line);
+    background: var(--surface);
+  }
+
+  .status-indicator.active {
+    color: var(--text);
+    border-color: var(--success);
+    background: var(--surface);
+  }
+
+  .status-indicator .status-dot {
+    background: var(--success);
+    border: 1px solid var(--success);
+    box-shadow: none;
+  }
+
   /* Default (inactive) TagChip — ensure readable contrast. */
   .tag-chip {
     color: var(--text);
