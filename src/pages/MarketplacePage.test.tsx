@@ -181,9 +181,7 @@ describe("MarketplacePage", () => {
       // depending on the order of effects; both are semantically correct.
       expect(liveRegion.textContent).toMatch(/(All filters cleared|Tag filter removed)/i);
     });
-  });
-  // ── tabular-nums (#476) ────────────────────────────────────────────────────
-
+  });  // ── tabular-nums (#476, #572) ──────────────────────────────────────────────
   it("wraps page-count numbers in .numeric-tabular spans for tabular-nums alignment", () => {
     renderMarketplacePage();
     settleMarketplaceTimers();
