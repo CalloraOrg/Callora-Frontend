@@ -376,6 +376,44 @@ describe('ApiUsage - prefers-reduced-motion', () => {
     const buttonSpinner = document.querySelector('.button-spinner');
     expect(buttonSpinner).toBeTruthy();
   });
+
+  it('tab-button has CSS class targeted by prefers-reduced-motion: reduce transition rules', () => {
+    render(<ApiUsage />);
+    act(() => { vi.advanceTimersByTime(500); });
+    const tabButtons = document.querySelectorAll('.tab-button');
+    expect(tabButtons.length).toBe(3);
+    tabButtons.forEach(btn => {
+      expect(btn.classList.contains('tab-button')).toBe(true);
+    });
+  });
+
+  it('danger-button has CSS class targeted by prefers-reduced-motion: reduce transition rules', () => {
+    render(<ApiUsage />);
+    act(() => { vi.advanceTimersByTime(500); });
+    const dangerButton = document.querySelector('.danger-button');
+    expect(dangerButton).toBeTruthy();
+  });
+
+  it('primary-button has CSS class targeted by prefers-reduced-motion: reduce transition rules', () => {
+    render(<ApiUsage />);
+    act(() => { vi.advanceTimersByTime(500); });
+    const primaryButtons = document.querySelectorAll('.primary-button');
+    expect(primaryButtons.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('secondary-button has CSS class targeted by prefers-reduced-motion: reduce transition rules', () => {
+    render(<ApiUsage />);
+    act(() => { vi.advanceTimersByTime(500); });
+    const secondaryButtons = document.querySelectorAll('.secondary-button');
+    expect(secondaryButtons.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('ghost-button has CSS class targeted by prefers-reduced-motion: reduce transition rules', () => {
+    render(<ApiUsage />);
+    act(() => { vi.advanceTimersByTime(500); });
+    const ghostButton = document.querySelector('.ghost-button');
+    expect(ghostButton).toBeTruthy();
+  });
   });
 
   describe('ApiUsage - Skeleton Parity', () => {

@@ -4314,6 +4314,26 @@ code,
   .api-usage-page .chart-bar {
     transition: none;
   }
+
+  .api-usage-page .tab-button {
+    transition: none;
+  }
+
+  .api-usage-page .danger-button {
+    transition: none;
+  }
+
+  .api-usage-page .primary-button {
+    transition: none;
+  }
+
+  .api-usage-page .secondary-button {
+    transition: none;
+  }
+
+  .api-usage-page .ghost-button {
+    transition: none;
+  }
 }
 
 @media (max-width: 768px) {
