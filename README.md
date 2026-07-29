@@ -61,14 +61,12 @@ Key principles:
 
 3. Open [http://localhost:5173](http://localhost:5173).
 
-## Accessibility notes
+## Print stylesheet
 
-The dashboard includes an accessible usage gauge that summarizes API spend for the current cycle. It exposes `role="progressbar"`, numeric ARIA values, and a human-readable usage state such as “Within limit”, “Approaching limit”, “Critical usage”, “Limit reached”, or “No limit configured” so screen-reader users receive the same status information as sighted users.
+Added `src/styles/print.css` to hide UI chrome and expand collapsible
+sections when printing the `SortMenu` page. This improves printed output
+by removing interactive controls and making content fully visible. (Closes #708)
 
-
-**ApiDetailPage keyboard focus (WCAG 2.1 AA, Issue #411):** All interactive elements on `ApiDetailPage` — buttons, links, inputs, selects, icon buttons, tab panels, and the pricing range slider — display a WCAG-compliant `:focus-visible` outline. The focus ring uses the theme-aware `--accent` token (2 px solid, 3 px offset), which meets the 3:1 non-text contrast requirement against both dark (`#4e85ff` on `#0b1020`) and light (`#2563eb` on `#f5f7fa`) backgrounds. Styles live in `src/styles/focus.css` inside `@layer focus` so they are always lower-priority than intentional page overrides. No mouse-triggered focus rings are shown (`outline: none` on `:focus`, restored on `:focus-visible`).
-
-**Plan Badge empty state (WCAG 2.1 AA, Issue #529):** The `EmptyState` `"plan-badge"` variant illustration is `aria-hidden`; meaning is carried exclusively by the heading and paragraph text (WCAG 1.1.1). Accent colour is a subordinate decorative detail — the state is never communicated by colour alone (WCAG 1.4.1). Both CTA buttons carry explicit accessible names via `aria-label`. All colours reference design tokens so contrast is maintained in both light and dark themes.
 ## Scripts
 
 | Command           | Description                         |
