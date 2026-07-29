@@ -8,6 +8,7 @@ import { CollectionsProvider } from "../state/collectionsStore";
 import { compareStore } from "../state/compareStore";
 import MarketplacePage from "./MarketplacePage";
 import type { APIItem } from "../data/mockApis";
+import { DENSITY_STORAGE_KEY } from "../utils/density";
 
 function renderMarketplacePage() {
   return render(
@@ -38,6 +39,7 @@ function settleMarketplaceTimers() {
 describe("MarketplacePage", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    localStorage.clear();
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: (query: string) => ({
@@ -51,6 +53,20 @@ describe("MarketplacePage", () => {
         dispatchEvent: () => false,
       }),
     });
+  });
+
+  it("applies and persists the compact density selection", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const compactButton = screen.getByRole("button", { name: "Compact" });
+    fireEvent.click(compactButton);
+
+    expect(compactButton.getAttribute("aria-pressed")).toBe("true");
+    expect(localStorage.getItem(DENSITY_STORAGE_KEY)).toBe("compact");
+    expect(
+      document.querySelectorAll(".api-marketplace-card.api-card--compact").length,
+    ).toBeGreaterThan(0);
   });
 
   afterEach(() => {
