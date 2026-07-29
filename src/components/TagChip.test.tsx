@@ -43,7 +43,7 @@ describe("TagChip", () => {
     expect(onClick).toHaveBeenCalledWith("FWC26");
   });
 
-  // ── High-contrast mode (Issue #735) ──────────────────────────────────────
+  // ── High-contrast mode (Issues #735, #695) ────────────────────────────────
   //
   // These tests verify the CSS-class contract for high-contrast overrides.
   // jsdom does not evaluate @media (prefers-contrast: more) rules, so we
@@ -51,7 +51,7 @@ describe("TagChip", () => {
   //   1. The contrast.css import is present (TagChip loads it)
   //   2. The correct CSS classes are present for the CSS cascade to apply
 
-  it("imports contrast.css for high-contrast mode overrides (Issue #735)", () => {
+  it("imports contrast.css for high-contrast mode overrides (Issues #735, #695)", () => {
     // If the import works at runtime, the module resolves.  We render the
     // component and verify it mounts without error — the import is a static
     // ES module import, so if the file were missing the build would fail.
