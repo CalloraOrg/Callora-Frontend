@@ -26,6 +26,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - **Global Command Palette**: Instantly jump to views, search APIs by name, cycle/toggle light & dark themes, or trigger vault deposits. Use `Cmd+K` on macOS or `Ctrl+K` on Windows/Linux to open.
 - **Pattern-based status badges**: Status indicators now use distinct textures in addition to color so they remain understandable for color-blind users and in grayscale displays.
 - **Response diff highlighting**: Pass a `compareWith` prop to `CallHistoryRow` to show a line-by-line diff between two call responses, with added (green), removed (red), and unchanged context lines. Includes a Diff/Raw toggle, before/after call labels, and full WCAG 2.1 AA accessibility. See [docs/ResponseDiff.md](docs/ResponseDiff.md).
+- **SLA details card**: The GrantFox Wave Compute API SLA page (`/marketplace/grantfox-wave-compute/sla`) displays all SLA metrics with per-value copy-to-clipboard buttons. Each button shows a 2-second "Copied!" success state (green checkmark + label), announces the copy to screen readers via `aria-live`, and falls back to `execCommand` in non-HTTPS contexts. Powered by the reusable `useCopy` hook. See [docs/SlaCard-CopyToClipboard.md](docs/SlaCard-CopyToClipboard.md).
 - **Smooth theme transition**: Light/dark switches animate color tokens (background, text, border) over 240 ms instead of snapping. The transition is gated behind a `theme-transitions-ready` class that ThemeProvider adds after the first paint, preventing any flash on load. Animated elements (toasts, skeletons, spinners) are automatically excluded. Use the `.no-theme-transition` escape hatch on any element that must opt out.
 - **Endpoint hover preview**: On the API Detail documentation tab, hovering or focusing an individual endpoint card header reveals a compact floating panel showing the HTTP method badge, endpoint URL, parameter table (name / type / required), and an optional response-shape snippet. Keyboard accessible (Escape dismisses); all colours from design tokens. See `src/components/EndpointPreview.tsx`.
 
@@ -90,6 +91,7 @@ The dashboard includes an accessible usage gauge that summarizes API spend for t
 | `/theme-playground` | Live theme token playground for designers |
 | `/500`              | Server error page                         |
 | `*`                 | 404 not found                             |
+| `/marketplace/grantfox-wave-compute/sla` | GrantFox Wave Compute API SLA details (FWC26) |
 
 ## Project layout
 

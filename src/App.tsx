@@ -26,6 +26,7 @@ import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 import { InvoiceCard } from "./pages/InvoiceCard";
+import SlaCard from "./pages/SlaCard";
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -124,7 +125,7 @@ const APP_ROUTES = {
   designSystem: "/design-system/docs",
   serverError: "/500",
   rateLimitCard: "/rate-limit",
-  onboardingTour: "/onboarding-tour",
+  slaCard: "/marketplace/grantfox-wave-compute/sla",
 } as const;
 
 function createMockHash() {
@@ -687,10 +688,8 @@ function App() {
 
             <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
 
-            <Route
-              path={APP_ROUTES.onboardingTour}
-              element={<OnboardingTour onComplete={() => navigate(APP_ROUTES.dashboard)} />}
-            />
+            {/* ── SLA Details (FWC26 campaign, Issue #545) ─────────────── */}
+            <Route path={APP_ROUTES.slaCard} element={<SlaCard />} />
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
           </Routes>
