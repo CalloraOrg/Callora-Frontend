@@ -6468,10 +6468,36 @@ code,
   }
 }
 
-/* Respect user motion preference. */
+/* Respect user motion preference.
+   When the user prefers reduced motion:
+   1. Disable all pill transitions (hover, active, focus).
+   2. Remove the scroll fade mask on narrow viewports — the mask implies
+      motion (content beyond the edge) and can be disorienting without
+      the smooth scroll experience.
+   3. Ensure the active pill still has a clear static border so the
+      selected state is obvious even without the transition.
+   4. Skeleton shimmer is handled globally (see .skeleton rule above). */
 @media (prefers-reduced-motion: reduce) {
   .api-tag-filter__pill {
     transition: none;
+  }
+
+  .api-tag-filter__pill--active {
+    /* Reinforce the border so the active state pops without the
+       smooth color transition. */
+    border-width: 2px;
+  }
+
+  /* Remove the fade mask on narrow viewports — static, no motion hint. */
+  .api-tag-filter {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  /* Skeleton pills in the filter get a static surface background. */
+  .api-tag-filter__pill-skeleton {
+    animation: none !important;
+    background: var(--surface-soft);
   }
 }
 

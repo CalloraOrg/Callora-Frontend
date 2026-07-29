@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
 
 const MOCK_TAGS = ["weather", "geo", "forecast", "payments", "cards"];
@@ -303,9 +303,7 @@ describe("ApiTagFilter", () => {
         isLoading={true}
       />,
     );
-    // Should not render the "All" button or tag buttons
     expect(screen.queryByRole("button", { name: "All" })).toBeNull();
-    // Should render the skeleton
     const skeletonPills = container.querySelectorAll(".skeleton");
     expect(skeletonPills.length).toBeGreaterThan(0);
   });
@@ -374,73 +372,77 @@ describe("ApiTagFilter", () => {
     });
   });
 
-  // ── Tooltip primitive integration (issue #533) ───────────────────────────
+  // ── Reduced-motion fallback (issue #701) ──────────────────────────────────
 
-  describe("Tooltip primitive integration", () => {
-    it("wraps tag icon buttons in Tooltip and displays tooltip on hover", () => {
+  describe("reduced-motion fallback", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("applies the api-tag-filter__pill class targeted by reduced-motion rules", () => {
       render(
         <ApiTagFilter
           tags={MOCK_TAGS}
           selectedTag={null}
+          onTagChange={() => {}}
+        />,
+      );
+      const allBtn = screen.getByRole("button", { name: "All" });
+      expect(allBtn.classList.contains("api-tag-filter__pill")).toBe(true);
+    });
+
+    it("applies the api-tag-filter__pill--active class targeted by reduced-motion rules", () => {
+      render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag="weather"
           onTagChange={() => {}}
         />,
       );
       const weatherBtn = screen.getByRole("button", { name: /weather/i });
-      expect(screen.queryByRole("tooltip")).toBeNull();
-
-      fireEvent.mouseEnter(weatherBtn);
-      const tooltip = screen.getByRole("tooltip");
-      expect(tooltip).toBeTruthy();
-      expect(tooltip.textContent).toMatch(/weather/i);
-
-      fireEvent.mouseLeave(weatherBtn);
-      expect(screen.queryByRole("tooltip")).toBeNull();
+      expect(weatherBtn.classList.contains("api-tag-filter__pill--active")).toBe(
+        true,
+      );
     });
 
-    it("respects hoverDelayMs when passed to ApiTagFilter", () => {
-      vi.useFakeTimers();
+    it("renders skeleton pills with the api-tag-filter__pill-skeleton class", () => {
+      const { container } = render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+          isLoading={true}
+        />,
+      );
+      const skeletonPills = container.querySelectorAll(
+        ".api-tag-filter__pill-skeleton",
+      );
+      expect(skeletonPills.length).toBeGreaterThan(0);
+    });
+
+    it("marks the skeleton container as aria-busy during loading", () => {
+      const { container } = render(
+        <ApiTagFilter
+          tags={MOCK_TAGS}
+          selectedTag={null}
+          onTagChange={() => {}}
+          isLoading={true}
+        />,
+      );
+      const group = container.querySelector(".api-tag-filter");
+      expect(group?.getAttribute("aria-busy")).toBe("true");
+    });
+
+    it("does not apply transition styles inline (relies on CSS for motion)", () => {
       render(
         <ApiTagFilter
           tags={MOCK_TAGS}
           selectedTag={null}
           onTagChange={() => {}}
-          hoverDelayMs={250}
         />,
       );
-      const weatherBtn = screen.getByRole("button", { name: /weather/i });
-
-      fireEvent.mouseEnter(weatherBtn);
-      expect(screen.queryByRole("tooltip")).toBeNull();
-
-      act(() => {
-        vi.advanceTimersByTime(250);
-      });
-      expect(screen.getByRole("tooltip")).toBeTruthy();
-
-      vi.useRealTimers();
-    });
-
-    it("opens tooltip on touch long-press with longPressMs", () => {
-      vi.useFakeTimers();
-      render(
-        <ApiTagFilter
-          tags={MOCK_TAGS}
-          selectedTag={null}
-          onTagChange={() => {}}
-          longPressMs={300}
-        />,
-      );
-      const geoBtn = screen.getByRole("button", { name: /geo/i });
-
-      fireEvent.touchStart(geoBtn);
-      expect(screen.queryByRole("tooltip")).toBeNull();
-
-      act(() => {
-        vi.advanceTimersByTime(300);
-      });
-      expect(screen.getByRole("tooltip")).toBeTruthy();
-
-      vi.useRealTimers();
+      const allBtn = screen.getByRole("button", { name: "All" });
+      expect(allBtn.style.transition).toBe("");
     });
   });
 });
