@@ -1,15 +1,4 @@
-/**
- * ApiDetailStickyTOC.tsx
- *
- * Sticky right-rail Table of Contents for the ApiDetailPage documentation tab.
- * Highlights the active section as the user scrolls using IntersectionObserver.
- *
- * Accessibility: keyboard-navigable anchor links, aria-current="location" on
- * the active item. Under `prefers-reduced-motion: reduce`, color transitions
- * are disabled so active/hover states update instantly (issue #528).
- */
-
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 
 export interface TocSection {
   id: string;
@@ -20,82 +9,119 @@ interface ApiDetailStickyTOCProps {
   sections: TocSection[];
 }
 
+const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
+const compactTocQuery = "(max-width: 1023px)";
+
+/**
+ * An accessible in-page navigation rail for API detail sections.
+ *
+ * The desktop rail remains visible while its content is in view. On viewports
+ * below 1024px it becomes a native disclosure so it never consumes article
+ * width. Active state is driven by IntersectionObserver and is exposed to
+ * assistive technology with aria-current="location".
+ */
 export function ApiDetailStickyTOC({ sections }: ApiDetailStickyTOCProps) {
-  const [activeId, setActiveId] = useState<string | null>(sections[0]?.id ?? null);
+  const [activeId, setActiveId] = useState(sections[0]?.id ?? null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-
-
+  const [isCompact, setIsCompact] = useState(false);
 
   useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setPrefersReducedMotion(media.matches);
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
+    const reducedMotion = window.matchMedia(reducedMotionQuery);
+    const compactToc = window.matchMedia(compactTocQuery);
+    const syncPreferences = () => {
+      setPrefersReducedMotion(reducedMotion.matches);
+      setIsCompact(compactToc.matches);
+    };
+
+    syncPreferences();
+    reducedMotion.addEventListener("change", syncPreferences);
+    compactToc.addEventListener("change", syncPreferences);
+    return () => {
+      reducedMotion.removeEventListener("change", syncPreferences);
+      compactToc.removeEventListener("change", syncPreferences);
+    };
   }, []);
 
   useEffect(() => {
-    observerRef.current?.disconnect();
+    if (!sections.length) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting);
-        if (visible.length > 0) {
-          // Pick the topmost visible heading.
-          const topEntry = visible.reduce((a, b) =>
-            a.boundingClientRect.top < b.boundingClientRect.top ? a : b,
-          );
-          setActiveId(topEntry.target.id);
-        }
+        const visibleEntries = entries.filter((entry) => entry.isIntersecting);
+        if (!visibleEntries.length) return;
+
+        const closestToTop = visibleEntries.reduce((closest, entry) =>
+          entry.boundingClientRect.top < closest.boundingClientRect.top
+            ? entry
+            : closest,
+        );
+        setActiveId(closestToTop.target.id);
       },
-      { rootMargin: "0px 0px -60% 0px", threshold: 0.1 },
+      { rootMargin: "-12% 0px -65% 0px", threshold: [0, 0.1, 0.5] },
     );
 
     sections.forEach(({ id }) => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
+      const section = document.getElementById(id);
+      if (section) observer.observe(section);
     });
 
-    observerRef.current = observer;
     return () => observer.disconnect();
   }, [sections]);
 
-  if (sections.length === 0) return null;
+  if (!sections.length) return null;
 
-  // Belt-and-suspenders with the CSS @media rule: inline style wins for
-  // environments where the stylesheet media query is not applied in tests.
-  const linkTransition = prefersReducedMotion
-    ? "none"
-    : "color var(--transition-speed) ease";
+  const jumpToSection = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
+    event.preventDefault();
+    const section = document.getElementById(id);
+    if (!section) return;
 
-  return (
-    <nav aria-label="On this page" className="api-detail-toc no-print">
-      <p className="api-detail-toc__heading">On this page</p>
-      <ol className="api-detail-toc__list">
-        {sections.map(({ id, label }) => (
+    window.history.replaceState(null, "", `#${id}`);
+    section.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "start",
+    });
+    setActiveId(id);
+  };
+
+  const links = (
+    <ol className="api-detail-toc__list">
+      {sections.map(({ id, label }) => {
+        const isActive = activeId === id;
+        return (
           <li key={id} className="api-detail-toc__item">
             <a
               href={`#${id}`}
-              aria-current={activeId === id ? "location" : undefined}
+              aria-current={isActive ? "location" : undefined}
               className={
-                activeId === id
+                isActive
                   ? "api-detail-toc__link api-detail-toc__link--active"
                   : "api-detail-toc__link"
               }
-              style={{ transition: linkTransition }}
+              onClick={(event) => jumpToSection(event, id)}
             >
               {label}
             </a>
           </li>
-        ))}
-      </ol>
+        );
+      })}
+    </ol>
+  );
+
+  if (isCompact) {
+    return (
+      <details className="api-detail-toc api-detail-toc--compact no-print">
+        <summary className="api-detail-toc__heading">On this page</summary>
+        {links}
+      </details>
+    );
+  }
+
+  return (
+    <nav aria-label="On this page" className="api-detail-toc no-print">
+      <p className="api-detail-toc__heading">On this page</p>
+      {links}
     </nav>
   );
 }
 
-/**
- * StickyToc — alias export matching the campaign issue path naming
- * (`src/pages/StickyToc.tsx` re-exports this component).
- */
 export { ApiDetailStickyTOC as StickyToc };
