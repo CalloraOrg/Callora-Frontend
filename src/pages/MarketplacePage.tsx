@@ -692,6 +692,7 @@ export default function MarketplacePage(): JSX.Element {
                 <ApiCard
                   key={a.id}
                   api={a}
+                  density={density}
                   onViewDetails={handleViewDetails}
                   onTagClick={handleTagClick}
                   activeTag={selectedTag}
