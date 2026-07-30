@@ -654,7 +654,7 @@ export default function EmptyState({
 }: EmptyStateProps) {
   const resolvedMessage = message ?? description;
   const resolvedAction = action;
-  const { copy: handleCopy, copied } = useCopy();
+  const { handleCopy, copied } = useCopy();
 
   if (loading) {
     return (
