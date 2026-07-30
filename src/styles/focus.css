@@ -1,0 +1,16 @@
+/* src/styles/focus.css */
+/* Ensure visible focus rings on interactive elements for accessibility (WCAG 2.1 AA) */
+.api-detail-page *:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+.api-detail-page button:focus-visible,
+.api-detail-page a:focus-visible,
+.api-detail-page input:focus-visible,
+.api-detail-page select:focus-visible,
+.api-detail-page [role="tab"]:focus-visible,
+.api-detail-page [tabindex="0"]:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}

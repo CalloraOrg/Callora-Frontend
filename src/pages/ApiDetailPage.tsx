@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import "../styles/focus.css";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import TestInBrowser from "../components/TestInBrowser";
