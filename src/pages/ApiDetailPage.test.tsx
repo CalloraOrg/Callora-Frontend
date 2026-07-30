@@ -1012,4 +1012,19 @@ describe("ApiDetailPage", () => {
       expect(totalEl?.textContent?.startsWith("$")).toBe(true);
     });
   });
+
+  it("interactive elements are focusable (issue #541)", () => {
+    render(<ApiDetailPage />);
+    settleLoadingState();
+
+    const tabs = screen.getAllByRole("tab");
+    tabs.forEach(tab => {
+      fireEvent.focus(tab);
+      expect(document.activeElement).toBe(tab);
+    });
+
+    const connectButton = screen.getByRole("button", { name: /Connect API/i });
+    fireEvent.focus(connectButton);
+    expect(document.activeElement).toBe(connectButton);
+  });
 });
