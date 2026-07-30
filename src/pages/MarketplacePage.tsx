@@ -45,6 +45,95 @@ export default function MarketplacePage(): JSX.Element {
   const [search, setSearchRaw] = useState(
     () => searchParams.get("q") ?? "",
   );
+
+  import React, { useState, useEffect } from 'react';
+
+export interface MarketplacePageProps {
+  // Existing props...
+}
+
+export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
+  const [items, setItems] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [filter, setFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  
+  // State dedicated to screen reader announcements
+  const [srAnnouncement, setSrAnnouncement] = useState<string>('');
+
+  // Example handler for filter or search change
+  const handleFilterChange = (newFilter: string) => {
+    setFilter(newFilter);
+    // Announce filter update trigger
+    setSrAnnouncement(`Filtering marketplace by ${newFilter}`);
+  };
+
+  // Announce results update after fetch/filter completion
+  useEffect(() => {
+    if (isLoading) {
+      setSrAnnouncement('Loading marketplace grants...');
+    } else {
+      const count = items.length;
+      const message = count === 1 
+        ? 'Marketplace updated: 1 grant found.' 
+        : `Marketplace updated: ${count} grants found.`;
+      
+      setSrAnnouncement(message);
+    }
+  }, [isLoading, items]);
+
+  return (
+    <div className="marketplace-page">
+      <h1>Grant Marketplace</h1>
+
+      {/* Screen Reader Live Region */}
+      <div 
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        data-testid="marketplace-sr-announcer"
+      >
+        {srAnnouncement}
+      </div>
+
+      {/* Visually Visible UI */}
+      <div className="marketplace-controls">
+        <label htmlFor="marketplace-search">Search Grants</label>
+        <input
+          id="marketplace-search"
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by keyword..."
+        />
+
+        <select 
+          value={filter} 
+          onChange={(e) => handleFilterChange(e.target.value)}
+          aria-label="Filter grants by category"
+        >
+          <option value="all">All Categories</option>
+          <option value="infrastructure">Infrastructure</option>
+          <option value="community">Community</option>
+        </select>
+      </div>
+
+      {isLoading ? (
+        <div>Loading...</div>
+      ) : (
+        <div className="marketplace-grid">
+          {items.map((item) => (
+            <article key={item.id} className="grant-card">
+              <h2>{item.title}</h2>
+              <p>{item.description}</p>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
   const setSearch = (v: string) => {
     setSearchRaw(v);
     setSearchParams((prev) => {
@@ -692,6 +781,7 @@ export default function MarketplacePage(): JSX.Element {
                 <ApiCard
                   key={a.id}
                   api={a}
+                  density={density}
                   onViewDetails={handleViewDetails}
                   onTagClick={handleTagClick}
                   activeTag={selectedTag}
