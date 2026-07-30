@@ -74,8 +74,9 @@ describe('ApiUsage - Filter Reset', () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(resetButton.disabled).toBe(true);
-    const srAnnouncement = screen.getByRole('status');
-    expect(srAnnouncement.textContent).toBe('Filters reset. Showing all calls from the last 24 hours.');
+    const srAnnouncements = screen.getAllByRole('status');
+    const srAnnouncement = srAnnouncements.find((node) => node.textContent?.includes('Filters reset. Showing all calls from the last 24 hours.'));
+    expect(srAnnouncement).toBeTruthy();
   });
 
   it('renders an accessible breadcrumb with the current page announced', () => {
@@ -100,7 +101,7 @@ describe('ApiUsage - Filter Reset', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(screen.getByRole('status').textContent).toBe('Showing error calls.');
+    expect(screen.getByText('Showing error calls.').closest('[role="status"]')).toBeTruthy();
   });
 
   it('announces copy actions to screen readers', async () => {
@@ -114,7 +115,7 @@ describe('ApiUsage - Filter Reset', () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(writeTextMock).toHaveBeenCalled();
-    expect(screen.getByRole('status').textContent).toBe('API key copied to clipboard.');
+    expect(screen.getByText('API key copied to clipboard.').closest('[role="status"]')).toBeTruthy();
   });
 });
 

@@ -17,6 +17,7 @@ import { Icons } from '../utils/icons';
 import { LinkIcon } from '../components/icons';
 import KbdHint from '../components/KbdHint';
 import { SHORTCUTS } from '../hooks/useGlobalShortcuts';
+import StatusIndicator from './StatusIndicator';
 import {
   clearHistory,
   loadHistory,
@@ -583,10 +584,7 @@ export default function ApiUsage() {
             <Icons.History size={16} style={{ marginRight: 6 }} />
             History
           </button>
-          <div className="status-indicator active">
-            <span className="status-dot"></span>
-            API is Active
-          </div>
+          <StatusIndicator label="API is Active" active />
         </div>
       </div>
 
