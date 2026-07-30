@@ -2665,6 +2665,35 @@ code,
   }
 }
 
+/* ── PricingTable primary-action shortcut hint (issue #944) ───────────────
+   Centres the `KbdHint` chip under the recommended tier's CTA button. The
+   chip itself is styled by `.kbd-hint--chip` above, so this only handles
+   placement — colours and radii stay token-driven for dark-mode parity. */
+.pricing-tier-card__kbd-hint {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--mkt-space-md);
+}
+
+/* On narrow viewports the CTA is full-width and vertical space is scarce,
+   so tighten the gap and shrink the chip slightly. */
+@media (max-width: 480px) {
+  .pricing-tier-card__kbd-hint {
+    margin-top: var(--mkt-space-sm);
+  }
+
+  .pricing-tier-card__kbd-hint .kbd-hint--chip {
+    gap: var(--mkt-space-sm);
+    padding: 2px var(--mkt-space-md);
+    font-size: 0.7rem;
+  }
+
+  .pricing-tier-card__kbd-hint .kbd-hint--chip .kbd-hint__key {
+    min-width: 16px;
+    font-size: 0.65rem;
+  }
+}
+
 /* QuotaBanner layout and styles */
 .quota-banner {
   display: flex;
@@ -7279,7 +7308,6 @@ code,
   .sort-menu {
     max-height: none !important;
   }
-}
 
 /* ── LatencyChart page (GrantFox FWC26) ───────────────────────────────────────
    Responsive latency dashboard with bar chart and HelpPopover. Uses design

@@ -50,4 +50,24 @@
     color: #ffffff;
     transform: none;
   }
+
+  /* ── KbdHint chip high-contrast overrides (issue #944) ─────────────────
+     The chip variant uses var(--muted) text on var(--surface-soft) with a
+     1px var(--line) border.  Under `prefers-contrast: more` we promote the
+     text to full-strength and thicken the borders so both the chip and the
+     inner <kbd> key cap meet 1.4.11 non-text contrast.
+
+     Selectors are doubled up (`.kbd-hint.kbd-hint--chip`) so they outrank the
+     single-class base rules in index.css regardless of bundle order. */
+  .kbd-hint.kbd-hint--chip {
+    color: var(--text);
+    border-width: 2px;
+    background: var(--surface);
+  }
+
+  .kbd-hint.kbd-hint--chip .kbd-hint__key {
+    color: var(--text);
+    border-width: 2px;
+    border-color: var(--line-strong, var(--line));
+  }
 }
