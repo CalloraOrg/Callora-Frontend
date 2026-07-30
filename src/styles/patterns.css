@@ -1,29 +1,29 @@
-/* ── StatusBadge: color-blind-safe patterns ────────────────────────────────
+/* src/styles/patterns.css */
+
+/* ── StatusBadge: color-blind-safe patterns (Issue #685) ──────────────────
    Each status gets a unique CSS background-image pattern so that the badge
    can be distinguished by shape/texture alone, satisfying WCAG 1.4.1
    (Use of Color) and supporting deuteranopia / protanopia / tritanopia.
 
    Patterns are applied as a second background layer on top of the solid
-   background-color already set by the --sb-*-bg tokens.  They are rendered
+   background-color already set by the --sb-*-bg tokens. They are rendered
    as inline SVG data URIs so no external assets are required.
 
-   Pattern key:
-     success   — no pattern  (solid fill, the baseline reference state)
-     error     — diagonal stripes ╲╲╲  (heavy cross, clearly "blocked")
-     warning   — diagonal stripes ╱╱╱  (lighter, opposite diagonal)
-     pending   — small dots  (…  neutral / in-progress feel)
-     degraded  — same as warning (alias)
-     down      — same as error (alias)
+   Pattern groups (related severity levels share a texture):
+     Baseline (solid)    → success, operational
+     Diagonal stripes ╲  → error, down
+     Opposite stripes ╱  → warning, degraded
+     Dots               → pending
+     Crosshatch ╳       → maintenance
    ──────────────────────────────────────────────────────────────────────── */
 
-/* Success: no supplemental pattern — solid color is unambiguous baseline */
+/* Success / Operational: no pattern — solid color baseline */
 .sb-pattern-success,
 .sb-pattern-operational {
   background-image: none;
 }
 
-/* Error / down: dense ╲ diagonal stripes (crosshatch would be too heavy at
-   badge scale; single direction with higher opacity reads clearly) */
+/* Error / Down: dense ╲ diagonal stripes */
 .sb-pattern-error,
 .sb-pattern-down {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='3' y1='0' x2='6' y2='3' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='0' y1='3' x2='3' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3C/svg%3E");
@@ -31,7 +31,7 @@
   background-repeat: repeat;
 }
 
-/* Warning / degraded: ╱ stripes (opposite diagonal, lower density) */
+/* Warning / Degraded: ╱ stripes (opposite diagonal) */
 .sb-pattern-warning,
 .sb-pattern-degraded {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cline x1='0' y1='8' x2='8' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='4' y1='8' x2='8' y2='4' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='0' y1='4' x2='4' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3C/svg%3E");
@@ -39,9 +39,103 @@
   background-repeat: repeat;
 }
 
-/* Pending: small dot grid — feels "in progress" without directional bias */
+/* Pending: small dot grid */
 .sb-pattern-pending {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1' fill='currentColor' fill-opacity='0.3'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+
+/* Maintenance: crosshatch ╳ pattern */
+.sb-pattern-maintenance {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M0 0L8 8M8 0L0 8' stroke='currentColor' stroke-width='0.75' stroke-opacity='0.25'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+
+/* Pattern style modifiers */
+.sb-pattern--disabled {
+  background-image: none !important;
+}
+
+.sb-pattern--dense {
+  background-size: 4px 4px;
+}
+
+.sb-pattern--high-contrast {
+  filter: contrast(1.5);
+}
+
+/* ── .status-chip color-blind-safe patterns ─────────────────────────────────
+   Applied alongside the existing background-color on each .status-chip variant
+   ──────────────────────────────────────────────────────────────────────── */
+
+.status-chip.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1' fill='currentColor' fill-opacity='0.25'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+
+.status-chip.approving {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M0 0L8 8M8 0L0 8' stroke='currentColor' stroke-width='0.75' stroke-opacity='0.22'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+
+.status-chip.pending {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cline x1='0' y1='8' x2='8' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='4' y1='8' x2='8' y2='4' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='0' y1='4' x2='4' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+
+.status-chip.confirmed {
+  background-image: none;
+}
+
+.status-chip.failed {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='3' y1='0' x2='6' y2='3' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='0' y1='3' x2='3' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3C/svg%3E");
+  background-size: 6px 6px;
+  background-repeat: repeat;
+}
+
+/* ── Filter status swatch ──────────────────────────────────────────────────
+   Small preview swatch shown alongside each status checkbox in the sidebar
+   filter. Inherits the SVG pattern from the sb-pattern-* class and overlays
+   it on top of the status color token so the user can see both the colour
+   and the texture before selecting the filter.
+   ──────────────────────────────────────────────────────────────────────── */
+.filter-status-swatch {
+  background-blend-mode: overlay;
+  flex-shrink: 0;
+}
+
+/* ── Rate-limit plan badge patterns ──────────────────────────────────────────
+   Each plan tier gets a unique SVG texture so the badges are distinguishable
+   without relying on colour alone (WCAG 1.4.1 Use of Color).
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Free: no pattern — solid color baseline */
+.rate-limit-badge.free {
+  background-image: none;
+}
+
+/* Developer: small dot grid */
+.rate-limit-badge.developer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1' fill='currentColor' fill-opacity='0.3'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-repeat: repeat;
+}
+
+/* Pro: diagonal stripes ╲ */
+.rate-limit-badge.pro {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3C/svg%3E");
+  background-size: 6px 6px;
+  background-repeat: repeat;
+}
+
+/* Enterprise: crosshatch ╳ */
+.rate-limit-badge.enterprise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M0 0L8 8M8 0L0 8' stroke='currentColor' stroke-width='0.75' stroke-opacity='0.25'/%3E%3C/svg%3E");
   background-size: 8px 8px;
   background-repeat: repeat;
 }

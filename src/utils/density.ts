@@ -1,27 +1,25 @@
 export type DensityPreference = "comfortable" | "compact";
 
-export const DENSITY_STORAGE_KEY = "callora.density";
+export const DENSITY_STORAGE_KEY = 'callora.density';
 
-const DEFAULT_DENSITY: DensityPreference = "comfortable";
-const VALID_DENSITIES: DensityPreference[] = ["comfortable", "compact"];
+const VALID: DensityPreference[] = ['comfortable', 'compact'];
 
 export function readDensityPreference(): DensityPreference {
-  if (typeof window === "undefined") {
-    return DEFAULT_DENSITY;
+  try {
+    const stored = localStorage.getItem(DENSITY_STORAGE_KEY);
+    if (stored && (VALID as string[]).includes(stored)) {
+      return stored as DensityPreference;
+    }
+  } catch {
+    // localStorage unavailable (SSR / private browsing)
   }
-
-  const storedValue = window.localStorage.getItem(DENSITY_STORAGE_KEY);
-  if (storedValue && VALID_DENSITIES.includes(storedValue as DensityPreference)) {
-    return storedValue as DensityPreference;
-  }
-
-  return DEFAULT_DENSITY;
+  return "comfortable";
 }
 
 export function persistDensityPreference(density: DensityPreference): void {
-  if (typeof window === "undefined") {
-    return;
+  try {
+    localStorage.setItem(DENSITY_STORAGE_KEY, density);
+  } catch {
+    // localStorage unavailable
   }
-
-  window.localStorage.setItem(DENSITY_STORAGE_KEY, density);
 }

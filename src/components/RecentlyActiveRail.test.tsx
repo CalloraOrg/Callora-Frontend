@@ -42,6 +42,27 @@ describe("RecentlyActiveRail", () => {
     expect(buttons[2].textContent).toContain("Bravo");
   });
 
+  it("breaks ties with usageCount when dates match", () => {
+    const tieApis = [
+      makeApi({ id: "t1", name: "Tie Low", createdAt: "2026-06-01", usageCount: 5 }),
+      makeApi({ id: "t2", name: "Tie High", createdAt: "2026-06-01", usageCount: 500 }),
+    ];
+    render(<RecentlyActiveRail apis={tieApis} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons[0].textContent).toContain("Tie High");
+    expect(buttons[1].textContent).toContain("Tie Low");
+  });
+
+  it("handles missing or invalid createdAt gracefully", () => {
+    const fallbackApis = [
+      makeApi({ id: "f1", name: "No Date API", createdAt: undefined }),
+      makeApi({ id: "f2", name: "Invalid Date API", createdAt: "invalid-date" }),
+    ];
+    render(<RecentlyActiveRail apis={fallbackApis} />);
+    expect(screen.getByText("No Date API")).toBeTruthy();
+    expect(screen.getAllByText("recently").length).toBe(2);
+  });
+
   it("respects the limit prop", () => {
     render(<RecentlyActiveRail apis={apis} limit={2} />);
     expect(screen.getAllByRole("button")).toHaveLength(2);

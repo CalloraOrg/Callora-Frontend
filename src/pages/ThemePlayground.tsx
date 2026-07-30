@@ -1,6 +1,8 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
+import StatusBadge from "../components/StatusBadge";
 import TokenEditor from "../components/TokenEditor";
+import useDocumentTitle from "../hooks/useDocumentTitle";
 
 const DEFAULT_TOKENS = {
   primary: "#4e85ff",
@@ -11,6 +13,7 @@ const DEFAULT_TOKENS = {
 type TokenKey = keyof typeof DEFAULT_TOKENS;
 
 export default function ThemePlayground() {
+  useDocumentTitle('Theme Playground');
   const [tokens, setTokens] = useState(DEFAULT_TOKENS);
 
   const cssPreview = useMemo(
@@ -118,6 +121,18 @@ export default function ThemePlayground() {
               Use this sandbox to tune a new visual direction while preserving
               accessible contrast.
             </p>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <StatusBadge status="operational" label="Live" />
+              <StatusBadge status="warning" label="Needs review" />
+              <StatusBadge status="error" label="Blocked" />
+            </div>
             <div className="theme-playground__actions-inline">
               <button
                 className="primary-button"

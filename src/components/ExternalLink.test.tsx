@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import ExternalLink from "./ExternalLink";
 
@@ -29,7 +29,7 @@ describe("ExternalLink", () => {
 
   it("adds aria-label describing external navigation", () => {
     render(
-      <ExternalLink href="https://docs.example.com" aria-label="API docs">
+      <ExternalLink href="https://docs.example.com" ariaLabel="API docs">
         API docs
       </ExternalLink>,
     );
@@ -38,15 +38,15 @@ describe("ExternalLink", () => {
     expect(link).toBeTruthy();
   });
 
-  it("renders an external link icon for external URLs", () => {
+  it("renders external link icon from lucide-react for external URLs", () => {
     const { container } = render(
       <ExternalLink href="https://example.com">External</ExternalLink>,
     );
 
     const link = container.querySelector("a");
-    const svg = link?.querySelector("svg");
-    expect(svg).toBeTruthy();
-    expect(svg?.getAttribute("aria-hidden")).toBe("true");
+    const iconSpan = link?.querySelector("span[aria-hidden]");
+    expect(iconSpan).toBeTruthy();
+    expect(iconSpan?.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("does not add external attributes for internal relative links", () => {
@@ -72,9 +72,9 @@ describe("ExternalLink", () => {
       writable: true,
     });
 
-    render(<ExternalLink href="https://callora.io/docs"> docs</ExternalLink>);
+    render(<ExternalLink href="https://callora.io/docs">docs</ExternalLink>);
 
-    const link = screen.getByText(" docs");
+    const link = screen.getByText("docs");
     expect(link.getAttribute("target")).toBeNull();
     expect(link.getAttribute("rel")).toBeNull();
 
@@ -86,7 +86,11 @@ describe("ExternalLink", () => {
 
   it("passes through additional anchor props", () => {
     render(
-      <ExternalLink href="https://example.com" title="External site" className="custom-link">
+      <ExternalLink
+        href="https://example.com"
+        title="External site"
+        className="custom-link"
+      >
         Site
       </ExternalLink>,
     );
@@ -119,4 +123,37 @@ describe("ExternalLink", () => {
     expect(link.getAttribute("target")).toBeNull();
     expect(link.getAttribute("rel")).toBeNull();
   });
+
+  it("supports hideIcon prop to suppress external link icon", () => {
+    const { container } = render(
+      <ExternalLink href="https://example.com" hideIcon>
+        External
+      </ExternalLink>,
+    );
+
+    const link = container.querySelector("a");
+    expect(link?.querySelector("svg")).toBeNull();
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("sets aria-label to just 'opens in new tab' when no custom label provided", () => {
+    render(<ExternalLink href="https://example.com">External</ExternalLink>);
+
+    const link = screen.getByLabelText("opens in new tab");
+    expect(link).toBeTruthy();
+  });
+
+  it("handles missing href gracefully", () => {
+    render(
+      <ExternalLink href="">
+        No href
+      </ExternalLink>,
+    );
+
+    const link = screen.getByText("No href");
+    expect(link.getAttribute("href")).toBe("");
+    expect(link.getAttribute("target")).toBeNull();
+  });
 });
+

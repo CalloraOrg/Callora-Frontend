@@ -1,11 +1,33 @@
-import { useState, useEffect, useCallback } from 'react';
-import EmptyState from './components/EmptyState';
-import Skeleton, { SkeletonRow } from './components/Skeleton';
-import { formatPrice } from './utils/format';
-import RequestBodyEditor from './components/RequestBodyEditor';
-import type { JsonSchema } from './components/RequestBodyEditor';
-import CallHistoryRow from './components/CallHistoryRow';
-import Breadcrumb from './components/Breadcrumb';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import EmptyState from '../components/EmptyState';
+import Skeleton, { ApiUsageSkeleton, SkeletonRow } from '../components/Skeleton';
+import { formatPrice } from '../utils/format';
+import type { JsonSchema } from '../components/RequestBodyEditor';
+import CallHistoryRow from '../components/CallHistoryRow';
+import Breadcrumb from '../components/Breadcrumb';
+import RequestHistoryPanel from '../components/RequestHistoryPanel';
+import ParamsBuilder from '../components/ParamsBuilder';
+import UsageChart from '../components/UsageChart';
+import { useFetchTracker } from '../hooks/useFetchTracker';
+import { useQuota } from '../hooks/useQuota';
+import PlanNudge from '../components/PlanNudge';
+import CallsHeatmap from '../components/CallsHeatmap';
+import Tabs from '../components/Tabs';
+import { Icons } from '../utils/icons';
+import { LinkIcon } from '../components/icons';
+import KbdHint from '../components/KbdHint';
+import { SHORTCUTS } from '../hooks/useGlobalShortcuts';
+import StatusIndicator from './StatusIndicator';
+import {
+  clearHistory,
+  loadHistory,
+  saveEntry,
+  type HistoryEntry,
+} from '../state/testCallHistory';
+import { copySnapshotUrl, parseSnapshotUrl } from '../utils/snapshotUrl';
+
+const MOCK_USAGE_PERCENT = 80;
+const LOADING_DELAY_MS = 500;
 
 type ApiEndpoint = {
   id: string;
@@ -176,6 +198,10 @@ curl -X GET "https://api.callora.com/v1/user/profile" \\
   -H "Content-Type: application/json"`
 };
 
+const API_USAGE_SHORTCUTS = SHORTCUTS.filter(
+  (s) => s.category === "ApiUsage",
+);
+
 
 
 function formatTime(ms: number) {
@@ -205,16 +231,28 @@ export default function ApiUsage() {
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
-  const [filterResetMessage, setFilterResetMessage] = useState('');
+  const [liveStatusMessage, setLiveStatusMessage] = useState('');
   const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
   const [isTableLoading, setIsTableLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const toggleHistory = useCallback(() => setIsHistoryOpen(prev => !prev), []);
+  const [historyEntries, setHistoryEntries] = useState<any[]>([]);
+
+  const prefersReducedMotion = useMemo(() => {
+    return typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
 
   useEffect(() => {
+    const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
     const timer = setTimeout(() => {
+      setIsPageLoading(false);
       setIsTableLoading(false);
-    }, LOADING_DELAY_MS);
+    }, delay);
     return () => clearTimeout(timer);
-  }, []);
+  }, [prefersReducedMotion]);
 
   const [selectedRange, setSelectedRange] = useState<DateRange>({ preset: '24h' });
   const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
@@ -248,6 +286,7 @@ export default function ApiUsage() {
     });
     if (success) {
       setSnapshotted(true);
+      announceStatus(`Snapshot URL copied for ${selectedEndpoint.name}.`);
       setTimeout(() => setSnapshotted(false), 2000);
     }
   };
@@ -326,18 +365,24 @@ export default function ApiUsage() {
   // Whether any call-history filter differs from its default value.
   const filtersAreActive = statusFilter !== 'all' || selectedRange.preset !== '24h';
 
+  const announceStatus = useCallback((message: string) => {
+    setLiveStatusMessage('');
+    window.setTimeout(() => setLiveStatusMessage(message), 0);
+  }, []);
+
   // Reset all call-history filters to their defaults and announce the change
   // to assistive technology via the aria-live region below.
   const handleResetFilters = () => {
     setStatusFilter('all');
     setSelectedRange({ preset: '24h' });
-    setFilterResetMessage('Filters reset. Showing all calls from the last 24 hours.');
+    announceStatus('Filters reset. Showing all calls from the last 24 hours.');
   };
 
   const handleCopyApiKey = async () => {
     try {
       await navigator.clipboard.writeText(apiKey);
       setCopied(true);
+      announceStatus('API key copied to clipboard.');
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy API key');
@@ -347,6 +392,7 @@ export default function ApiUsage() {
   const handleRegenerateApiKey = () => {
     const newKey = 'ck_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     setApiKey(newKey);
+    announceStatus('API key regenerated.');
   };
 
   const handleMakeTestCall = async () => {
@@ -455,6 +501,7 @@ export default function ApiUsage() {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
+      announceStatus(`${selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)} code example copied to clipboard.`);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy code');
@@ -493,6 +540,10 @@ export default function ApiUsage() {
       a.click();
     }
   };
+
+  if (isPageLoading) {
+    return <ApiUsageSkeleton />;
+  }
 
   return (
     <div className="api-usage-page">
@@ -533,12 +584,11 @@ export default function ApiUsage() {
             <Icons.History size={16} style={{ marginRight: 6 }} />
             History
           </button>
-          <div className="status-indicator active">
-            <span className="status-dot"></span>
-            API is Active
-          </div>
+          <StatusIndicator label="API is Active" active />
         </div>
       </div>
+
+      <KbdHint shortcuts={API_USAGE_SHORTCUTS} />
 
       {/* API Key Section */}
       <div className="surface api-key-section">
@@ -586,6 +636,7 @@ export default function ApiUsage() {
                 const endpoint = MOCK_ENDPOINTS.find(ep => ep.id === e.target.value);
                 if (endpoint) {
                   setSelectedEndpoint(endpoint);
+                  announceStatus(`Selected endpoint: ${endpoint.method} ${endpoint.path}.`);
                   // Reset the request body when switching endpoints so stale
                   // JSON from a previous endpoint doesn't fail the new schema.
                   setRequestParams('{}');
@@ -602,14 +653,11 @@ export default function ApiUsage() {
           </div>
 
           <div className="form-row">
-            <RequestBodyEditor
+            <ParamsBuilder
               value={requestParams}
               onChange={setRequestParams}
-              schema={selectedEndpoint.requestBodySchema}
-              label="Parameters (JSON)"
-              placeholder={'{\n  "key": "value"\n}'}
-              rows={6}
               disabled={isLoading}
+              label="Parameters"
             />
           </div>
 
@@ -657,8 +705,8 @@ export default function ApiUsage() {
             ) : (
               <div className="response-content">
                 <div className="response-meta">
-                  <span className="response-time">Response time: {formatTime(responseTime || 0)}</span>
-                  <span className="response-cost">Cost: {formatPrice(callCost || 0)} USDC</span>
+                  <span className="response-time tabular-nums">Response time: {formatTime(responseTime || 0)}</span>
+                  <span className="response-cost tabular-nums">Cost: {formatPrice(callCost || 0)} USDC</span>
                 </div>
                 <pre className="response-json">
                   {JSON.stringify(apiResponse, null, 2)}
@@ -675,46 +723,33 @@ export default function ApiUsage() {
         <div className="stats-grid">
           <div className="stat-card">
             <span className="stat-label">Calls Today</span>
-            <strong className="stat-value">{usageStats.callsToday}</strong>
+            <strong className="stat-value tabular-nums">{usageStats.callsToday}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Calls This Week</span>
-            <strong className="stat-value">{usageStats.callsWeek}</strong>
+            <strong className="stat-value tabular-nums">{usageStats.callsWeek}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Total Spent</span>
-            <strong className="stat-value">{formatPrice(usageStats.totalSpent)} USDC</strong>
+            <strong className="stat-value tabular-nums">{formatPrice(usageStats.totalSpent)} USDC</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Avg Response Time</span>
-            <strong className="stat-value">{formatTime(usageStats.avgResponseTime)}</strong>
+            <strong className="stat-value tabular-nums">{formatTime(usageStats.avgResponseTime)}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Success Rate</span>
-            <strong className="stat-value">{usageStats.successRate}%</strong>
+            <strong className="stat-value tabular-nums">{usageStats.successRate}%</strong>
           </div>
         </div>
 
         <div className="mini-chart">
           <h3>Calls Over Time</h3>
           <CallsHeatmap />
-          <div className="chart-placeholder" style={{ marginTop: '24px' }}>
-            {/* Simple bar chart visualization */}
-            <div className="chart-bars">
-              {[65, 59, 80, 81, 56, 55, 47].map((height, i) => (
-                <div key={i} className="chart-bar" style={{ height: `${height}%` }}></div>
-              ))}
-            </div>
-            <div className="chart-labels">
-              <span>Mon</span>
-              <span>Tue</span>
-              <span>Wed</span>
-              <span>Thu</span>
-              <span>Fri</span>
-              <span>Sat</span>
-              <span>Sun</span>
-            </div>
-          </div>
+          <UsageChart 
+            title="API Call Trends"
+            alt="Usage statistics chart showing API call trends over time"
+          />
         </div>
       </div>
 
@@ -731,8 +766,13 @@ export default function ApiUsage() {
               ]}
               activeTab={statusFilter}
               onChange={(id) => {
-                setStatusFilter(id as 'all' | 'success' | 'error');
-                setFilterResetMessage('');
+                const nextStatus = id as 'all' | 'success' | 'error';
+                setStatusFilter(nextStatus);
+                announceStatus(
+                  nextStatus === 'all'
+                    ? 'Showing all call statuses.'
+                    : `Showing ${nextStatus} calls.`
+                );
               }}
             />
             <button
@@ -752,9 +792,9 @@ export default function ApiUsage() {
           </div>
         </div>
 
-        {/* Screen-reader announcement for filter reset (WCAG 2.1 AA) */}
-        <p className="sr-only" role="status" aria-live="polite">
-          {filterResetMessage}
+        {/* Screen-reader announcement for ApiUsage state changes (WCAG 2.1 AA) */}
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {liveStatusMessage}
         </p>
 
         <div className="call-history-table" aria-busy={isLoading}>

@@ -1,27 +1,45 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icons } from "../utils/icons";
-import { usePersistedState } from "../hooks/usePersistedState";
+import { getDefaultCodeLanguage, setDefaultCodeLanguage } from "../state/userPrefs";
 
 /**
  * CodeExample component with tabbed navigation for multiple code snippets.
- * 
- * Features:
+ *
+ * Layout overview
+ * ───────────────
+ * Desktop / tablet (>375 px):
+ *   Header is a flex row: [tab strip (scrollable)] [copy button]
+ *
+ * Narrow mobile (≤375 px)  — Issue #684:
+ *   Header stacks to a column layout with a smooth CSS transition:
+ *   [tab strip full-width] [copy button right-aligned]
+ *   Tap targets reach 44 × 44 px (WCAG 2.5.5).
+ *   Code panel scrolls horizontally so long lines never overflow the page.
+ *   Tabs hint at scrollability via a right-edge fade mask.
+ *
+ * All layout, spacing, and breakpoint rules live in src/styles/code.css.
+ * The component itself carries **no inline layout styles** so that @media
+ * breakpoints in CSS can override them without specificity fights.
+ *
+ * Features
+ * ────────
  * - Tabbed navigation for multiple languages with roving tabindex
- * - Language persistence via usePersistedState hook
- * - Copy-to-clipboard with visual feedback
- * - Full WCAG 2.1 AA accessibility
+ * - Default language pinned via userPrefs, shared across all CodeExample instances
+ * - Copy-to-clipboard with visual feedback and screen-reader announcement
+ * - Full WCAG 2.1 AA accessibility (keyboard navigation, aria-live, focus rings)
  * - Dark mode support via CSS custom properties
+ * - prefers-reduced-motion respected in CSS
  */
 
 type CodeExampleProps = {
-  /** An object where keys are language names and values are the code strings.
-   * Example: { "bash": "curl...", "javascript": "fetch..." }
+  /**
+   * An object where keys are language names and values are the code strings.
+   * @example { "bash": "curl...", "javascript": "fetch..." }
    */
   snippets: Record<string, string>;
+  /** Preferred language to show when no user preference is stored. */
   defaultLanguage?: string;
 };
-
-const STORAGE_KEY = "callora:codeExample:language";
 
 export default function CodeExample({
   snippets,
@@ -29,14 +47,23 @@ export default function CodeExample({
 }: CodeExampleProps) {
   // Extract available languages from the snippets keys
   const languages = Object.keys(snippets);
-  
-  // Use persisted state for language selection
-  const [activeLanguage, setActiveLanguage] = usePersistedState<string>(
-    STORAGE_KEY,
-    defaultLanguage && defaultLanguage in snippets
+
+  // Pin the user's preferred language (if set and available here), otherwise
+  // fall back to this example's own defaultLanguage prop, then the first language.
+  const [activeLanguage, setActiveLanguageState] = useState<string>(() => {
+    const pinned = getDefaultCodeLanguage();
+    if (pinned && pinned in snippets) {
+      return pinned;
+    }
+    return defaultLanguage && defaultLanguage in snippets
       ? defaultLanguage
-      : languages[0] || ""
-  );
+      : languages[0] || "";
+  });
+
+  const setActiveLanguage = useCallback((language: string) => {
+    setActiveLanguageState(language);
+    setDefaultCodeLanguage(language);
+  }, []);
 
   // Validate persisted language is still in current languages list
   const resolvedLanguage = languages.includes(activeLanguage)
@@ -68,8 +95,8 @@ export default function CodeExample({
   }, [snippets, resolvedLanguage, defaultLanguage, setActiveLanguage]);
 
   /**
-   * Handles the clipboard copy action with fallback.
-   * Provides immediate visual feedback.
+   * Handles the clipboard copy action with fallback for older browsers.
+   * Provides immediate visual feedback via `copied` state.
    */
   const handleCopy = async () => {
     if (!activeCode) return;
@@ -78,7 +105,7 @@ export default function CodeExample({
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(activeCode);
       } else {
-        // Fallback for browsers without clipboard API
+        // Fallback for browsers without the Clipboard API
         const textarea = document.createElement("textarea");
         textarea.value = activeCode;
         textarea.style.position = "fixed";
@@ -90,7 +117,7 @@ export default function CodeExample({
       }
 
       setCopied(true);
-      // Revert the button text after 2 seconds
+      // Revert the button label after 2 seconds
       window.setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy text: ", err);
@@ -98,8 +125,8 @@ export default function CodeExample({
   };
 
   /**
-   * Handles keyboard navigation in tab strip (arrow keys, Home, End).
-   * Implements roving tabindex pattern.
+   * Keyboard navigation within the tab strip (roving tabindex pattern).
+   * Supports ArrowRight, ArrowLeft, Home, End per WAI-ARIA 1.2 tabs pattern.
    */
   const handleTabKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
     let nextIndex: number | null = null;
@@ -126,22 +153,28 @@ export default function CodeExample({
 
   return (
     <div className="code-sample">
-      {/* Header Section: Contains Language Tabs and Copy Button */}
-      <div
-        className="no-print"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 12px",
-          background: "var(--bg-subtle, #f9f9f9)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
-        {/* Navigation Tabs List with Roving Tabindex */}
-        <div 
+      {/*
+       * Header — flex row on ≥376 px, stacked column on ≤375 px.
+       *
+       * .no-print suppresses the header in print mode (copy button is
+       *  useless on paper and the language tabs add visual noise).
+       *
+       * NOTE: No inline layout styles here. All layout is driven by
+       * code.css so that the @media (max-width: 375px) block can
+       * override everything without a specificity battle.
+       */}
+      <div className="no-print code-sample__header">
+        {/*
+         * Tab strip — horizontally scrollable rail.
+         *
+         * `flex: 1 1 auto` + `min-width: 0` keeps it from pushing the
+         * copy button off-screen when many languages are present.
+         * On ≤375 px the CSS makes it full-width and removes the
+         * flex-shrink constraint.
+         */}
+        <div
           ref={tablistRef}
-          className="code-sample__tabs" 
+          className="code-sample__tabs"
           role="tablist"
           aria-label="Code language"
         >
@@ -153,7 +186,7 @@ export default function CodeExample({
               aria-selected={resolvedLanguage === lang}
               aria-controls={`tabpanel-${lang}`}
               tabIndex={resolvedLanguage === lang ? 0 : -1}
-              className={`code-sample__tab ${resolvedLanguage === lang ? 'code-sample__tab--active' : ''}`}
+              className={`code-sample__tab${resolvedLanguage === lang ? " code-sample__tab--active" : ""}`}
               onClick={() => setActiveLanguage(lang)}
               onKeyDown={(e) => handleTabKeyDown(e, index)}
             >
@@ -162,15 +195,18 @@ export default function CodeExample({
           ))}
         </div>
 
-        {/* Action: Copy to Clipboard */}
+        {/*
+         * Copy button — full-width on ≤375 px (set in CSS) to give a
+         * comfortable 44 × 44 px minimum tap target (WCAG 2.5.5).
+         */}
         <button
-          className={`ghost-button code-sample__copy ${copied ? 'code-sample__copy--success' : ''}`}
+          className={`ghost-button code-sample__copy${copied ? " code-sample__copy--success" : ""}`}
           onClick={handleCopy}
           aria-label="Copy code snippet to clipboard"
         >
           {copied ? (
-            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              <Icons.Check size={14} /> Copied
+            <span className="code-sample__copy-inner">
+              <Icons.Check size={14} aria-hidden="true" /> Copied
             </span>
           ) : (
             "Copy"
@@ -178,7 +214,12 @@ export default function CodeExample({
         </button>
       </div>
 
-      {/* Code Display Area */}
+      {/*
+       * Code panel — `overflow-x: auto` on the panel prevents long lines
+       * from forcing the page to scroll horizontally on narrow viewports.
+       * The pre inside uses `white-space: pre` on wider screens and
+       * `white-space: pre-wrap` on ≤375 px (set in CSS).
+       */}
       <div
         role="tabpanel"
         id={`tabpanel-${resolvedLanguage}`}
@@ -191,7 +232,7 @@ export default function CodeExample({
         </pre>
       </div>
 
-      {/* Screen reader announcement for copy success */}
+      {/* Screen reader polite announcement for copy success (WCAG 4.1.3) */}
       <span
         aria-live="polite"
         aria-atomic="true"

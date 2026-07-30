@@ -42,7 +42,8 @@ type Action =
       collectionId: string;
       fromIndex: number;
       toIndex: number;
-    };
+    }
+  | { type: "CREATE_COLLECTION_WITH_ENDPOINT"; name: string; endpointId: string };
 
 // ─── Storage key ─────────────────────────────────────────────────────────────
 
@@ -157,6 +158,15 @@ function reducer(state: CollectionsState, action: Action): CollectionsState {
         }),
       };
 
+    case "CREATE_COLLECTION_WITH_ENDPOINT": {
+      const newCol: Collection = {
+        id: generateId(),
+        name: action.name.trim() || "Untitled Collection",
+        endpointIds: [action.endpointId],
+      };
+      return { ...state, collections: [...state.collections, newCol] };
+    }
+
     default:
       return state;
   }
@@ -166,6 +176,7 @@ function reducer(state: CollectionsState, action: Action): CollectionsState {
 
 interface CollectionsContextType extends CollectionsState {
   createCollection: (name: string) => void;
+  createCollectionWithEndpoint: (name: string, endpointId: string) => void;
   renameCollection: (id: string, name: string) => void;
   deleteCollection: (id: string) => void;
   addEndpointToCollection: (collectionId: string, endpointId: string) => void;
@@ -223,6 +234,15 @@ export function CollectionsProvider({
     endpointId: string
   ) => dispatch({ type: "ADD_ENDPOINT", collectionId, endpointId });
 
+  const createCollectionWithEndpoint = (
+    name: string,
+    endpointId: string
+  ) => dispatch({
+    type: "CREATE_COLLECTION_WITH_ENDPOINT",
+    name,
+    endpointId,
+  });
+
   const removeEndpointFromCollection = (
     collectionId: string,
     endpointId: string
@@ -261,6 +281,7 @@ export function CollectionsProvider({
       value={{
         ...state,
         createCollection,
+        createCollectionWithEndpoint,
         renameCollection,
         deleteCollection,
         addEndpointToCollection,

@@ -86,3 +86,23 @@ These do not affect the functionality of the changes in this PR.
 PR: https://github.com/CalloraOrg/Callora-Frontend/pull/337
 
 closes #254
+
+## Regression fix (2026-07-24)
+
+A merge conflict in a later PR dropped part of this feature from `FiltersSidebar.tsx`: the
+`ChevronIcon`/`usePersistedState` imports and the entire "Price range" section were lost, and the
+"Popularity" section was left outside of `FilterGroup` (so it no longer collapsed or persisted its
+state). The matching `.filter-group__header`, `.filter-group__chevron`, and `.filter-group__panel`
+styles were also dropped from `src/index.css`.
+
+This fix restores:
+- The "Price range" section wrapped in `FilterGroup` (`storageKey="price"`), including the
+  min/max validation error.
+- The "Popularity" section wrapped in `FilterGroup` (`storageKey="popularity"`) so it collapses
+  and persists like Categories and Price range.
+- The missing imports and collapsible-section CSS.
+
+The "Favorites" section intentionally remains a plain, non-collapsible `fieldset` — it was never
+part of the original collapsible set.
+
+closes #369

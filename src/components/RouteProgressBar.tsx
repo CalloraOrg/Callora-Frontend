@@ -27,6 +27,7 @@ export default function RouteProgressBar() {
       aria-label="Page loading"
       aria-busy={isLoading}
     >
+      <div className="route-progress-bar-glow" aria-hidden="true" />
       <div className="route-progress-bar-track">
         <div className="route-progress-bar-indicator" />
       </div>

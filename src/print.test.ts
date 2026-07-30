@@ -38,6 +38,11 @@ describe("print stylesheet contract", () => {
     expect(css).toMatch(/pre[\s\S]*?white-space:\s*pre-wrap\s*!important/);
     expect(css).toMatch(/pre[\s\S]*?overflow:\s*visible\s*!important/);
   });
+
+  it("forces EndpointSummary collapsibles to expand on print", () => {
+    expect(css).toMatch(/\.endpoint-summary-content--collapsed\s*\{[\s\S]*?display:\s*block\s*!important/);
+    expect(css).toMatch(/\.endpoint-summary-trigger\s+\.chevron-icon\s*\{[\s\S]*?display:\s*none\s*!important/);
+  });
 });
 
 describe("no-print markup", () => {
@@ -52,16 +57,177 @@ describe("no-print markup", () => {
     const page = read("src/pages/ApiDetailPage.tsx");
     expect(page).toMatch(/className="api-detail-tabs no-print"/);
     expect(page).toMatch(/className="api-detail-sidebar no-print"/);
-    expect(page).toMatch(/className="api-hero__cta no-print"/);
+    // CTA row uses api-hero__cta--detail modifier; all three classes must be present
+    expect(page).toMatch(/className="api-hero__cta api-hero__cta--detail no-print"/);
   });
 
   it("marks CodeExample header controls as no-print", () => {
     const codeExample = read("src/components/CodeExample.tsx");
-    expect(codeExample).toMatch(/className="no-print"/);
+    expect(codeExample).toMatch(/className="no-print/);
   });
 
   it("does not import the removed print.css file", () => {
     const main = read("src/main.tsx");
     expect(main).not.toMatch(/print\.css/);
+  });
+});
+
+// ── ReviewsTab print contract (issue #580) ────────────────────────────────────
+
+describe("ReviewsTab print markup contract", () => {
+  const source = read("src/pages/ReviewsTab.tsx");
+
+  it("wraps the panel in a section with class 'reviews-tab'", () => {
+    // The .reviews-tab class is required by the @media print block in index.css
+    // to inject the section heading and scope all ReviewsTab-specific rules.
+    expect(source).toMatch(/className="reviews-tab"/);
+  });
+
+  it("marks the sort-row with both reviews-tab__sort-row and no-print", () => {
+    // The sort <select> must be hidden in print media.
+    expect(source).toMatch(/reviews-tab__sort-row no-print/);
+  });
+
+  it("marks the interactive header with no-print", () => {
+    // The 'Write a Review' CTA and heading row must be hidden when printing.
+    expect(source).toMatch(/api-detail-reviews-header no-print/);
+  });
+
+  it("marks each review card with reviews-tab__card", () => {
+    // Required so the @media print rule can apply break-inside: avoid.
+    expect(source).toMatch(/reviews-tab__card/);
+  });
+
+  it("marks the review list with reviews-tab__list", () => {
+    // Required so the @media print rule can collapse the grid gap.
+    expect(source).toMatch(/reviews-tab__list/);
+  });
+
+  it("wraps star ratings in a span with role=img and aria-label", () => {
+    // WCAG 2.1 AA: non-text content must have a text alternative.
+    expect(source).toMatch(/role="img"/);
+    expect(source).toMatch(/aria-label=\{`\$\{rating\} out of 5 stars`\}/);
+  });
+
+  it("uses aria-hidden on decorative SVGs", () => {
+    expect(source).toMatch(/aria-hidden="true"/);
+  });
+});
+
+describe("ReviewsTab @media print CSS rules", () => {
+  const css = read("src/index.css");
+
+  it("hides .reviews-tab__sort-row in print", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.reviews-tab__sort-row[\s\S]*?display:\s*none\s*!important/,
+    );
+  });
+
+  it("hides .reviews-tab .api-detail-reviews-header in print", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.reviews-tab\s+\.api-detail-reviews-header[\s\S]*?display:\s*none\s*!important/,
+    );
+  });
+
+  it("injects a ::before heading on .reviews-tab", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.reviews-tab::before[\s\S]*?content:\s*"Developer Reviews"/,
+    );
+  });
+
+  it("applies break-inside: avoid to .reviews-tab__card", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.reviews-tab__card[\s\S]*?break-inside:\s*avoid\s*!important/,
+    );
+  });
+
+  it("collapses the grid gap on .reviews-tab__list in print", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.reviews-tab__list[\s\S]*?display:\s*block\s*!important/,
+    );
+  });
+
+  it("sets max-height: none on .reviews-tab to expand collapsibles", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.reviews-tab[\s\S]*?max-height:\s*none\s*!important/,
+    );
+  });
+
+  it("mirrors the ReviewsTab rules in src/styles/print.css as documentation", () => {
+    // The print.css file is the human-readable source of truth; it must define
+    // the same key selectors (even though it is not imported by main.tsx).
+    const printCss = read("src/styles/print.css");
+    expect(printCss).toMatch(/\.reviews-tab__sort-row/);
+    expect(printCss).toMatch(/\.reviews-tab::before/);
+    expect(printCss).toMatch(/\.reviews-tab__card/);
+  });
+});
+
+// ── SortMenu print contract (issue #580) ─────────────────────────────────────
+
+describe("SortMenu print markup contract", () => {
+  const source = read("src/pages/SortMenu.tsx");
+
+  it("wraps the panel in a section with class 'sort-menu'", () => {
+    // The .sort-menu class is required by the @media print block in index.css
+    // to inject the section heading and scope all SortMenu-specific rules.
+    expect(source).toMatch(/className="sort-menu"/);
+  });
+
+  it("marks the sort-row with both sort-menu__sort-row and no-print", () => {
+    // The sort dropdown must be hidden in print media.
+    expect(source).toMatch(/sort-menu__sort-row no-print/);
+  });
+
+  it("marks the current state display with sort-menu__current-state", () => {
+    // The current sort state should be visible when printing.
+    expect(source).toMatch(/sort-menu__current-state/);
+  });
+
+  it("marks the label with sort-menu__label", () => {
+    // The label for the current sort state.
+    expect(source).toMatch(/sort-menu__label/);
+  });
+
+  it("marks the value with sort-menu__value", () => {
+    // The value showing the current sort option.
+    expect(source).toMatch(/sort-menu__value/);
+  });
+});
+
+describe("SortMenu @media print CSS rules", () => {
+  const css = read("src/index.css");
+
+  it("hides .sort-menu__sort-row in print", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.sort-menu__sort-row[\s\S]*?display:\s*none\s*!important/,
+    );
+  });
+
+  it("injects a ::before heading on .sort-menu", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.sort-menu::before[\s\S]*?content:\s*"Sort Options"/,
+    );
+  });
+
+  it("displays .sort-menu__current-state in print", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.sort-menu__current-state[\s\S]*?display:\s*block\s*!important/,
+    );
+  });
+
+  it("sets max-height: none on .sort-menu to expand collapsibles", () => {
+    expect(css).toMatch(
+      /@media print[\s\S]*\.sort-menu[\s\S]*?max-height:\s*none\s*!important/,
+    );
+  });
+
+  it("mirrors the SortMenu rules in src/styles/print.css as documentation", () => {
+    // The print.css file is the human-readable source of truth; it must define
+    // the same key selectors (even though it is not imported by main.tsx).
+    const printCss = read("src/styles/print.css");
+    expect(printCss).toMatch(/\.sort-menu__sort-row/);
+    expect(printCss).toMatch(/\.sort-menu::before/);
+    expect(printCss).toMatch(/\.sort-menu__current-state/);
   });
 });

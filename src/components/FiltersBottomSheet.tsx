@@ -33,7 +33,7 @@ const SNAP_HEIGHT: Record<Snap, string> = {
 interface FiltersBottomSheetProps {
   open: boolean;
   onClose: () => void;
-  /** Live result count shown in the footer CTA */
+  /** Live result count shown in the footer CTA and used for empty-state illustration */
   resultCount: number;
   selectedCategories: Set<string>;
   toggleCategory: (c: string) => void;
@@ -46,6 +46,8 @@ interface FiltersBottomSheetProps {
   clearFilters: () => void;
   favoritesOnly: boolean;
   toggleFavoritesOnly: () => void;
+  selectedStatuses?: Set<string>;
+  toggleStatus?: (s: string) => void;
   /** Ref to the trigger button so focus is restored on close */
   triggerRef: React.RefObject<HTMLButtonElement>;
 }
@@ -65,6 +67,8 @@ export default function FiltersBottomSheet({
   clearFilters,
   favoritesOnly,
   toggleFavoritesOnly,
+  selectedStatuses = new Set<string>(),
+  toggleStatus = () => {},
   triggerRef,
 }: FiltersBottomSheetProps) {
   const [snap, setSnap] = useState<Snap>("half");
@@ -72,8 +76,10 @@ export default function FiltersBottomSheet({
   const dragStartY = useRef<number | null>(null);
 
   // Detect reduced-motion preference once; stable for the component lifetime.
+  // Guard against environments (jsdom, SSR) where matchMedia may be absent.
   const prefersReducedMotion =
     typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Reset to half-snap whenever the sheet opens.
@@ -228,6 +234,9 @@ export default function FiltersBottomSheet({
             clearFilters={clearFilters}
             favoritesOnly={favoritesOnly}
             toggleFavoritesOnly={toggleFavoritesOnly}
+            selectedStatuses={selectedStatuses}
+            toggleStatus={toggleStatus}
+            resultCount={resultCount}
           />
         </div>
 

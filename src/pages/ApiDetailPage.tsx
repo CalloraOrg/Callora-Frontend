@@ -1,38 +1,52 @@
-import { useMemo, useState, useEffect } from "react";
-import "../styles/focus.css";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import TestInBrowser from "../components/TestInBrowser";
-import Skeleton from "../components/Skeleton";
+import Skeleton, { ApiDetailPageSkeleton } from "../components/Skeleton";
 import EmbedPreview from "../components/EmbedPreview";
 import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { findApiById } from "../data/mockApis";
-import type { Review } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 import { formatPrice } from "../utils/format";
 import { Icons } from "../utils/icons";
-import { useRecentlyViewed } from "../hooks/useRecentlyViewed";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
+import EndpointPreview from "../components/EndpointPreview";
 import RatingHistogram from "../components/RatingHistogram";
+import { ApiDetailStickyTOC, type TocSection } from "../components/ApiDetailStickyTOC";
+import { StickyTocErrorBoundary } from "../components/StickyTocErrorBoundary";
+import { CheckIcon } from "../components/icons";
+import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
+import SubscribeButton from "../components/SubscribeButton";
+import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
+import SubscribeCTA from "./SubscribeCTA";
+import { useToast } from "../components/Toast";
+import { useCollections } from "../state/collectionsStore";
+import RelatedApisRail from "../components/RelatedApisRail";
+import MOCK_APIS from "../data/mockApis";
+import KbdHint from "../components/KbdHint";
+import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
+import PlanBadge from "../components/PlanBadge";
+import LiveRegion from "../components/LiveRegion";
+import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
 
 /**
- * ApiDetailPage Component
- * * Provides a comprehensive view of a specific API, including:
- * - Interactive documentation with code snippets
- * - Real-time cost estimation
- * - Performance statistics and health metrics
- * - Implementation examples across multiple languages
- * - Token-driven loading skeletons (1.5s) for hero, metrics, and sidebar
+ * ApiDetailPage
+ *
+ * Comprehensive view of a single API listing:
+ * - Tabbed layout: Overview, Documentation (with sticky TOC), Pricing,
+ *   Examples, Reviews, Embed
+ * - 1.5 s token-driven skeleton loading (consistent with MarketplacePage)
+ * - Sticky right-rail TOC on the Documentation tab (>= 1100 px viewports)
+ * - WCAG 2.1 AA accessible throughout
  */
 
 type Props = {
   onBack?: () => void;
 };
 
-type TabType =
-  "overview" | "documentation" | "pricing" | "examples" | "reviews" | "embed";
+type TabType = "overview" | "documentation" | "pricing" | "examples" | "reviews" | "embed";
 
 type ReviewSort = "newest" | "highest" | "lowest";
 
@@ -52,35 +66,22 @@ type ApiEndpoint = {
   group?: string;
 };
 
-const GENERIC_ENDPOINT_VERBS = new Set([
-  "get",
-  "list",
-  "create",
-  "update",
-  "delete",
-  "remove",
-  "fetch",
-]);
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const GENERIC_ENDPOINT_VERBS = new Set(["get", "list", "create", "update", "delete", "remove", "fetch"]);
 
 function toTitleCase(value: string) {
   return value.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function deriveEndpointGroupLabel(endpoint: ApiEndpoint): string {
-  if (endpoint.group?.trim()) {
-    return endpoint.group.trim();
-  }
+  if (endpoint.group?.trim()) return endpoint.group.trim();
 
   if (endpoint.title?.trim()) {
     const words = endpoint.title.trim().split(/\s+/);
-
-    if (
-      words.length > 1 &&
-      GENERIC_ENDPOINT_VERBS.has(words[0].toLowerCase())
-    ) {
+    if (words.length > 1 && GENERIC_ENDPOINT_VERBS.has(words[0].toLowerCase())) {
       return words.slice(1).join(" ");
     }
-
     return endpoint.title.trim();
   }
 
@@ -89,41 +90,291 @@ function deriveEndpointGroupLabel(endpoint: ApiEndpoint): string {
     .filter(Boolean)
     .find((segment) => !/^v\d+$/i.test(segment) && !segment.startsWith("{"));
 
-  if (!firstMeaningfulSegment) {
-    return "General";
-  }
-
+  if (!firstMeaningfulSegment) return "General";
   return toTitleCase(firstMeaningfulSegment.replace(/[-_]+/g, " "));
 }
 
+// ── TOC sections (ids must match heading elements in the doc tab) ─────────────
+
+const DOC_TOC_SECTIONS: TocSection[] = [
+  { id: "toc-endpoints", label: "Endpoints" },
+  { id: "toc-parameters", label: "Parameters" },
+  { id: "toc-implementation", label: "Implementation" },
+];
+
+// ── Ordered tab definitions ───────────────────────────────────────────────────
+
+const TAB_ITEMS = [
+  { id: "overview", label: "Overview" },
+  { id: "documentation", label: "Documentation" },
+  { id: "pricing", label: "Pricing" },
+  { id: "examples", label: "Examples" },
+  { id: "reviews", label: "Reviews" },
+  { id: "embed", label: "Embed" },
+] as const satisfies Array<{ id: TabType; label: string }>;
+
+const API_DETAIL_SHORTCUTS = SHORTCUTS.filter(
+  (shortcut) => shortcut.category === "ApiDetailPage",
+);
+
+// ── Endpoint save controls ───────────────────────────────────────────────────
+
+function EndpointSaveButton({ endpointId }: { endpointId: string }) {
+  const {
+    collections,
+    isEndpointSaved,
+    collectionIdsForEndpoint,
+    addEndpointToCollection,
+    removeEndpointFromCollection,
+    createCollectionWithEndpoint,
+  } = useCollections();
+
+  const [open, setOpen] = useState(false);
+  const [showNewInput, setShowNewInput] = useState(false);
+  const [newName, setNewName] = useState("");
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const savedIn = collectionIdsForEndpoint(endpointId);
+  const isSaved = isEndpointSaved(endpointId);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        panelRef.current &&
+        !panelRef.current.contains(e.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [open]);
+
+  const handleCreateCollection = useCallback(() => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    createCollectionWithEndpoint(trimmed, endpointId);
+    setNewName("");
+    setShowNewInput(false);
+    setOpen(true);
+  }, [createCollectionWithEndpoint, endpointId, newName]);
+
+  const handleNewKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleCreateCollection();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setShowNewInput(false);
+      setNewName("");
+    }
+  };
+
+  const handleToggleCollection = (collectionId: string) => {
+    if (savedIn.has(collectionId)) {
+      removeEndpointFromCollection(collectionId, endpointId);
+    } else {
+      addEndpointToCollection(collectionId, endpointId);
+    }
+  };
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        ref={buttonRef}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((prev) => !prev);
+        }}
+        className="icon-button"
+        aria-label={isSaved ? "Saved endpoint" : "Save endpoint to collection"}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <Icons.Link size={14} />
+        <span>{isSaved ? "Saved" : "Save"}</span>
+      </button>
+
+      {open && (
+        <div
+          ref={panelRef}
+          role="dialog"
+          className="endpoint-save-popover"
+          aria-modal="true"
+          aria-label="Save endpoint to collection"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            top: "38px",
+            right: 0,
+            zIndex: 120,
+            width: 260,
+            background: "var(--surface-strong, rgba(17,24,46,0.98))",
+            border: "1px solid var(--line-strong, rgba(169,184,255,0.28))",
+            borderRadius: "var(--radius-md)",
+            boxShadow: "var(--shadow, 0 24px 80px rgba(3,8,22,0.45))",
+            padding: "var(--mkt-space-lg)",
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: "var(--mkt-font-size-micro)",
+              fontWeight: 700,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Save to collection
+          </p>
+
+          {collections.length === 0 && !showNewInput && (
+            <div style={{ marginTop: "var(--mkt-space-lg)", display: "flex", flexDirection: "column", gap: "var(--mkt-space-md)" }}>
+              <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.85rem" }}>
+                No collections yet.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowNewInput(true)}
+                className="icon-button"
+                style={{ width: "100%" }}
+              >
+                <span>＋ New collection</span>
+              </button>
+            </div>
+          )}
+
+          {collections.length > 0 && (
+            <div style={{ marginTop: "var(--mkt-space-lg)", display: "flex", flexDirection: "column", gap: "var(--mkt-space-sm)", maxHeight: 180, overflowY: "auto" }}>
+              {collections.map((collection) => (
+                <label
+                  key={collection.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "var(--mkt-space-lg)",
+                    padding: "6px 4px",
+                    borderRadius: 8,
+                    background: savedIn.has(collection.id)
+                      ? "rgba(78,133,255,0.12)"
+                      : "transparent",
+                    cursor: "pointer",
+                    color: "var(--text)",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={savedIn.has(collection.id)}
+                    onChange={() => handleToggleCollection(collection.id)}
+                    aria-label={`${savedIn.has(collection.id) ? "Remove from" : "Add to"} collection \"${collection.name}\"`}
+                    style={{ accentColor: "var(--accent)", width: 16, height: 16 }}
+                  />
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {collection.name}
+                  </span>
+                  <span style={{ color: "var(--muted)", fontSize: "var(--mkt-font-size-micro)" }}>
+                    {collection.endpointIds.length}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {showNewInput ? (
+            <div style={{ display: "flex", gap: "var(--mkt-space-md)", marginTop: "var(--mkt-space-lg)" }}>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={handleNewKeyDown}
+                placeholder="Collection name"
+                aria-label="New collection name"
+                style={{
+                  flex: 1,
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid var(--line)",
+                  borderRadius: 8,
+                  color: "var(--text)",
+                  padding: "8px 10px",
+                  fontSize: "0.85rem",
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleCreateCollection}
+                disabled={!newName.trim()}
+                className="icon-button"
+                style={{ minWidth: 56, justifyContent: "center" }}
+              >
+                Save
+              </button>
+            </div>
+          ) : collections.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowNewInput(true)}
+              className="icon-button"
+              style={{ width: "100%", marginTop: 10 }}
+            >
+              <span>＋ New collection</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function ApiDetailPage({ onBack }: Props) {
-  const { trackFetch } = useFetchTracker();
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
   const [isLoading, setIsLoading] = useState(true);
   const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
+  const [announcement, setAnnouncement] = useState("");
+  const { showToast } = useToast();
 
-  // Ordered tab definitions — single source of truth for labels and ids.
-  const TAB_ITEMS = [
-    { id: "overview",       label: "Overview"       },
-    { id: "documentation",  label: "Documentation"  },
-    { id: "pricing",        label: "Pricing"        },
-    { id: "examples",       label: "Examples"       },
-    { id: "reviews",        label: "Reviews"        },
-    { id: "embed",          label: "Embed"          },
-  ] as const satisfies Array<{ id: TabType; label: string }>;
+  const handleTabChange = useCallback((newTab: TabType) => {
+    setTab(newTab);
+    const tabLabel = TAB_ITEMS.find((t) => t.id === newTab)?.label ?? newTab;
+    setAnnouncement(`Showing ${tabLabel} tab`);
+  }, []);
+
+  const prefersReducedMotion = useMemo(() => {
+    return typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
 
   // Extract ID from URL path: /details/[id]
-  const id =
-    typeof window !== "undefined"
-      ? window.location.pathname.split("/").filter(Boolean).pop()
-      : undefined;
+  const id = typeof window !== "undefined" ? window.location.pathname.split("/").filter(Boolean).pop() : undefined;
 
   const api = useMemo(() => findApiById(id), [id]);
   useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
 
   const rawReviews = api?.reviews || [];
   const averageRating = api?.rating ?? 0;
+
   const sortedReviews = useMemo(() => {
     return [...rawReviews].sort((a, b) => {
       if (reviewSort === "highest") return b.rating - a.rating;
@@ -132,10 +383,10 @@ export default function ApiDetailPage({ onBack }: Props) {
     });
   }, [rawReviews, reviewSort]);
 
-  const documentationEndpoints = useMemo(
-    () => (api?.endpoints || []) as ApiEndpoint[],
-    [api],
-  );
+  // ReviewsTab receives the raw (unsorted) reviews; sorting is managed inside
+  // the component so the parent no longer needs sortedReviews for that panel.
+
+  const documentationEndpoints = useMemo(() => (api?.endpoints || []) as ApiEndpoint[], [api]);
 
   const endpointGroups = useMemo<EndpointGroupPreview[]>(() => {
     const groups = new Map<
@@ -157,8 +408,7 @@ export default function ApiDetailPage({ onBack }: Props) {
         .replace(/^-|-$/g, "");
       const method = (endpoint.method || "GET").toUpperCase();
       const paramsCount = endpoint.params?.length ?? 0;
-      const requiredCount =
-        endpoint.params?.filter((param) => param.required).length ?? 0;
+      const requiredCount = endpoint.params?.filter((param) => param.required).length ?? 0;
 
       const existingGroup = groups.get(id) ?? {
         id,
@@ -195,15 +445,32 @@ export default function ApiDetailPage({ onBack }: Props) {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [documentationEndpoints]);
 
-  // Simulate initial data loading with 1.5s delay (consistent with MarketplacePage)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, LOADING_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
+  // Derive distribution map from raw reviews for the histogram
+  const ratingDistribution = useMemo(() => {
+    if (rawReviews.length === 0) return undefined;
+    const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    rawReviews.forEach((r) => {
+      const star = Math.min(5, Math.max(1, Math.round(r.rating)));
+      dist[star] = (dist[star] ?? 0) + 1;
+    });
+    return dist;
+  }, [rawReviews]);
 
-  // Show "not found" after loading completes and API is missing
+  // Simulate 1.5 s initial data load (consistent with MarketplacePage)
+  useEffect(() => {
+    const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
+    const timer = setTimeout(() => setIsLoading(false), delay);
+    return () => clearTimeout(timer);
+  }, [prefersReducedMotion]);
+
+  useEffect(() => {
+    if (!isLoading && api) {
+      setAnnouncement(`${api.name} detail page loaded`);
+    }
+  }, [isLoading, api]);
+
+  // ── Not found (post-load) ─────────────────────────────────────────────────
+
   if (!isLoading && !api) {
     return (
       <div className="api-detail-page">
@@ -215,186 +482,29 @@ export default function ApiDetailPage({ onBack }: Props) {
             ]}
           />
           <EmptyState
-            title="API not found"
-            message="We couldn't find that API. Try the marketplace."
+            variant="api-detail"
+            action={{
+              label: "Back to marketplace",
+              onClick: () => (window.location.href = "/marketplace"),
+            }}
           />
-          <div style={{ textAlign: "center", marginTop: 12 }}>
-            <button
-              className="primary-button"
-              onClick={() => (window.location.href = "/marketplace")}
-            >
-              Back to marketplace
-            </button>
-          </div>
         </div>
       </div>
     );
   }
 
-  // Show loading skeletons while loading
+  // ── Skeleton loading ──────────────────────────────────────────────────────
+
   if (isLoading) {
-    return (
-      <div className="api-detail-page">
-        <div className="api-detail-container">
-          <Breadcrumb
-            items={[
-              { label: "Marketplace", href: "/marketplace" },
-              { label: "Loading...", href: "", isCurrent: true },
-            ]}
-          />
-          <div className="api-detail-shell">
-            {/* Hero Skeleton */}
-            <div className="api-detail-hero">
-              <div className="api-detail-heading">
-                <button className="ghost-button no-print" onClick={onBack} type="button">
-                  Back
-                </button>
-                <div className="api-detail-brand">
-                  <Skeleton width={56} height={56} borderRadius={10} />
-                  <div
-                    className="api-detail-title"
-                    style={{ flex: 1, marginLeft: 12 }}
-                  >
-                    <Skeleton
-                      width="60%"
-                      height={32}
-                      style={{ marginBottom: 8 }}
-                    />
-                    <Skeleton width="40%" height={16} />
-                  </div>
-                </div>
-              </div>
-              <div className="api-detail-price-panel">
-                <Skeleton width={100} height={32} style={{ marginBottom: 8 }} />
-                <Skeleton
-                  width={120}
-                  height={14}
-                  style={{ marginBottom: 12 }}
-                />
-                <Skeleton width="100%" height={44} borderRadius={8} />
-              </div>
-            </div>
-
-            <div className="api-detail-content-grid">
-              <div className="content-left">
-                {/* Tabs Navigation Skeleton */}
-                <nav className="api-detail-tabs no-print">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton
-                      key={i}
-                      width={80}
-                      height={20}
-                      style={{ marginRight: 24 }}
-                    />
-                  ))}
-                </nav>
-
-                {/* Metrics Skeleton */}
-                <div className="api-detail-metrics">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="stat-card-skeleton"
-                      style={{ padding: 20 }}
-                    >
-                      <Skeleton
-                        width="40%"
-                        height={12}
-                        style={{ marginBottom: 12 }}
-                      />
-                      <Skeleton width="60%" height={28} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Sidebar Skeleton */}
-              <aside className="api-detail-sidebar no-print">
-                <div className="api-detail-sidebar-inner">
-                  {/* API Health Card Skeleton */}
-                  <div
-                    className="stat-card-skeleton"
-                    style={{ padding: 24, marginBottom: 20 }}
-                  >
-                    <Skeleton
-                      width="50%"
-                      height={20}
-                      style={{ marginBottom: 16 }}
-                    />
-                    <Skeleton
-                      width="100%"
-                      height={16}
-                      style={{ marginBottom: 8 }}
-                    />
-                    <Skeleton
-                      width="100%"
-                      height={16}
-                      style={{ marginBottom: 8 }}
-                    />
-                    <Skeleton width="100%" height={16} />
-                  </div>
-
-                  {/* SDKs Card Skeleton */}
-                  <div
-                    className="preview-card-skeleton"
-                    style={{ padding: 24, marginBottom: 20 }}
-                  >
-                    <Skeleton
-                      width="50%"
-                      height={20}
-                      style={{ marginBottom: 16 }}
-                    />
-                    <Skeleton
-                      width="100%"
-                      height={36}
-                      style={{ marginBottom: 8 }}
-                    />
-                    <Skeleton
-                      width="100%"
-                      height={36}
-                      style={{ marginBottom: 8 }}
-                    />
-                    <Skeleton width="100%" height={36} />
-                  </div>
-
-                  {/* Support Card Skeleton */}
-                  <div style={{ padding: 24, borderRadius: 16 }}>
-                    <Skeleton
-                      width="50%"
-                      height={20}
-                      style={{ marginBottom: 12 }}
-                    />
-                    <Skeleton
-                      width="100%"
-                      height={14}
-                      style={{ marginBottom: 6 }}
-                    />
-                    <Skeleton
-                      width="100%"
-                      height={14}
-                      style={{ marginBottom: 16 }}
-                    />
-                    <Skeleton width="100%" height={44} borderRadius={8} />
-                  </div>
-                </div>
-              </aside>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <ApiDetailPageSkeleton onBack={onBack} />;
   }
 
-  // Render actual content after loading completes
-  if (!api) {
-    return null; // This should not happen due to the check above, but kept for safety
-  }
+  // Safety guard — unreachable after the checks above, satisfies TS
+  if (!api) return null;
 
-  // Example Generation Logic
-  const firstEndpoint = (api.endpoints && api.endpoints[0]) || {
-    url: "/v1/data",
-    method: "GET",
-  };
+  // ── Code examples ─────────────────────────────────────────────────────────
+
+  const firstEndpoint = api.endpoints?.[0] ?? { url: "/v1/data", method: "GET" };
 
   const curlExample = `curl -X ${firstEndpoint.method} "${API_BASE_URL}${firstEndpoint.url}?lat=37.78&lon=-122.41" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
@@ -426,27 +536,22 @@ headers = {
     "Authorization": "Bearer YOUR_API_KEY",
     "Content-Type": "application/json"
 }
-params = {
-    "lat": 37.78,
-    "lon": -122.41
-}
+params = { "lat": 37.78, "lon": -122.41 }
 
 response = requests.get(url, headers=headers, params=params)
-data = response.json()
+print(response.json())`;
 
-print(data)`;
+  const allSnippets = { bash: curlExample, javascript: jsExample, python: pyExample };
 
-  const allSnippets = {
-    bash: curlExample,
-    javascript: jsExample,
-    python: pyExample,
-  };
+  const estimatedCost = (n: number) => `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
 
-  const estimatedCost = (n: number) =>
-    `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="api-detail-page">
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {isLoading ? "Loading API details…" : `Loaded ${api.name}`}
+      </div>
       <div className="api-detail-container">
         <Breadcrumb
           items={[
@@ -454,10 +559,12 @@ print(data)`;
             { label: api.name, href: "", isCurrent: true },
           ]}
         />
+
         <div className="api-detail-shell">
+          {/* ── Hero ──────────────────────────────────────────────────────── */}
           <div className="api-detail-hero">
             <div className="api-detail-heading">
-              <button className="ghost-button" onClick={onBack} type="button">
+              <button className="ghost-button no-print" onClick={onBack} type="button">
                 Back
               </button>
               <div className="api-detail-brand">
@@ -466,82 +573,67 @@ print(data)`;
                   <h1>{api.name}</h1>
                   <div className="api-detail-meta">
                     <a href={api.provider?.url}>{api.provider?.name}</a> ·{" "}
-                    <strong style={{ color: "var(--accent-strong)" }}>
-                      {`$${formatPrice(api.pricePerRequest ?? 0)}`}
-                    </strong>{" "}
-                    per request
+                    <strong className="tabular-nums" style={{ color: "var(--accent-strong)" }}>{`$${formatPrice(api.pricePerRequest ?? 0)}`}</strong> per request
                   </div>
+                  {api.status && (
+                    <div style={{ marginTop: 8 }}>
+                      <StatusBadge status={apiStatusToVariant(api.status)} />
+                    </div>
+                  )}
                 </div>
                 <div className="api-detail-provider">
                   Published by{" "}
-                  <a
-                    href={api.provider?.url}
-                    style={{
-                      color: "var(--text-main)",
-                      textDecoration: "none",
-                    }}
-                  >
+                  <a href={api.provider?.url} style={{ color: "var(--text)", textDecoration: "none" }}>
                     {api.provider?.name}
                   </a>
                 </div>
               </div>
             </div>
+
             <div className="api-detail-price-panel">
-              <div className="api-detail-price">
-                {`$${formatPrice(api.pricePerRequest ?? 0)}`}
-              </div>
-              <div className="api-detail-price-label">
-                per successful request
-              </div>
-              <button className="primary-button">Connect API</button>
+              <div className="api-detail-price tabular-nums">{`$${formatPrice(api.pricePerRequest ?? 0)}`}</div>
+              <div className="api-detail-price-label">per successful request</div>
+              <button className="primary-button" style={{ marginTop: "var(--mkt-space-xl)" }}>
+                Connect API
+              </button>
             </div>
           </div>
 
-    <button
-      className="ghost-button no-print"
-      onClick={onBack}
-      type="button"
-    >
-    </button>
-<section className="api-hero" aria-labelledby="api-title">
+          {/* ── CTA row (below hero, above tabs) ──────────────────────────── */}
+          {/* Responsive class handles flex→column stacking on narrow viewports */}
+          <div className="api-hero__cta api-hero__cta--detail no-print">
+            <button className="primary-button">Try API</button>
+            <button className="secondary-button" onClick={() => handleTabChange("pricing")}>
+              View Pricing
+            </button>
+            <SubscribeButton apiName={api.name} onSubscribe={() => showToast(`Subscribed to ${api.name}!`, "success")} />
+          </div>
 
-              <div
-                className="tab-content"
-                style={{ animation: "fadeIn 0.3s ease" }}
-              >
-                {/* OVERVIEW TAB */}
+          {/* ── Content grid: main column + sidebar ───────────────────────── */}
+          <div className="api-detail-content-grid">
+            <div className="content-left">
+              {/* Tab navigation */}
+              <div className="api-detail-tabs no-print">
+                <KbdHint shortcuts={API_DETAIL_SHORTCUTS} />
+                <Tabs tabs={TAB_ITEMS} activeTab={tab} onChange={(id) => handleTabChange(id as TabType)} />
+              </div>
+
+              {/* Tab panels */}
+              <div className="tab-content" style={{ animation: prefersReducedMotion ? "none" : "fadeIn 0.3s ease" }}>
+                {/* ── OVERVIEW ────────────────────────────────────────────── */}
                 {tab === "overview" && (
-                  <section
-                    id="panel-overview"
-                    role="tabpanel"
-                    aria-labelledby="tab-overview"
-                    tabIndex={0}
-                  >
-                    <div
-                      className="preview-card"
-                      style={{ padding: 24, marginBottom: 32 }}
-                    >
-                      <h3 style={{ marginTop: 0 }}>About this API</h3>
-                      <p
-                        style={{
-                          lineHeight: 1.6,
-                          fontSize: 16,
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        {api.description}
-                      </p>
+                  <section id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" tabIndex={0}>
+            <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-5xl)" }}>
+              <h3 style={{ marginTop: 0 }}>About this API</h3>
+              <p style={{ lineHeight: "var(--mkt-line-height-relaxed)", fontSize: "var(--mkt-font-size-base)", color: "var(--muted)" }}>{api.description}</p>
                     </div>
 
                     <div className="api-detail-two-column">
                       <div>
                         <h2>Key Features</h2>
-                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                        <ul style={{ paddingLeft: "var(--mkt-space-2xl)", lineHeight: "var(--mkt-line-height-loose)" }}>
                           {(api.features || []).map((f) => (
-                            <li
-                              key={f}
-                              style={{ color: "var(--text-secondary)" }}
-                            >
+                            <li key={f} style={{ color: "var(--muted)" }}>
                               {f}
                             </li>
                           ))}
@@ -549,12 +641,9 @@ print(data)`;
                       </div>
                       <div>
                         <h2>Primary Use Cases</h2>
-                        <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                        <ul style={{ paddingLeft: "var(--mkt-space-2xl)", lineHeight: "var(--mkt-line-height-loose)" }}>
                           {(api.useCases || []).map((u) => (
-                            <li
-                              key={u}
-                              style={{ color: "var(--text-secondary)" }}
-                            >
+                            <li key={u} style={{ color: "var(--muted)" }}>
                               {u}
                             </li>
                           ))}
@@ -562,399 +651,209 @@ print(data)`;
                       </div>
                     </div>
 
-                    <h2 style={{ marginTop: 40 }}>Performance Metrics</h2>
+                    <h2 style={{ marginTop: "var(--mkt-space-6xl)" }}>Performance Metrics</h2>
                     <div className="api-detail-metrics">
-                      <div
-                        className="stat-card"
-                        style={{
-                          padding: 20,
-                          background: "var(--bg-subtle)",
-                          borderRadius: 12,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "var(--muted)",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          Total Requests
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 24,
-                            fontWeight: 700,
-                            marginTop: 8,
-                          }}
-                        >
-                          {(api.stats?.totalCalls ?? 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div
-                        className="stat-card"
-                        style={{
-                          padding: 20,
-                          background: "var(--bg-subtle)",
-                          borderRadius: 12,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "var(--muted)",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          Latency (P95)
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 24,
-                            fontWeight: 700,
-                            marginTop: 8,
-                          }}
-                        >
-                          {api.stats?.avgResponseMs ?? 0}ms
-                        </div>
-                      </div>
-                      <div
-                        className="stat-card"
-                        style={{
-                          padding: 20,
-                          background: "var(--bg-subtle)",
-                          borderRadius: 12,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "var(--muted)",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          System Uptime
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 24,
-                            fontWeight: 700,
-                            color: "#10b981",
-                            marginTop: 8,
-                          }}
-                        >
-                          {api.stats?.uptimePct ?? 0}%
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-                )}
-
-                {/* DOCUMENTATION TAB */}
-                {tab === "documentation" && (
-                  <section
-                    id="panel-documentation"
-                    role="tabpanel"
-                    aria-labelledby="tab-documentation"
-                    tabIndex={0}
-                  >
-                    <div className="endpoint-section-header">
-                      <h3>Available Endpoints</h3>
-                      <span style={{ fontSize: 13, color: "var(--muted)" }}>
-                        Base URL: <code>{API_BASE_URL}</code>
-                      </span>
-                    </div>
-
-                    {endpointGroups.length > 0 && (
-                      <EndpointGroupHover groups={endpointGroups} />
-                    )}
-
-                    <div style={{ display: "grid", gap: 20, marginTop: 16 }}>
-                      {documentationEndpoints.map((ep: ApiEndpoint) => (
-                        <div
-                          key={ep.id}
-                          className="preview-card"
-                          style={{ padding: 0, overflow: "hidden" }}
-                        >
-                          <div className="endpoint-card-header">
-                            <div className="endpoint-title-row">
-                              <span
-                                className={`method-badge method-badge--${(ep.method || "get").toLowerCase()}`}
-                              >
-                                {ep.method}
-                              </span>
-                              <strong style={{ fontSize: 15 }}>
-                                {ep.title}
-                              </strong>
-                            </div>
-                            <div className="endpoint-header-actions">
-                              <code className="endpoint-url">{ep.url}</code>
-                              <div className="endpoint-client-buttons">
-                                <button
-                                  type="button"
-                                  className="icon-button"
-                                  aria-label="Copy Postman import URL"
-                                  title="Open in Postman"
-                                  onClick={() => {
-                                    const url = getPostmanImportUrl(
-                                      ep.method,
-                                      ep.url,
-                                      ep.title,
-                                      API_BASE_URL,
-                                    );
-                                    copyToClipboard(url).then((ok) => {
-                                      showToast(
-                                        ok
-                                          ? "Postman import URL copied"
-                                          : "Failed to copy",
-                                        ok ? "success" : "error",
-                                      );
-                                    });
-                                  }}
-                                >
-                                  <Icons.ExternalLink size={14} />
-                                  <span>Postman</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="icon-button"
-                                  aria-label="Copy Insomnia import URL"
-                                  title="Open in Insomnia"
-                                  onClick={() => {
-                                    const url = getInsomniaImportUrl(
-                                      ep.method,
-                                      ep.url,
-                                      ep.title,
-                                      API_BASE_URL,
-                                    );
-                                    copyToClipboard(url).then((ok) => {
-                                      showToast(
-                                        ok
-                                          ? "Insomnia import URL copied"
-                                          : "Failed to copy",
-                                        ok ? "success" : "error",
-                                      );
-                                    });
-                                  }}
-                                >
-                                  <Icons.ExternalLink size={14} />
-                                  <span>Insomnia</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div style={{ padding: 24 }}>
-                            <h4 style={{ margin: "0 0 12px 0", fontSize: 14 }}>
-                              Request Parameters
-                            </h4>
-                            <div className="endpoint-table-wrap">
-                              <table
-                                style={{
-                                  width: "100%",
-                                  borderCollapse: "collapse",
-                                  fontSize: 13,
-                                }}
-                              >
-                                <thead>
-                                  <tr
-                                    style={{
-                                      textAlign: "left",
-                                      color: "var(--muted)",
-                                      borderBottom:
-                                        "1px solid var(--border-subtle)",
-                                    }}
-                                  >
-                                    <th style={{ padding: "8px 0" }}>
-                                      Parameter
-                                    </th>
-                                    <th>Type</th>
-                                    <th>Required</th>
-                                    <th>Description</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {ep.params.map((p: any) => (
-                                    <tr
-                                      key={p.name}
-                                      style={{
-                                        borderBottom:
-                                          "1px solid var(--border-subtle)",
-                                      }}
-                                    >
-                                      <td
-                                        style={{
-                                          padding: "12px 0",
-                                          fontFamily: "monospace",
-                                          color: "var(--accent)",
-                                        }}
-                                      >
-                                        {p.name}
-                                      </td>
-                                      <td>
-                                        <span className="type-tag">
-                                          {p.type}
-                                        </span>
-                                      </td>
-                                      <td>{p.required ? "Yes" : "Optional"}</td>
-                                      <td style={{ color: "var(--muted)" }}>
-                                        Standard filter for this endpoint.
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-
-                            <h4
-                              style={{ margin: "24px 0 12px 0", fontSize: 14 }}
-                            >
-                              Implementation
-                            </h4>
-                            <CodeExample
-                              snippets={allSnippets}
-                              defaultLanguage="bash"
-                            />
-
-                            {/* One-click inline test runner (issue #290) */}
-                            <TestInBrowser
-                              endpointUrl={`${API_BASE_URL}${ep.url}`}
-                              method={ep.method || "GET"}
-                              params={(ep.params || []).map((p: any) => ({
-                                name: p.name,
-                                type: p.type ?? "string",
-                                required: Boolean(p.required),
-                              }))}
-                            />
-                          </div>
+                      {[
+                        {
+                          label: "Total Requests",
+                          value: (api.stats?.totalCalls ?? 0).toLocaleString(),
+                          color: "var(--text)",
+                        },
+                        {
+                          label: "Latency (P95)",
+                          value: `${api.stats?.avgResponseMs ?? 0}ms`,
+                          color: "var(--text)",
+                        },
+                        {
+                          label: "System Uptime",
+                          value: `${api.stats?.uptimePct ?? 0}%`,
+                          color: "var(--success)",
+                        },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} className="stat-card">
+                          <div style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)", textTransform: "uppercase" }}>{label}</div>
+                          {/* tabular-nums prevents digit-width jitter on live-updating stats (#466) */}
+                          <div className="tabular-nums stat-card__value" style={{ fontSize: "var(--mkt-font-size-xl)", fontWeight: 700, marginTop: "var(--mkt-space-md)", color }}>{value}</div>
                         </div>
                       ))}
                     </div>
                   </section>
                 )}
 
-                {/* PRICING TAB */}
-                {tab === "pricing" && (
+                {/* ── DOCUMENTATION ───────────────────────────────────────── */}
+                {tab === "documentation" && (
                   <section
-                    id="panel-pricing"
+                    id="panel-documentation"
                     role="tabpanel"
-                    aria-labelledby="tab-pricing"
+                    aria-labelledby="tab-documentation"
                     tabIndex={0}
+                    style={{ display: "flex", gap: "var(--mkt-space-5xl)", alignItems: "flex-start" }}
                   >
+                    {/* Main documentation content */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="endpoint-section-header">
+                        <h3 id="toc-endpoints">Available Endpoints</h3>
+                        <span style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)" }}>
+                          Base URL: <code>{API_BASE_URL}</code>
+                        </span>
+                      </div>
+
+                      {endpointGroups.length > 0 && <EndpointGroupHover groups={endpointGroups} />}
+
+                      <div style={{ display: "grid", gap: "var(--mkt-space-2xl)", marginTop: "var(--mkt-space-xl)" }}>
+                        {documentationEndpoints.map((ep: ApiEndpoint, idx) => (
+                          <div key={ep.id} className="preview-card" style={{ padding: 0, overflow: "hidden" }}>
+                            {/*
+                              EndpointPreview wraps the card header so that hovering
+                              or focusing it shows a floating schema preview (params,
+                              types, response shape) without navigating away.
+                            */}
+                            <EndpointPreview endpoint={ep}>
+                              <div className="endpoint-card-header">
+                                <div className="endpoint-title-row">
+                                  <span className={`method-badge method-badge--${(ep.method || "get").toLowerCase()}`}>{ep.method}</span>
+                                  <strong style={{ fontSize: 15 }}>{ep.title}</strong>
+                                </div>
+                                <div className="endpoint-header-actions">
+                                  <code className="endpoint-url">{ep.url}</code>
+                                  <div className="endpoint-client-buttons">
+                                    <button
+                                      type="button"
+                                      className="icon-button"
+                                      aria-label="Copy Postman import URL"
+                                      title="Open in Postman"
+                                      onClick={() => {
+                                        const url = getPostmanImportUrl(ep.method, ep.url, ep.title, API_BASE_URL);
+                                        copyToClipboard(url).then((ok) => showToast(ok ? "Postman import URL copied" : "Failed to copy", ok ? "success" : "error"));
+                                      }}
+                                    >
+                                      <Icons.ExternalLink size={14} />
+                                      <span>Postman</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="icon-button"
+                                      aria-label="Copy Insomnia import URL"
+                                      title="Open in Insomnia"
+                                      onClick={() => {
+                                        const url = getInsomniaImportUrl(ep.method, ep.url, ep.title, API_BASE_URL);
+                                        copyToClipboard(url).then((ok) => showToast(ok ? "Insomnia import URL copied" : "Failed to copy", ok ? "success" : "error"));
+                                      }}
+                                    >
+                                      <Icons.ExternalLink size={14} />
+                                      <span>Insomnia</span>
+                                    </button>
+                                    <EndpointSaveButton endpointId={ep.id} />
+                                  </div>
+                                </div>
+                              </div>
+                            </EndpointPreview>
+
+                            <div style={{ padding: "var(--mkt-space-3xl)" }}>
+                              {/* id anchors only on first endpoint card */}
+                              <h4 id={idx === 0 ? "toc-parameters" : undefined} style={{ margin: "0 0 var(--mkt-space-lg) 0", fontSize: "var(--mkt-font-size-tag)" }}>
+                                Request Parameters
+                              </h4>
+                              <div className="endpoint-table-wrap">
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--mkt-font-size-sm)" }}>
+                                  <thead>
+                                    <tr style={{ textAlign: "left", color: "var(--muted)", borderBottom: "1px solid var(--line)" }}>
+                                      <th style={{ padding: "8px 0" }}>Parameter</th>
+                                      <th>Type</th>
+                                      <th>Required</th>
+                                      <th>Description</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {ep.params.map((p) => (
+                                      <tr key={p.name} style={{ borderBottom: "1px solid var(--line)" }}>
+                                        <td style={{ padding: "12px 0", fontFamily: "monospace", color: "var(--accent)" }}>{p.name}</td>
+                                        <td>
+                                          <span className="type-tag">{p.type}</span>
+                                        </td>
+                                        <td>{p.required ? "Yes" : "Optional"}</td>
+                                        <td style={{ color: "var(--muted)" }}>Standard filter for this endpoint.</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              <h4 id={idx === 0 ? "toc-implementation" : undefined} style={{ margin: "var(--mkt-space-3xl) 0 var(--mkt-space-lg) 0", fontSize: "var(--mkt-font-size-tag)" }}>
+                                Implementation
+                              </h4>
+                              <CodeExample snippets={allSnippets} defaultLanguage="bash" />
+
+                              <TestInBrowser
+                                endpointUrl={`${API_BASE_URL}${ep.url}`}
+                                method={ep.method || "GET"}
+                                params={(ep.params || []).map((p) => ({
+                                  name: p.name,
+                                  type: p.type ?? "string",
+                                  required: Boolean(p.required),
+                                }))}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Sticky TOC — hidden below 1100 px via CSS */}
+                    <StickyTocErrorBoundary>
+                      <ApiDetailStickyTOC sections={DOC_TOC_SECTIONS} />
+                    </StickyTocErrorBoundary>
+                  </section>
+                )}
+
+                {/* ── PRICING ─────────────────────────────────────────────── */}
+                {tab === "pricing" && (
+                  <section id="panel-pricing" role="tabpanel" aria-labelledby="tab-pricing" tabIndex={0}>
                     <h2>Pricing Plans</h2>
                     <div className="api-detail-pricing-grid">
-                      <div
-                        className="preview-card"
-                        style={{
-                          padding: 24,
-                          border: "2px solid var(--accent)",
-                        }}
-                      >
-                        <div
-                          style={{
-                            color: "var(--accent)",
-                            fontWeight: 700,
-                            fontSize: 12,
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          Standard
+                      {/* Standard plan */}
+                      <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", border: "2px solid var(--accent)" }}>
+                        <PlanBadge tier="pro" />
+                        {/* tabular-nums prevents digit-width jitter on formatted prices (#466) */}
+                        <div className="api-detail-plan-price tabular-nums">
+                          {`$${formatPrice(api.pricePerRequest ?? 0)}`} <span style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>/ call</span>
                         </div>
-                        <div className="api-detail-plan-price">
-                          {`$${formatPrice(api.pricePerRequest ?? 0)}`}{" "}
-                          <span style={{ fontSize: 14, color: "var(--muted)" }}>
-                            / call
-                          </span>
-                        </div>
-                        <p style={{ fontSize: 14, color: "var(--muted)" }}>
-                          Perfect for startups and scaling applications. Pay
-                          only for what you use.
-                        </p>
-                        <ul
-                          style={{
-                            padding: 0,
-                            listStyle: "none",
-                            fontSize: 14,
-                            marginTop: 20,
-                          }}
-                        >
-                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Unlimited Throughput
-                          </li>
-                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> 99.9% Uptime SLA
-                          </li>
-                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Community Support
-                          </li>
+                        <p style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>Perfect for startups and scaling applications. Pay only for what you use.</p>
+                        <ul style={{ padding: 0, listStyle: "none", fontSize: "var(--mkt-font-size-tag)", marginTop: "var(--mkt-space-2xl)" }}>
+                          {["Unlimited Throughput", "99.9% Uptime SLA", "Community Support"].map((feat) => (
+                            <li key={feat} style={{ marginBottom: "var(--mkt-space-lg)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              <CheckIcon size={16} aria-hidden="true" /> {feat}
+                            </li>
+                          ))}
                         </ul>
                       </div>
-                      <div className="preview-card" style={{ padding: 24 }}>
-                        <div
-                          style={{
-                            color: "var(--muted)",
-                            fontWeight: 700,
-                            fontSize: 12,
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          Enterprise
-                        </div>
+
+                      {/* Enterprise plan */}
+                      <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)" }}>
+                        <PlanBadge tier="enterprise" />
                         <div className="api-detail-plan-price">Custom</div>
-                        <p style={{ fontSize: 14, color: "var(--muted)" }}>
-                          For high-volume needs requiring dedicated
-                          infrastructure and support.
-                        </p>
-                        <ul
-                          style={{
-                            padding: 0,
-                            listStyle: "none",
-                            fontSize: 14,
-                            marginTop: 20,
-                          }}
-                        >
-                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Dedicated Node
-                          </li>
-                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> 24/7 Phone Support
-                          </li>
-                          <li style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            <CheckIcon size={16} style={{ color: "var(--success)" }} /> Custom Rate Limits
-                          </li>
+                        <p style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>For high-volume needs requiring dedicated infrastructure and support.</p>
+                        <ul style={{ padding: 0, listStyle: "none", fontSize: "var(--mkt-font-size-tag)", marginTop: "var(--mkt-space-2xl)" }}>
+                          {["Dedicated Node", "24/7 Phone Support", "Custom Rate Limits"].map((feat) => (
+                            <li key={feat} style={{ marginBottom: "var(--mkt-space-lg)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              <CheckIcon size={16} aria-hidden="true" /> {feat}
+                            </li>
+                          ))}
                         </ul>
-                        <button
-                          className="secondary-button"
-                          style={{ width: "100%", marginTop: 10 }}
-                        >
+                        <button className="secondary-button" style={{ width: "100%", marginTop: "var(--mkt-space-lg)" }}>
                           Contact Sales
                         </button>
                       </div>
                     </div>
 
-                    <div className="preview-card" style={{ padding: 32 }}>
+                    {/* Cost calculator */}
+                    <div className="preview-card" style={{ padding: "var(--mkt-space-5xl)" }}>
                       <h4 style={{ marginTop: 0 }}>Cost Calculator</h4>
-                      <p style={{ color: "var(--muted)" }}>
-                        Estimate your monthly billing based on projected request
-                        volume.
-                      </p>
-
-                      <div style={{ marginTop: 32 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            marginBottom: 12,
-                          }}
-                        >
-                          <span style={{ fontWeight: 600 }}>
-                            Monthly Volume
-                          </span>
-                          <span
-                            style={{ color: "var(--accent)", fontWeight: 700 }}
-                          >
-                            {requests.toLocaleString()} Requests
-                          </span>
+                      <p style={{ color: "var(--muted)" }}>Estimate your monthly billing based on projected request volume.</p>
+                      <div style={{ marginTop: "var(--mkt-space-5xl)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--mkt-space-lg)" }}>
+                          <span style={{ fontWeight: 600 }}>Monthly Volume</span>
+                          <span className="tabular-nums" style={{ color: "var(--accent)", fontWeight: 700 }}>{requests.toLocaleString()} Requests</span>
                         </div>
                         <input
                           type="range"
@@ -962,41 +861,22 @@ print(data)`;
                           max={1000000}
                           step={100}
                           value={requests}
-                          onChange={(e) => setRequests(Number(e.target.value))}
-                          style={{
-                            width: "100%",
-                            height: 6,
-                            borderRadius: 3,
-                            appearance: "none",
-                            background: "var(--border-subtle)",
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setRequests(val);
+                            setAnnouncement(`Estimated monthly total: ${estimatedCost(val)} for ${val.toLocaleString()} requests`);
                           }}
+                          style={{ width: "100%", height: 6, borderRadius: 3, appearance: "none", background: "var(--line)" }}
                         />
-
                         <div className="api-detail-calculator-total">
                           <div>
-                            <div
-                              style={{ fontSize: 12, color: "var(--muted)" }}
-                            >
-                              Estimated Monthly Total
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 28,
-                                fontWeight: 800,
-                                color: "var(--text-main)",
-                              }}
-                            >
-                              {estimatedCost(requests)}
-                            </div>
+                            <div style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)" }}>Estimated Monthly Total</div>
+                            {/* tabular-nums prevents layout shift as the slider moves (#466) */}
+                            <div className="tabular-nums api-detail-calculator-total__amount" style={{ fontSize: "var(--mkt-font-size-2xl)", fontWeight: 800, color: "var(--text)" }}>{estimatedCost(requests)}</div>
                           </div>
-                          <div
-                            style={{
-                              textAlign: "right",
-                              fontSize: 13,
-                              color: "var(--muted)",
-                            }}
-                          >
-                            * Volume discounts apply automatically <br />
+                          <div style={{ textAlign: "right", fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)" }}>
+                            * Volume discounts apply automatically
+                            <br />
                             at 500k+ requests.
                           </div>
                         </div>
@@ -1005,149 +885,91 @@ print(data)`;
                   </section>
                 )}
 
-                {/* EXAMPLES TAB */}
+                {/* ── EXAMPLES ────────────────────────────────────────────── */}
                 {tab === "examples" && (
-                  <section
-                    id="panel-examples"
-                    role="tabpanel"
-                    aria-labelledby="tab-examples"
-                    tabIndex={0}
-                  >
+                  <section id="panel-examples" role="tabpanel" aria-labelledby="tab-examples" tabIndex={0}>
                     <h3>Integration Gallery</h3>
-                    <p style={{ color: "var(--muted)", marginBottom: 24 }}>
-                      Explore these Boilerplate examples to get integrated in
-                      minutes.
-                    </p>
+                    <p style={{ color: "var(--muted)", marginBottom: "var(--mkt-space-3xl)" }}>Explore these boilerplate examples to get integrated in minutes.</p>
 
-                    <div
-                      className="preview-card"
-                      style={{ padding: 24, marginBottom: 24 }}
-                    >
+                    <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-3xl)" }}>
                       <div className="api-detail-example-tags">
-                        <span
-                          style={{
-                            padding: "4px 12px",
-                            background: "#e0f2fe",
-                            color: "#0369a1",
-                            borderRadius: 4,
-                            fontSize: 12,
-                            fontWeight: 600,
-                          }}
-                        >
+                        <span style={{ padding: "4px 12px", background: "#e0f2fe", color: "#0369a1", borderRadius: 4, fontSize: "var(--mkt-font-size-micro)", fontWeight: 600 }}>
                           React / Next.js
                         </span>
-                        <span
-                          style={{
-                            padding: "4px 12px",
-                            background: "#fef3c7",
-                            color: "#92400e",
-                            borderRadius: 4,
-                            fontSize: 12,
-                            fontWeight: 600,
-                          }}
-                        >
-                          Server-side
-                        </span>
+                        <span style={{ padding: "4px 12px", background: "#fef3c7", color: "#92400e", borderRadius: 4, fontSize: "var(--mkt-font-size-micro)", fontWeight: 600 }}>Server-side</span>
                       </div>
                       <h4>Fetching data in a Next.js Page</h4>
-                      <CodeExample
-                        snippets={allSnippets}
-                        defaultLanguage="javascript"
-                      />
+                      <CodeExample snippets={allSnippets} defaultLanguage="javascript" />
                     </div>
 
-                    <div className="preview-card" style={{ padding: 24 }}>
+                    <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)" }}>
                       <h4>Python Data Analysis Workflow</h4>
-                      <CodeExample
-                        snippets={allSnippets}
-                        defaultLanguage="python"
-                      />
+                      <CodeExample snippets={allSnippets} defaultLanguage="python" />
                     </div>
                   </section>
                 )}
 
-                {/* REVIEWS TAB */}
+                {/* ── REVIEWS ─────────────────────────────────────────────── */}
+                {/*
+                 * ReviewsTab is a standalone component (src/pages/ReviewsTab.tsx)
+                 * that owns its own sort state and carries all necessary
+                 * print-safe class names (reviews-tab, reviews-tab__card,
+                 * reviews-tab__sort-row, no-print) so the @media print block
+                 * in index.css can hide chrome and expand collapsibles without
+                 * any runtime JS.  See issue #580 and src/styles/print.css.
+                 */}
                 {tab === "reviews" && (
                   <section
                     id="panel-reviews"
                     role="tabpanel"
                     aria-labelledby="tab-reviews"
                     tabIndex={0}
+                    data-reviews-section
                   >
                     <div className="api-detail-reviews-header">
                       <h3 style={{ margin: 0 }}>Developer Feedback</h3>
-                      <button className="secondary-button">
-                        Write a Review
-                      </button>
+                      {/* Write a Review button: not meaningful on paper */}
+                      <button className="secondary-button no-print">Write a Review</button>
                     </div>
 
                     {rawReviews.length === 0 ? (
-                      <div
-                        className="preview-card"
-                        style={{
-                          padding: 40,
-                          textAlign: "center",
-                          borderStyle: "dashed",
-                          marginTop: 16,
-                        }}
-                      >
-                        <div style={{ fontSize: 40, marginBottom: 16 }}>💬</div>
+                      <div className="preview-card" style={{ padding: "var(--mkt-space-6xl)", textAlign: "center", borderStyle: "dashed", marginTop: "var(--mkt-space-xl)" }}>
+                        <div style={{ fontSize: 40, marginBottom: "var(--mkt-space-xl)" }}>💬</div>
                         <h4>No public reviews yet</h4>
-                        <p
-                          style={{
-                            color: "var(--muted)",
-                            maxWidth: 400,
-                            margin: "0 auto",
-                          }}
-                        >
-                          Be the first to share your experience with this API.
-                          Your feedback helps other developers make better
-                          choices.
-                        </p>
+                        <p style={{ color: "var(--muted)", maxWidth: 400, margin: "0 auto" }}>Be the first to share your experience with this API.</p>
                       </div>
                     ) : (
                       <>
-                        {/* Rating histogram summary */}
                         <div style={{ marginTop: 16 }}>
-                          <RatingHistogram
-                            reviews={rawReviews}
-                            averageRating={averageRating}
-                          />
+                          <RatingHistogram rating={averageRating} distribution={ratingDistribution} />
                         </div>
 
-                        {/* Sort controls */}
+                        {/* Sort controls: hidden when printing — sort order is irrelevant on paper */}
                         <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            marginBottom: 16,
-                            flexWrap: "wrap",
-                          }}
+                          className="reviews-sort-controls no-print"
+                          style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}
                         >
-                          <label
-                            htmlFor="review-sort"
-                            style={{
-                              fontSize: 13,
-                              color: "var(--muted)",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
+                          <label htmlFor="review-sort" style={{ fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-lg)", marginBottom: "var(--mkt-space-xl)", flexWrap: "wrap" }}>
+                          <label htmlFor="review-sort" style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)", whiteSpace: "nowrap" }}>
                             Sort by
                           </label>
                           <select
                             id="review-sort"
                             value={reviewSort}
-                            onChange={(e) =>
-                              setReviewSort(e.target.value as ReviewSort)
-                            }
+                            onChange={(e) => {
+                              const nextSort = e.target.value as ReviewSort;
+                              setReviewSort(nextSort);
+                              const sortLabel = nextSort === "newest" ? "newest" : nextSort === "highest" ? "highest rated" : "lowest rated";
+                              setAnnouncement(`Reviews sorted by ${sortLabel}`);
+                            }}
                             style={{
-                              fontSize: 13,
+                              fontSize: "var(--mkt-font-size-sm)",
                               padding: "5px 10px",
                               borderRadius: 6,
-                              border: "1px solid var(--border-subtle)",
-                              background: "var(--bg-subtle)",
-                              color: "var(--text-main)",
+                              border: "1px solid var(--line)",
+                              background: "var(--surface-soft)",
+                              color: "var(--text)",
                               cursor: "pointer",
                             }}
                           >
@@ -1157,46 +979,13 @@ print(data)`;
                           </select>
                         </div>
 
-                        {/* Review list */}
-                        <div style={{ display: "grid", gap: 16 }}>
+                        <div className="reviews-list" style={{ display: "grid", gap: 16 }}>
+                        <div style={{ display: "grid", gap: "var(--mkt-space-xl)" }}>
                           {sortedReviews.map((review) => (
-                            <div
-                              key={review.id}
-                              className="preview-card"
-                              style={{ padding: 20 }}
-                            >
-                              {/* Review header */}
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "flex-start",
-                                  justifyContent: "space-between",
-                                  gap: 8,
-                                  flexWrap: "wrap",
-                                  marginBottom: 10,
-                                }}
-                              >
-                                {/* Author + badge */}
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    flexWrap: "wrap",
-                                    minWidth: 0,
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      fontWeight: 600,
-                                      fontSize: 14,
-                                      color: "var(--text-main)",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    {review.author}
-                                  </span>
-
+                            <div key={review.id} className="preview-card" style={{ padding: "var(--mkt-space-2xl)" }}>
+                              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--mkt-space-md)", flexWrap: "wrap", marginBottom: "var(--mkt-space-lg)" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-md)", flexWrap: "wrap", minWidth: 0 }}>
+                                  <span style={{ fontWeight: 600, fontSize: "var(--mkt-font-size-tag)", color: "var(--text)", whiteSpace: "nowrap" }}>{review.author}</span>
                                   {review.verified && (
                                     <span
                                       title="Has called this API in the last 30 days"
@@ -1207,106 +996,42 @@ print(data)`;
                                         gap: 4,
                                         padding: "2px 8px",
                                         borderRadius: 999,
-                                        fontSize: 11,
+                                        fontSize: "var(--mkt-font-size-micro)",
                                         fontWeight: 600,
                                         lineHeight: "18px",
-                                        background:
-                                          "rgba(16, 185, 129, 0.12)",
-                                        color: "#10b981",
-                                        border:
-                                          "1px solid rgba(16, 185, 129, 0.3)",
+                                        background: "rgba(16, 185, 129, 0.12)",
+                                        color: "var(--success)",
+                                        border: "1px solid rgba(16, 185, 129, 0.3)",
                                         cursor: "default",
                                         whiteSpace: "nowrap",
                                         flexShrink: 0,
                                         userSelect: "none",
                                       }}
                                     >
-                                      {/* Checkmark icon */}
-                                      <svg
-                                        width="10"
-                                        height="10"
-                                        viewBox="0 0 12 12"
-                                        fill="none"
-                                        aria-hidden="true"
-                                        focusable="false"
-                                      >
-                                        <path
-                                          d="M2 6l3 3 5-5"
-                                          stroke="currentColor"
-                                          strokeWidth="1.8"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        />
+                                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">
+                                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                                       </svg>
                                       Verified Developer
                                     </span>
                                   )}
                                 </div>
-
-                                {/* Star rating + date */}
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  <span
-                                    role="img"
-                                    aria-label={`${review.rating} out of 5 stars`}
-                                    style={{ display: "flex", gap: 1 }}
-                                  >
+                                <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-md)", flexShrink: 0 }}>
+                                  <span role="img" aria-label={`${review.rating} out of 5 stars`} style={{ display: "flex", gap: 1 }}>
                                     {Array.from({ length: 5 }, (_, i) => (
-                                      <svg
-                                        key={i}
-                                        width="13"
-                                        height="13"
-                                        viewBox="0 0 20 20"
-                                        aria-hidden="true"
-                                        focusable="false"
-                                      >
+                                      <svg key={i} width="13" height="13" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                                         <path
                                           d="M10 1.5l2.39 4.84 5.34.78-3.87 3.77.91 5.32L10 13.77l-4.77 2.44.91-5.32L2.27 7.12l5.34-.78L10 1.5z"
-                                          fill={
-                                            i < review.rating
-                                              ? "var(--accent, #f59e0b)"
-                                              : "var(--border-subtle, #374151)"
-                                          }
+                                          fill={i < review.rating ? "var(--accent)" : "var(--line)"}
                                         />
                                       </svg>
                                     ))}
                                   </span>
-                                  <span
-                                    style={{
-                                      fontSize: 12,
-                                      color: "var(--muted)",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    {new Date(review.date).toLocaleDateString(
-                                      "en-US",
-                                      {
-                                        year: "numeric",
-                                        month: "short",
-                                        day: "numeric",
-                                      }
-                                    )}
+                                  <span style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)", whiteSpace: "nowrap" }}>
+                                    {new Date(review.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                                   </span>
                                 </div>
                               </div>
-
-                              {/* Review body */}
-                              <p
-                                style={{
-                                  margin: 0,
-                                  fontSize: 14,
-                                  lineHeight: 1.6,
-                                  color: "var(--text-secondary)",
-                                }}
-                              >
-                                {review.body}
-                              </p>
+                              <p style={{ margin: 0, fontSize: "var(--mkt-font-size-tag)", lineHeight: "var(--mkt-line-height-relaxed)", color: "var(--muted)" }}>{review.body}</p>
                             </div>
                           ))}
                         </div>
@@ -1315,32 +1040,15 @@ print(data)`;
                   </section>
                 )}
 
-                {/* EMBED TAB */}
+                {/* ── EMBED ───────────────────────────────────────────────── */}
                 {tab === "embed" && (
-                  <section
-                    id="panel-embed"
-                    role="tabpanel"
-                    aria-labelledby="tab-embed"
-                    tabIndex={0}
-                  >
-                    <div
-                      className="preview-card"
-                      style={{ padding: 24, marginBottom: 24 }}
-                    >
+                  <section id="panel-embed" role="tabpanel" aria-labelledby="tab-embed" tabIndex={0}>
+                    <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-3xl)" }}>
                       <h3 style={{ marginTop: 0 }}>Embed Widget</h3>
-                      <p
-                        style={{
-                          color: "var(--muted)",
-                          marginBottom: 24,
-                          fontSize: 14,
-                        }}
-                      >
-                        Embed a real-time widget on your website to showcase
-                        this API's performance metrics. Customize the size and
-                        copy the embed code below.
+                      <p style={{ color: "var(--muted)", marginBottom: "var(--mkt-space-3xl)", fontSize: "var(--mkt-font-size-tag)" }}>
+                        Embed a real-time widget on your website to showcase this API's performance metrics. Customize the size and copy the embed code below.
                       </p>
                     </div>
-
                     <EmbedPreview
                       providerName={api.provider?.name || "Unknown Provider"}
                       stats={{
@@ -1353,162 +1061,77 @@ print(data)`;
                   </section>
                 )}
               </div>
+              {/* /tab-content */}
             </div>
+            {/* /content-left */}
 
-            {/* Sidebar Sticky Column */}
+            {/* ── Sidebar ─────────────────────────────────────────────────── */}
             <aside className="api-detail-sidebar no-print">
               <div className="api-detail-sidebar-inner">
-                <div
-                  className="stat-card"
-                  style={{ padding: 24, marginBottom: 20 }}
-                >
+                <div className="stat-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-2xl)" }}>
                   <h4 style={{ marginTop: 0 }}>API Health</h4>
-                  <div style={{ display: "grid", gap: 16, marginTop: 20 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <span style={{ fontSize: 14, color: "var(--muted)" }}>
-                        Status
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 14,
-                          color: "#10b981",
-                          fontWeight: 600,
-                        }}
-                      >
-                        ● Operational
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <span style={{ fontSize: 14, color: "var(--muted)" }}>
-                        Region
-                      </span>
-                      <span style={{ fontSize: 14 }}>Global (Edge)</span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <span style={{ fontSize: 14, color: "var(--muted)" }}>
-                        CORS
-                      </span>
-                      <span style={{ fontSize: 14, color: "#10b981" }}>
-                        Supported
-                      </span>
+                  <div style={{ display: "grid", gap: "var(--mkt-space-xl)", marginTop: "var(--mkt-space-2xl)" }}>
+                    {[
+                      { label: "Region", value: "Global (Edge)", color: "var(--text)" },
+                      { label: "CORS", value: "Supported", color: "var(--success)" },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>{label}</span>
+                        <span style={{ fontSize: "var(--mkt-font-size-tag)", color, fontWeight: label !== "Region" ? 600 : undefined }}>{value}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 14, color: "var(--muted)" }}>Status</span>
+                      <StatusBadge status={apiStatusToVariant(api.status)} />
                     </div>
                   </div>
                 </div>
 
-                <div
-                  className="preview-card"
-                  style={{ padding: 24, marginBottom: 20 }}
-                >
-                  <h4 style={{ marginTop: 0 }}>SDKs & Tools</h4>
-                  <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
-                    <button
-                      className="ghost-button"
-                      style={{
-                        justifyContent: "flex-start",
-                        width: "100%",
-                        fontSize: 13,
-                      }}
-                    >
-                      📦 Node.js SDK
-                    </button>
-                    <button
-                      className="ghost-button"
-                      style={{
-                        justifyContent: "flex-start",
-                        width: "100%",
-                        fontSize: 13,
-                      }}
-                    >
-                      📦 Python Wrapper
-                    </button>
-                    <button
-                      className="ghost-button"
-                      style={{
-                        justifyContent: "flex-start",
-                        width: "100%",
-                        fontSize: 13,
-                      }}
-                    >
-                      📜 OpenAPI Spec (JSON)
-                    </button>
+                <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-2xl)" }}>
+                  <h4 style={{ marginTop: 0 }}>SDKs &amp; Tools</h4>
+                  <div style={{ display: "grid", gap: "var(--mkt-space-lg)", marginTop: "var(--mkt-space-xl)" }}>
+                    {["📦 Node.js SDK", "📦 Python Wrapper", "📜 OpenAPI Spec (JSON)"].map((label) => (
+                      <button key={label} className="ghost-button" style={{ justifyContent: "flex-start", width: "100%", fontSize: "var(--mkt-font-size-sm)" }}>
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <div
                   style={{
-                    background:
-                      "linear-gradient(rgba(78, 133, 255, 0.1), rgba(78, 133, 255, 0.05))",
-                    padding: 24,
+                    background: "linear-gradient(rgba(78,133,255,0.1),rgba(78,133,255,0.05))",
+                    padding: "var(--mkt-space-3xl)",
                     borderRadius: 16,
-                    border: "1px solid rgba(78, 133, 255, 0.2)",
+                    border: "1px solid rgba(78,133,255,0.2)",
                   }}
                 >
-                  <h4 style={{ marginTop: 0, color: "var(--accent-strong)" }}>
-                    Support
-                  </h4>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: "var(--text-secondary)",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    Need help with integration? Access our developer discord or
-                    email the provider directly.
+                  <h4 style={{ marginTop: 0, color: "var(--accent-strong)" }}>Support</h4>
+                  <p style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)", lineHeight: "var(--mkt-line-height-normal)" }}>
+                    Need help with integration? Access our developer Discord or email the provider directly.
                   </p>
-                  <button
-                    className="primary-button"
-                    style={{ width: "100%", marginTop: 12 }}
-                  >
+                  <button className="primary-button" style={{ width: "100%", marginTop: "var(--mkt-space-lg)" }}>
                     Contact Publisher
                   </button>
                 </div>
+
+                {/* ── Related APIs rail ───────────────────────────────── */}
+                <RelatedApisRail
+                  currentApi={api}
+                  allApis={MOCK_APIS}
+                  onSelect={(related) => {
+                    window.location.href = `/details/${related.id}`;
+                  }}
+                />
               </div>
             </aside>
           </div>
+          {/* /api-detail-content-grid */}
         </div>
+        {/* /api-detail-shell */}
       </div>
+      {/* /api-detail-container */}
+      <LiveRegion>{announcement}</LiveRegion>
     </div>
-
-    <div className="api-hero__cta no-print">
-      <button className="primary-button">
-        Try API
-      </button>
-
-      <button
-        className="secondary-button"
-        onClick={() => setTab("pricing")}
-      >
-        View Pricing
-      </button>
-
-      {/* Accessible subscribe flow with inline confirmation (issue #287) */}
-      <SubscribeButton
-        apiName={api.name}
-        onSubscribe={() => showToast(`Subscribed to ${api.name}!`, "success")}
-      />
-    </div>
-  </div>
-</section>
-
-  <div className="api-detail-content-grid"></div>
-      </div>
-    </div>
-  </div>
   );
 }
