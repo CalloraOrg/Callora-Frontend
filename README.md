@@ -89,6 +89,7 @@ by removing interactive controls and making content fully visible. (Closes #708)
 | Path                | Description                               |
 | ------------------- | ----------------------------------------- |
 | `/`                 | Landing page                              |
+| `/login`            | Sign-in page with polite aria-live status announcements (issue #530) |
 | `/dashboard`        | Developer dashboard                       |
 | `/marketplace`      | API marketplace                           |
 | `/billing`          | USDC deposit and settlements              |

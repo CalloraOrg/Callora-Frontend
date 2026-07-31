@@ -27,6 +27,7 @@ import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 import { InvoiceCard } from "./pages/InvoiceCard";
 import BillingHistory from "./pages/BillingHistory";
+import LoginPage from "./pages/LoginPage";
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -127,6 +128,7 @@ const APP_ROUTES = {
   serverError: "/500",
   rateLimitCard: "/rate-limit",
   slaCard: "/marketplace/grantfox-wave-compute/sla",
+  login: "/login",
 } as const;
 
 function createMockHash() {
@@ -285,6 +287,7 @@ function App() {
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
     [APP_ROUTES.endpointSummary]: "Endpoint Summary – Callora",
+    [APP_ROUTES.login]: "Sign in – Callora",
   };
   const routeDescriptionMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
@@ -294,6 +297,7 @@ function App() {
     "/api-usage": "Monitor API usage, request stats, and view call history.",
     [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
     [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
+    [APP_ROUTES.login]: "Sign in to Callora to manage API usage, deposits, and marketplace listings.",
   };
   const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
@@ -580,6 +584,8 @@ function App() {
               path={APP_ROUTES.landing}
               element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} />}
             />
+
+            <Route path={APP_ROUTES.login} element={<LoginPage />} />
 
             <Route path={APP_ROUTES.publish} element={<PublishApi />} />
 
