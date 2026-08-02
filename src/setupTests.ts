@@ -67,3 +67,6 @@ Object.defineProperty(window, "IntersectionObserver", {
   configurable: true,
 });
 
+// Mock scrollIntoView for jsdom (used by EndpointSearch)
+Element.prototype.scrollIntoView = vi.fn();
+
