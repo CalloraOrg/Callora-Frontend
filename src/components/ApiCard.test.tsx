@@ -423,11 +423,48 @@ describe("ApiCard skeleton", () => {
   });
 
   it("uses tone stellar for themed skeleton appearance", () => {
-    const { container } = render(<ApiCard loading />);
-    const skeletons = container.querySelectorAll(".skeleton--stellar");
-    expect(skeletons.length).toBeGreaterThan(0);
+      const { container } = render(<ApiCard loading />);
+      const skeletons = container.querySelectorAll(".skeleton--stellar");
+      expect(skeletons.length).toBeGreaterThan(0);
+    });
+
+    it("uses CSS variable tokens for icon size and radius matching final card shape", () => {
+      const { container } = render(<ApiCard loading />);
+      const header = container.querySelector(".api-marketplace-card-header");
+      expect(header).toBeTruthy();
+      // Header gap should use the CSS variable token
+      expect(header?.getAttribute("style")).toContain("mkt-space-lg");
+    });
+
+    it("uses CSS variable token for price padding-right matching final card layout", () => {
+      const { container } = render(<ApiCard loading />);
+      // The price column should use the CSS variable for padding-right
+      const priceDivs = container.querySelectorAll('[style*="padding-right"]');
+      const hasVariable = Array.from(priceDivs).some(
+        (el) => (el as HTMLElement).style.paddingRight?.includes("mkt-card-price-padding-right")
+      );
+      expect(hasVariable).toBe(true);
+    });
+
+    it("applies flexWrap on title row to match final card's responsive layout", () => {
+      const { container } = render(<ApiCard loading />);
+      // The title row inside the body should have flexWrap
+      const body = container.querySelector(".api-marketplace-card-body");
+      expect(body).toBeTruthy();
+      const titleRow = body?.querySelector('[style*="flex-wrap"]');
+      expect(titleRow).toBeTruthy();
+    });
+
+    it("uses CSS variable token for sparkline gap matching final card", () => {
+      const { container } = render(<ApiCard loading />);
+      // The sparkline section should use mkt-space-lg for gap
+      const sparklineSections = container.querySelectorAll('[style*="justify-content: space-between"]');
+      const hasVariable = Array.from(sparklineSections).some(
+        (el) => (el as HTMLElement).style.gap?.includes("mkt-space-lg")
+      );
+      expect(hasVariable).toBe(true);
+    });
   });
-});
 
 describe("ApiCard responsiveness", () => {
   const mockApi: APIItem = {

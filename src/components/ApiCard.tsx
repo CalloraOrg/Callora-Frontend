@@ -83,17 +83,22 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
         <Skeleton tone="stellar" width={60} height={28} borderRadius={8} />
       </div>
 
-      <div className="api-marketplace-card-header" style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <Skeleton tone="stellar" width={56} height={56} borderRadius={10} />
+      <div className="api-marketplace-card-header" style={{ display: "flex", gap: "var(--mkt-space-lg, 12px)", alignItems: "center" }}>
+        <Skeleton
+          tone="stellar"
+          width="var(--mkt-card-icon-size, 56px)"
+          height="var(--mkt-card-icon-size, 56px)"
+          borderRadius="var(--mkt-card-icon-radius, 10px)"
+        />
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--mkt-space-md, 8px)" }}>
-          <div style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", alignItems: "baseline" }}>
+        <div className="api-marketplace-card-body" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, gap: "var(--mkt-space-md, 8px)" }}>
+          <div style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", alignItems: "baseline", flexWrap: "wrap" }}>
             <Skeleton tone="stellar" width="60%" height={18} />
             <Skeleton tone="stellar" width="20%" height={12} />
           </div>
 
           {!isCompact && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--mkt-card-margin-top-sm, 4px)" }}>
               <Skeleton tone="stellar" width="90%" height={14} />
               <Skeleton tone="stellar" width="70%" height={14} />
             </div>
@@ -103,7 +108,7 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
         <div
           style={{
             textAlign: "right",
-            paddingRight: 36,
+            paddingRight: "var(--mkt-card-price-padding-right, 36px)",
             flexShrink: 0,
             display: "flex",
             flexDirection: "column",
@@ -116,7 +121,7 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
         </div>
       </div>
 
-      <div className="api-marketplace-card-tags" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+      <div className="api-marketplace-card-tags" style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", flexWrap: "wrap", marginTop: 4 }}>
         <Skeleton tone="stellar" width={45} height={24} borderRadius={8} />
         <Skeleton tone="stellar" width={55} height={24} borderRadius={8} />
         <Skeleton tone="stellar" width={40} height={24} borderRadius={8} />
@@ -130,14 +135,15 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
         </div>
       )}
 
-      {/* Sparkline section placeholder */}
+      {/* Sparkline section placeholder — matches final card's marginTop, gap, and flexWrap */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 12,
-          marginTop: 2,
+          gap: "var(--mkt-space-lg, 12px)",
+          flexWrap: "wrap",
+          marginTop: "var(--mkt-space-md, 16px)",
         }}
       >
         <Skeleton tone="stellar" width={52} height={12} />
@@ -167,7 +173,7 @@ export function ApiCardSkeleton({ density = "comfortable" }: { density?: "comfor
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            gap: 12,
+            gap: "var(--mkt-space-lg, 12px)",
             flexWrap: "wrap",
           }}
         >
