@@ -40,7 +40,7 @@ export default function Header({ breadcrumbItems }: HeaderProps) {
       </div>
 
       <div className="topbar-actions">
-        <Breadcrumb items={breadcrumbItems} middleEllipsis={true} />
+        <Breadcrumb items={breadcrumbItems} middleEllipsis={true} maxLabelLength={28} />
       </div>
     </header>
   );

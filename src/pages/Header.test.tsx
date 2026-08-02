@@ -224,4 +224,84 @@ describe("Header – GrantFox FWC26", () => {
     const ellipsis = container.querySelector(".breadcrumb-ellipsis");
     expect(ellipsis).not.toBeNull();
   });
+
+  // ── maxLabelLength truncation tests ─────────────────────────────────────
+  //
+  // The Header passes maxLabelLength={28} to Breadcrumb, so long first and
+  // last crumb labels are truncated with a middle-ellipsis.  These tests
+  // verify that the truncation is visible and that the full label is
+  // preserved in `title` / `aria-label`.
+
+  it("truncates the first crumb label when it exceeds maxLabelLength", () => {
+    const longItems: BreadcrumbItem[] = [
+      {
+        label: "A Very Long Root Segment Name That Keeps Going",
+        href: "/very-long-root-segment",
+      },
+      {
+        label: "Short",
+        href: "/very-long-root-segment/short",
+        isCurrent: true,
+      },
+    ];
+
+    render(<Header breadcrumbItems={longItems} />);
+
+    const link = screen.getByRole("link", {
+      name: "A Very Long Root Segment Name That Keeps Going",
+    });
+    // Visual text should be truncated (contain …)
+    expect(link.textContent).toContain("\u2026");
+    // Full label preserved in title and aria-label
+    expect(link.getAttribute("title")).toBe(
+      "A Very Long Root Segment Name That Keeps Going",
+    );
+    expect(link.getAttribute("aria-label")).toBe(
+      "A Very Long Root Segment Name That Keeps Going",
+    );
+  });
+
+  it("truncates the current-page crumb label when it exceeds maxLabelLength", () => {
+    const longItems: BreadcrumbItem[] = [
+      {
+        label: "Home",
+        href: "/",
+      },
+      {
+        label: "A Very Long Current Page Title Indeed That Should Be Truncated",
+        href: "/long",
+        isCurrent: true,
+      },
+    ];
+
+    render(<Header breadcrumbItems={longItems} />);
+
+    const current = document.querySelector<HTMLSpanElement>(
+      '[aria-current="page"]',
+    );
+    expect(current).not.toBeNull();
+    // Visual text should be truncated
+    expect(current?.textContent).toContain("\u2026");
+    // Full label preserved in title and aria-label
+    expect(current?.getAttribute("title")).toBe(
+      "A Very Long Current Page Title Indeed That Should Be Truncated",
+    );
+    expect(current?.getAttribute("aria-label")).toBe(
+      "A Very Long Current Page Title Indeed That Should Be Truncated",
+    );
+  });
+
+  it("does not truncate short crumb labels", () => {
+    const shortItems: BreadcrumbItem[] = [
+      { label: "Home", href: "/" },
+      { label: "Settings", href: "/settings", isCurrent: true },
+    ];
+
+    render(<Header breadcrumbItems={shortItems} />);
+
+    const link = screen.getByRole("link", { name: "Home" });
+    expect(link.textContent).toBe("Home");
+    // No aria-label override when not truncated
+    expect(link.getAttribute("aria-label")).toBeNull();
+  });
 });
