@@ -654,7 +654,6 @@ export default function EmptyState({
 }: EmptyStateProps) {
   const resolvedMessage = message ?? description;
   const resolvedAction = action;
-  const { copy: handleCopy, copied } = useCopy();
 
   if (loading) {
     return (
@@ -842,49 +841,16 @@ export default function EmptyState({
         {finalTitle}
       </HeadingTag>
 
-      <MessageWithCopy message={finalMessage} isCompact={isCompact} />
-
-      {copyable && finalMessage && (
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => handleCopy(finalMessage)}
-            aria-label="Copy message to clipboard"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.375rem",
-              fontSize: isCompact ? "0.75rem" : "0.8125rem",
-              padding: isCompact ? "0.25rem 0.5rem" : "0.3125rem 0.75rem",
-              color: copied ? "var(--success, #10b981)" : "var(--muted)",
-              minHeight: "36px",
-            }}
-          >
-            <span aria-hidden="true">
-              {copied ? "✓" : "⧉"}
-            </span>
-            {copied ? "Copied" : "Copy"}
-          </button>
-          <span
-            aria-live="polite"
-            aria-atomic="true"
-            style={{
-              position: "absolute",
-              width: "1px",
-              height: "1px",
-              margin: "-1px",
-              padding: 0,
-              overflow: "hidden",
-              clip: "rect(0 0 0 0)",
-              whiteSpace: "nowrap",
-              border: 0,
-            }}
-          >
-            {copied ? "Message copied to clipboard" : ""}
-          </span>
-        </div>
-      )}
+      {copyable && finalMessage ? (
+        <MessageWithCopy message={finalMessage} isCompact={isCompact} />
+      ) : finalMessage ? (
+        <p
+          style={messageStyle}
+          data-testid="empty-state-message"
+        >
+          {finalMessage}
+        </p>
+      ) : null}
 
       {resolvedAction && (
         <button

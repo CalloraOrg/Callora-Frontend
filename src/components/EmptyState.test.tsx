@@ -193,7 +193,7 @@ describe("EmptyState", () => {
     });
   });
 
-  describe("copy-to-clipboard affordance (Issue #733)", () => {
+  describe("copy-to-clipboard affordance (Issue #733 / #950)", () => {
     const originalClipboard = navigator.clipboard;
 
     beforeEach(() => {
@@ -208,8 +208,14 @@ describe("EmptyState", () => {
       Object.assign(navigator, { clipboard: originalClipboard });
     });
 
-    it("renders a copy button next to the message when clipboard is supported", () => {
+    it("renders message without copy button when copyable is false (default)", () => {
       render(<EmptyState variant="error" message="Something went wrong" />);
+      expect(screen.queryByTestId("empty-state-copy-button")).toBeNull();
+      expect(screen.getByTestId("empty-state-message")).toBeTruthy();
+    });
+
+    it("renders a copy button when copyable is true and clipboard is supported", () => {
+      render(<EmptyState variant="error" message="Something went wrong" copyable />);
       const copyBtn = screen.getByTestId("empty-state-copy-button");
       expect(copyBtn).toBeTruthy();
       expect(copyBtn.textContent).toBe("Copy");
@@ -219,7 +225,7 @@ describe("EmptyState", () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, { clipboard: { writeText } });
 
-      render(<EmptyState variant="error" message="Error details to copy" />);
+      render(<EmptyState variant="error" message="Error details to copy" copyable />);
       const copyBtn = screen.getByTestId("empty-state-copy-button");
       fireEvent.click(copyBtn);
 
@@ -233,7 +239,7 @@ describe("EmptyState", () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, { clipboard: { writeText } });
 
-      render(<EmptyState variant="error" message="test message" />);
+      render(<EmptyState variant="error" message="test message" copyable />);
       const copyBtn = screen.getByTestId("empty-state-copy-button");
       fireEvent.click(copyBtn);
 
@@ -243,14 +249,14 @@ describe("EmptyState", () => {
     });
 
     it("has an accessible aria-label on the copy button", () => {
-      render(<EmptyState variant="filtered" message="Copy this text" />);
+      render(<EmptyState variant="filtered" message="Copy this text" copyable />);
       const copyBtn = screen.getByTestId("empty-state-copy-button");
       expect(copyBtn.getAttribute("aria-label")).toBe('Copy "Copy this text"');
     });
 
     it("does not render copy button when clipboard API is unsupported", () => {
       Object.assign(navigator, { clipboard: undefined });
-      render(<EmptyState variant="error" message="Unsupported" />);
+      render(<EmptyState variant="error" message="Unsupported" copyable />);
       expect(screen.queryByTestId("empty-state-copy-button")).toBeNull();
     });
 
@@ -260,6 +266,7 @@ describe("EmptyState", () => {
           variant="filtered"
           size="compact"
           message="Compact copy"
+          copyable
         />,
       );
       const copyBtn = screen.getByTestId("empty-state-copy-button");
@@ -271,7 +278,7 @@ describe("EmptyState", () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, { clipboard: { writeText } });
 
-      render(<EmptyState variant="error" message="Announce this" />);
+      render(<EmptyState variant="error" message="Announce this" copyable />);
       const copyBtn = screen.getByTestId("empty-state-copy-button");
       fireEvent.click(copyBtn);
 
@@ -531,17 +538,17 @@ describe("EmptyState", () => {
 
     it("renders copy button when copyable is true and message is present", () => {
       render(<EmptyState copyable message="Copy this text" />);
-      expect(screen.getByLabelText("Copy message to clipboard")).toBeTruthy();
+      expect(screen.getByTestId("empty-state-copy-button")).toBeTruthy();
     });
 
     it("does not render copy button when copyable is false (default)", () => {
       render(<EmptyState message="No copy here" />);
-      expect(screen.queryByLabelText("Copy message to clipboard")).toBeNull();
+      expect(screen.queryByTestId("empty-state-copy-button")).toBeNull();
     });
 
     it("copies the message text to clipboard on click", async () => {
       render(<EmptyState copyable message="Test message" />);
-      const btn = screen.getByLabelText("Copy message to clipboard");
+      const btn = screen.getByTestId("empty-state-copy-button");
       await act(async () => {
         fireEvent.click(btn);
       });
@@ -550,7 +557,7 @@ describe("EmptyState", () => {
 
     it("shows 'Copied' feedback after clicking", async () => {
       render(<EmptyState copyable message="Some text" />);
-      const btn = screen.getByLabelText("Copy message to clipboard");
+      const btn = screen.getByTestId("empty-state-copy-button");
       await act(async () => {
         fireEvent.click(btn);
       });
@@ -559,18 +566,17 @@ describe("EmptyState", () => {
 
     it("announces copy success via aria-live region", async () => {
       render(<EmptyState copyable message="Announce this" />);
-      const btn = screen.getByLabelText("Copy message to clipboard");
+      const btn = screen.getByTestId("empty-state-copy-button");
       await act(async () => {
         fireEvent.click(btn);
       });
-      const liveRegion = screen.getByText("Message copied to clipboard");
-      expect(liveRegion).toBeTruthy();
-      expect(liveRegion.getAttribute("aria-live")).toBe("polite");
+      const liveRegion = screen.getByRole("status");
+      expect(liveRegion.textContent).toBe("Message copied.");
     });
 
     it("reverts 'Copied' feedback after 2 seconds", async () => {
       render(<EmptyState copyable message="Revert test" />);
-      const btn = screen.getByLabelText("Copy message to clipboard");
+      const btn = screen.getByTestId("empty-state-copy-button");
       await act(async () => {
         fireEvent.click(btn);
       });
@@ -591,7 +597,7 @@ describe("EmptyState", () => {
         />,
       );
       await act(async () => {
-        fireEvent.click(screen.getByLabelText("Copy message to clipboard"));
+        fireEvent.click(screen.getByTestId("empty-state-copy-button"));
       });
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Primary message");
     });
@@ -599,7 +605,7 @@ describe("EmptyState", () => {
     it("copies the default message when no custom message is provided", async () => {
       render(<EmptyState variant="empty" copyable />);
       await act(async () => {
-        fireEvent.click(screen.getByLabelText("Copy message to clipboard"));
+        fireEvent.click(screen.getByTestId("empty-state-copy-button"));
       });
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
         "Check back soon for new integrations.",
@@ -608,9 +614,9 @@ describe("EmptyState", () => {
 
     it("renders copy button with compact size styling", () => {
       render(<EmptyState copyable size="compact" message="Compact copy" />);
-      const btn = screen.getByLabelText("Copy message to clipboard");
+      const btn = screen.getByTestId("empty-state-copy-button");
       expect(btn).toBeTruthy();
-      expect(btn.style.fontSize).toBe("0.75rem");
+      expect(btn.style.fontSize).toBe("0.7rem");
     });
   });
 });
