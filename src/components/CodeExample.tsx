@@ -7,10 +7,10 @@ import { getDefaultCodeLanguage, setDefaultCodeLanguage } from "../state/userPre
  *
  * Layout overview
  * ───────────────
- * Desktop / tablet (>375 px):
+ * Desktop / tablet (>480 px):
  *   Header is a flex row: [tab strip (scrollable)] [copy button]
  *
- * Narrow mobile (≤375 px)  — Issue #684:
+ * Narrow mobile (≤480 px)  — Issue #941:
  *   Header stacks to a column layout with a smooth CSS transition:
  *   [tab strip full-width] [copy button right-aligned]
  *   Tap targets reach 44 × 44 px (WCAG 2.5.5).
@@ -154,13 +154,13 @@ export default function CodeExample({
   return (
     <div className="code-sample">
       {/*
-       * Header — flex row on ≥376 px, stacked column on ≤375 px.
+       * Header — flex row on ≥481 px, stacked column on ≤480 px.
        *
        * .no-print suppresses the header in print mode (copy button is
        *  useless on paper and the language tabs add visual noise).
        *
        * NOTE: No inline layout styles here. All layout is driven by
-       * code.css so that the @media (max-width: 375px) block can
+       * code.css so that the @media (max-width: 480px) block can
        * override everything without a specificity battle.
        */}
       <div className="no-print code-sample__header">
@@ -169,7 +169,7 @@ export default function CodeExample({
          *
          * `flex: 1 1 auto` + `min-width: 0` keeps it from pushing the
          * copy button off-screen when many languages are present.
-         * On ≤375 px the CSS makes it full-width and removes the
+         * On ≤480 px the CSS makes it full-width and removes the
          * flex-shrink constraint.
          */}
         <div
@@ -196,7 +196,7 @@ export default function CodeExample({
         </div>
 
         {/*
-         * Copy button — full-width on ≤375 px (set in CSS) to give a
+         * Copy button — full-width on ≤480 px (set in CSS) to give a
          * comfortable 44 × 44 px minimum tap target (WCAG 2.5.5).
          */}
         <button
@@ -218,7 +218,7 @@ export default function CodeExample({
        * Code panel — `overflow-x: auto` on the panel prevents long lines
        * from forcing the page to scroll horizontally on narrow viewports.
        * The pre inside uses `white-space: pre` on wider screens and
-       * `white-space: pre-wrap` on ≤375 px (set in CSS).
+       * `white-space: pre-wrap` on ≤480 px (set in CSS).
        */}
       <div
         role="tabpanel"

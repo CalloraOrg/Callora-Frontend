@@ -1,18 +1,17 @@
 /* ==========================================================================
    code.css — CodeExample component styles
-   Issue #684: Polish layout for narrow (mobile) viewports ≤375 px
+   Issue #941: Polish layout for narrow (mobile) viewports ≤480 px
 
    Breakpoint strategy
    ───────────────────
    No inline styles exist on the component; all layout lives here so
    @media overrides work without specificity battles.
 
-   ≥ 481 px   — Default (full) layout
-   376–480 px — Intermediate: slightly larger tap targets
-   ≤ 375 px   — Narrow mobile: stacked column header, 44 px tap targets,
+   ≥ 481 px   — Default (full) layout: row header, compact tap targets
+   ≤ 480 px   — Narrow mobile: stacked column header, 44 px tap targets,
                 horizontal-scroll panel, right-aligned copy button
 
-   The header flex-direction change at ≤375 px is animated via a smooth
+   The header flex-direction change at ≤480 px is animated via a smooth
    transition so the visual switch is not jarring when the user resizes.
    ========================================================================== */
 
@@ -202,28 +201,11 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   376 px – 480 px  (small / large phones, landscape)
-   Enlarge tap targets slightly without changing the header layout.
-   -------------------------------------------------------------------------- */
-@media (min-width: 376px) and (max-width: 480px) {
-  .code-sample__tab {
-    min-height: 40px;
-    padding: 8px 10px;
-    font-size: 11px;
-  }
-
-  .code-sample__copy {
-    min-height: 40px;
-    padding: 8px 12px;
-  }
-}
-
-/* --------------------------------------------------------------------------
-   ≤ 375 px  (narrow mobile — iPhone SE, Galaxy A series, etc.)
-   Issue #684: stack header column, full-width tab rail, 44 px tap targets,
+   ≤ 480 px  (narrow mobile — iPhone SE, iPhone 14, Pixel 7, Galaxy A series)
+   Issue #941: stacked column header, full-width tab rail, 44 px tap targets,
    right-aligned copy button.
    -------------------------------------------------------------------------- */
-@media (max-width: 375px) {
+@media (max-width: 480px) {
   /* Stack header into a vertical column. */
   .code-sample__header {
     flex-direction: column;

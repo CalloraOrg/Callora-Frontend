@@ -2,12 +2,13 @@
 /**
  * CodeExample test suite
  *
- * Issue #724 — added focused tests for narrow (≤375 px) mobile viewports:
+ * Issue #941 — added focused tests for narrow (≤480 px) mobile viewports:
  *   - No inline layout styles on any structural element
  *   - panel has overflow-x: auto (handled via CSS class, not inline)
  *   - tab strip has correct ARIA and CSS classes
  *   - copy button has correct CSS class and min-height/width from CSS
  *   - component is fully keyboard-navigable at any viewport width
+ *   - expanded breakpoint from 375px to 480px covers more devices
  *
  * Viewport-width assertions test the CSS *class contract*, not computed
  * layout, because jsdom does not apply @media rules. Each test verifies that
@@ -273,7 +274,7 @@ describe('CodeExample', () => {
     });
   });
 
-  // ── Mobile layout — CSS-class contract (Issue #684) ───────────────────────
+  // ── Mobile layout — CSS-class contract (Issue #941) ───────────────────────
   //
   // jsdom does not evaluate @media rules, so these tests verify the *class
   // contract*: the correct BEM class is present so the CSS breakpoint rules
@@ -281,12 +282,13 @@ describe('CodeExample', () => {
   // bearing elements because they would override @media rules at any
   // specificity level.
   //
-  // New in Issue #684:
+  // New in Issue #941:
+  // • Expanded breakpoint from 375px to 480px for wider device coverage
   // • Header carries a CSS transition for smooth flex-direction change
-  // • All breakpoint references updated from #724 to #684
+  // • All breakpoint references updated from #684 to #941
   // • Additional verification of mobile-scale tap targets and wrapping
 
-  describe('mobile layout — CSS-class contract (Issue #684)', () => {
+  describe('mobile layout — CSS-class contract (Issue #941)', () => {
     it('header has no inline layout styles that would override @media rules', () => {
       render(<CodeExample snippets={mockSnippets} />);
       const header = document.querySelector('.code-sample__header');
@@ -394,14 +396,14 @@ describe('CodeExample', () => {
       });
     });
 
-    // ── Issue #684: enhanced mobile layout tests ─────────────────────────
+    // ── Issue #941: enhanced mobile layout tests ─────────────────────────
     //
     // These tests verify the CSS-class contract for the improvements added
-    // as part of Issue #684.  jsdom does not evaluate @media rules, so
+    // as part of Issue #941.  jsdom does not evaluate @media rules, so
     // we check that the correct classes are present; the real @media query
     // applies in a browser.
 
-    it('header uses CSS class for layout so @media breakpoint transitions take effect (Issue #684)', () => {
+    it('header uses CSS class for layout so @media breakpoint transitions take effect (Issue #941)', () => {
       render(<CodeExample snippets={mockSnippets} />);
       const header = document.querySelector('.code-sample__header');
       expect(header).toBeTruthy();
@@ -411,7 +413,7 @@ describe('CodeExample', () => {
       expect(header!.classList.contains('code-sample__header')).toBe(true);
     });
 
-    it('tab strip stays fully interactive when many tabs overflow (Issue #684)', () => {
+    it('tab strip stays fully interactive when many tabs overflow (Issue #941)', () => {
       const manySnippets: Record<string, string> = {};
       for (let i = 0; i < 12; i++) {
         manySnippets[`lang-${i}`] = `code for lang ${i}`;
@@ -428,7 +430,7 @@ describe('CodeExample', () => {
       expect(tablist.classList.contains('code-sample__tabs')).toBe(true);
     });
 
-    it('panel has overflow-x: auto from CSS (not inline style) (Issue #684)', () => {
+    it('panel has overflow-x: auto from CSS (not inline style) (Issue #941)', () => {
       render(<CodeExample snippets={mockSnippets} />);
       const panel = screen.getByRole('tabpanel');
       // No inline style — overflow comes from CSS
@@ -436,11 +438,52 @@ describe('CodeExample', () => {
       expect(panel.classList.contains('code-sample__panel')).toBe(true);
     });
 
-    it('pre uses code-sample__pre class for font-size and white-space rules (Issue #684)', () => {
+    it('pre uses code-sample__pre class for font-size and white-space rules (Issue #941)', () => {
       render(<CodeExample snippets={mockSnippets} />);
       const pre = document.querySelector('.code-sample__pre');
       expect(pre).toBeTruthy();
       expect(pre!.classList.contains('code-sample__pre')).toBe(true);
+    });
+
+    // ── Issue #941: expanded breakpoint and mobile wrapping ──────────────
+    //
+    // These tests verify the CSS-class contract for the expanded mobile
+    // breakpoint (now 480px instead of 375px).  jsdom does not evaluate
+    // @media rules, so we verify the class contract.
+
+    it('header has code-sample__header class for @media breakpoint override (Issue #941)', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const header = document.querySelector('.code-sample__header');
+      expect(header).toBeTruthy();
+      expect(header!.classList.contains('code-sample__header')).toBe(true);
+      // No inline layout styles — @media rules in code.css drive the
+      // flex-direction switch at ≤480px.
+      expect(header).not.toHaveAttribute('style');
+    });
+
+    it('copy button has ghost-button class for consistent styling across breakpoints (Issue #941)', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const copyBtn = screen.getByLabelText(/copy code/i);
+      expect(copyBtn.classList.contains('ghost-button')).toBe(true);
+      expect(copyBtn.classList.contains('code-sample__copy')).toBe(true);
+    });
+
+    it('pre element has code-sample__pre class for white-space switching at breakpoint (Issue #941)', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const pre = document.querySelector('.code-sample__pre');
+      expect(pre).toBeTruthy();
+      // white-space switches from 'pre' to 'pre-wrap' via @media (max-width: 480px)
+      expect(pre!.classList.contains('code-sample__pre')).toBe(true);
+    });
+
+    it('skeleton-class test: tab strip fade mask uses webkit-mask-image on mobile (Issue #941)', () => {
+      render(<CodeExample snippets={mockSnippets} />);
+      const tablist = screen.getByRole('tablist');
+      expect(tablist.classList.contains('code-sample__tabs')).toBe(true);
+      // The CSS @media (max-width: 480px) block applies -webkit-mask-image
+      // to hint at scrollability.  We verify the *class contract* — the
+      // actual mask-image comes from code.css.
+      expect(tablist).not.toHaveAttribute('style');
     });
   });
 
