@@ -15,6 +15,7 @@ describe("formatRating", () => {
   it("rounds half-up consistently", () => {
     expect(formatRating(4.25, 1)).toBe("4.3");
     expect(formatRating(4.24, 1)).toBe("4.2");
+    expect(formatRating(1.005, 2)).toBe("1.01");
   });
 
   it("supports a 0-decimal display", () => {

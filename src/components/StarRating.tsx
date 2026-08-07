@@ -39,8 +39,10 @@ export type StarRatingProps = {
 export function formatRating(value: number, decimals = 1): string {
   const safe = Number.isFinite(value) ? value : 0;
   const clamped = Math.min(MAX_STARS, Math.max(0, safe));
-  // toFixed already rounds half-up for positive numbers and pads decimals.
-  return clamped.toFixed(Math.max(0, decimals));
+  const factor = Math.pow(10, decimals);
+  // Add a small epsilon to handle precision issues before rounding.
+  const rounded = Math.round((clamped + 1e-9) * factor) / factor;
+  return rounded.toFixed(Math.max(0, decimals));
 }
 
 export default function StarRating({
