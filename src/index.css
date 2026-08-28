@@ -7450,4 +7450,37 @@ code,
   }
 }
 
+/* ── Skeleton layout-stability on narrow screens (#1010) ───────────────
+   Mirror the real .api-marketplace-card responsive rules so that the
+   skeleton's height, grid columns, header layout, and visible sections
+   match the loaded card at every breakpoint.  This eliminates CLS when
+   the skeleton swaps to real content. */
+@media (max-width: 768px) {
+  .api-card-skeleton {
+    min-height: 0 !important;
+  }
 
+  /* Skeleton header matches real card grid: icon 48px + fluid body */
+  .api-card-skeleton .api-marketplace-card-header {
+    display: grid !important;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: flex-start !important;
+  }
+
+  /* Skeleton icon shrinks to match real 48×48 icon */
+  .api-card-skeleton .api-marketplace-card-header > .skeleton:first-child {
+    width: 48px !important;
+    height: 48px !important;
+    flex: 0 0 48px;
+  }
+
+  /* Hide skeleton price section (matches real card display:none) */
+  .api-card-skeleton .api-marketplace-card-price {
+    display: none !important;
+  }
+
+  /* Stats row adapts to full width */
+  .api-card-skeleton .api-card__stats {
+    gap: var(--mkt-space-xl);
+  }
+}
