@@ -1,12 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import Breadcrumb from "../components/Breadcrumb";
 import HelpPopover from "../components/HelpPopover";
-
-type LatencyPoint = {
-  label: string;
-  value: number;
-  timestamp: Date;
-};
+import { downsampleLatencyData, type LatencyPoint } from "../utils/downsample";
+import { useFetchTracker } from "../hooks/useFetchTracker";
+import { LOADING_DELAY_MS } from "../config/constants";
+import EmptyState from "../components/EmptyState";
 
 const MOCK_DATA: LatencyPoint[] = [
   { label: "00:00", value: 120, timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000) },
@@ -36,7 +34,16 @@ const MOCK_DATA: LatencyPoint[] = [
   { label: "Now", value: 120, timestamp: new Date() },
 ];
 
+function getMockDataForAccount(accountId: string): LatencyPoint[] {
+  if (accountId === "empty") return [];
+  if (accountId === "error") throw new Error("Simulated backend error");
+  
+  const multiplier = accountId === "acc-2" ? 1.5 : 1;
+  return MOCK_DATA.map(d => ({ ...d, value: Math.round(d.value * multiplier) }));
+}
+
 function computeStats(data: LatencyPoint[]) {
+  if (data.length === 0) return { min: 0, max: 0, avg: 0, p95: 0 };
   const values = data.map((d) => d.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -47,20 +54,89 @@ function computeStats(data: LatencyPoint[]) {
   return { min, max, avg, p95 };
 }
 
-export default function LatencyChart() {
-  const stats = useMemo(() => computeStats(MOCK_DATA), []);
-  const maxValue = useMemo(() => Math.max(...MOCK_DATA.map((d) => d.value)), []);
+export function useLatencyData(accountId: string) {
+  const [state, setState] = useState({
+    data: [] as LatencyPoint[],
+    isLoading: true,
+    isError: false,
+    isStale: false,
+  });
+  
+  const { trackFetch } = useFetchTracker();
+  const generationRef = useRef(0);
+  const [retryCounter, setRetryCounter] = useState(0);
+
+  const retry = useCallback(() => setRetryCounter(c => c + 1), []);
+
+  useEffect(() => {
+    generationRef.current += 1;
+    const currentGen = generationRef.current;
+    const abortController = new AbortController();
+
+    setState(prev => ({
+      ...prev,
+      isLoading: prev.data.length === 0,
+      isStale: prev.data.length > 0,
+      isError: false,
+    }));
+
+    trackFetch(
+      new Promise<LatencyPoint[]>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          if (!abortController.signal.aborted) {
+            try {
+              resolve(getMockDataForAccount(accountId));
+            } catch (err) {
+              reject(err);
+            }
+          } else {
+            resolve([]);
+          }
+        }, LOADING_DELAY_MS);
+
+        abortController.signal.addEventListener("abort", () => {
+          clearTimeout(timer);
+          resolve([]);
+        });
+      })
+    ).then((data) => {
+      // The GUARANTEED generation check
+      if (currentGen === generationRef.current) {
+        setState({
+          data, // Keep the raw data for stats calculations
+          isLoading: false,
+          isStale: false,
+          isError: false,
+        });
+      }
+    }).catch((err) => {
+      if (currentGen === generationRef.current) {
+        setState(prev => ({ ...prev, isLoading: false, isError: true, isStale: false }));
+      }
+    });
+
+    return () => abortController.abort();
+  }, [accountId, trackFetch, retryCounter]);
+
+  return { ...state, retry };
+}
+
+export default function LatencyChart({ accountId = "default" }: { accountId?: string }) {
+  const { data, isLoading, isError, isStale, retry } = useLatencyData(accountId);
+
+  // Compute stats on the RAW data, not the downsampled peaks, so Min/Avg remain accurate.
+  const stats = useMemo(() => computeStats(data), [data]);
+  
+  // Downsample visually for the bars chart
+  const visualData = useMemo(() => downsampleLatencyData(data, 12), [data]);
+  const maxValue = useMemo(() => visualData.length > 0 ? Math.max(...visualData.map((d) => d.value)) : 100, [visualData]);
 
   return (
     <div className="latency-chart-page">
       <Breadcrumb
         items={[
           { label: "Dashboard", href: "/dashboard" },
-          {
-            label: "Latency",
-            href: "/latency-chart",
-            isCurrent: true,
-          },
+          { label: "Latency", href: "/latency-chart", isCurrent: true },
         ]}
       />
 
@@ -71,22 +147,12 @@ export default function LatencyChart() {
             <HelpPopover
               content={
                 <span>
-                  <strong style={{ display: "block", marginBottom: "0.25rem" }}>
-                    P95 Latency
-                  </strong>
+                  <strong style={{ display: "block", marginBottom: "0.25rem" }}>P95 Latency</strong>
                   <span style={{ display: "block" }}>
-                    The 95th percentile response time. 95% of requests complete
-                    faster than this value; the remaining 5% are slower.
+                    The 95th percentile response time. 95% of requests complete faster than this value; the remaining 5% are slower.
                   </span>
-                  <span
-                    style={{
-                      display: "block",
-                      marginTop: "0.25rem",
-                      opacity: 0.85,
-                    }}
-                  >
-                    Lower is better — aim for under 200 ms for a smooth
-                    experience.
+                  <span style={{ display: "block", marginTop: "0.25rem", opacity: 0.85 }}>
+                    Lower is better — aim for under 200 ms for a smooth experience.
                   </span>
                 </span>
               }
@@ -96,61 +162,68 @@ export default function LatencyChart() {
           <span className="latency-chart-subtitle">Last 24 hours</span>
         </div>
 
-        <div className="latency-stats-grid">
-          <div className="latency-stat-card">
-            <span className="latency-stat-label">Min</span>
-            <strong className="latency-stat-value tabular-nums">
-              {stats.min} ms
-            </strong>
-          </div>
-          <div className="latency-stat-card">
-            <span className="latency-stat-label">Avg</span>
-            <strong className="latency-stat-value tabular-nums">
-              {stats.avg} ms
-            </strong>
-          </div>
-          <div className="latency-stat-card">
-            <span className="latency-stat-label">P95</span>
-            <strong className="latency-stat-value tabular-nums">
-              {stats.p95} ms
-            </strong>
-          </div>
-          <div className="latency-stat-card">
-            <span className="latency-stat-label">Max</span>
-            <strong className="latency-stat-value tabular-nums">
-              {stats.max} ms
-            </strong>
-          </div>
-        </div>
+        {isError ? (
+          <EmptyState
+            variant="error"
+            title="Failed to load latency data"
+            message="There was an error loading the latency chart. Please try again."
+            onRetry={retry}
+          />
+        ) : isLoading ? (
+          <div className="latency-chart-skeleton" aria-live="polite" aria-busy="true">Loading latency data...</div>
+        ) : data.length === 0 ? (
+          <EmptyState
+            variant="empty"
+            title="No Data"
+            message="There is no latency data available for this account."
+          />
+        ) : (
+          <>
+            <div className={`latency-stats-grid ${isStale ? "latency-chart-stale" : ""}`} style={{ opacity: isStale ? 0.6 : 1 }}>
+              <div className="latency-stat-card">
+                <span className="latency-stat-label">Min</span>
+                <strong className="latency-stat-value tabular-nums">{stats.min} ms</strong>
+              </div>
+              <div className="latency-stat-card">
+                <span className="latency-stat-label">Avg</span>
+                <strong className="latency-stat-value tabular-nums">{stats.avg} ms</strong>
+              </div>
+              <div className="latency-stat-card">
+                <span className="latency-stat-label">P95</span>
+                <strong className="latency-stat-value tabular-nums">{stats.p95} ms</strong>
+              </div>
+              <div className="latency-stat-card">
+                <span className="latency-stat-label">Max</span>
+                <strong className="latency-stat-value tabular-nums">{stats.max} ms</strong>
+              </div>
+            </div>
 
-        <div className="latency-chart-container" role="img" aria-label="Latency bar chart showing response times over the last 24 hours">
-          <div className="latency-chart-bars">
-            {MOCK_DATA.map((point, idx) => {
-              const heightPct = (point.value / maxValue) * 100;
-              const isHighest = point.value === maxValue;
-              return (
-                <div
-                  key={idx}
-                  className={`latency-chart-bar-wrapper`}
-                  style={{ flex: 1 }}
-                >
-                  <div
-                    className={`latency-chart-bar${isHighest ? " latency-chart-bar--peak" : ""}`}
-                    style={{ height: `${heightPct}%` }}
-                    title={`${point.label}: ${point.value} ms`}
-                    role="img"
-                    aria-label={`${point.label}: ${point.value} ms`}
-                  />
-                  <span className="latency-chart-bar-label">{point.label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+            <div className={`latency-chart-container ${isStale ? "latency-chart-stale" : ""}`} style={{ opacity: isStale ? 0.6 : 1 }} role="img" aria-label="Latency bar chart showing response times over the last 24 hours">
+              {isStale && <div className="sr-only" aria-live="polite">Updating chart data...</div>}
+              <div className="latency-chart-bars">
+                {visualData.map((point, idx) => {
+                  const heightPct = (point.value / maxValue) * 100;
+                  const isHighest = point.value === maxValue;
+                  return (
+                    <div key={idx} className={`latency-chart-bar-wrapper`} style={{ flex: 1 }}>
+                      <div
+                        className={`latency-chart-bar${isHighest ? " latency-chart-bar--peak" : ""}`}
+                        style={{ height: `${heightPct}%` }}
+                        title={`${point.label}: ${point.value} ms`}
+                        role="img"
+                        aria-label={`${point.label}: ${point.value} ms`}
+                      />
+                      <span className="latency-chart-bar-label">{point.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
 
         <p className="latency-chart-caption">
-          Bars represent sampled response times. The tallest bar marks the
-          highest observed latency in the window.
+          Bars represent sampled response times. The tallest bar marks the highest observed latency in the window.
         </p>
       </div>
     </div>
