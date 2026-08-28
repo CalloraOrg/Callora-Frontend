@@ -8,7 +8,7 @@ import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
-import { formatPrice } from "../utils/format";
+import { formatPrice, formatEstimatedCost, formatCount, formatDateShort } from "../utils/format";
 import { Icons } from "../utils/icons";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
@@ -543,7 +543,7 @@ print(response.json())`;
 
   const allSnippets = { bash: curlExample, javascript: jsExample, python: pyExample };
 
-  const estimatedCost = (n: number) => `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
+  const estimatedCost = (n: number) => formatEstimatedCost(n * (api.pricePerRequest ?? 0));
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -656,7 +656,7 @@ print(response.json())`;
                       {[
                         {
                           label: "Total Requests",
-                          value: (api.stats?.totalCalls ?? 0).toLocaleString(),
+                          value: formatCount(api.stats?.totalCalls ?? 0),
                           color: "var(--text)",
                         },
                         {
@@ -853,7 +853,7 @@ print(response.json())`;
                       <div style={{ marginTop: "var(--mkt-space-5xl)" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--mkt-space-lg)" }}>
                           <span style={{ fontWeight: 600 }}>Monthly Volume</span>
-                          <span className="tabular-nums" style={{ color: "var(--accent)", fontWeight: 700 }}>{requests.toLocaleString()} Requests</span>
+                          <span className="tabular-nums" style={{ color: "var(--accent)", fontWeight: 700 }}>{formatCount(requests)} Requests</span>
                         </div>
                         <input
                           type="range"
@@ -864,7 +864,7 @@ print(response.json())`;
                           onChange={(e) => {
                             const val = Number(e.target.value);
                             setRequests(val);
-                            setAnnouncement(`Estimated monthly total: ${estimatedCost(val)} for ${val.toLocaleString()} requests`);
+                            setAnnouncement(`Estimated monthly total: ${estimatedCost(val)} for ${formatCount(val)} requests`);
                           }}
                           style={{ width: "100%", height: 6, borderRadius: 3, appearance: "none", background: "var(--line)" }}
                         />
@@ -1027,7 +1027,7 @@ print(response.json())`;
                                     ))}
                                   </span>
                                   <span style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)", whiteSpace: "nowrap" }}>
-                                    {new Date(review.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                                    {formatDateShort(review.date)}
                                   </span>
                                 </div>
                               </div>
