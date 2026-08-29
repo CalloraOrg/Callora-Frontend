@@ -143,7 +143,7 @@ export default function ApiUsage() {
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>(
-    'all',
+    'all'
   );
   const [callHistory, setCallHistory] =
     useState<CallRecord[]>(MOCK_CALL_HISTORY);
@@ -280,7 +280,7 @@ export default function ApiUsage() {
 
         setIsLoading(false);
       },
-      1000 + Math.random() * 2000,
+      1000 + Math.random() * 2000
     );
   };
 
@@ -317,7 +317,7 @@ export default function ApiUsage() {
         'Timestamp,Endpoint,Status,Response Time,Cost',
         ...data.map(
           (call) =>
-            `${call.timestamp},${call.endpoint},${call.status},${call.responseTime},${call.cost}`,
+            `${call.timestamp},${call.endpoint},${call.status},${call.responseTime},${call.cost}`
         ),
       ].join('\n');
 
@@ -331,29 +331,29 @@ export default function ApiUsage() {
   };
 
   return (
-    <div className='api-usage-page'>
+    <div className="api-usage-page">
       {/* Header Section */}
-      <div className='api-header'>
-        <div className='api-header-info'>
-          <div className='api-logo'>
-            <div className='logo-placeholder'>API</div>
+      <div className="api-header">
+        <div className="api-header-info">
+          <div className="api-logo">
+            <div className="logo-placeholder">API</div>
           </div>
           <div>
             <h1>User Profile API</h1>
-            <p className='api-description'>
+            <p className="api-description">
               Manage user profiles and authentication
             </p>
           </div>
         </div>
-        <div className='api-header-actions'>
+        <div className="api-header-actions">
           <button
-            className='secondary-button'
+            className="secondary-button"
             onClick={() => window.history.back()}
           >
             ← Back to API Details
           </button>
-          <div className='status-indicator active'>
-            <span className='status-dot'></span>
+          <div className="status-indicator active">
+            <span className="status-dot"></span>
             API is Active
           </div>
         </div>
@@ -373,37 +373,37 @@ export default function ApiUsage() {
       )}
 
       {/* API Key Section */}
-      <div className='surface api-key-section'>
+      <div className="surface api-key-section">
         <h2>API Key</h2>
-        <div className='api-key-card'>
-          <div className='api-key-display'>
-            <div className='key-input-group'>
+        <div className="api-key-card">
+          <div className="api-key-display">
+            <div className="key-input-group">
               <input
                 type={isApiKeyVisible ? 'text' : 'password'}
                 value={apiKey}
                 readOnly
-                className='api-key-input'
+                className="api-key-input"
               />
               <button
-                className='ghost-button'
+                className="ghost-button"
                 onClick={() => setIsApiKeyVisible(!isApiKeyVisible)}
               >
                 {isApiKeyVisible ? 'Hide' : 'Show'}
               </button>
             </div>
-            <div className='key-actions'>
-              <button className='secondary-button' onClick={handleCopyApiKey}>
+            <div className="key-actions">
+              <button className="secondary-button" onClick={handleCopyApiKey}>
                 {copied ? 'Copied!' : 'Copy'}
               </button>
               <button
-                className='danger-button'
+                className="danger-button"
                 onClick={handleRegenerateApiKey}
               >
                 Regenerate
               </button>
             </div>
           </div>
-          <p className='usage-instruction'>
+          <p className="usage-instruction">
             Include this key in your requests as a Bearer token in the
             Authorization header.
           </p>
@@ -411,20 +411,20 @@ export default function ApiUsage() {
       </div>
 
       {/* Test API Call Section */}
-      <div className='surface test-call-section'>
+      <div className="surface test-call-section">
         <h2>Test API Call</h2>
-        <div className='test-call-form'>
-          <div className='form-row'>
+        <div className="test-call-form">
+          <div className="form-row">
             <label>Endpoint</label>
             <select
               value={selectedEndpoint.id}
               onChange={(e) => {
                 const endpoint = MOCK_ENDPOINTS.find(
-                  (ep) => ep.id === e.target.value,
+                  (ep) => ep.id === e.target.value
                 );
                 if (endpoint) setSelectedEndpoint(endpoint);
               }}
-              className='endpoint-select'
+              className="endpoint-select"
             >
               {MOCK_ENDPOINTS.map((endpoint) => (
                 <option key={endpoint.id} value={endpoint.id}>
@@ -434,30 +434,30 @@ export default function ApiUsage() {
             </select>
           </div>
 
-          <div className='form-row'>
+          <div className="form-row">
             <label>Parameters (JSON)</label>
             <textarea
               value={requestParams}
               onChange={(e) => setRequestParams(e.target.value)}
-              placeholder='{'key': 'value'}'
-              className='params-textarea'
+              placeholder={`{'key': 'value'}`}
+              className="params-textarea"
               rows={4}
             />
           </div>
 
           <div
-            className='form-row'
+            className="form-row"
             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
             <input
-              type='checkbox'
-              id='simulate-rate-limit'
+              type="checkbox"
+              id="simulate-rate-limit"
               checked={shouldSimulateRateLimit}
               onChange={(e) => setShouldSimulateRateLimit(e.target.checked)}
               style={{ cursor: 'pointer' }}
             />
             <label
-              htmlFor='simulate-rate-limit'
+              htmlFor="simulate-rate-limit"
               style={{ cursor: 'pointer', margin: 0 }}
             >
               Simulate Rate Limit (429 response)
@@ -486,7 +486,7 @@ export default function ApiUsage() {
             disabled={isLoading}
           >
             {isLoading && (
-              <span className='button-spinner' aria-hidden='true' />
+              <span className="button-spinner" aria-hidden="true" />
             )}
             {isLoading ? 'Making Call...' : 'Make Test Call'}
           </button>
@@ -494,36 +494,36 @@ export default function ApiUsage() {
 
         {(apiResponse || isLoading) && (
           <div
-            className='response-display'
-            aria-live='polite'
+            className="response-display"
+            aria-live="polite"
             aria-busy={isLoading}
           >
             <h3>Response</h3>
             {isLoading ? (
-              <div className='response-content'>
-                <div className='response-meta'>
-                  <Skeleton width='120px' height='18px' borderRadius='4px' />
-                  <Skeleton width='100px' height='18px' borderRadius='4px' />
+              <div className="response-content">
+                <div className="response-meta">
+                  <Skeleton width="120px" height="18px" borderRadius="4px" />
+                  <Skeleton width="100px" height="18px" borderRadius="4px" />
                 </div>
-                <div className='response-json-skeleton'>
-                  <Skeleton width='60%' height='16px' borderRadius='4px' />
-                  <Skeleton width='80%' height='16px' borderRadius='4px' />
-                  <Skeleton width='45%' height='16px' borderRadius='4px' />
-                  <Skeleton width='70%' height='16px' borderRadius='4px' />
-                  <Skeleton width='30%' height='16px' borderRadius='4px' />
+                <div className="response-json-skeleton">
+                  <Skeleton width="60%" height="16px" borderRadius="4px" />
+                  <Skeleton width="80%" height="16px" borderRadius="4px" />
+                  <Skeleton width="45%" height="16px" borderRadius="4px" />
+                  <Skeleton width="70%" height="16px" borderRadius="4px" />
+                  <Skeleton width="30%" height="16px" borderRadius="4px" />
                 </div>
               </div>
             ) : (
-              <div className='response-content'>
-                <div className='response-meta'>
-                  <span className='response-time'>
+              <div className="response-content">
+                <div className="response-meta">
+                  <span className="response-time">
                     Response time: {formatTime(responseTime || 0)}
                   </span>
-                  <span className='response-cost'>
+                  <span className="response-cost">
                     Cost: {formatPrice(callCost || 0)} USDC
                   </span>
                 </div>
-                <pre className='response-json'>
+                <pre className="response-json">
                   {JSON.stringify(apiResponse, null, 2)}
                 </pre>
               </div>
@@ -533,49 +533,49 @@ export default function ApiUsage() {
       </div>
 
       {/* Usage Statistics */}
-      <div className='surface usage-stats-section'>
+      <div className="surface usage-stats-section">
         <h2>Usage Statistics</h2>
-        <div className='stats-grid'>
-          <div className='stat-card'>
-            <span className='stat-label'>Calls Today</span>
-            <strong className='stat-value'>{usageStats.callsToday}</strong>
+        <div className="stats-grid">
+          <div className="stat-card">
+            <span className="stat-label">Calls Today</span>
+            <strong className="stat-value">{usageStats.callsToday}</strong>
           </div>
-          <div className='stat-card'>
-            <span className='stat-label'>Calls This Week</span>
-            <strong className='stat-value'>{usageStats.callsWeek}</strong>
+          <div className="stat-card">
+            <span className="stat-label">Calls This Week</span>
+            <strong className="stat-value">{usageStats.callsWeek}</strong>
           </div>
-          <div className='stat-card'>
-            <span className='stat-label'>Total Spent</span>
-            <strong className='stat-value'>
+          <div className="stat-card">
+            <span className="stat-label">Total Spent</span>
+            <strong className="stat-value">
               {formatPrice(usageStats.totalSpent)} USDC
             </strong>
           </div>
-          <div className='stat-card'>
-            <span className='stat-label'>Avg Response Time</span>
-            <strong className='stat-value'>
+          <div className="stat-card">
+            <span className="stat-label">Avg Response Time</span>
+            <strong className="stat-value">
               {formatTime(usageStats.avgResponseTime)}
             </strong>
           </div>
-          <div className='stat-card'>
-            <span className='stat-label'>Success Rate</span>
-            <strong className='stat-value'>{usageStats.successRate}%</strong>
+          <div className="stat-card">
+            <span className="stat-label">Success Rate</span>
+            <strong className="stat-value">{usageStats.successRate}%</strong>
           </div>
         </div>
 
-        <div className='mini-chart'>
+        <div className="mini-chart">
           <h3>Calls Over Time</h3>
-          <div className='chart-placeholder'>
+          <div className="chart-placeholder">
             {/* Simple bar chart visualization */}
-            <div className='chart-bars'>
+            <div className="chart-bars">
               {[65, 59, 80, 81, 56, 55, 47].map((height, i) => (
                 <div
                   key={i}
-                  className='chart-bar'
+                  className="chart-bar"
                   style={{ height: `${height}%` }}
                 ></div>
               ))}
             </div>
-            <div className='chart-labels'>
+            <div className="chart-labels">
               <span>Mon</span>
               <span>Tue</span>
               <span>Wed</span>
@@ -589,30 +589,30 @@ export default function ApiUsage() {
       </div>
 
       {/* Call History */}
-      <div className='surface call-history-section'>
-        <div className='section-header'>
+      <div className="surface call-history-section">
+        <div className="section-header">
           <h2>Call History</h2>
-          <div className='history-actions'>
+          <div className="history-actions">
             <select
-              className='filter-select'
-              aria-label='Call status filter'
+              className="filter-select"
+              aria-label="Call status filter"
               value={statusFilter}
               onChange={(e) =>
                 setStatusFilter(e.target.value as 'all' | 'success' | 'error')
               }
             >
-              <option value='all'>All Status</option>
-              <option value='success'>Success</option>
-              <option value='error'>Error</option>
+              <option value="all">All Status</option>
+              <option value="success">Success</option>
+              <option value="error">Error</option>
             </select>
             <button
-              className='secondary-button'
+              className="secondary-button"
               onClick={() => handleExportHistory('csv')}
             >
               Export CSV
             </button>
             <button
-              className='secondary-button'
+              className="secondary-button"
               onClick={() => handleExportHistory('json')}
             >
               Export JSON
@@ -620,8 +620,8 @@ export default function ApiUsage() {
           </div>
         </div>
 
-        <div className='call-history-table'>
-          <div className='table-header'>
+        <div className="call-history-table">
+          <div className="table-header">
             <span>Timestamp</span>
             <span>Endpoint</span>
             <span>Status</span>
@@ -631,12 +631,12 @@ export default function ApiUsage() {
           </div>
 
           {filteredCallHistory.length === 0 ? (
-            <EmptyState message='No call records match the selected filter.' />
+            <EmptyState message="No call records match the selected filter." />
           ) : (
             filteredCallHistory.map((call) => (
-              <div key={call.id} className='table-row'>
+              <div key={call.id} className="table-row">
                 <span>{formatTimestamp(call.timestamp)}</span>
-                <span className='endpoint-cell'>{call.endpoint}</span>
+                <span className="endpoint-cell">{call.endpoint}</span>
                 <span className={`status-cell ${call.status}`}>
                   {call.status === 'success' ? '✓' : '✗'} {call.status}
                 </span>
@@ -644,7 +644,7 @@ export default function ApiUsage() {
                 <span>{formatPrice(call.cost)} USDC</span>
                 <span>
                   <button
-                    className='ghost-button'
+                    className="ghost-button"
                     onClick={() =>
                       setExpandedCall(expandedCall === call.id ? null : call.id)
                     }
@@ -654,12 +654,12 @@ export default function ApiUsage() {
                 </span>
 
                 {expandedCall === call.id && (
-                  <div className='expanded-details'>
-                    <div className='detail-section'>
+                  <div className="expanded-details">
+                    <div className="detail-section">
                       <h4>Request</h4>
                       <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
                     </div>
-                    <div className='detail-section'>
+                    <div className="detail-section">
                       <h4>Response</h4>
                       <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
                     </div>
@@ -672,10 +672,10 @@ export default function ApiUsage() {
       </div>
 
       {/* Integration Guide */}
-      <div className='surface integration-guide-section'>
+      <div className="surface integration-guide-section">
         <h2>Integration Guide</h2>
 
-        <div className='language-tabs'>
+        <div className="language-tabs">
           {(['javascript', 'python', 'curl'] as const).map((lang) => (
             <button
               key={lang}
@@ -687,27 +687,27 @@ export default function ApiUsage() {
           ))}
         </div>
 
-        <div className='code-example'>
-          <div className='code-header'>
+        <div className="code-example">
+          <div className="code-header">
             <h3>
               {selectedLanguage.charAt(0).toUpperCase() +
                 selectedLanguage.slice(1)}{' '}
               Example
             </h3>
             <button
-              className='secondary-button'
+              className="secondary-button"
               onClick={() => handleCopyCode(CODE_EXAMPLES[selectedLanguage])}
             >
               {copied ? 'Copied!' : 'Copy Code'}
             </button>
           </div>
-          <pre className='code-block'>
+          <pre className="code-block">
             <code>{CODE_EXAMPLES[selectedLanguage]}</code>
           </pre>
         </div>
 
-        <div className='documentation-link'>
-          <a href='#' className='primary-button'>
+        <div className="documentation-link">
+          <a href="#" className="primary-button">
             View Full Documentation →
           </a>
         </div>
