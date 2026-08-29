@@ -1,78 +1,45 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Icons } from "../utils/icons";
+import { getDefaultCodeLanguage, setDefaultCodeLanguage } from "../state/userPrefs";
 
 /**
- * UPDATED COMPONENT FOR ISSUE #59:
- * - Features tabbed navigation for multiple code snippets.
- * - Integrated copy-to-clipboard with visual feedback toast.
- * - Accessible roles (tablist, tab) for keyboard users.
- * - Minimalist design that respects CSS variables.
- * - Persists last-used language under localStorage key `callora.prefs.codeLang`.
+ * CodeExample component with tabbed navigation for multiple code snippets.
+ *
+ * Layout overview
+ * ───────────────
+ * Desktop / tablet (>375 px):
+ *   Header is a flex row: [tab strip (scrollable)] [copy button]
+ *
+ * Narrow mobile (≤375 px)  — Issue #684:
+ *   Header stacks to a column layout with a smooth CSS transition:
+ *   [tab strip full-width] [copy button right-aligned]
+ *   Tap targets reach 44 × 44 px (WCAG 2.5.5).
+ *   Code panel scrolls horizontally so long lines never overflow the page.
+ *   Tabs hint at scrollability via a right-edge fade mask.
+ *
+ * All layout, spacing, and breakpoint rules live in src/styles/code.css.
+ * The component itself carries **no inline layout styles** so that @media
+ * breakpoints in CSS can override them without specificity fights.
+ *
+ * Features
+ * ────────
+ * - Tabbed navigation for multiple languages with roving tabindex
+ * - Default language pinned via userPrefs, shared across all CodeExample instances
+ * - Copy-to-clipboard with visual feedback and screen-reader announcement
+ * - Full WCAG 2.1 AA accessibility (keyboard navigation, aria-live, focus rings)
+ * - Dark mode support via CSS custom properties
+ * - prefers-reduced-motion respected in CSS
  */
 
 type CodeExampleProps = {
-  /** * An object where keys are language names and values are the code strings.
-   * Example: { "bash": "curl...", "javascript": "fetch..." }
+  /**
+   * An object where keys are language names and values are the code strings.
+   * @example { "bash": "curl...", "javascript": "fetch..." }
    */
   snippets: Record<string, string>;
+  /** Preferred language to show when no user preference is stored. */
   defaultLanguage?: string;
 };
-
-const USER_PREFS_KEY = "callora.prefs";
-const CODE_LANG_KEY = "codeLang";
-
-function readUserPrefs(): Record<string, unknown> | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const stored = localStorage.getItem(USER_PREFS_KEY);
-  if (!stored) return null;
-
-  try {
-    return JSON.parse(stored) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function writeUserPref(key: string, value: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const currentPrefs = readUserPrefs() || {};
-  const nextPrefs = { ...currentPrefs, [key]: value };
-
-  try {
-    localStorage.setItem(USER_PREFS_KEY, JSON.stringify(nextPrefs));
-  } catch {
-    // Silently ignore storage failures to avoid runtime warnings.
-  }
-}
-
-function getPersistedLanguage(snippets: Record<string, string>): string | undefined {
-  const prefs = readUserPrefs();
-  const persisted = prefs?.[CODE_LANG_KEY];
-  return typeof persisted === "string" && persisted in snippets ? persisted : undefined;
-}
-
-function getInitialLanguage(
-  snippets: Record<string, string>,
-  defaultLanguage?: string
-): string {
-  const languages = Object.keys(snippets);
-  const persisted = getPersistedLanguage(snippets);
-
-  if (persisted) {
-    return persisted;
-  }
-
-  if (defaultLanguage && defaultLanguage in snippets) {
-    return defaultLanguage;
-  }
-
-  return languages[0] || "";
-}
 
 export default function CodeExample({
   snippets,
@@ -80,25 +47,41 @@ export default function CodeExample({
 }: CodeExampleProps) {
   // Extract available languages from the snippets keys
   const languages = Object.keys(snippets);
-  
-  // State to manage the active language tab and the 'Copied' feedback status
-  const [activeTab, setActiveTab] = useState(() =>
-    getInitialLanguage(snippets, defaultLanguage)
-  );
+
+  // Pin the user's preferred language (if set and available here), otherwise
+  // fall back to this example's own defaultLanguage prop, then the first language.
+  const [activeLanguage, setActiveLanguageState] = useState<string>(() => {
+    const pinned = getDefaultCodeLanguage();
+    if (pinned && pinned in snippets) {
+      return pinned;
+    }
+    return defaultLanguage && defaultLanguage in snippets
+      ? defaultLanguage
+      : languages[0] || "";
+  });
+
+  const setActiveLanguage = useCallback((language: string) => {
+    setActiveLanguageState(language);
+    setDefaultCodeLanguage(language);
+  }, []);
+
+  // Validate persisted language is still in current languages list
+  const resolvedLanguage = languages.includes(activeLanguage)
+    ? activeLanguage
+    : languages[0] || "";
+
+  // State for copy feedback
   const [copied, setCopied] = useState(false);
 
-  // Retrieve the code string based on the currently selected tab
-  const activeCode = snippets[activeTab] || "";
+  // Ref for tab list (used for keyboard navigation)
+  const tablistRef = useRef<HTMLDivElement>(null);
 
-  // Persist the selected language across page navigation and future mounts.
-  useEffect(() => {
-    if (!activeTab) return;
-    writeUserPref(CODE_LANG_KEY, activeTab);
-  }, [activeTab]);
+  // Retrieve the code string based on the currently selected language
+  const activeCode = snippets[resolvedLanguage] || "";
 
-  // When the available languages change, ensure the active tab remains valid.
+  // When the available languages change, ensure the active language remains valid.
   useEffect(() => {
-    if (activeTab && activeTab in snippets) return;
+    if (resolvedLanguage && resolvedLanguage in snippets) return;
 
     const availableLanguages = Object.keys(snippets);
     const fallback =
@@ -106,96 +89,124 @@ export default function CodeExample({
         ? defaultLanguage
         : availableLanguages[0] || "";
 
-    if (fallback !== activeTab) {
-      setActiveTab(fallback);
+    if (fallback !== resolvedLanguage) {
+      setActiveLanguage(fallback);
     }
-  }, [snippets, activeTab, defaultLanguage]);
+  }, [snippets, resolvedLanguage, defaultLanguage, setActiveLanguage]);
 
   /**
-   * Handles the clipboard copy action. 
-   * Provides immediate visual feedback by changing the button text.
+   * Handles the clipboard copy action with fallback for older browsers.
+   * Provides immediate visual feedback via `copied` state.
    */
   const handleCopy = async () => {
     if (!activeCode) return;
+
     try {
-      await navigator.clipboard.writeText(activeCode);
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(activeCode);
+      } else {
+        // Fallback for browsers without the Clipboard API
+        const textarea = document.createElement("textarea");
+        textarea.value = activeCode;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+
       setCopied(true);
-      // Revert the button text back to 'Copy' after 1.5 seconds
-      window.setTimeout(() => setCopied(false), 1500);
+      // Revert the button label after 2 seconds
+      window.setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy text: ", err);
     }
   };
 
+  /**
+   * Keyboard navigation within the tab strip (roving tabindex pattern).
+   * Supports ArrowRight, ArrowLeft, Home, End per WAI-ARIA 1.2 tabs pattern.
+   */
+  const handleTabKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
+    let nextIndex: number | null = null;
+
+    if (e.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % languages.length;
+    } else if (e.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + languages.length) % languages.length;
+    } else if (e.key === "Home") {
+      nextIndex = 0;
+    } else if (e.key === "End") {
+      nextIndex = languages.length - 1;
+    }
+
+    if (nextIndex !== null) {
+      e.preventDefault();
+      setActiveLanguage(languages[nextIndex]);
+
+      // Move DOM focus to the newly selected tab
+      const tabs = tablistRef.current?.querySelectorAll("[role=\"tab\"]");
+      (tabs?.[nextIndex] as HTMLElement)?.focus();
+    }
+  };
+
   return (
-    <div 
-      className="preview-card" 
-      style={{ 
-        padding: 0, 
-        overflow: "hidden", 
-        border: "1px solid var(--border-subtle)" 
-      }}
-    >
-      {/* Header Section: Contains Language Tabs and Copy Button */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 12px",
-          background: "var(--bg-subtle, #f9f9f9)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
-        {/* Navigation Tabs List */}
-        <div style={{ display: "flex", gap: "4px" }} role="tablist">
-          {languages.map((lang) => (
+    <div className="code-sample">
+      {/*
+       * Header — flex row on ≥376 px, stacked column on ≤375 px.
+       *
+       * .no-print suppresses the header in print mode (copy button is
+       *  useless on paper and the language tabs add visual noise).
+       *
+       * NOTE: No inline layout styles here. All layout is driven by
+       * code.css so that the @media (max-width: 375px) block can
+       * override everything without a specificity battle.
+       */}
+      <div className="no-print code-sample__header">
+        {/*
+         * Tab strip — horizontally scrollable rail.
+         *
+         * `flex: 1 1 auto` + `min-width: 0` keeps it from pushing the
+         * copy button off-screen when many languages are present.
+         * On ≤375 px the CSS makes it full-width and removes the
+         * flex-shrink constraint.
+         */}
+        <div
+          ref={tablistRef}
+          className="code-sample__tabs"
+          role="tablist"
+          aria-label="Code language"
+        >
+          {languages.map((lang, index) => (
             <button
               key={lang}
               role="tab"
-              aria-selected={activeTab === lang}
-              onClick={() => setActiveTab(lang)}
-              style={{
-                padding: "4px 10px",
-                fontSize: "11px",
-                fontWeight: activeTab === lang ? 600 : 400,
-                color: activeTab === lang ? "var(--text-main)" : "var(--muted)",
-                background: activeTab === lang ? "var(--bg-highlight, #fff)" : "transparent",
-                border: "1px solid",
-                borderColor: activeTab === lang ? "var(--border-subtle)" : "transparent",
-                borderRadius: "4px",
-                cursor: "pointer",
-                textTransform: "uppercase",
-                transition: "all 0.2s ease",
-              }}
+              id={`tab-${lang}`}
+              aria-selected={resolvedLanguage === lang}
+              aria-controls={`tabpanel-${lang}`}
+              tabIndex={resolvedLanguage === lang ? 0 : -1}
+              className={`code-sample__tab${resolvedLanguage === lang ? " code-sample__tab--active" : ""}`}
+              onClick={() => setActiveLanguage(lang)}
+              onKeyDown={(e) => handleTabKeyDown(e, index)}
             >
               {lang}
             </button>
           ))}
         </div>
 
-        {/* Action: Copy to Clipboard */}
+        {/*
+         * Copy button — full-width on ≤375 px (set in CSS) to give a
+         * comfortable 44 × 44 px minimum tap target (WCAG 2.5.5).
+         */}
         <button
-          className="ghost-button"
+          className={`ghost-button code-sample__copy${copied ? " code-sample__copy--success" : ""}`}
           onClick={handleCopy}
           aria-label="Copy code snippet to clipboard"
-          style={{
-            padding: "5px 12px",
-            fontSize: "11px",
-            minWidth: "75px",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
         >
           {copied ? (
-            <span style={{ 
-              color: "var(--success, #10b981)", 
-              display: "flex", 
-              alignItems: "center", 
-              gap: "4px" 
-            }}>
-              ✓ Copied
+            <span className="code-sample__copy-inner">
+              <Icons.Check size={14} aria-hidden="true" /> Copied
             </span>
           ) : (
             "Copy"
@@ -203,22 +214,32 @@ export default function CodeExample({
         </button>
       </div>
 
-      {/* Code Display Area */}
-      <div style={{ padding: "16px 12px" }}>
-        <pre
-          style={{
-            margin: 0,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            fontSize: "13px",
-            fontFamily: "var(--font-mono, monospace)",
-            lineHeight: 1.5,
-            color: "var(--text-main)"
-          }}
-        >
+      {/*
+       * Code panel — `overflow-x: auto` on the panel prevents long lines
+       * from forcing the page to scroll horizontally on narrow viewports.
+       * The pre inside uses `white-space: pre` on wider screens and
+       * `white-space: pre-wrap` on ≤375 px (set in CSS).
+       */}
+      <div
+        role="tabpanel"
+        id={`tabpanel-${resolvedLanguage}`}
+        aria-labelledby={`tab-${resolvedLanguage}`}
+        tabIndex={0}
+        className="code-sample__panel"
+      >
+        <pre className="code-sample__pre">
           <code>{activeCode}</code>
         </pre>
       </div>
+
+      {/* Screen reader polite announcement for copy success (WCAG 4.1.3) */}
+      <span
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {copied ? "Code copied to clipboard" : ""}
+      </span>
     </div>
   );
 }

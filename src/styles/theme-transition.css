@@ -1,0 +1,157 @@
+/**
+ * theme-transition.css
+ *
+ * Smooths the light ↔ dark theme switch by animating color-related CSS
+ * properties instead of swapping them instantaneously.
+ *
+ * STRATEGY
+ * --------
+ * 1. Guard with `.theme-transitions-ready` — ThemeProvider adds this class to
+ *    <html> after the first paint via requestAnimationFrame, so the initial
+ *    theme is applied with no flash.
+ * 2. Use explicit, scoped selectors instead of the universal `*` selector.
+ *    Targeting `*` causes the browser to compute a new transition for every
+ *    element in the DOM and — critically — it intercepts `animation` keyframes
+ *    (toasts, skeletons, progress bars) because their animated properties
+ *    overlap with the transition shorthand.  Scoped selectors are both faster
+ *    and safe.
+ * 3. Expose `.no-theme-transition` as a public escape hatch.  Any element
+ *    (or its subtree via inheritance) can opt out — use it on animated
+ *    components such as toasts, skeletons, spinners, and canvases.
+ * 4. Honour `prefers-reduced-motion: reduce` by disabling all transitions
+ *    inside the guard block.
+ *
+ * WHAT IS ANIMATED
+ * ----------------
+ * Only color-bearing CSS properties transition:
+ *   background-color, border-color, color, fill, stroke, outline-color
+ *
+ * Properties that must NOT transition (to avoid interfering with keyframe
+ * animations or layout):
+ *   transform, opacity, box-shadow, width, height, max-height, etc.
+ *
+ * The `--transition-speed` token (240 ms, defined in index.css :root) is used
+ * so the duration stays in sync with the rest of the design system.
+ */
+
+/* ── Scoped selector list ─────────────────────────────────────────────────
+   Covers every element category that carries a theme-sensitive color without
+   resorting to `*`. Adding new categories here is sufficient — no JS change
+   is required.
+   ──────────────────────────────────────────────────────────────────────── */
+.theme-transitions-ready :where(
+  html,
+  body,
+  /* Generic block / sectioning */
+  div, section, article, aside, main, header, footer, nav,
+  /* Typography */
+  h1, h2, h3, h4, h5, h6,
+  p, span, strong, em, small, label, legend, figcaption, blockquote, cite,
+  /* Lists */
+  ul, ol, li, dl, dt, dd,
+  /* Tables */
+  table, thead, tbody, tfoot, tr, th, td,
+  /* Media wrappers */
+  figure,
+  /* Interactive */
+  a, button, summary,
+  /* Form controls */
+  input, textarea, select, option,
+  /* Code */
+  pre, code, kbd, samp,
+  /* SVG painted elements */
+  svg, path, circle, rect, line, polyline, polygon, ellipse, g
+):not(.no-theme-transition) {
+  transition:
+    background-color var(--transition-speed, 240ms) ease,
+    border-color     var(--transition-speed, 240ms) ease,
+    color            var(--transition-speed, 240ms) ease,
+    fill             var(--transition-speed, 240ms) ease,
+    stroke           var(--transition-speed, 240ms) ease,
+    outline-color    var(--transition-speed, 240ms) ease;
+}
+
+/* ── Icon cross-fade ──────────────────────────────────────────────────────
+   The ThemeToggle icon swaps between moon / sun / monitor SVGs.  The parent
+   .theme-toggle-icon span receives a brief opacity fade so the swap feels
+   intentional rather than jarring.  This is a JS-driven class toggle
+   (see ThemeToggle.tsx) — NOT a CSS transition on the icon itself (which
+   would interfere with the paint of the new SVG).
+   ──────────────────────────────────────────────────────────────────────── */
+.theme-transitions-ready .theme-toggle-icon {
+  transition: opacity var(--transition-speed, 240ms) ease;
+}
+
+.theme-toggle-icon--swapping {
+  opacity: 0;
+}
+
+/* ── Escape hatch ─────────────────────────────────────────────────────────
+   Apply `.no-theme-transition` to any element that must not participate in
+   the theme transition — or to a container to exclude an entire subtree.
+   Common candidates:
+     • Toast notification wrappers  (.toast-queue)
+     • Skeleton shimmer elements    (.skeleton)
+     • Loading spinners             (.button-spinner, .status-dot)
+     • Route progress bar           (.route-progress-bar)
+     • Canvas / WebGL elements
+   ──────────────────────────────────────────────────────────────────────── */
+.no-theme-transition,
+.no-theme-transition * {
+  transition: none !important;
+}
+
+/* ── Known animated components ───────────────────────────────────────────
+   These elements rely on CSS `animation` keyframes whose animated properties
+   (opacity, transform, background-position) would be overridden by the color
+   transition shorthand if they weren't excluded here.
+   ──────────────────────────────────────────────────────────────────────── */
+.theme-transitions-ready :where(
+  /* Toast notifications — slide in/out + progress bar animations */
+  .toast-queue,
+  .toast-queue *,
+  /* Skeleton loading shimmer — background-position animation */
+  .skeleton,
+  /* Button loading spinner — rotate animation */
+  .button-spinner,
+  /* Animated status dot — pulse opacity animation */
+  .status-dot,
+  /* Route progress bar — indeterminate translateX animation */
+  .route-progress-bar,
+  .route-progress-bar *,
+  /* Bottom sheet snap animation */
+  .bottom-sheet,
+  /* History panel slide animation */
+  .history-panel,
+  .history-bottom-sheet,
+  /* Sticky action bar (#583) — slide-up entrance animation */
+  .theme-sticky-bar
+) {
+  /* Remove the color transition so keyframe animations are unimpeded.
+     These elements still receive their own per-property transitions defined
+     in the component CSS (e.g. .history-panel uses transform 0.25s). */
+  transition: none !important;
+}
+
+/* ── Reduced-motion override ──────────────────────────────────────────────
+   Users who set "Reduce motion" in their OS preferences get an instant
+   switch with no animation — regardless of whether the ready class is set.
+   ──────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .theme-transitions-ready :where(
+    html, body,
+    div, section, article, aside, main, header, footer, nav,
+    h1, h2, h3, h4, h5, h6,
+    p, span, strong, em, small, label, legend, figcaption, blockquote, cite,
+    ul, ol, li, dl, dt, dd,
+    table, thead, tbody, tfoot, tr, th, td,
+    figure,
+    a, button, summary,
+    input, textarea, select, option,
+    pre, code, kbd, samp,
+    svg, path, circle, rect, line, polyline, polygon, ellipse, g
+  ),
+  .theme-transitions-ready .theme-toggle-icon {
+    transition: none !important;
+  }
+}

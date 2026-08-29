@@ -2,11 +2,17 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { AccountProvider } from "./hooks/useAccountContext";
 import RouteProgressBar from "./components/RouteProgressBar";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
+import { ToastProvider } from "./components/Toast";
 import "./index.css";
 import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
+import { CollectionsProvider } from "./state/collectionsStore";
+import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
+import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
+import LatencyChart from "./pages/LatencyChart";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -21,10 +27,14 @@ async function renderRoute() {
   const wrap = (children: React.ReactNode) => (
     <React.StrictMode>
       <ThemeProvider>
-        <BrowserRouter>
-          <RouteProgressBar />
-          {children}
-        </BrowserRouter>
+        <CollectionsProvider>
+          <AccountProvider>
+            <BrowserRouter>
+              <RouteProgressBar />
+              <ToastProvider>{children}</ToastProvider>
+            </BrowserRouter>
+          </AccountProvider>
+        </CollectionsProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
@@ -38,6 +48,7 @@ async function renderRoute() {
 
   if (pathname.startsWith("/marketplace")) {
     startRouteLoading();
+    root.render(wrap(<MarketplacePageSkeleton />));
     const mod = await import("./pages/MarketplacePage");
     const MarketplacePage = mod.default;
     root.render(wrap(<MarketplacePage />));
@@ -47,6 +58,7 @@ async function renderRoute() {
 
   if (pathname.startsWith("/details/")) {
     startRouteLoading();
+    root.render(wrap(<ApiDetailPageSkeleton />));
     const mod = await import("./pages/ApiDetailPage");
     const ApiDetailPage = mod.default;
     root.render(
@@ -63,14 +75,25 @@ async function renderRoute() {
     return;
   }
 
+  if (pathname.startsWith("/latency-chart")) {
+    root.render(wrap(<LatencyChart />));
+    return;
+  }
+
   // Default: render the existing App
   root.render(
     <React.StrictMode>
       <BrowserRouter>
-      <ThemeProvider>
-      <RouteProgressBar />
-      <App />
-      </ThemeProvider>
+        <ThemeProvider>
+          <CollectionsProvider>
+            <AccountProvider>
+              <RouteProgressBar />
+              <ToastProvider>
+                <App />
+              </ToastProvider>
+            </AccountProvider>
+          </CollectionsProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,
   );

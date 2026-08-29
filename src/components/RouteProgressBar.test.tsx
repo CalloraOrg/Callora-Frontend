@@ -93,4 +93,38 @@ describe("RouteProgressBar", () => {
       { timeout: 500 },
     );
   });
+
+  it("renders the glow layer when loading", () => {
+    render(<RouteProgressBar />);
+
+    act(() => {
+      startRouteLoading();
+    });
+
+    const glow = document.querySelector(".route-progress-bar-glow");
+    expect(glow).toBeTruthy();
+    expect(glow?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("uses the no-print class to hide from print media", () => {
+    render(<RouteProgressBar />);
+
+    act(() => {
+      startRouteLoading();
+    });
+
+    const bar = screen.getByRole("progressbar");
+    expect(bar.classList.contains("no-print")).toBe(true);
+  });
+
+  it("indicator has the expected CSS class", () => {
+    render(<RouteProgressBar />);
+
+    act(() => {
+      startRouteLoading();
+    });
+
+    const indicator = document.querySelector(".route-progress-bar-indicator");
+    expect(indicator).toBeTruthy();
+  });
 });

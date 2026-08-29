@@ -1,31 +1,65 @@
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import OpenAPIImport from '../components/OpenAPIImport';
 import type { ParsedEndpoint } from '../components/OpenAPIImport';
+import FormField from '../components/FormField';
+import type { FieldStatus } from '../components/FormField';
+import useDocumentTitle from '../hooks/useDocumentTitle';
+import { useFormPersistence } from '../hooks/useFormPersistence';
+import { useSessionExpiry } from '../hooks/useSessionExpiry';
+import { useBeforeUnload } from '../hooks/useBeforeUnload';
+import SessionExpiryBanner from '../components/SessionExpiryBanner';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type EndpointEntry = ParsedEndpoint & {
-  /** Stable key for React lists. */
   id: string;
 };
 
 type PublishFormState = {
   apiName: string;
   baseUrl: string;
+  category: string;
   description: string;
   pricePerCall: string;
   endpoints: EndpointEntry[];
 };
 
+type ValidatedFields = Exclude<keyof PublishFormState, 'description' | 'endpoints'>;
+
+type TouchedState = Record<ValidatedFields, boolean>;
+
+type ValidationErrors = Partial<Record<ValidatedFields, string>>;
+
+const PUBLISH_FORM_DRAFT_KEY = 'callora:publish-form:draft';
+
 const INITIAL_FORM: PublishFormState = {
   apiName: '',
   baseUrl: '',
+  category: '',
   description: '',
   pricePerCall: '',
   endpoints: [],
 };
+
+const INITIAL_TOUCHED: TouchedState = {
+  apiName: false,
+  baseUrl: false,
+  category: false,
+  pricePerCall: false,
+};
+
+const CATEGORIES = [
+  'AI & Machine Learning',
+  'Data & Analytics',
+  'Finance & Payments',
+  'Weather & Environment',
+  'Mapping & Location',
+  'Communication',
+  'Security',
+  'Other',
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -47,30 +81,106 @@ function methodBadgeClass(method: string): string {
   return 'pa-badge pa-badge-default';
 }
 
+function validateForm(form: PublishFormState): ValidationErrors {
+  const errors: ValidationErrors = {};
+
+  if (!form.apiName.trim()) {
+    errors.apiName = 'API name is required.';
+  }
+
+  if (!form.baseUrl.trim()) {
+    errors.baseUrl = 'Base URL is required.';
+  } else {
+    try {
+      const parsed = new URL(form.baseUrl);
+      if (parsed.protocol !== 'https:') {
+        errors.baseUrl = 'Base URL must use the https scheme.';
+      }
+    } catch {
+      errors.baseUrl = 'Enter a valid URL (e.g. https://api.example.com).';
+    }
+  }
+
+  if (!form.category) {
+    errors.category = 'Please select a category.';
+  }
+
+  if (form.pricePerCall.trim() !== '') {
+    const price = Number(form.pricePerCall);
+    if (!Number.isFinite(price) || price < 0) {
+      errors.pricePerCall = 'Price per call must be 0 or greater.';
+    }
+  }
+
+  return errors;
+}
+
+function fieldStatus(
+  field: ValidatedFields,
+  errors: ValidationErrors,
+  touched: TouchedState,
+  submitAttempted: boolean,
+): FieldStatus {
+  const active = touched[field] || submitAttempted;
+  if (!active) return 'idle';
+  if (errors[field]) return 'error';
+  return 'success';
+}
+
 // ---------------------------------------------------------------------------
 // PublishApi page
 // ---------------------------------------------------------------------------
 
 /**
- * PublishApi — publish flow page for Callora.
+ * PublishApi — developer publish-flow page for Callora.
  *
- * Lets developers describe and publish an API on the marketplace.
- * Includes an OpenAPI import section that pre-populates the endpoint list
- * without altering any other publish-flow behaviour or auto-submitting.
+ * Provides per-field inline validation (name, base URL, category, price per
+ * call) with aria-invalid / aria-describedby wired for screen readers. Errors
+ * appear only after a field is blurred or the form is submitted.
  */
 export default function PublishApi() {
+  useDocumentTitle('Publish API');
   const [form, setForm] = useState<PublishFormState>(INITIAL_FORM);
+  const [touched, setTouched] = useState<TouchedState>(INITIAL_TOUCHED);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const importSectionId = useId();
 
-  // ── Form field handlers ────────────────────────────────────────────────
+  // ── Session expiry & form persistence ────────────────────────────────
+  const { clearDraft, wasRestored } = useFormPersistence(
+    PUBLISH_FORM_DRAFT_KEY,
+    form as unknown as Record<string, unknown>,
+    setForm as unknown as React.Dispatch<React.SetStateAction<Record<string, unknown>>>,
+    { restoreOnMount: true },
+  );
+  const { isExpired, dismiss: dismissExpiry, countdown, signalExpiry } = useSessionExpiry();
+
+  const hasUnsavedChanges = useMemo(() => {
+    return form.apiName !== '' || form.baseUrl !== '' || form.category !== '' ||
+           form.description !== '' || form.pricePerCall !== '' ||
+           form.endpoints.length > 0;
+  }, [form]);
+
+  useBeforeUnload(hasUnsavedChanges);
+
+  const errors = validateForm(form);
+  const isFormValid = Object.keys(errors).length === 0;
+
+  // ── Field change handlers ──────────────────────────────────────────────
 
   const handleField = useCallback(
     (field: keyof Omit<PublishFormState, 'endpoints'>) =>
-      (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
       },
+    [],
+  );
+
+  const handleBlur = useCallback(
+    (field: ValidatedFields) => () => {
+      setTouched((prev) => ({ ...prev, [field]: true }));
+    },
     [],
   );
 
@@ -81,14 +191,10 @@ export default function PublishApi() {
       ...ep,
       id: nextId(),
     }));
-
     setForm((prev) => ({
       ...prev,
-      // Merge: replace the endpoint list with imported endpoints (preserves
-      // any manually added endpoints already in the list).
       endpoints: [...prev.endpoints, ...entries],
     }));
-
     setImportOpen(false);
   }, []);
 
@@ -104,9 +210,14 @@ export default function PublishApi() {
   const handleSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      setSubmitAttempted(true);
+      // Touch all validated fields so errors become visible
+      setTouched({ apiName: true, baseUrl: true, category: true, pricePerCall: true });
+      if (!isFormValid) return;
       setSubmitted(true);
+      clearDraft();
     },
-    [],
+    [isFormValid],
   );
 
   // ── Success screen ─────────────────────────────────────────────────────
@@ -129,8 +240,11 @@ export default function PublishApi() {
               className="pa-btn-primary"
               onClick={() => {
                 setForm(INITIAL_FORM);
+                setTouched(INITIAL_TOUCHED);
+                setSubmitAttempted(false);
                 setSubmitted(false);
                 setImportOpen(false);
+                clearDraft();
               }}
             >
               Publish another API
@@ -143,9 +257,24 @@ export default function PublishApi() {
 
   // ── Main form ──────────────────────────────────────────────────────────
 
+  // ── Simulate a 401 for demo purposes ─────────────────────────────────
+  const handleSimulateExpiry = useCallback(() => {
+    signalExpiry();
+  }, [signalExpiry]);
+
   return (
     <>
       <style>{STYLES}</style>
+      <SessionExpiryBanner
+        isVisible={isExpired}
+        countdown={countdown}
+        onDismiss={dismissExpiry}
+      />
+      {wasRestored && !isExpired && (
+        <div className="pa-draft-restored" role="status" aria-live="polite">
+          Draft restored from a previous session.
+        </div>
+      )}
       <div className="pa-shell">
         <header className="pa-page-header">
           <p className="pa-eyebrow">Developer tools</p>
@@ -190,6 +319,38 @@ export default function PublishApi() {
           )}
         </section>
 
+        {/* ── Draft restored notice (with dismiss) ─────────────── */}
+        {wasRestored && !isExpired && (
+          <div className="pa-draft-banner surface">
+            <span aria-hidden="true">💾</span>
+            <span>Your previous draft has been restored. Your form data is being saved automatically.</span>
+            <button
+              type="button"
+              className="pa-btn-secondary pa-draft-dismiss"
+              onClick={() => {
+                clearDraft();
+                setForm(INITIAL_FORM);
+                setTouched(INITIAL_TOUCHED);
+                setSubmitAttempted(false);
+              }}
+            >
+              Clear draft
+            </button>
+          </div>
+        )}
+
+        {/* ── Session expiry simulation (demo) ──────────────────── */}
+        <div className="pa-demo-controls surface">
+          <p className="pa-demo-label">Session controls (demo)</p>
+          <button
+            type="button"
+            className="pa-btn-secondary"
+            onClick={handleSimulateExpiry}
+          >
+            Simulate session expiry
+          </button>
+        </div>
+
         {/* ── Publish form ───────────────────────────────────────── */}
         <form
           className="pa-form surface"
@@ -200,42 +361,76 @@ export default function PublishApi() {
           <fieldset className="pa-fieldset">
             <legend className="pa-legend">API details</legend>
 
-            <div className="pa-field">
-              <label className="pa-label" htmlFor="pa-api-name">
-                API name <span aria-hidden="true">*</span>
-              </label>
+            <FormField
+              id="pa-api-name"
+              label="API name"
+              required
+              error={errors.apiName}
+              status={fieldStatus('apiName', errors, touched, submitAttempted)}
+            >
               <input
                 id="pa-api-name"
                 type="text"
                 className="pa-input"
                 value={form.apiName}
                 onChange={handleField('apiName')}
+                onBlur={handleBlur('apiName')}
                 placeholder="e.g. Weather Forecast API"
                 required
                 aria-required="true"
               />
-            </div>
+            </FormField>
 
-            <div className="pa-field">
-              <label className="pa-label" htmlFor="pa-base-url">
-                Base URL <span aria-hidden="true">*</span>
-              </label>
+            <FormField
+              id="pa-base-url"
+              label="Base URL"
+              required
+              error={errors.baseUrl}
+              status={fieldStatus('baseUrl', errors, touched, submitAttempted)}
+            >
               <input
                 id="pa-base-url"
                 type="url"
                 className="pa-input"
                 value={form.baseUrl}
                 onChange={handleField('baseUrl')}
+                onBlur={handleBlur('baseUrl')}
                 placeholder="https://api.example.com"
                 required
                 aria-required="true"
               />
-            </div>
+            </FormField>
 
-            <div className="pa-field">
-              <label className="pa-label" htmlFor="pa-price">
-                Price per call (USDC)
-              </label>
+            <FormField
+              id="pa-category"
+              label="Category"
+              required
+              error={errors.category}
+              status={fieldStatus('category', errors, touched, submitAttempted)}
+            >
+              <select
+                id="pa-category"
+                className="pa-input pa-select"
+                value={form.category}
+                onChange={handleField('category')}
+                onBlur={handleBlur('category')}
+                required
+                aria-required="true"
+              >
+                <option value="">Select a category</option>
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField
+              id="pa-price"
+              label="Price per call (USDC)"
+              hint="Charged per successful API call. Leave blank to set later."
+              error={errors.pricePerCall}
+              status={fieldStatus('pricePerCall', errors, touched, submitAttempted)}
+            >
               <input
                 id="pa-price"
                 type="text"
@@ -243,13 +438,10 @@ export default function PublishApi() {
                 className="pa-input pa-input-narrow"
                 value={form.pricePerCall}
                 onChange={handleField('pricePerCall')}
+                onBlur={handleBlur('pricePerCall')}
                 placeholder="0.001"
-                aria-describedby="pa-price-hint"
               />
-              <p id="pa-price-hint" className="pa-field-hint">
-                Charged per successful API call. Leave blank to set later.
-              </p>
-            </div>
+            </FormField>
 
             <div className="pa-field">
               <label className="pa-label" htmlFor="pa-description">
@@ -317,13 +509,12 @@ export default function PublishApi() {
             <button
               type="submit"
               className="pa-btn-primary"
-              disabled={!form.apiName.trim() || !form.baseUrl.trim()}
             >
               Publish API
             </button>
             <p className="pa-form-note">
-              Submission is reviewed before going live. API name and base URL are
-              required.
+              Submission is reviewed before going live. API name, base URL, and
+              category are required.
             </p>
           </div>
         </form>
@@ -475,7 +666,8 @@ const STYLES = `
   }
 
   .pa-input,
-  .pa-textarea {
+  .pa-textarea,
+  .pa-select {
     min-height: 46px;
     padding: 10px 14px;
     border-radius: 12px;
@@ -485,7 +677,21 @@ const STYLES = `
     font-size: 0.95rem;
     font-family: inherit;
     resize: vertical;
-    transition: border-color 180ms ease, box-shadow 180ms ease;
+    transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  }
+
+  .pa-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2393a0bf' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+    cursor: pointer;
+  }
+
+  .pa-select option {
+    background: var(--surface-strong, #0e1427);
+    color: var(--text, #f3f5fb);
   }
 
   .pa-input::placeholder,
@@ -494,7 +700,8 @@ const STYLES = `
   }
 
   .pa-input:focus-visible,
-  .pa-textarea:focus-visible {
+  .pa-textarea:focus-visible,
+  .pa-select:focus-visible {
     outline: 2px solid var(--accent, #4e85ff);
     outline-offset: 0;
     box-shadow: var(--focus-ring, 0 0 0 3px rgba(78,133,255,0.55));
@@ -657,7 +864,7 @@ const STYLES = `
   }
 
   .pa-btn-primary {
-    background: linear-gradient(135deg, #4e85ff, #6da6ff);
+    background: linear-gradient(135deg, var(--accent, #4e85ff), #6da6ff);
     color: #ffffff;
   }
 
@@ -735,6 +942,66 @@ const STYLES = `
 
   /* ── Responsive ─────────────────────────────────────────────────────── */
 
+  /* ── Draft restored banner ─────────────────────────────────────────── */
+
+  .pa-draft-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    color: var(--text, #f3f5fb);
+    border: 1px solid rgba(78, 133, 255, 0.25);
+  }
+
+  .pa-draft-banner span:first-child {
+    font-size: 1.1rem;
+  }
+
+  .pa-draft-dismiss {
+    margin-left: auto;
+    min-height: 32px;
+    font-size: 0.8rem;
+    padding: 0 12px;
+  }
+
+  .pa-draft-restored {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 100;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: var(--surface-strong, #0e1427);
+    border: 1px solid var(--line, rgba(169,184,255,0.16));
+    font-size: 0.82rem;
+    color: var(--muted, #93a0bf);
+    animation: pa-fade-out 3s ease forwards;
+  }
+
+  @keyframes pa-fade-out {
+    0%, 70% { opacity: 1; }
+    100% { opacity: 0; pointer-events: none; }
+  }
+
+  /* ── Demo controls ─────────────────────────────────────────────────── */
+
+  .pa-demo-controls {
+    padding: 14px 18px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .pa-demo-label {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--muted, #93a0bf);
+    font-weight: 600;
+  }
+
   @media (max-width: 600px) {
     .pa-shell {
       padding: 4px 0 32px;
@@ -768,6 +1035,10 @@ const STYLES = `
 
     .pa-btn-primary {
       width: 100%;
+    }
+
+    .pa-draft-banner {
+      flex-wrap: wrap;
     }
   }
 `;

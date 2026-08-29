@@ -1,7 +1,20 @@
+export type Review = {
+  id: string;
+  author: string;
+  rating: number; // 1–5
+  date: string;   // ISO date string
+  body: string;
+  verified: boolean;
+};
+
+
+
 export type APIItem = {
   id: string;
   name: string;
-  provider: { name: string; url?: string };
+  provider: { name: string; url?: string; avatar?:string;};
+   version?: string;
+  status?: "operational" | "degraded" | "maintenance";
   description: string;
   pricePerRequest: number;
   pricePerCall?: number;
@@ -16,13 +29,20 @@ export type APIItem = {
   useCases?: string[];
   endpoints?: Array<any>;
   stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
+  ratingDistribution?: Record<number, number>;
+  hourlyHealth?: ("operational" | "degraded" | "down")[];
+  reviews?: Review[];
+  sparklineValues?: number[];
 };
+
 
 export const MOCK_APIS: APIItem[] = [
   {
     id: "weather-001",
     name: "WeatherSim API",
     provider: { name: "Acme Labs", url: "#" },
+     version: "2.3.1",
+  status: "operational",
     description:
       "WeatherSim provides hyper-local weather forecasts, historical climate data, and simulated conditions for testing your services.",
     pricePerRequest: 0.01,
@@ -51,6 +71,7 @@ export const MOCK_APIS: APIItem[] = [
         title: "Get Forecast",
         url: "/v1/forecast",
         method: "GET",
+        group: "Forecast",
         params: [
           { name: "lat", type: "number", required: true },
           { name: "lon", type: "number", required: true },
@@ -62,17 +83,46 @@ export const MOCK_APIS: APIItem[] = [
         title: "Historical Weather",
         url: "/v1/history",
         method: "GET",
+        group: "Forecast",
         params: [{ name: "date", type: "string", required: true }],
         response: '{ "date": "2026-03-01", "summary": { ... } }',
       },
+      {
+        id: "alerts-create",
+        title: "Create Weather Alert",
+        url: "/v1/alerts",
+        method: "POST",
+        group: "Alerts",
+        params: [
+          { name: "location", type: "string", required: true },
+          { name: "conditions", type: "array", required: false },
+        ],
+        response: '{ "alert_id": "12345", "status": "active" }',
+      },
+      {
+        id: "alerts-delete",
+        title: "Delete Weather Alert",
+        url: "/v1/alerts/{id}",
+        method: "DELETE",
+        group: "Alerts",
+        params: [
+          { name: "id", type: "string", required: true },
+        ],
+        response: '{ "status": "deleted" }',
+      },
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
+    ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
+    hourlyHealth: Array(24).fill("operational").map((_, i) => i === 12 || i === 13 ? "degraded" : "operational"),
+    sparklineValues: [15, 17, 16, 19, 21, 20, 24, 25, 23, 26, 28, 27],
   },
   {
     id: "pay-qr",
     name: "QuickPay",
     provider: { name: "PayFast", url: "#" },
-    description: "Simple payment processing with card and ACH support.",
+    status: "degraded",
+ version: "1.8.0",
+    description: "Simple payment processing with card and ACH support",
     pricePerRequest: 0.001,
     pricePerCall: 0.001,
     avgLatencyMs: 260,
@@ -84,13 +134,73 @@ export const MOCK_APIS: APIItem[] = [
     usageCount: 880000,
     features: ["PCI-compliant", "Low-latency captures"],
     useCases: ["Checkout", "Subscriptions"],
-    endpoints: [],
+    endpoints: [
+      {
+        id: "payment-create",
+        title: "Create Payment",
+        url: "/v1/payments",
+        method: "POST",
+        group: "Payments",
+        params: [
+          { name: "amount", type: "number", required: true },
+          { name: "currency", type: "string", required: true },
+          { name: "card_token", type: "string", required: true },
+        ],
+        response: '{ "payment_id": "pay_123", "status": "processed" }',
+      },
+      {
+        id: "payment-refund",
+        title: "Refund Payment",
+        url: "/v1/payments/{id}/refund",
+        method: "POST",
+        group: "Payments",
+        params: [
+          { name: "id", type: "string", required: true },
+          { name: "amount", type: "number", required: false },
+        ],
+        response: '{ "refund_id": "ref_456", "status": "processed" }',
+      },
+      {
+        id: "webhook-register",
+        title: "Register Webhook",
+        url: "/v1/webhooks",
+        method: "POST",
+        group: "Webhooks",
+        params: [
+          { name: "url", type: "string", required: true },
+          { name: "events", type: "array", required: true },
+        ],
+        response: '{ "webhook_id": "wh_789", "status": "active" }',
+      },
+    ],
     stats: { totalCalls: 880000, avgResponseMs: 260, uptimePct: 99.9 },
+    reviews: [
+      {
+        id: "r1",
+        author: "Naomi L.",
+        rating: 4,
+        date: "2026-06-01",
+        body: "PCI compliance out of the box is a huge time-saver.",
+        verified: true,
+      },
+      {
+        id: "r2",
+        author: "Ben F.",
+        rating: 5,
+        date: "2026-04-20",
+        body: "Handles high-volume checkouts with no issues.",
+        verified: false,
+      },
+    ],
+    hourlyHealth: Array(24).fill("operational"),
+    sparklineValues: [30, 28, 35, 32, 40, 38, 45, 42, 50, 48, 55, 52],
   },
   {
     id: "msg-01",
     name: "ChatStream",
     provider: { name: "Comms Inc.", url: "#" },
+     version: "3.0.2",
+  status: "maintenance",
     description: "Scalable messaging and notifications for apps.",
     pricePerRequest: 0.0005,
     pricePerCall: 0.0005,
@@ -103,8 +213,60 @@ export const MOCK_APIS: APIItem[] = [
     usageCount: 1200000,
     features: ["Bulk sending", "Delivery webhooks"],
     useCases: ["Notifications", "Two-factor auth"],
-    endpoints: [],
+    endpoints: [
+      {
+        id: "sms-send",
+        title: "Send SMS",
+        url: "/v1/sms",
+        method: "POST",
+        group: "Messaging",
+        params: [
+          { name: "to", type: "string", required: true },
+          { name: "message", type: "string", required: true },
+          { name: "from", type: "string", required: false },
+        ],
+        response: '{ "message_id": "msg_001", "status": "sent" }',
+      },
+      {
+        id: "email-send",
+        title: "Send Email",
+        url: "/v1/email",
+        method: "POST",
+        group: "Messaging",
+        params: [
+          { name: "to", type: "string", required: true },
+          { name: "subject", type: "string", required: true },
+          { name: "body", type: "string", required: true },
+        ],
+        response: '{ "email_id": "email_002", "status": "queued" }',
+      },
+      {
+        id: "template-create",
+        title: "Create Template",
+        url: "/v1/templates",
+        method: "POST",
+        group: "Templates",
+        params: [
+          { name: "name", type: "string", required: true },
+          { name: "content", type: "string", required: true },
+          { name: "type", type: "string", required: true },
+        ],
+        response: '{ "template_id": "tpl_003", "status": "active" }',
+      },
+    ],
     stats: { totalCalls: 1200000, avgResponseMs: 120, uptimePct: 99.99 },
+    reviews: [
+      {
+        id: "r1",
+        author: "Eva C.",
+        rating: 5,
+        date: "2026-06-15",
+        body: "Delivery webhooks are rock-solid. Brilliant product.",
+        verified: true,
+      },
+    ],
+    hourlyHealth: Array(24).fill("operational").map((_, i) => i > 18 && i < 22 ? "down" : "operational"),
+    sparklineValues: [8, 10, 9, 12, 14, 13, 16, 17, 15, 18, 20, 19],
   },
   // minimal demo items
   ...Array.from({ length: 10 }).map((_, i) => {
@@ -112,11 +274,18 @@ export const MOCK_APIS: APIItem[] = [
     const avgLatencyMs = i % 5 === 0 ? undefined : 140 + i * 18;
     const uptimePercent =
       i % 3 === 0 ? undefined : Number((99.2 + i * 0.07).toFixed(2));
-
+const status:  APIItem["status"] =
+  i % 3 === 0
+    ? "operational"
+    : i % 3 === 1
+    ? "degraded"
+    : "maintenance";
     return {
       id: `demo-${i}`,
       name: `Demo API ${i + 1}`,
       provider: { name: i % 2 === 0 ? "OpenTools" : "ThirdParty", url: "#" },
+       version: `1.${i}.0`,
+       status,
       description: `Demo API number ${i + 1} showcasing features and endpoints.`,
       pricePerRequest,
       pricePerCall: i % 4 === 0 ? undefined : pricePerRequest,
@@ -135,6 +304,7 @@ export const MOCK_APIS: APIItem[] = [
         avgResponseMs: avgLatencyMs,
         uptimePct: uptimePercent,
       },
+      hourlyHealth: Array(24).fill("operational").map(() => Math.random() > 0.9 ? (Math.random() > 0.5 ? "degraded" : "down") : "operational"),
     };
   }),
 ];

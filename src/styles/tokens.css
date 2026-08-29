@@ -1,0 +1,200 @@
+/* Status icon semantic tokens — reference these in CallHistoryRow and any
+    component that renders per-call status icons.  They alias the global
+    --success / --danger tokens so both themes are covered automatically.  */
+
+  :root {
+  --status-success-icon-color: var(--success);
+  --status-error-icon-color: var(--danger);
+  --status-icon-size: 16px;
+
+  /* ── Market spacing tokens ────────────────────────────────────────
+     Used by MarketplacePage, ApiDetailPage, and their children.
+     Named on a 4px grid with explicit scale values so every hardcoded
+     gap / padding / margin is replaceable with var(--mkt-…). */
+  --mkt-space-xs: 2px;
+  --mkt-space-sm: 4px;
+  --mkt-space-md: 8px;
+  --mkt-space-lg: 12px;
+  --mkt-space-xl: 16px;
+  --mkt-space-2xl: 20px;
+  --mkt-space-3xl: 24px;
+  --mkt-space-4xl: 28px;
+  --mkt-space-5xl: 32px;
+  --mkt-space-6xl: 40px;
+  --mkt-space-7xl: 48px;
+
+  /* ── Market / detail typography tokens ────────────────────────────
+     Tight, readable defaults consumed by marketplace + detail pages. */
+  --mkt-font-size-micro: 0.75rem;    /* 12px */
+  --mkt-font-size-sm: 0.8125rem;     /* 13px */
+  --mkt-font-size-tag: 0.875rem;     /* 14px */
+  --mkt-font-size-base: 1rem;        /* 16px */
+  --mkt-font-size-lg: 0.9375rem;     /* 15px */
+  --mkt-font-size-xl: 1.5rem;        /* 24px */
+  --mkt-font-size-2xl: 1.75rem;      /* 28px */
+  --mkt-font-size-page-title: clamp(1.75rem, 3vw, 2.35rem);
+  --mkt-line-height-tight: 1.05;
+  --mkt-line-height-normal: 1.5;
+  --mkt-line-height-relaxed: 1.6;
+  --mkt-line-height-loose: 2;
+  --mkt-grid-min: 240px;
+
+  /* ── Market colour references ──────────────────────────────────
+     Replaces hardcoded hex / rgba values used by marketplace cards. */
+  --mkt-card-border: rgba(255, 255, 255, 0.03);
+  --mkt-card-hover-border: #4666ff;
+  --mkt-card-hover-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  --mkt-card-compact-padding: 10px;
+  --mkt-card-compact-gap: 6px;
+  --mkt-card-compact-min-height: 188px;
+  --mkt-card-padding: 12px;
+  --mkt-card-gap: 8px;
+  --mkt-card-min-height: 220px;
+  --mkt-card-icon-radius: 10px;
+  --mkt-card-icon-size: 56px;
+  --mkt-card-icon-font-size: 20px;
+  --mkt-card-popover-radius: 12px;
+  --mkt-card-popover-width: 230px;
+  --mkt-card-compare-radius: 8px;
+  --mkt-card-tag-radius: 8px;
+  --mkt-card-margin-top-sm: 6px;
+  --mkt-card-price-padding-right: 36px;
+  --mkt-radius-sm: 6px;
+
+  /* ── Market layout tokens ───────────────────────────────────────── */
+  --mkt-page-padding: 20px;
+  --mkt-page-padding-sm: 14px;
+  --mkt-sidebar-padding-start: 8px;
+  --mkt-drawer-offset: 80px;
+
+  /* ── ApiUsage spacing tokens ────────────────────────────────────────
+     Named on a 4px grid, following the same scale as --mkt-* tokens but
+     namespaced under --api- for the ApiUsage page.  Replaces hardcoded
+     padding / gap / margin values in the ApiUsage component styles. */
+  --api-space-xs: 2px;
+  --api-space-sm: 4px;
+  --api-space-md: 8px;
+  --api-space-lg: 12px;
+  --api-space-xl: 16px;
+  --api-space-2xl: 20px;
+  --api-space-3xl: 24px;
+  --api-space-4xl: 28px;
+  --api-space-5xl: 32px;
+  --api-space-6xl: 40px;
+
+  /* ── ApiUsage typography tokens ─────────────────────────────────────
+     Locked font sizes for the ApiUsage page sections. */
+  --api-font-size-xs: 0.6875rem;
+  --api-font-size-sm: 0.8125rem;
+  --api-font-size-md: 0.875rem;
+  --api-font-size-base: 0.9375rem;
+  --api-font-size-lg: 1.25rem;
+  --api-font-size-xl: 1.5rem;
+  --api-line-height-tight: 1.15;
+  --api-line-height-normal: 1.5;
+
+  /* ── ApiUsage surface tokens ──────────────────────────────────────── */
+  --api-card-min-height: 48px;
+  --api-border-radius: 18px;
+}
+
+/* Light-mode overrides for tokens whose contrast depends on the theme */
+[data-theme="light"] {
+  --mkt-card-border: rgba(0, 0, 0, 0.06);
+  --mkt-card-hover-border: #2563eb;
+  --mkt-card-hover-shadow: 0 6px 20px rgba(37, 99, 235, 0.1);
+}
+
+/* Dark-mode overrides ensure the tokens above are visible on both
+   backgrounds — kept explicit so future readers can tune each value
+   without hunting through the main component styles. */
+[data-theme="dark"] {
+  --mkt-card-hover-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* ── StatusBadge design tokens ─────────────────────────────────────────────
+   Each status variant exposes three properties:
+     --sb-<status>-bg   Background fill (low-opacity tint)
+     --sb-<status>-fg   Text / icon foreground (meets 4.5:1 on the bg above)
+     --sb-<status>-border  Subtle outline
+
+   Patterns (diagonal stripes / crosshatch / dots) are defined in
+   src/styles/patterns.css and referenced via CSS custom property
+   --sb-<status>-pattern so the badge is distinguishable without color alone.
+   ──────────────────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  /* success — solid fill, no pattern (baseline / reference state) */
+  --sb-success-bg: rgba(115, 242, 187, 0.14);
+  --sb-success-fg: #73f2bb;
+  --sb-success-border: rgba(115, 242, 187, 0.35);
+
+  /* error — red tint */
+  --sb-error-bg: rgba(255, 125, 141, 0.14);
+  --sb-error-fg: #ff7d8d;
+  --sb-error-border: rgba(255, 125, 141, 0.35);
+
+  /* warning */
+  --sb-warning-bg: rgba(251, 191, 36, 0.14);
+  --sb-warning-fg: #fbbf24;
+  --sb-warning-border: rgba(251, 191, 36, 0.35);
+
+  /* operational (alias of success) */
+  --sb-operational-bg: var(--sb-success-bg);
+  --sb-operational-fg: var(--sb-success-fg);
+  --sb-operational-border: var(--sb-success-border);
+
+  /* degraded (alias of warning) */
+  --sb-degraded-bg: var(--sb-warning-bg);
+  --sb-degraded-fg: var(--sb-warning-fg);
+  --sb-degraded-border: var(--sb-warning-border);
+
+  /* down (alias of error) */
+  --sb-down-bg: var(--sb-error-bg);
+  --sb-down-fg: var(--sb-error-fg);
+  --sb-down-border: var(--sb-error-border);
+
+  /* pending — neutral blue */
+  --sb-pending-bg: rgba(78, 133, 255, 0.14);
+  --sb-pending-fg: #4e85ff;
+  --sb-pending-border: rgba(78, 133, 255, 0.35);
+
+  /* maintenance (alias of pending) */
+  --sb-maintenance-bg: var(--sb-pending-bg);
+  --sb-maintenance-fg: var(--sb-pending-fg);
+  --sb-maintenance-border: var(--sb-pending-border);
+}
+
+[data-theme="light"] {
+  --sb-success-bg: rgba(5, 150, 105, 0.1);
+  --sb-success-fg: #065f46;
+  --sb-success-border: rgba(5, 150, 105, 0.3);
+
+  --sb-error-bg: rgba(220, 38, 38, 0.1);
+  --sb-error-fg: #991b1b;
+  --sb-error-border: rgba(220, 38, 38, 0.3);
+
+  --sb-warning-bg: rgba(217, 119, 6, 0.1);
+  --sb-warning-fg: #92400e;
+  --sb-warning-border: rgba(217, 119, 6, 0.3);
+
+  --sb-operational-bg: var(--sb-success-bg);
+  --sb-operational-fg: var(--sb-success-fg);
+  --sb-operational-border: var(--sb-success-border);
+
+  --sb-degraded-bg: var(--sb-warning-bg);
+  --sb-degraded-fg: var(--sb-warning-fg);
+  --sb-degraded-border: var(--sb-warning-border);
+
+  --sb-down-bg: var(--sb-error-bg);
+  --sb-down-fg: var(--sb-error-fg);
+  --sb-down-border: var(--sb-error-border);
+
+  --sb-pending-bg: rgba(37, 99, 235, 0.1);
+  --sb-pending-fg: #1e40af;
+  --sb-pending-border: rgba(37, 99, 235, 0.25);
+
+  /* maintenance (alias of pending) */
+  --sb-maintenance-bg: var(--sb-pending-bg);
+  --sb-maintenance-fg: var(--sb-pending-fg);
+  --sb-maintenance-border: var(--sb-pending-border);
+}

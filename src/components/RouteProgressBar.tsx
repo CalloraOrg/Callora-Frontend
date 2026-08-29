@@ -22,11 +22,12 @@ export default function RouteProgressBar() {
 
   return (
     <div
-      className={`route-progress-bar${isLoading ? " route-progress-bar--active" : ""}`}
+      className={`route-progress-bar no-print${isLoading ? " route-progress-bar--active" : ""}`}
       role="progressbar"
       aria-label="Page loading"
       aria-busy={isLoading}
     >
+      <div className="route-progress-bar-glow" aria-hidden="true" />
       <div className="route-progress-bar-track">
         <div className="route-progress-bar-indicator" />
       </div>
