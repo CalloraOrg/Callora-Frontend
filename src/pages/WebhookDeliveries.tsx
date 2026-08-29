@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useWebhookDeliveries } from '../hooks/useWebhookDeliveries';
-import { ToastProvider, Toast } from '../components/Toast';
 
 export default function WebhookDeliveries() {
   const [accountId, setAccountId] = useState('acc_123'); // Simulate account switch
@@ -114,13 +113,20 @@ export default function WebhookDeliveries() {
         </div>
       )}
       
-      <ToastProvider />
       {toastMessage && (
-        <Toast 
-          message={toastMessage} 
-          onDismiss={() => setToastMessage(null)} 
-          type="info"
-        />
+        <div 
+          role="status"
+          style={{
+            marginTop: '16px',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            background: 'var(--surface-soft, #222)',
+            color: 'var(--text, #fff)',
+            display: 'inline-block'
+          }}
+        >
+          {toastMessage}
+        </div>
       )}
     </div>
   );
