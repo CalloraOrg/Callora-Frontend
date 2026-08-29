@@ -28,7 +28,8 @@ import { ToastProvider } from "./components/Toast";
 import { InvoiceCard } from "./pages/InvoiceCard";
 import BillingHistory from "./pages/BillingHistory";
  import WebhookDeliveries from "./pages/WebhookDeliveries";
- import { useAccountContext } from "./hooks/useAccountContext";
+import { useAccountContext } from "./hooks/useAccountContext";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -579,6 +580,7 @@ function App() {
         </header>
 
         <main id="main-content" role="main" className="page">
+          <RouteErrorBoundary resetKey={location.pathname} onGoHome={() => navigate(APP_ROUTES.dashboard)}>
           <Routes>
             <Route
               path={APP_ROUTES.landing}
@@ -705,6 +707,7 @@ function App() {
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
           </Routes>
+          </RouteErrorBoundary>
         </main>
 
         <footer className="surface app-footer no-print" role="contentinfo">
