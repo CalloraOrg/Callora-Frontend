@@ -1082,7 +1082,6 @@ print(response.json())`;
                             </div>
                           ))}
                         </div>
-                      </div>
                       </>
                     )}
                   </section>
