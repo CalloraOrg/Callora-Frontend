@@ -1,16 +1,5 @@
 import { useState } from "react";
-
-/**
- * TestInBrowser
- *
- * Renders a one-click inline test runner affordance for a single API endpoint.
- * Clicking "Test in browser" expands a panel where the user can fill in query
- * parameters and fire a live GET/POST request directly from the page.
- *
- * Accessibility: the trigger button has an aria-expanded attribute and the
- * panel is labelled via aria-labelledby so it is announced correctly by
- * screen readers (WCAG 2.1 AA).
- */
+import { useApiCache } from "../hooks/useApiCache";
 
 export interface EndpointParam {
   name: string;
@@ -42,9 +31,11 @@ export default function TestInBrowser({
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { get, set } = useApiCache<RunResult>();
 
   const panelId = `tib-panel-${endpointUrl.replace(/[^a-z0-9]/gi, "-")}`;
   const triggerId = `tib-trigger-${endpointUrl.replace(/[^a-z0-9]/gi, "-")}`;
+  const cacheKey = `${method}:${endpointUrl}`;
 
   function handleChange(name: string, value: string) {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -71,6 +62,13 @@ export default function TestInBrowser({
         );
       }
 
+      const isCacheable = method.toUpperCase() === "GET";
+      const cached = isCacheable ? get(cacheKey) : null;
+      if (cached) {
+        setResult(cached);
+        return;
+      }
+
       const response = await fetch(url, fetchInit);
       const text = await response.text();
       let body: string;
@@ -79,7 +77,11 @@ export default function TestInBrowser({
       } catch {
         body = text;
       }
-      setResult({ status: response.status, body });
+      const runResult: RunResult = { status: response.status, body };
+      setResult(runResult);
+      if (isCacheable) {
+        set(cacheKey, runResult);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { formatPrice } from '../utils/format';
+import { formatDuration, formatPrice, formatTimestamp } from '../utils/format';
 
 export type CallRecord = {
   id: string;
@@ -17,20 +17,6 @@ type CallHistoryRowProps = {
   isExpanded: boolean;
   onToggle: () => void;
 };
-
-function formatTime(ms: number) {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatTimestamp(date: Date) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
 
 export default function CallHistoryRow({ call, isExpanded, onToggle }: CallHistoryRowProps) {
   // Aria-live polite announcement for status changes (WCAG 4.1.3)
@@ -53,7 +39,7 @@ export default function CallHistoryRow({ call, isExpanded, onToggle }: CallHisto
       <span className={`status-cell ${call.status}`} data-label="Status">
         {call.status === 'success' ? '✓' : '✗'} {call.status}
       </span>
-      <span data-label="Response Time">{formatTime(call.responseTime)}</span>
+      <span data-label="Response Time">{formatDuration(call.responseTime)}</span>
       <span data-label="Cost">{formatPrice(call.cost)} USDC</span>
       <span data-label="Actions">
         <button
