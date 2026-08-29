@@ -223,7 +223,7 @@ export function formatTimeString(date: Date, locale?: string): string {
 export function formatCountdown(ms: number): string {
   if (ms <= 0) return '0s';
 
-  const totalSeconds = Math.ceil(ms / 1000);
+  const totalSeconds = Math.round(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
@@ -235,3 +235,66 @@ export function formatCountdown(ms: number): string {
 
   return parts.join(' ');
 }
+
+/**
+ * Options for formatting an invoice due date.
+ */
+export interface FormatDueDateOptions {
+  /** The target timezone (e.g. 'America/New_York', 'Europe/London', 'UTC'). */
+  timeZone?: string;
+  /** The locale to format with (e.g. 'en-US'). */
+  locale?: string;
+  /** Whether to include time alongside date (default: true). */
+  includeTime?: boolean;
+}
+
+/**
+ * Format a Date, timestamp, or ISO date string into an invoice due date string
+ * formatted according to an account timezone and locale.
+ * If input is a relative string (e.g. 'Due in 7 days'), it is returned as-is.
+ *
+ * @example formatDueDate('2026-09-05T00:00:00Z', { timeZone: 'America/New_York' })
+ */
+export function formatDueDate(
+  dateOrIsoOrString: Date | string | number,
+  options?: FormatDueDateOptions
+): string {
+  if (typeof dateOrIsoOrString === 'string') {
+    // If it is not a parsable date (e.g., "Due in 7 days"), return as-is
+    const parsed = Date.parse(dateOrIsoOrString);
+    if (isNaN(parsed)) {
+      return dateOrIsoOrString;
+    }
+  }
+
+  try {
+    const date =
+      typeof dateOrIsoOrString === 'number'
+        ? new Date(dateOrIsoOrString)
+        : typeof dateOrIsoOrString === 'string'
+        ? new Date(dateOrIsoOrString)
+        : dateOrIsoOrString;
+
+    if (isNaN(date.getTime())) {
+      return String(dateOrIsoOrString);
+    }
+
+    const loc = resolveLocale(options?.locale);
+    const formatOptions: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: options?.timeZone,
+    };
+
+    if (options?.includeTime) {
+      formatOptions.hour = '2-digit';
+      formatOptions.minute = '2-digit';
+    }
+
+    return new Intl.DateTimeFormat(loc, formatOptions).format(date);
+  } catch {
+    return String(dateOrIsoOrString);
+  }
+}
+

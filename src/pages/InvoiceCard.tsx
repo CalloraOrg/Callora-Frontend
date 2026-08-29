@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useAccount } from '../hooks/useAccount';
+import { formatDueDate } from '../utils/format';
 
 /**
  * Props for the InvoiceCard component.
@@ -8,8 +10,12 @@ export type InvoiceCardProps = {
   invoiceNumber: string;
   /** The formatted amount due (e.g., '$4,200') */
   amountDue: string;
-  /** Optional due date string. Defaults to 'Due in 7 days' */
-  dueDate?: string;
+  /** Optional due date string, timestamp, or ISO string. Defaults to 'Due in 7 days' */
+  dueDate?: string | Date | number;
+  /** Optional timezone override (e.g., 'America/New_York'). Defaults to current account's timezone or system timezone */
+  timezone?: string;
+  /** Optional locale override (e.g., 'en-US') */
+  locale?: string;
   /** Callback triggered when the 'Pay now' primary action is clicked */
   onPay?: () => void;
   /** Callback triggered when the 'Download' secondary action is clicked */
@@ -26,10 +32,22 @@ export function InvoiceCard({
   invoiceNumber,
   amountDue,
   dueDate = 'Due in 7 days',
+  timezone,
+  locale,
   onPay,
   onDownload,
 }: InvoiceCardProps) {
   const [isScrolled, setIsScrolled] = useState(false);
+  const account = useAccount();
+
+  const effectiveTimezone = timezone ?? account?.timezone;
+
+  const formattedDueDate = useMemo(() => {
+    return formatDueDate(dueDate, {
+      timeZone: effectiveTimezone,
+      locale,
+    });
+  }, [dueDate, effectiveTimezone, locale]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -57,7 +75,7 @@ export function InvoiceCard({
       </header>
 
       <div className="invoice-card__meta">
-        <span>{dueDate}</span>
+        <span data-testid="invoice-card-due-date">{formattedDueDate}</span>
         <span>GrantFox FWC26</span>
       </div>
 

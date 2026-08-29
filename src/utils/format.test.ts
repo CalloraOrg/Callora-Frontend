@@ -11,6 +11,8 @@ import {
   formatTimestamp,
   formatDateShort,
   formatTimeString,
+  formatCountdown,
+  formatDueDate,
 } from './format';
 
 // ---------------------------------------------------------------------------
@@ -415,17 +417,12 @@ describe('locale fallback (no explicit locale arg)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// formatCountdown – Human-readable countdown timer formatter
-// ---------------------------------------------------------------------------
-import { formatCountdown } from './format';
-
 describe('formatCountdown', () => {
-  it('formats 0ms as '0s'', () => {
+  it('formats 0ms as "0s"', () => {
     expect(formatCountdown(0)).toBe('0s');
   });
 
-  it('formats negative values as '0s'', () => {
+  it('formats negative values as "0s"', () => {
     expect(formatCountdown(-1000)).toBe('0s');
   });
 
@@ -464,3 +461,43 @@ describe('formatCountdown', () => {
     expect(formatCountdown(90061000)).toBe('25h 1m 1s');
   });
 });
+
+// ---------------------------------------------------------------------------
+// formatDueDate – formats invoice due dates in target timezone
+// ---------------------------------------------------------------------------
+describe('formatDueDate', () => {
+  it('preserves non-date strings like "Due in 7 days"', () => {
+    expect(formatDueDate('Due in 7 days')).toBe('Due in 7 days');
+    expect(formatDueDate('Immediate')).toBe('Immediate');
+  });
+
+  it('formats an ISO timestamp in UTC timezone', () => {
+    const iso = '2026-09-01T15:30:00Z';
+    const formatted = formatDueDate(iso, { timeZone: 'UTC', locale: 'en-US' });
+    expect(formatted).toContain('Sep 1, 2026');
+  });
+
+  it('formats dates across different timezones reflecting timezone offsets', () => {
+    // 2026-09-01T01:00:00Z -> Aug 31 in New York (EDT -4), Sep 1 in Tokyo (JST +9)
+    const iso = '2026-09-01T01:00:00Z';
+    const ny = formatDueDate(iso, { timeZone: 'America/New_York', locale: 'en-US' });
+    const tokyo = formatDueDate(iso, { timeZone: 'Asia/Tokyo', locale: 'en-US' });
+
+    expect(ny).toContain('Aug 31, 2026');
+    expect(tokyo).toContain('Sep 1, 2026');
+  });
+
+  it('supports includeTime option', () => {
+    const iso = '2026-09-01T15:30:00Z';
+    const formatted = formatDueDate(iso, { timeZone: 'UTC', locale: 'en-US', includeTime: true });
+    expect(formatted).toMatch(/Sep 1, 2026/);
+    expect(formatted).toMatch(/03:30|3:30/);
+  });
+
+  it('handles Date objects and numeric timestamps', () => {
+    const date = new Date('2026-10-15T12:00:00Z');
+    expect(formatDueDate(date, { timeZone: 'UTC', locale: 'en-US' })).toContain('Oct 15, 2026');
+    expect(formatDueDate(date.getTime(), { timeZone: 'UTC', locale: 'en-US' })).toContain('Oct 15, 2026');
+  });
+});
+

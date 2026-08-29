@@ -5,6 +5,7 @@ export type Account = {
   id: string;
   label: string;
   apiKey: string;
+  timezone?: string;
 };
 
 type AccountState = {
@@ -46,7 +47,7 @@ function load(): void {
     const accounts = raw ? (JSON.parse(raw) as Account[]) : [];
     state = {
       currentAccountId: current,
-      accounts: accounts.filter((a) => a.id === current),
+      accounts: accounts,
     };
   } catch {
     /* ignore parse errors */
