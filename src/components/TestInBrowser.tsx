@@ -1,4 +1,23 @@
 import { useState } from "react";
+import { isSensitiveKey } from "../utils/snapshotUrl";
+
+/**
+ * TestInBrowser
+ *
+ * Renders a one-click inline test runner affordance for a single API endpoint.
+ * Clicking "Test in browser" expands a panel where the user can fill in query
+ * parameters and fire a live GET/POST request directly from the page.
+ *
+ * Accessibility: the trigger button has an aria-expanded attribute and the
+ * panel is labelled via aria-labelledby so it is announced correctly by
+ * screen readers (WCAG 2.1 AA).
+ *
+ * SECURITY: parameter inputs whose names look like credentials (API keys,
+ * tokens, passwords, etc.) are rendered as password-type inputs so the values
+ * are masked in the UI and excluded from browser autocomplete suggestions.
+ * This prevents secrets from being visible on screen, saved by the browser,
+ * or leaked via shoulder-surfing.
+ */
 import { useApiCache } from "../hooks/useApiCache";
 
 export interface EndpointParam {
@@ -157,7 +176,13 @@ export default function TestInBrowser({
               style={{ display: "grid", gap: 10, marginBottom: 14 }}
               aria-label="Endpoint parameters"
             >
-              {params.map((p) => (
+              {params.map((p) => {
+                // Mask inputs whose parameter name looks like a credential so
+                // the value is hidden in the UI and not offered by browser
+                // autocomplete.  Uses the same pattern list as snapshotUrl so
+                // the masking and redaction logic stay in sync.
+                const sensitive = isSensitiveKey(p.name);
+                return (
                 <label
                   key={p.name}
                   style={{
@@ -186,14 +211,24 @@ export default function TestInBrowser({
                       }}
                     >
                       {p.type}
+                      {sensitive && (
+                        <span
+                          aria-label="sensitive — value will be masked"
+                          style={{ marginLeft: 4, color: "var(--warning, #f59e0b)" }}
+                          title="This parameter looks like a credential and will be masked"
+                        >
+                          🔒
+                        </span>
+                      )}
                     </span>
                   </span>
                   <input
-                    type="text"
+                    type={sensitive ? "password" : "text"}
                     placeholder={p.required ? "Required" : "Optional"}
                     value={values[p.name] ?? ""}
                     onChange={(e) => handleChange(p.name, e.target.value)}
-                    aria-label={`${p.name} parameter value`}
+                    aria-label={`${p.name} parameter value${sensitive ? " (sensitive — masked)" : ""}`}
+                    autoComplete={sensitive ? "new-password" : "off"}
                     style={{
                       padding: "6px 10px",
                       borderRadius: 6,
@@ -204,7 +239,8 @@ export default function TestInBrowser({
                     }}
                   />
                 </label>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>

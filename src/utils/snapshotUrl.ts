@@ -11,29 +11,103 @@ export interface EndpointSnapshot {
 }
 
 /**
+ * Case-insensitive set of parameter key patterns that may carry secret values.
+ * Any param key matching one of these patterns is stripped before the snapshot
+ * is encoded into the URL, so credentials never enter browser history,
+ * server logs, or shared links.
+ *
+ * Matches are performed on the lowercased key; a key is redacted when it
+ * *contains* any of these substrings.
+ */
+export const SENSITIVE_PARAM_PATTERNS: readonly string[] = [
+  'key',
+  'token',
+  'secret',
+  'password',
+  'passwd',
+  'pass',
+  'auth',
+  'authorization',
+  'credential',
+  'apikey',
+  'api_key',
+  'access',
+  'private',
+  'signing',
+  'bearer',
+  'session',
+  'jwt',
+  'x-api',
+];
+
+/**
+ * Returns true when a parameter key should be treated as sensitive and must
+ * not be embedded in a shareable URL.
+ *
+ * The check is intentionally broad: a key is flagged when its lowercased form
+ * *contains* any of the patterns above.  This catches both camelCase
+ * ("apiKey") and snake_case ("api_key") variants without requiring an exact
+ * match.
+ */
+export function isSensitiveKey(key: string): boolean {
+  const lower = key.toLowerCase();
+  return SENSITIVE_PARAM_PATTERNS.some((pattern) => lower.includes(pattern));
+}
+
+/**
+ * Returns a shallow copy of `params` with all sensitive keys removed.
+ * Non-sensitive keys are forwarded unchanged.
+ *
+ * This is the authoritative scrubbing step that must be applied before any
+ * params are encoded into a URL or written to the clipboard.
+ */
+export function redactSensitiveParams(
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (!isSensitiveKey(key)) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/**
  * Serializes endpoint state to a URL-safe query string format.
  * - params: JSON stringified and base64 encoded to handle complex objects
  * - Handles circular references gracefully by catching errors
+ *
+ * SECURITY: sensitive parameter keys (auth tokens, API keys, passwords, etc.)
+ * are stripped by `redactSensitiveParams` before encoding.  This prevents
+ * secret values from entering browser history, server-side request logs, or
+ * shared links.
  */
 export function generateSnapshotUrl(
   basePath: string,
   snapshot: EndpointSnapshot,
 ): string {
-  const params = new URLSearchParams();
-  params.set('endpoint', snapshot.endpointId);
+  const urlParams = new URLSearchParams();
+  urlParams.set('endpoint', snapshot.endpointId);
 
   if (snapshot.params) {
     try {
-      const json = JSON.stringify(snapshot.params);
-      // Use encodeURIComponent to handle Unicode, then btoa for binary-safe base64
-      const encoded = btoa(unescape(encodeURIComponent(json)));
-      params.set('params', encoded);
+      // Strip sensitive keys before encoding — secrets must never enter the URL.
+      const safeParams = redactSensitiveParams(snapshot.params);
+
+      // Only include the params segment when there is at least one safe key.
+      if (Object.keys(safeParams).length > 0) {
+        const json = JSON.stringify(safeParams);
+        // Use encodeURIComponent to handle Unicode, then btoa for binary-safe base64
+        const encoded = btoa(unescape(encodeURIComponent(json)));
+        urlParams.set('params', encoded);
+      }
     } catch {
-      // Silently fail if JSON serialization fails
+      // Silently fail if JSON serialization fails; no partial data leaks out.
     }
   }
 
-  return `${basePath}?${params.toString()}`;
+  return `${basePath}?${urlParams.toString()}`;
 }
 
 /**
