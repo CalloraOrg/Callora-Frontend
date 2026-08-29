@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import ApiCard from "../components/ApiCard";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { useFavorites } from "../hooks/useFavorites";
+import { useMarketplaceUrlState } from "../hooks/useMarketplaceUrlState";
+import { useAccountContext } from "../hooks/useAccountContext";
 import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
@@ -43,132 +45,40 @@ export default function MarketplacePage(): JSX.Element {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [search, setSearchRaw] = useState(
-    () => searchParams.get("q") ?? "",
-  );
+  // Single source of truth for every marketplace filter: the URL. The hook
+  // derives each value from `searchParams` on render and only ever writes back
+  // to the URL, so back/forward, refreshes, and deep links can never leave the
+  // UI showing a stale, locally-cached filter (#989).
+  const {
+    query,
+    queryDraft,
+    commitQuery,
+    setQueryDraft,
+    categories,
+    setCategories,
+    statuses,
+    setStatuses,
+    tag,
+    setTag,
+    minPrice,
+    setMinPrice,
+    maxPrice,
+    setMaxPrice,
+    popularity,
+    setPopularity,
+    favoritesOnly,
+    setFavoritesOnly,
+    sort,
+    setSort,
+    clearAll,
+  } = useMarketplaceUrlState();
 
-  const setSearch = (v: string) => {
-    setSearchRaw(v);
-    setSearchParams((prev) => {
-      if (v) prev.set("q", v); else prev.delete("q");
-      return prev;
-    }, { replace: true });
-  };
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
 
   const [density, setDensity] = useState<DensityPreference>(() =>
     readDensityPreference(),
   );
-  const debouncedSearch = useDebounce(search, 300);
-  // ── Filter persistence in URL ──────────────────────────────────────────────
-  const [selectedCategories, setSelectedCategoriesRaw] = useState<Set<string>>(
-    () => {
-      const raw = searchParams.get("categories");
-      return raw ? new Set(raw.split(",").filter(Boolean)) : new Set();
-    },
-  );
-  const setSelectedCategories = (next: Set<string>) => {
-    setSelectedCategoriesRaw(next);
-    setSearchParams(
-      (prev) => {
-        if (next.size > 0) prev.set("categories", [...next].join(","));
-        else prev.delete("categories");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(
-    () => {
-      const raw = searchParams.get("statuses");
-      return raw ? new Set(raw.split(",").filter(Boolean)) : new Set();
-    },
-  );
-
-  const [selectedTag, setSelectedTagRaw] = useState<string | null>(() =>
-    searchParams.get("tag"),
-  );
-  const setSelectedTag = (tag: string | null) => {
-    setSelectedTagRaw(tag);
-    setSearchParams(
-      (prev) => {
-        if (tag) prev.set("tag", tag);
-        else prev.delete("tag");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const [minPrice, setMinPriceRaw] = useState<number | null>(() => {
-    const v = searchParams.get("minPrice");
-    return v ? Number(v) : null;
-  });
-  const setMinPrice = (v: number | null) => {
-    setMinPriceRaw(v);
-    setSearchParams(
-      (prev) => {
-        if (v !== null) prev.set("minPrice", String(v));
-        else prev.delete("minPrice");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const [maxPrice, setMaxPriceRaw] = useState<number | null>(() => {
-    const v = searchParams.get("maxPrice");
-    return v ? Number(v) : null;
-  });
-  const setMaxPrice = (v: number | null) => {
-    setMaxPriceRaw(v);
-    setSearchParams(
-      (prev) => {
-        if (v !== null) prev.set("maxPrice", String(v));
-        else prev.delete("maxPrice");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const [popularity, setPopularityRaw] = useState<string>(
-    () => searchParams.get("popularity") ?? "any",
-  );
-  const setPopularity = (v: string) => {
-    setPopularityRaw(v);
-    setSearchParams(
-      (prev) => {
-        if (v !== "any") prev.set("popularity", v);
-        else prev.delete("popularity");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-  const { favorites, toggleFavorite, isFavorite } = useFavorites();
-
-  const [favoritesOnly, setFavoritesOnlyRaw] = useState(
-    () => searchParams.get("favorites") === "1",
-  );
-  const setFavoritesOnly = (v: boolean) => {
-    setFavoritesOnlyRaw(v);
-    setSearchParams((prev) => {
-      if (v) prev.set("favorites", "1"); else prev.delete("favorites");
-      return prev;
-    }, { replace: true });
-  };
-
-  const sortParam = (searchParams.get("sort") ?? "popularity") as SortValue;
-  const setSortParam = (value: SortValue) => {
-    setSearchParams(
-      (prev) => {
-        prev.set("sort", value);
-        return prev;
-      },
-      { replace: true },
-    );
-  };
+  const debouncedQuery = useDebounce(query, 300);
 
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -177,8 +87,13 @@ export default function MarketplacePage(): JSX.Element {
 
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
   const isInitialMount = useRef(true);
+  // Monotonic sequence that guards the loading transition: only the latest
+  // in-flight load may flip `isLoading` off, so a stale timer from an earlier
+  // navigation can never overwrite the loading state of a newer one (#989).
+  const requestSeqRef = useRef(0);
 
   useEffect(() => {
+    const seq = ++requestSeqRef.current;
     const abortController = new AbortController();
     const prefersReducedMotion =
       typeof window !== "undefined" &&
@@ -187,12 +102,12 @@ export default function MarketplacePage(): JSX.Element {
     trackFetch(
       new Promise<void>((resolve) => {
         if (prefersReducedMotion) {
-          setIsLoading(false);
+          if (seq === requestSeqRef.current) setIsLoading(false);
           resolve();
         } else {
           const timer = setTimeout(() => {
             if (!abortController.signal.aborted) {
-              setIsLoading(false);
+              if (seq === requestSeqRef.current) setIsLoading(false);
               resolve();
             }
           }, LOADING_DELAY_MS);
@@ -212,24 +127,24 @@ export default function MarketplacePage(): JSX.Element {
 
   const hasActiveFilters = () => {
     return (
-      search.trim() !== "" ||
-      selectedCategories.size > 0 ||
-      selectedTag !== null ||
+      query.trim() !== "" ||
+      categories.size > 0 ||
+      tag !== null ||
       minPrice !== null ||
       maxPrice !== null ||
       popularity !== "any" ||
       favoritesOnly ||
-      selectedStatuses.size > 0
+      statuses.size > 0
     );
   };
 
   const activeFilterCount =
-    selectedCategories.size +
+    categories.size +
     (minPrice !== null ? 1 : 0) +
     (maxPrice !== null ? 1 : 0) +
     (popularity !== "any" ? 1 : 0) +
     (favoritesOnly ? 1 : 0) +
-    (selectedStatuses.size > 0 ? 1 : 0);
+    (statuses.size > 0 ? 1 : 0);
 
   const handleRetryFetch = async () => {
     setFetchError(null);
@@ -250,12 +165,26 @@ export default function MarketplacePage(): JSX.Element {
     announceTimerRef.current = setTimeout(() => setAnnouncement(""), 3000);
   }, []);
 
+  // Account-switch reset. Marketplace filters are scoped to the active account
+  // (favorites, category availability, etc.), so when the account changes we
+  // clear every filter + cursor from the URL. This guarantees the new account
+  // starts from authoritative, non-stale state instead of inheriting a previous
+  // account's selections (stale-state guard for #989).
+  const { account } = useAccountContext();
+  const accountIdRef = useRef(account?.id);
+  useEffect(() => {
+    if (accountIdRef.current === account?.id) return;
+    accountIdRef.current = account?.id;
+    clearAll();
+    announce("Switched account. Marketplace filters were reset.");
+  }, [account?.id, clearAll, announce]);
+
   // Filter and sort items
   const filtered = useMemo(() => {
     let items = MOCK_APIS.slice();
 
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.toLowerCase();
       items = items.filter((a) => {
         return (
           a.name.toLowerCase().includes(q) ||
@@ -266,24 +195,22 @@ export default function MarketplacePage(): JSX.Element {
       });
     }
 
-    if (selectedCategories.size > 0) {
-      items = items.filter((a) => selectedCategories.has(a.category ?? ""));
+    if (categories.size > 0) {
+      items = items.filter((a) => categories.has(a.category ?? ""));
     }
 
-    if (selectedStatuses.size > 0) {
-      items = items.filter((a) => a.status && selectedStatuses.has(a.status));
+    if (statuses.size > 0) {
+      items = items.filter((a) => a.status && statuses.has(a.status));
     }
 
     if (favoritesOnly) {
       items = items.filter((a) => favorites.includes(a.id));
     }
 
-    if (selectedTag) {
-      const normalizedSelectedTag = selectedTag.toLowerCase();
+    if (tag) {
+      const normalizedTag = tag.toLowerCase();
       items = items.filter((a) =>
-        (a.tags || []).some(
-          (tag) => tag.toLowerCase() === normalizedSelectedTag,
-        ),
+        (a.tags || []).some((t) => t.toLowerCase() === normalizedTag),
       );
     }
 
@@ -306,17 +233,17 @@ export default function MarketplacePage(): JSX.Element {
       );
     }
 
-    if (sortParam === "price-asc")
+    if (sort === "price-asc")
       items = items.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
-    if (sortParam === "latency-asc")
+    if (sort === "latency-asc")
       items = items.sort(
         (a, b) =>
           (a.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER) -
           (b.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER),
       );
-    if (sortParam === "popularity")
+    if (sort === "popularity")
       items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
-    if (sortParam === "newest")
+    if (sort === "newest")
       items = items.sort(
         (a, b) =>
           Date.parse(b.createdAt ?? "1970-01-01") -
@@ -325,15 +252,15 @@ export default function MarketplacePage(): JSX.Element {
 
     return items;
   }, [
-    debouncedSearch,
-    selectedCategories,
-    selectedTag,
+    debouncedQuery,
+    categories,
+    tag,
     minPrice,
     maxPrice,
     popularity,
     favoritesOnly,
-    sortParam,
-    selectedStatuses,
+    sort,
+    statuses,
   ]);
 
   // ── Cursor pagination ──────────────────────────────────────────────────
@@ -373,14 +300,14 @@ export default function MarketplacePage(): JSX.Element {
     }
     resetCursor();
   }, [
-    debouncedSearch,
-    selectedCategories,
-    selectedTag,
+    debouncedQuery,
+    categories,
+    tag,
     minPrice,
     maxPrice,
     popularity,
-    sortParam,
-    selectedStatuses,
+    sort,
+    statuses,
     favoritesOnly,
     resetCursor,
   ]);
@@ -407,59 +334,50 @@ export default function MarketplacePage(): JSX.Element {
   const prevTag = useRef<string | null>(null);
   useEffect(() => {
     const prev = prevTag.current;
-    if (selectedTag !== prev) {
-      if (selectedTag) {
-        announce(`Filtering by tag: ${selectedTag}`);
+    if (tag !== prev) {
+      if (tag) {
+        announce(`Filtering by tag: ${tag}`);
       } else {
         announce("Tag filter removed.");
       }
-      prevTag.current = selectedTag;
+      prevTag.current = tag;
     }
-  }, [selectedTag, announce]);
+  }, [tag, announce]);
 
-  const handleTagClick = (tag: string) => {
-    setSelectedTag(
-      selectedTag?.toLowerCase() === tag.toLowerCase() ? null : tag,
-    );
+  const handleTagClick = (clickedTag: string) => {
+    setTag(tag?.toLowerCase() === clickedTag.toLowerCase() ? null : clickedTag);
   };
 
   // Handlers
   const toggleCategory = (c: string) => {
-    const copy = new Set(selectedCategories);
+    const copy = new Set(categories);
     if (copy.has(c)) copy.delete(c);
     else copy.add(c);
-    setSelectedCategories(copy);
+    setCategories(copy);
   };
 
   const toggleStatus = (s: string) => {
-    const copy = new Set(selectedStatuses);
+    const copy = new Set(statuses);
     if (copy.has(s)) copy.delete(s);
     else copy.add(s);
-    setSelectedStatuses(copy);
+    setStatuses(copy);
   };
 
   const clearCategories = () => {
-    setSelectedCategories(new Set());
+    setCategories(new Set());
   };
 
   const clearFilters = () => {
-    setSelectedCategories(new Set());
-    setSelectedTag(null);
-    setMinPrice(null);
-    setMaxPrice(null);
-    setPopularity("any");
-    setFavoritesOnly(false);
-    setSelectedStatuses(new Set());
-    setSortParam("popularity");
-    setSearch("");
+    clearAll();
     announce("All filters cleared. Showing all APIs.");
     setPageSize(12);
   };
 
   const handlePageChange = () => {
+    const seq = ++requestSeqRef.current;
     setIsPageLoading(true);
     requestAnimationFrame(() => {
-      setIsPageLoading(false);
+      if (seq === requestSeqRef.current) setIsPageLoading(false);
     });
   };
 
@@ -500,7 +418,7 @@ export default function MarketplacePage(): JSX.Element {
         <h1>API Marketplace</h1>
         <div className="marketplace-search-row">
           <div className="marketplace-search">
-            <SearchBar value={search} onChange={setSearch} />
+            <SearchBar value={queryDraft} onChange={commitQuery} />
           </div>
           <div
             className="marketplace-density-toggle"
@@ -525,7 +443,7 @@ export default function MarketplacePage(): JSX.Element {
             </button>
           </div>
         </div>
-        <SortDropdown value={sortParam} onChange={setSortParam} />
+        <SortDropdown value={sort} onChange={setSort} />
       </div>
 
       {/* Rail of APIs with the most recent usage */}
@@ -535,7 +453,7 @@ export default function MarketplacePage(): JSX.Element {
       <div className="marketplace-layout">
         <aside className="marketplace-sidebar">
           <FiltersSidebar
-            selectedCategories={selectedCategories}
+            selectedCategories={categories}
             toggleCategory={toggleCategory}
             minPrice={minPrice}
             maxPrice={maxPrice}
@@ -546,7 +464,7 @@ export default function MarketplacePage(): JSX.Element {
             clearFilters={clearFilters}
             favoritesOnly={favoritesOnly}
             toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
-            selectedStatuses={selectedStatuses}
+            selectedStatuses={statuses}
             toggleStatus={toggleStatus}
             resultCount={filtered.length}
           />
@@ -580,17 +498,17 @@ export default function MarketplacePage(): JSX.Element {
                   {" "}APIs
                 </>
               )}
-              {selectedTag && (
+              {tag && (
                 <span className="marketplace-active-tag" aria-live="polite">
-                  Filtered by tag: #{selectedTag}
+                  Filtered by tag: #{tag}
                 </span>
               )}
             </div>
 
             <div className="marketplace-actions">
               <select
-                value={sortParam}
-                onChange={(e) => setSortParam(e.target.value as SortValue)}
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortValue)}
               >
                 <option value="relevance">Relevance</option>
                 <option value="priceAsc">Price: low → high</option>
@@ -621,15 +539,15 @@ export default function MarketplacePage(): JSX.Element {
 
           <CategoryPills
             categories={ALL_CATEGORIES}
-            selectedCategories={selectedCategories}
+            selectedCategories={categories}
             toggleCategory={toggleCategory}
             clearCategories={clearCategories}
           />
 
           <ApiTagFilter
             tags={allTags}
-            selectedTag={selectedTag}
-            onTagChange={setSelectedTag}
+            selectedTag={tag}
+            onTagChange={setTag}
           />
 
           {fetchError ? (
@@ -683,7 +601,7 @@ export default function MarketplacePage(): JSX.Element {
                   density={density}
                   onViewDetails={handleViewDetails}
                   onTagClick={handleTagClick}
-                  activeTag={selectedTag}
+                  activeTag={tag}
                 />
               ))}
             </div>
@@ -714,7 +632,7 @@ export default function MarketplacePage(): JSX.Element {
         open={showFiltersMobile}
         onClose={() => setShowFiltersMobile(false)}
         resultCount={filtered.length}
-        selectedCategories={selectedCategories}
+        selectedCategories={categories}
         toggleCategory={toggleCategory}
         minPrice={minPrice}
         maxPrice={maxPrice}
@@ -725,7 +643,7 @@ export default function MarketplacePage(): JSX.Element {
         clearFilters={clearFilters}
         favoritesOnly={favoritesOnly}
         toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
-        selectedStatuses={selectedStatuses}
+        selectedStatuses={statuses}
         toggleStatus={toggleStatus}
         triggerRef={filtersTriggerRef}
       />
