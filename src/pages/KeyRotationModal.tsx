@@ -1,20 +1,38 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useToast } from '../components/Toast';
+import {
+  validateRotationRequest,
+  sanitizeRotationError,
+  isRetryableError,
+  generateConfirmationToken,
+  RotationContext,
+  stripSensitiveData,
+  type RotationRequest,
+} from '../services/KeyRotationService';
+import { rotateKeyWithToken } from '../services/KeyRotationApi';
+import { logError, formatErrorForUI } from '../services/SecureErrorHandler';
 
 /**
  * KeyRotationModal
  *
  * A WCAG 2.1 AA accessible modal for rotating API keys with optimistic UI
- * update and automatic revert on failure.
+ * update, automatic revert on failure, and comprehensive security boundaries.
  *
- * Flow:
+ * Security features:
+ *   - Authorization checks before mutation (via validateRotationRequest)
+ *   - Confirmation tokens to prevent replay/cross-tenant attacks
+ *   - Staleness checks for all requests
+ *   - Secure error handling (no API key or token leakage)
+ *   - Input validation for all parameters
+ *
+ * User flow:
  *   1. User opens the modal → sees the current (masked) API key.
- *   2. User clicks "Rotate Key" → the new key is **immediately** displayed
- *      (optimistic update) while the rotation request is sent.
- *   3. If the request *succeeds* → a success toast is shown and the new key
- *      is kept.
- *   4. If the request *fails* → the old key is **reverted** and an error
- *      toast is displayed so the user can retry.
+ *   2. User clicks "Rotate Key" → validates authorization first.
+ *   3. On validation pass: new key is **immediately** displayed (optimistic update)
+ *      while the rotation request is sent.
+ *   4. If the request *succeeds* → a success toast is shown and the new key is kept.
+ *   5. If the request *fails* → the old key is **reverted** and a safe error
+ *      toast is displayed. User can retry if the error is retryable.
  *
  * Focus management (WCAG 2.1 AA):
  *   - When the modal opens, focus is moved to the "Close" button.
@@ -24,7 +42,7 @@ import { useToast } from '../components/Toast';
  * Design tokens are used for all colors, shadows, and spacing so the modal
  * works correctly in both light and dark themes.
  *
- * Part of GrantFox FWC26 campaign UI/UX requirements.
+ * Part of issue #991: Make API-key rotation confirmation lossless
  */
 
 interface KeyRotationModalProps {
@@ -34,13 +52,18 @@ interface KeyRotationModalProps {
   onClose: () => void;
   /** The current API key displayed in the modal. */
   currentKey: string;
-  /**
-   * Async callback that performs the actual key rotation.
-   * Must resolve with the new key string on success, or throw on failure.
-   */
-  onRotateKey: () => Promise<string>;
+  /** Unique identifier for this key (used in rotation context). */
+  keyId: string;
   /** Called with the new key after a successful rotation. */
   onKeyChanged?: (newKey: string) => void;
+  /** Current user ID (used in authorization context). */
+  userId: string;
+  /** Current tenant ID (used in authorization context). */
+  tenantId: string;
+  /** Current session ID (used in authorization context). */
+  sessionId: string;
+  /** Session bearer token for API authentication. */
+  sessionToken: string;
 }
 
 /**
@@ -59,8 +82,12 @@ export default function KeyRotationModal({
   isOpen,
   onClose,
   currentKey,
-  onRotateKey,
+  keyId,
   onKeyChanged,
+  userId,
+  tenantId,
+  sessionId,
+  sessionToken,
 }: KeyRotationModalProps) {
   const { showToast } = useToast();
 
@@ -69,6 +96,8 @@ export default function KeyRotationModal({
   const [isKeyVisible, setIsKeyVisible] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const [rotationError, setRotationError] = useState<string | null>(null);
+  const [lastErrorCode, setLastErrorCode] = useState<string | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
 
   // Track the key that was showing before the optimistic update started,
   // so we can revert to it on failure.
@@ -133,17 +162,55 @@ export default function KeyRotationModal({
   }, [isOpen]);
 
   /**
-   * Optimistic key rotation:
-   * 1. Save the current key as fallback.
-   * 2. Generate an optimistic new key and display it immediately.
-   * 3. Call the async rotation handler.
-   * 4. On success: keep the new key, notify parent, show success toast.
-   * 5. On failure: revert to the saved key, show error toast.
+   * Lossless key rotation with security boundaries:
+   * 1. **Before** optimistic update: Validate authorization, context, and token
+   * 2. If validation fails: Reject immediately without state changes (fail closed)
+   * 3. If validation passes: Show optimistic key
+   * 4. Call the API with signed rotation request
+   * 5. On success: keep the new key from server, notify parent, show success toast
+   * 6. On failure: revert to saved key, show safe (non-leaking) error toast, allow retry if appropriate
    */
   const handleRotate = useCallback(async () => {
     if (isRotating) return;
 
     setRotationError(null);
+    setLastErrorCode(null);
+    setCanRetry(false);
+
+    // Step 1: Build the rotation context
+    const context: RotationContext = {
+      userId,
+      tenantId,
+      sessionId,
+      timestamp: Date.now(),
+    };
+
+    // Step 2: Generate a confirmation token
+    const confirmationToken = generateConfirmationToken(context);
+
+    // Step 3: Validate authorization BEFORE any state changes (fail closed)
+    const validationResult = validateRotationRequest(
+      {
+        keyId,
+        confirmationToken,
+        context,
+      },
+      userId,
+      tenantId,
+      sessionId,
+    );
+
+    if (!validationResult.valid) {
+      // Authorization failed: show error without modifying state
+      const error = validationResult.error;
+      setRotationError(error?.message ?? 'Authorization failed.');
+      setLastErrorCode(error?.code ?? null);
+      setCanRetry(false);
+      showToast(error?.message ?? 'You are not authorized to rotate this key.', 'error');
+      return; // Don't proceed to optimistic update
+    }
+
+    // Step 4: Authorization passed - now proceed with optimistic update
     setIsRotating(true);
 
     // Save the current key as fallback before optimistic update
@@ -155,24 +222,56 @@ export default function KeyRotationModal({
     setDisplayedKey(optimisticKey);
 
     try {
-      // Attempt actual rotation
-      const newKey = await onRotateKey();
+      // Attempt actual rotation with the API layer
+      const response = await rotateKeyWithToken(
+        {
+          keyId,
+          confirmationToken,
+          context,
+        },
+        sessionToken,
+      );
+
+      if (!response.success || !response.newKey) {
+        // Backend returned an error
+        const formattedError = formatErrorForUI(
+          new Error(response.error?.message),
+          response.error?.code
+        );
+
+        // Log for debugging (sanitized)
+        logError('[KeyRotationModal] Rotation failed', response.error, {
+          code: response.error?.code,
+          retryable: formattedError.isRetryable,
+        });
+
+        throw new Error(formattedError.message);
+      }
 
       // Success: keep the new key from the server
-      setDisplayedKey(newKey);
-      previousKeyRef.current = newKey;
-      onKeyChanged?.(newKey);
+      setDisplayedKey(response.newKey);
+      previousKeyRef.current = response.newKey;
+      onKeyChanged?.(response.newKey);
       showToast('API key rotated successfully.', 'success');
-    } catch {
+    } catch (error) {
       // Failure: revert to the previous key
       setDisplayedKey(fallbackKey);
       previousKeyRef.current = fallbackKey;
-      setRotationError('Failed to rotate API key. Please try again.');
-      showToast('Key rotation failed. Your previous key has been restored.', 'error');
+
+      // Use secure error formatting
+      const formattedError = formatErrorForUI(error);
+      
+      // Log the error internally (without exposing to user)
+      logError('[KeyRotationModal] Rotation failed', error);
+
+      setRotationError(formattedError.message);
+      setLastErrorCode(formattedError.code ?? null);
+      setCanRetry(formattedError.isRetryable);
+      showToast(formattedError.message, 'error');
     } finally {
       setIsRotating(false);
     }
-  }, [isRotating, displayedKey, onRotateKey, onKeyChanged, showToast]);
+  }, [isRotating, displayedKey, keyId, userId, tenantId, sessionId, sessionToken, onKeyChanged, showToast]);
 
   const handleClose = useCallback(() => {
     if (isRotating) return; // Prevent closing while rotation is in progress
@@ -359,6 +458,18 @@ export default function KeyRotationModal({
           >
             Cancel
           </button>
+          {canRetry && rotationError && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleRotate}
+              disabled={isRotating}
+              aria-label="Retry API key rotation"
+              title="Retry the rotation"
+            >
+              {isRotating ? 'Rotating…' : 'Retry'}
+            </button>
+          )}
           <button
             type="button"
             className="primary-button"
