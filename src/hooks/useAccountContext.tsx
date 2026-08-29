@@ -3,13 +3,13 @@ import { getCurrentAccount, switchAccount as doSwitchAccount, addAccount, getKno
 import { invalidateAccountCache } from "../utils/offlineApiCache";
 
 const DEFAULT_ACCOUNTS = [
-  { id: "account-1", label: "Account 1", apiKey: "ck_live_4e85ff1ed6a4ff73893a0bf73f2bb" },
-  { id: "account-2", label: "Account 2", apiKey: "ck_live_9a2bc33e7f5d991475c1cb84g3cc" },
+  { id: "account-1", label: "Account 1", apiKey: "ck_live_4e85ff1ed6a4ff73893a0bf73f2bb", timezone: "America/New_York" },
+  { id: "account-2", label: "Account 2", apiKey: "ck_live_9a2bc33e7f5d991475c1cb84g3cc", timezone: "Europe/London" },
 ];
 
 interface AccountContextValue {
-  account: { id: string; label: string; apiKey: string } | null;
-  accounts: { id: string; label: string; apiKey: string }[];
+  account: { id: string; label: string; apiKey: string; timezone?: string } | null;
+  accounts: { id: string; label: string; apiKey: string; timezone?: string }[];
   switchAccount: (accountId: string) => void;
 }
 
