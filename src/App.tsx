@@ -27,6 +27,7 @@ import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 import { InvoiceCard } from "./pages/InvoiceCard";
 import BillingHistory from "./pages/BillingHistory";
+import { useAccountContext } from "./hooks/useAccountContext";
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -570,6 +571,7 @@ function App() {
                 Design System
               </NavLink>
             </nav>
+            <AccountSwitcher />
             <ThemeToggle />
           </div>
         </header>
@@ -925,6 +927,69 @@ function App() {
         )}
       </div>
     </ToastProvider>
+  );
+}
+
+function AccountSwitcher() {
+  const { account, accounts, switchAccount } = useAccountContext();
+  const [open, setOpen] = useState(false);
+
+  if (accounts.length === 0) return null;
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        className="ghost-button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        style={{ fontSize: 13 }}
+      >
+        {account ? account.label : "Switch account"}
+      </button>
+      {open && (
+        <ul
+          role="listbox"
+          aria-label="Accounts"
+          style={{
+            position: "absolute",
+            right: 0,
+            top: "100%",
+            marginTop: 8,
+            padding: 8,
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            listStyle: "none",
+            minWidth: 180,
+            zIndex: 1000,
+          }}
+        >
+          {accounts.map((acc) => (
+            <li
+              key={acc.id}
+              role="option"
+              aria-selected={account?.id === acc.id}
+              onClick={() => {
+                switchAccount(acc.id);
+                setOpen(false);
+              }}
+              style={{
+                padding: "8px 12px",
+                cursor: "pointer",
+                borderRadius: 4,
+                background: account?.id === acc.id ? "var(--accent)" : "transparent",
+                color: account?.id === acc.id ? "#fff" : "var(--text)",
+                fontSize: 13,
+              }}
+            >
+              {acc.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
