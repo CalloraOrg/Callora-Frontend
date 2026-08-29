@@ -96,8 +96,10 @@ export default function EndpointGroupHover({
                   onFocus={() => setActiveGroupId(group.id)}
                   onKeyDown={(event) => {
                     if (event.key === "Escape") {
+                      // Close the preview but keep keyboard focus on the
+                      // trigger so the user is not stranded on the body.
                       clearPreview();
-                      (event.currentTarget as HTMLButtonElement).blur();
+                      event.preventDefault();
                     }
                   }}
                 >

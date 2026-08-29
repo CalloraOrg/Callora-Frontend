@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import EmptyState from '../components/EmptyState';
 import Skeleton, { ApiUsageSkeleton, SkeletonRow } from '../components/Skeleton';
-import { formatPrice } from '../utils/format';
+import { formatPrice, formatDuration, formatTimestamp } from '../utils/format';
 import type { JsonSchema } from '../components/RequestBodyEditor';
 import CallHistoryRow from '../components/CallHistoryRow';
 import Breadcrumb from '../components/Breadcrumb';
@@ -204,19 +204,6 @@ const API_USAGE_SHORTCUTS = SHORTCUTS.filter(
 
 
 
-function formatTime(ms: number) {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatTimestamp(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 
 export default function ApiUsage() {
@@ -705,7 +692,7 @@ export default function ApiUsage() {
             ) : (
               <div className="response-content">
                 <div className="response-meta">
-                  <span className="response-time tabular-nums">Response time: {formatTime(responseTime || 0)}</span>
+                  <span className="response-time tabular-nums">Response time: {formatDuration(responseTime || 0)}</span>
                   <span className="response-cost tabular-nums">Cost: {formatPrice(callCost || 0)} USDC</span>
                 </div>
                 <pre className="response-json">
@@ -735,7 +722,7 @@ export default function ApiUsage() {
           </div>
           <div className="stat-card">
             <span className="stat-label">Avg Response Time</span>
-            <strong className="stat-value tabular-nums">{formatTime(usageStats.avgResponseTime)}</strong>
+            <strong className="stat-value tabular-nums">{formatDuration(usageStats.avgResponseTime)}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Success Rate</span>
