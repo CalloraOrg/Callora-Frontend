@@ -17,6 +17,9 @@ import { LinkIcon } from '../components/icons';
 import KbdHint from '../components/KbdHint';
 import { SHORTCUTS } from '../hooks/useGlobalShortcuts';
 import StatusIndicator from './StatusIndicator';
+import { useAccountId } from '../hooks/useAccount';
+import { useExportHistory } from '../hooks/useExportHistory';
+import { ExportProgressBar } from '../components/ExportProgressBar';
 import {
   clearHistory,
   loadHistory,
@@ -224,6 +227,28 @@ export default function ApiUsage() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const toggleHistory = useCallback(() => setIsHistoryOpen(prev => !prev), []);
   const [historyEntries, setHistoryEntries] = useState<any[]>([]);
+
+  const currentAccountId = useAccountId() ?? 'default';
+  const {
+    status: exportStatus,
+    format: exportFormat,
+    progress: exportProgress,
+    totalRecords: exportTotalRecords,
+    processedRecords: exportProcessedRecords,
+    error: exportError,
+    downloadUrl: exportDownloadUrl,
+    fileName: exportFileName,
+    lastFailedFormat: exportLastFailedFormat,
+    isExporting,
+    isFailed: isExportFailed,
+    isCompleted: isExportCompleted,
+    isCancelled: isExportCancelled,
+    startExport,
+    cancelExport,
+    retryLastFailedExport,
+    recoverDownload,
+    resetExport,
+  } = useExportHistory(callHistory, { accountId: currentAccountId });
 
   const prefersReducedMotion = useMemo(() => {
     return typeof window !== 'undefined' &&
@@ -495,36 +520,8 @@ export default function ApiUsage() {
   };
 
   const handleExportHistory = (format: 'csv' | 'json') => {
-    const data = callHistory.map(call => ({
-      timestamp: call.timestamp.toISOString(),
-      endpoint: call.endpoint,
-      status: call.status,
-      responseTime: call.responseTime,
-      cost: call.cost
-    }));
-
-    if (format === 'json') {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'call-history.json';
-      a.click();
-    } else {
-      const csv = [
-        'Timestamp,Endpoint,Status,Response Time,Cost',
-        ...data.map(call =>
-          `${call.timestamp},${call.endpoint},${call.status},${call.responseTime},${call.cost}`
-        )
-      ].join('\n');
-
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'call-history.csv';
-      a.click();
-    }
+    announceStatus(`Starting ${format.toUpperCase()} export...`);
+    startExport(format);
   };
 
   if (isPageLoading) {
@@ -769,14 +766,42 @@ export default function ApiUsage() {
             >
               Reset Filters
             </button>
-            <button className="secondary-button" onClick={() => handleExportHistory('csv')}>
-              Export CSV
+            <button
+              className="secondary-button"
+              onClick={() => handleExportHistory('csv')}
+              disabled={isExporting}
+              aria-busy={isExporting && exportFormat === 'csv'}
+            >
+              {isExporting && exportFormat === 'csv' ? 'Exporting CSV...' : 'Export CSV'}
             </button>
-            <button className="secondary-button" onClick={() => handleExportHistory('json')}>
-              Export JSON
+            <button
+              className="secondary-button"
+              onClick={() => handleExportHistory('json')}
+              disabled={isExporting}
+              aria-busy={isExporting && exportFormat === 'json'}
+            >
+              {isExporting && exportFormat === 'json' ? 'Exporting JSON...' : 'Export JSON'}
             </button>
           </div>
         </div>
+
+        <ExportProgressBar
+          exportState={{
+            status: exportStatus,
+            format: exportFormat,
+            progress: exportProgress,
+            totalRecords: exportTotalRecords,
+            processedRecords: exportProcessedRecords,
+            error: exportError,
+            downloadUrl: exportDownloadUrl,
+            fileName: exportFileName,
+            lastFailedFormat: exportLastFailedFormat,
+          }}
+          onCancel={cancelExport}
+          onRetry={retryLastFailedExport}
+          onRecoverDownload={recoverDownload}
+          onDismiss={resetExport}
+        />
 
         {/* Screen-reader announcement for ApiUsage state changes (WCAG 2.1 AA) */}
         <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">

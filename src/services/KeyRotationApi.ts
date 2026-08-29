@@ -17,8 +17,19 @@
  * Part of issue #991: Make API-key rotation confirmation lossless
  */
 
-import { RotationRequest } from './KeyRotationService';
-import { redactSensitiveData, classifyHttpError, logError } from './SecureErrorHandler';
+import { RotationRequest } from "./KeyRotationService";
+import {
+  redactSensitiveData,
+  classifyHttpError,
+  logError,
+} from "./SecureErrorHandler";
+import {
+  generateIdempotencyKey,
+  createInFlightGuard,
+  runWithTimeout,
+  withRetry,
+  isTimeoutError,
+} from "./idempotency";
 
 export interface KeyRotationApiResponse {
   success: boolean;
@@ -50,7 +61,150 @@ export interface KeyRotationApiResponse {
  * - User IDs, tenant IDs, or session IDs
  * - Implementation details or SQL errors
  */
-const ROTATE_KEY_ENDPOINT = '/api/v1/keys/rotate';
+const ROTATE_KEY_ENDPOINT = "/api/v1/keys/rotate";
+const ROTATION_TIMEOUT_MS = 30_000;
+const ROTATION_MAX_RETRIES = 1;
+const ROTATION_BASE_DELAY_MS = 250;
+class RotationApiError extends Error {
+  readonly code: string;
+  readonly status?: number;
+  readonly retryable: boolean;
+
+  constructor(
+    message: string,
+    opts: { code: string; status?: number; retryable?: boolean },
+  ) {
+    super(message);
+    this.name = "RotationApiError";
+    this.code = opts.code;
+    this.status = opts.status;
+    this.retryable = opts.retryable ?? false;
+  }
+}
+
+const rotationGuard = createInFlightGuard<KeyRotationApiResponse>();
+function isRetryableRotationError(error: unknown): boolean {
+  return error instanceof RotationApiError && error.retryable;
+}
+
+function toRotationFailure(error: unknown): KeyRotationApiResponse {
+  const baseMessage = "Failed to rotate API key. Please try again.";
+
+  if (error instanceof RotationApiError) {
+    return {
+      success: false,
+      error: {
+        code: error.code,
+        message: redactSensitiveData(error.message || baseMessage),
+      },
+    };
+  }
+
+  if (error instanceof Error) {
+    const isAbort =
+      error.name === "AbortError" ||
+      (typeof error.message === "string" &&
+        error.message.toLowerCase().includes("abort"));
+
+    if (isTimeoutError(error) || isAbort) {
+      return {
+        success: false,
+        error: {
+          code: "ROTATION_FAILED",
+          message:
+            "The rotation request exceeded its timeout. Please try again.",
+        },
+      };
+    }
+
+    return {
+      success: false,
+      error: {
+        code: "ROTATION_FAILED",
+        message: redactSensitiveData(
+          "Network error during rotation. Please try again.",
+        ),
+      },
+    };
+  }
+
+  return {
+    success: false,
+    error: {
+      code: "ROTATION_FAILED",
+      message: baseMessage,
+    },
+  };
+}
+
+async function performRotation(
+  rotationRequest: RotationRequest,
+  sessionToken: string,
+  idempotencyKey: string,
+  signal: AbortSignal,
+): Promise<KeyRotationApiResponse> {
+  const response = await fetch(ROTATE_KEY_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${sessionToken}`,
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify({
+      keyId: rotationRequest.keyId,
+      confirmationToken: rotationRequest.confirmationToken,
+      context: rotationRequest.context,
+    }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorClassification = classifyHttpError(response.status);
+    const data = await response.json().catch(() => ({}));
+
+    logError("KeyRotationApi.rotateKeyWithToken", data, {
+      status: response.status,
+      endpoint: ROTATE_KEY_ENDPOINT,
+    });
+
+    const code = data?.error?.code
+      ? String(data.error.code)
+      : errorClassification.retryable
+        ? "ROTATION_FAILED"
+        : "AUTHORIZATION_FAILED";
+
+    throw new RotationApiError(
+      redactSensitiveData(data?.error?.message || "Failed to rotate API key."),
+      {
+        code,
+        status: response.status,
+        retryable: errorClassification.retryable,
+      },
+    );
+  }
+
+  const data = await response.json();
+
+  if (data?.newKey) {
+    return {
+      success: true,
+      newKey: data.newKey,
+    };
+  }
+
+  logError(
+    "KeyRotationApi.rotateKeyWithToken",
+    "Invalid response format from server",
+  );
+
+  throw new RotationApiError(
+    "Failed to rotate API key. Invalid server response.",
+    {
+      code: "ROTATION_FAILED",
+      retryable: false,
+    },
+  );
+}
 
 /**
  * Rotates an API key using the backend with token-based confirmation.
@@ -72,129 +226,45 @@ export async function rotateKeyWithToken(
   rotationRequest: RotationRequest,
   sessionToken: string, // Bearer token from current session
 ): Promise<KeyRotationApiResponse> {
+  const idempotencyKey = generateIdempotencyKey("key-rotate");
+
   try {
-    const response = await fetch(ROTATE_KEY_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sessionToken}`,
-      },
-      body: JSON.stringify({
-        keyId: rotationRequest.keyId,
-        confirmationToken: rotationRequest.confirmationToken,
-        context: rotationRequest.context,
-      }),
-      // Prevent hanging requests
-      signal: AbortSignal.timeout(30000),
-    });
-
-    // Handle HTTP errors
-    if (!response.ok) {
-      const errorClassification = classifyHttpError(response.status);
-      const data = await response.json().catch(() => ({}));
-
-      // Log the error securely for debugging
-      logError('KeyRotationApi.rotateKeyWithToken', data, {
-        status: response.status,
-        endpoint: ROTATE_KEY_ENDPOINT,
-      });
-
-      // Check for specific error codes from backend
-      if (data?.error?.code) {
-        return {
-          success: false,
-          error: {
-            code: data.error.code,
-            message: data.error.message || 'Failed to rotate API key.',
-          },
-        };
-      }
-
-      // Generic HTTP error response
-      return {
-        success: false,
-        error: {
-          code: errorClassification.retryable ? 'ROTATION_FAILED' : 'AUTHORIZATION_FAILED',
-          message: 'Failed to rotate API key. Please try again.',
+    return await rotationGuard.run(rotationRequest.keyId, () =>
+      withRetry(
+        () =>
+          runWithTimeout(
+            (signal) =>
+              performRotation(
+                rotationRequest,
+                sessionToken,
+                idempotencyKey,
+                signal,
+              ),
+            ROTATION_TIMEOUT_MS,
+            "rotateKeyWithToken",
+          ),
+        {
+          maxRetries: ROTATION_MAX_RETRIES,
+          baseDelayMs: ROTATION_BASE_DELAY_MS,
+          shouldRetry: isRetryableRotationError,
         },
-      };
-    }
-
-    // Parse successful response
-    const data = await response.json();
-
-    if (data?.newKey) {
-      return {
-        success: true,
-        newKey: data.newKey,
-      };
-    }
-
-    // Unexpected response format
-    logError('KeyRotationApi.rotateKeyWithToken', 'Invalid response format from server');
-
-    return {
-      success: false,
-      error: {
-        code: 'ROTATION_FAILED',
-        message: 'Failed to rotate API key. Invalid server response.',
-      },
-    };
+      ),
+    );
   } catch (error) {
-    // Network errors, timeouts, or JSON parse errors
-    logError('KeyRotationApi.rotateKeyWithToken', error, {
+    logError("KeyRotationApi.rotateKeyWithToken", error, {
       endpoint: ROTATE_KEY_ENDPOINT,
     });
 
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        return {
-          success: false,
-          error: {
-            code: 'ROTATION_FAILED',
-            message: 'Request timed out. Please try again.',
-          },
-        };
-      }
-
-      // Generic network error
-      return {
-        success: false,
-        error: {
-          code: 'ROTATION_FAILED',
-          message: 'Network error during rotation. Please try again.',
-        },
-      };
-    }
-
-    return {
-      success: false,
-      error: {
-        code: 'ROTATION_FAILED',
-        message: 'Failed to rotate API key. Please try again.',
-      },
-    };
+    return toRotationFailure(error);
   }
 }
 
-/**
- * Initiates a key rotation by requesting a confirmation token from the backend.
- * This token is then used in the actual rotation request.
- *
- * This two-step process ensures:
- * 1. The token is generated server-side with proper randomness
- * 2. The token is bound to a specific user/tenant/session context
- * 3. The token has server-side expiration tracking
- * 4. Replayed tokens can be detected and rejected
- *
- * Called before showing the rotation modal.
- */
 export async function getRotationToken(
   keyId: string,
   sessionToken: string,
 ): Promise<{
   token?: string;
-  expiresIn?: number; // milliseconds
+  expiresIn?: number;
   error?: {
     code: string;
     message: string;
@@ -202,10 +272,10 @@ export async function getRotationToken(
 }> {
   try {
     const response = await fetch(`${ROTATE_KEY_ENDPOINT}/token`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sessionToken}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sessionToken}`,
       },
       body: JSON.stringify({ keyId }),
       signal: AbortSignal.timeout(10000),
@@ -215,8 +285,8 @@ export async function getRotationToken(
       const data = await response.json().catch(() => ({}));
       return {
         error: {
-          code: data?.error?.code || 'TOKEN_REQUEST_FAILED',
-          message: data?.error?.message || 'Failed to request rotation token.',
+          code: data?.error?.code || "TOKEN_REQUEST_FAILED",
+          message: data?.error?.message || "Failed to request rotation token.",
         },
       };
     }
@@ -229,8 +299,8 @@ export async function getRotationToken(
   } catch (error) {
     return {
       error: {
-        code: 'TOKEN_REQUEST_FAILED',
-        message: 'Failed to request rotation token. Please try again.',
+        code: "TOKEN_REQUEST_FAILED",
+        message: "Failed to request rotation token. Please try again.",
       },
     };
   }

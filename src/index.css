@@ -60,6 +60,17 @@
   --modal-bg: linear-gradient(180deg, rgba(20, 27, 50, 0.98), rgba(12, 18, 34, 0.98));
   --visited: #a78bfa;
 
+  /* ── Theme-agnostic display / glyph tokens ─────────────────────────────
+     These carry foreground colours that must remain legible in BOTH themes.
+     They are defined per-theme (light + dark) so dynamic theme switching
+     never leaves a hardcoded light-on-dark colour behind on a light surface.
+     Each value is tuned to clear WCAG 2.1 AA (>= 4.5:1) against its
+     intended background token.                                            */
+  --display-404: #dbe5ff;       /* .not-found-code — on --page-bg */
+  --glyph-error: #ffd0d6;       /* .error-illustration span — on --page-bg */
+  --status-pending-fg: #ffe08a; /* .status-chip.pending — on --surface */
+  --status-approving-fg: #cbd9ff; /* .status-chip.approving — on --surface */
+
   /* HTTP Method Badge Tokens - Dark Theme (High Contrast / Accessible) */
   --method-get-bg: rgba(59, 130, 246, 0.16);
   --method-get-color: #60a5fa;
@@ -103,6 +114,13 @@
   --backdrop: rgba(255, 255, 255, 0.8);
   --modal-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 255, 0.98));
   --visited: #7c3aed;
+
+  /* ── Theme-agnostic display / glyph tokens (Light Theme) ───────────────
+     Dark foregrounds so they clear WCAG 2.1 AA against light surfaces. */
+  --display-404: #1e3a8a;
+  --glyph-error: #b91c1c;
+  --status-pending-fg: #854d0e;
+  --status-approving-fg: #1e40af;
 
   /* HTTP Method Badge Tokens - Light Theme (High Contrast / Accessible) */
   --method-get-bg: rgba(37, 99, 235, 0.1);
@@ -960,8 +978,8 @@ code,
 }
 
 .primary-button {
-  background: linear-gradient(135deg, #4e85ff, #6da6ff);
-  color: white;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 84%, #000000), var(--accent));
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -1091,7 +1109,7 @@ code,
 .error-illustration span {
   font-size: 2rem;
   font-weight: 700;
-  color: #ffd0d6;
+  color: var(--glyph-error);
 }
 
 .not-found-code {
@@ -1099,7 +1117,7 @@ code,
   font-size: clamp(4rem, 16vw, 8rem);
   line-height: 0.9;
   font-weight: 700;
-  color: #dbe5ff;
+  color: var(--display-404);
   letter-spacing: 0.04em;
 }
 
@@ -1367,7 +1385,7 @@ code,
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1.2' fill='currentColor' fill-opacity='0.25'/%3E%3C/svg%3E") repeat,
     rgba(250, 204, 21, 0.12);
-  color: #ffe08a;
+  color: var(--status-pending-fg);
 }
 
 .status-chip.confirmed {
@@ -1390,7 +1408,7 @@ code,
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cline x1='0' y1='8' x2='8' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='4' y1='8' x2='8' y2='4' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='0' y1='4' x2='4' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3C/svg%3E") repeat,
     rgba(78, 133, 255, 0.14);
-  color: #cbd9ff;
+  color: var(--status-approving-fg);
 }
 
 .status-chip.input {
@@ -6978,6 +6996,10 @@ code,
     --line-strong: rgba(0, 0, 0, 0.12) !important;
     --text: #1a2332 !important;
     --muted: #64748b !important;
+    --display-404: #1e3a8a !important;
+    --glyph-error: #b91c1c !important;
+    --status-pending-fg: #854d0e !important;
+    --status-approving-fg: #1e40af !important;
     --accent: #2563eb !important;
     --accent-strong: #059669 !important;
     --danger: #dc2626 !important;

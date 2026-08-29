@@ -1,15 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
-import ApiUsage from "./pages/ApiUsage";
-import DashboardPage from "./pages/DashboardPage";
-import MyApis from "./pages/MyApis";
-import PlanBadgePage from "./pages/PlanBadge";
 import RouteProgressBar from "./components/RouteProgressBar";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
-import PublishApi from "./pages/PublishApi";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut } from "./utils/format";
 import DepositPreview from "./components/DepositPreview";
@@ -17,18 +12,50 @@ import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS } from "./c
 import CompareDrawer from "./components/CompareDrawer";
 import CompareTray from "./components/CompareTray";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
-import MarketplacePage from "./pages/MarketplacePage";
-import ThemePlayground from "./pages/ThemePlayground";
-import DesignSystemDocs from "./pages/DesignSystemDocs";
-import A11yAudit from "./pages/A11yAudit";
-import RateLimitCard from "./pages/RateLimitCard";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
-import { InvoiceCard } from "./pages/InvoiceCard";
-import BillingHistory from "./pages/BillingHistory";
- import WebhookDeliveries from "./pages/WebhookDeliveries";
- import { useAccountContext } from "./hooks/useAccountContext";
+import { useAccountContext } from "./hooks/useAccountContext";
+
+// Route splitting: dynamic imports for all heavy page routes
+const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
+const PublishApi = lazy(() => import("./pages/PublishApi"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const ApiUsage = lazy(() => import("./pages/ApiUsage"));
+const MyApis = lazy(() => import("./pages/MyApis"));
+const PlanBadgePage = lazy(() => import("./pages/PlanBadge"));
+const ThemePlayground = lazy(() => import("./pages/ThemePlayground"));
+const DesignSystemDocs = lazy(() => import("./pages/DesignSystemDocs"));
+const A11yAudit = lazy(() => import("./pages/A11yAudit"));
+const RateLimitCard = lazy(() => import("./pages/RateLimitCard"));
+const BillingHistory = lazy(() => import("./pages/BillingHistory"));
+const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
+const InvoiceCard = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.InvoiceCard })));
+
+// Prefetch cache map to ensure modules are loaded on hover / focus without delaying critical interaction
+const routePrefetchers: Record<string, () => Promise<any>> = {
+  "/marketplace": () => import("./pages/MarketplacePage"),
+  "/publish": () => import("./pages/PublishApi"),
+  "/dashboard": () => import("./pages/DashboardPage"),
+  "/api-usage": () => import("./pages/ApiUsage"),
+  "/apis/my-apis": () => import("./pages/MyApis"),
+  "/apis/plan-badge": () => import("./pages/PlanBadge"),
+  "/billing/history": () => import("./pages/BillingHistory"),
+  "/theme-playground": () => import("./pages/ThemePlayground"),
+  "/design-system/docs": () => import("./pages/DesignSystemDocs"),
+  "/a11y-audit": () => import("./pages/A11yAudit"),
+  "/rate-limit": () => import("./pages/RateLimitCard"),
+  "/webhooks/deliveries": () => import("./pages/WebhookDeliveries"),
+};
+
+export function prefetchRoute(path: string) {
+  const prefetcher = routePrefetchers[path];
+  if (prefetcher) {
+    prefetcher().catch(() => {
+      // Ignore prefetch failures gracefully
+    });
+  }
+}
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -551,25 +578,55 @@ function App() {
 
           <div className="topbar-actions">
             <nav className="nav" aria-label="Primary navigation">
-              <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.dashboard} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.dashboard)}
+                onFocus={() => prefetchRoute(APP_ROUTES.dashboard)}
+              >
                 Dashboard
               </NavLink>
-              <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.marketplace} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.marketplace)}
+                onFocus={() => prefetchRoute(APP_ROUTES.marketplace)}
+              >
                 Marketplace
               </NavLink>
-              <NavLink to={APP_ROUTES.myApis} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.myApis} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.myApis)}
+                onFocus={() => prefetchRoute(APP_ROUTES.myApis)}
+              >
                 My APIs
               </NavLink>
               <NavLink to={APP_ROUTES.billing} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
                 Billing
               </NavLink>
-              <NavLink to={APP_ROUTES.billingHistory} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.billingHistory} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.billingHistory)}
+                onFocus={() => prefetchRoute(APP_ROUTES.billingHistory)}
+              >
                 Billing History
               </NavLink>
-              <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.themePlayground} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.themePlayground)}
+                onFocus={() => prefetchRoute(APP_ROUTES.themePlayground)}
+              >
                 Theme Playground
               </NavLink>
-              <NavLink to={APP_ROUTES.designSystem} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.designSystem} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.designSystem)}
+                onFocus={() => prefetchRoute(APP_ROUTES.designSystem)}
+              >
                 Design System
               </NavLink>
             </nav>
@@ -579,7 +636,8 @@ function App() {
         </header>
 
         <main id="main-content" role="main" className="page">
-          <Routes>
+          <Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
+            <Routes>
             <Route
               path={APP_ROUTES.landing}
               element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} />}
@@ -704,7 +762,8 @@ function App() {
             <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
-          </Routes>
+            </Routes>
+          </Suspense>
         </main>
 
         <footer className="surface app-footer no-print" role="contentinfo">
