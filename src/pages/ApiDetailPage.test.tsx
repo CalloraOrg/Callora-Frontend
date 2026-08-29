@@ -694,17 +694,30 @@ describe("ApiDetailPage", () => {
       });
     });
 
-    it("tab buttons (role='tab') are reachable via keyboard", () => {
+    it("tab buttons follow the APG roving tabindex pattern (one tabbable, rest via arrow keys)", () => {
       renderWithProviders(<ApiDetailPage />);
       settleLoadingState();
 
       const tabs = screen.getAllByRole("tab");
       expect(tabs.length).toBeGreaterThanOrEqual(6); // All 6 tab items
 
-      // Verify no tab has tabIndex={-1} (all should be reachable)
+      // Exactly one tab is in the tab order at a time (the active tab); the
+      // others use tabIndex=-1 and are reached with ArrowLeft / ArrowRight.
+      const tabbable = tabs.filter((tab) => (tab as HTMLElement).tabIndex === 0);
+      expect(tabbable.length).toBe(1);
+
       tabs.forEach((tab) => {
-        expect((tab as HTMLElement).tabIndex).not.toBe(-1);
+        const t = tab as HTMLElement;
+        expect(t.tabIndex === 0 || t.tabIndex === -1).toBe(true);
       });
+
+      // ArrowRight from the active tab moves focus to the next tab (keyboard
+      // reachability without Tab).
+      const activeTab = tabbable[0];
+      fireEvent.keyDown(activeTab, { key: "ArrowRight" });
+      const focused = document.activeElement as HTMLElement;
+      expect(focused.getAttribute("role")).toBe("tab");
+      expect(focused).not.toBe(activeTab);
     });
 
     it("select element in reviews tab is keyboard-focusable", () => {
@@ -750,6 +763,10 @@ describe("ApiDetailPage", () => {
 
       interactiveElements.forEach((el) => {
         const htmlEl = el as HTMLElement;
+        // The Tabs component intentionally sets `outline: none` inline and
+        // restores the ring via a `:focus-visible` CSS rule (see focus.css /
+        // issue #541), so it is exempt from this check.
+        if (htmlEl.closest('[role="tablist"]')) return;
         const inlineOutline = htmlEl.style.outline;
         // Inline outline:none would suppress the :focus-visible ring
         expect(inlineOutline).not.toBe("none");
@@ -771,8 +788,10 @@ describe("ApiDetailPage", () => {
       });
       expect(dialog).toBeTruthy();
 
-      // Dialog should be focusable
-      expect((dialog as HTMLElement).tabIndex).not.toBe(-1);
+      // The dialog is a modal: focus must move into it on open (deterministic
+      // focus management) so keyboard users are not stranded on the trigger.
+      const focused = document.activeElement as HTMLElement;
+      expect(dialog.contains(focused)).toBe(true);
 
       // Check inputs inside dialog are focusable
       const inputs = dialog.querySelectorAll("input, button");
@@ -782,6 +801,126 @@ describe("ApiDetailPage", () => {
           expect(htmlInput.tabIndex).not.toBe(-1);
         }
       });
+    });
+  });
+
+  describe("save endpoint dialog focus management", () => {
+    function openSaveDialog() {
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      const saveButtons = screen.getAllByRole("button", {
+        name: /Save endpoint to collection/i,
+      });
+      fireEvent.click(saveButtons[0]);
+      const dialog = screen.getByRole("dialog", {
+        name: /Save endpoint to collection/i,
+      });
+      return { dialog, trigger: saveButtons[0] };
+    }
+
+    function dialogFocusable(dialog: HTMLElement) {
+      return Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), [href], select:not([disabled]), [tabindex]:not([tabindex='-1'])",
+        ),
+      );
+    }
+
+    it("moves focus into the dialog when it opens", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const { dialog } = openSaveDialog();
+      // Focus should land on the first focusable control inside the dialog.
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    });
+
+    it("is labelled by its visible title", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const { dialog } = openSaveDialog();
+      expect(dialog.getAttribute("aria-labelledby")).toBe("endpoint-save-dialog-title");
+      const title = document.getElementById("endpoint-save-dialog-title");
+      expect(title?.textContent).toBe("Save endpoint to collection");
+    });
+
+    it("traps Tab focus within the dialog", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const { dialog } = openSaveDialog();
+      const focusable = dialogFocusable(dialog);
+      expect(focusable.length).toBeGreaterThan(1);
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      // Shift+Tab from the first control wraps to the last (focus stays inside).
+      first.focus();
+      fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).toBe(last);
+
+      // Tab from the last control wraps back to the first.
+      last.focus();
+      fireEvent.keyDown(dialog, { key: "Tab" });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).toBe(first);
+    });
+
+    it("restores focus to the trigger button when closed with Escape", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const { dialog, trigger } = openSaveDialog();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+
+      fireEvent.keyDown(dialog, { key: "Escape" });
+      expect(document.activeElement).toBe(trigger);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("announces when the dialog opens and closes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      openSaveDialog();
+      const polite = document.querySelector('[data-testid="live-region"]');
+      expect(polite?.textContent).toContain("Save endpoint dialog opened");
+
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      expect(polite?.textContent).toContain("Save endpoint dialog closed");
+    });
+  });
+
+  describe("in-page TOC keyboard navigation", () => {
+    it("moves focus to the target heading when a TOC link is activated", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      const nav = screen.getByRole("navigation", { name: "On this page" });
+      const link = nav.querySelector('a[href="#toc-endpoints"]') as HTMLAnchorElement;
+      expect(link).toBeTruthy();
+
+      fireEvent.click(link);
+
+      const heading = document.getElementById("toc-endpoints");
+      expect(heading).toBeTruthy();
+      // Heading becomes the active element and is programmatically focusable.
+      expect(document.activeElement).toBe(heading);
+      expect(heading?.getAttribute("tabindex")).toBe("-1");
+    });
+  });
+
+  describe("assertive live region (errors / status)", () => {
+    it("renders a dedicated assertive live region for status changes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const region = document.querySelector("[aria-live='assertive']");
+      expect(region).toBeTruthy();
+      expect(region?.getAttribute("role")).toBe("alert");
     });
   });
 
@@ -1014,17 +1153,18 @@ describe("ApiDetailPage", () => {
   });
 
   it("interactive elements are focusable (issue #541)", () => {
-    render(<ApiDetailPage />);
+    renderWithProviders(<ApiDetailPage />);
     settleLoadingState();
 
+    // Only the active tab is in the tab order (roving tabindex). Focus it via
+    // the real focus method so document.activeElement reflects it.
     const tabs = screen.getAllByRole("tab");
-    tabs.forEach(tab => {
-      fireEvent.focus(tab);
-      expect(document.activeElement).toBe(tab);
-    });
+    const activeTab = tabs.find((tab) => (tab as HTMLElement).tabIndex === 0) as HTMLElement;
+    activeTab.focus();
+    expect(document.activeElement).toBe(activeTab);
 
     const connectButton = screen.getByRole("button", { name: /Connect API/i });
-    fireEvent.focus(connectButton);
+    connectButton.focus();
     expect(document.activeElement).toBe(connectButton);
   });
 });
