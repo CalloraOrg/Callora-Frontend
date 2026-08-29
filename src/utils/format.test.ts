@@ -414,3 +414,53 @@ describe('locale fallback (no explicit locale arg)', () => {
     expect(formatTimestamp(new Date()).length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// formatCountdown – Human-readable countdown timer formatter
+// ---------------------------------------------------------------------------
+import { formatCountdown } from './format';
+
+describe('formatCountdown', () => {
+  it('formats 0ms as '0s'', () => {
+    expect(formatCountdown(0)).toBe('0s');
+  });
+
+  it('formats negative values as '0s'', () => {
+    expect(formatCountdown(-1000)).toBe('0s');
+  });
+
+  it('formats seconds correctly', () => {
+    expect(formatCountdown(5000)).toBe('5s');
+    expect(formatCountdown(1000)).toBe('1s');
+    expect(formatCountdown(59000)).toBe('59s');
+  });
+
+  it('formats minutes and seconds correctly', () => {
+    expect(formatCountdown(63000)).toBe('1m 3s');
+    expect(formatCountdown(125000)).toBe('2m 5s');
+    expect(formatCountdown(3599000)).toBe('59m 59s');
+  });
+
+  it('formats hours, minutes, and seconds correctly', () => {
+    expect(formatCountdown(3661000)).toBe('1h 1m 1s');
+    expect(formatCountdown(7322000)).toBe('2h 2m 2s');
+  });
+
+  it('omits zero values', () => {
+    expect(formatCountdown(60000)).toBe('1m');
+    expect(formatCountdown(3600000)).toBe('1h');
+    expect(formatCountdown(3660000)).toBe('1h 1m');
+  });
+
+  it('handles rounding for milliseconds', () => {
+    // 1500ms should round up to 2s
+    expect(formatCountdown(1500)).toBe('2s');
+    // 1499ms should round down to 1s
+    expect(formatCountdown(1499)).toBe('1s');
+  });
+
+  it('handles large durations', () => {
+    expect(formatCountdown(86400000)).toBe('24h');
+    expect(formatCountdown(90061000)).toBe('25h 1m 1s');
+  });
+});

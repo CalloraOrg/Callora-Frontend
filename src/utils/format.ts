@@ -207,3 +207,31 @@ export function formatTimeString(date: Date, locale?: string): string {
     return date.toISOString();
   }
 }
+
+/**
+ * Format milliseconds as a human-readable countdown string.
+ *
+ * Examples:
+ *   0 → '0s'
+ *   5000 → '5s'
+ *   63000 → '1m 3s'
+ *   3661000 → '1h 1m 1s'
+ *
+ * @param ms - Milliseconds remaining
+ * @returns Formatted countdown string (e.g., '1m 23s')
+ */
+export function formatCountdown(ms: number): string {
+  if (ms <= 0) return '0s';
+
+  const totalSeconds = Math.ceil(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+
+  return parts.join(' ');
+}
