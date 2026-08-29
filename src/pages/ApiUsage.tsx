@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import EmptyState from '../components/EmptyState';
-import Skeleton, { ApiUsageSkeleton, SkeletonRow } from '../components/Skeleton';
-import { formatPrice, formatDuration, formatTimestamp } from '../utils/format';
+import Skeleton, { ApiUsageSkeleton } from '../components/Skeleton';
+import { formatPrice, formatDuration } from '../utils/format';
 import type { JsonSchema } from '../components/RequestBodyEditor';
-import CallHistoryRow from '../components/CallHistoryRow';
+import VirtualizedCallHistory from '../components/VirtualizedCallHistory';
 import Breadcrumb from '../components/Breadcrumb';
 import RequestHistoryPanel from '../components/RequestHistoryPanel';
 import ParamsBuilder from '../components/ParamsBuilder';
@@ -784,31 +783,12 @@ export default function ApiUsage() {
           {liveStatusMessage}
         </p>
 
-        <div className="call-history-table" aria-busy={isLoading}>
-           <div className="table-header">
-             <span>Timestamp</span>
-             <span>Endpoint</span>
-             <span>Status</span>
-             <span>Response Time</span>
-             <span>Cost</span>
-             <span>Actions</span>
-           </div>
-
-           {isTableLoading ? (
-             <SkeletonRow rows={5} />
-           ) : filteredCallHistory.length === 0 ? (
-             <EmptyState message="No call records match the selected filter." />
-           ) : (
-             filteredCallHistory.map(call => (
-               <CallHistoryRow
-                 key={call.id}
-                 call={call}
-                 expanded={expandedCall === call.id}
-                 onToggleExpand={id => setExpandedCall(expandedCall === id ? null : id)}
-               />
-             ))
-           )}
-         </div>
+        <VirtualizedCallHistory
+          calls={filteredCallHistory}
+          isLoading={isTableLoading}
+          expandedCallId={expandedCall}
+          onToggleExpand={(id) => setExpandedCall(expandedCall === id ? null : id)}
+        />
       </div>
 
       {/* Integration Guide */}

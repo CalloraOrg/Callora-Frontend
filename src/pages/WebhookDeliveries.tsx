@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useWebhookDeliveries } from '../hooks/useWebhookDeliveries';
-import { ToastProvider, Toast } from '../components/Toast';
+import { useToast } from '../components/Toast';
 
 export default function WebhookDeliveries() {
   const [accountId, setAccountId] = useState('acc_123'); // Simulate account switch
@@ -16,14 +16,14 @@ export default function WebhookDeliveries() {
     refresh
   } = useWebhookDeliveries(accountId);
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const handleRetry = async (id: string) => {
     try {
       await retryDelivery(id);
-      setToastMessage('Retry triggered successfully');
+      showToast('Retry triggered successfully');
     } catch (err: any) {
-      setToastMessage(`Retry failed: ${err.message}`);
+      showToast(`Retry failed: ${err.message}`, 'error');
     }
   };
 
@@ -112,15 +112,6 @@ export default function WebhookDeliveries() {
             </table>
           )}
         </div>
-      )}
-      
-      <ToastProvider />
-      {toastMessage && (
-        <Toast 
-          message={toastMessage} 
-          onDismiss={() => setToastMessage(null)} 
-          type="info"
-        />
       )}
     </div>
   );

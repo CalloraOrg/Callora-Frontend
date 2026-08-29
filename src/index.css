@@ -3655,17 +3655,27 @@ code,
 }
 
 .call-history-table {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 8px;
-  overflow: hidden;
+  /* Internal scroll container: bounds the table height so the virtualized
+     window stays small and stable no matter how many calls exist. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  max-height: min(60vh, 640px);
 }
 
 .table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr;
   gap: 16px;
   padding: 16px;
   background: var(--surface);
+  backdrop-filter: blur(22px);
   font-weight: 500;
   font-size: 0.875rem;
   border-bottom: 1px solid var(--line);
@@ -3680,7 +3690,31 @@ code,
   align-items: center;
 }
 
-.table-row:last-child {
+.call-history-table__viewport {
+  position: relative;
+}
+
+/* Windowed rows are absolutely positioned at their measured offsets; the
+   viewport's explicit height acts as the full-list spacer. */
+.call-history-table__item {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+/* The pinned row stays mounted (and focusable) when the keyboard-focused
+   row is scrolled outside the window. */
+.call-history-table__item--pinned {
+  z-index: 0;
+}
+
+/* Virtualized rows: drop the divider on the final rendered row. */
+.call-history-table__item:last-child .table-row {
+  border-bottom: none;
+}
+
+/* Loading skeletons are still direct children of the table shell. */
+.call-history-table > .table-row:last-child {
   border-bottom: none;
 }
 
