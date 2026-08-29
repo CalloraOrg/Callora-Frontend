@@ -157,6 +157,7 @@ const APP_ROUTES = {
   rateLimitCard: "/rate-limit",
   slaCard: "/marketplace/grantfox-wave-compute/sla",
   webhookDeliveries: "/webhooks/deliveries",
+  onboarding: "/onboarding",
 } as const;
 
 function createMockHash() {
@@ -177,7 +178,7 @@ function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
   return hasValidAmount ? "Review transaction preview" : "Enter a deposit amount";
 }
 
-function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () => void; onPublishApi: () => void }) {
+function LandingPage({ onStartUsingApis, onPublishApi, onTakeTour }: { onStartUsingApis: () => void; onPublishApi: () => void; onTakeTour?: () => void }) {
   return (
     <div className="lp-shell">
       <header className="lp-section lp-hero" aria-labelledby="hero-title">
@@ -196,6 +197,11 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
             <button className="lp-btn lp-btn-secondary" onClick={onPublishApi}>
               Publish Your API
             </button>
+            {onTakeTour && (
+              <button className="lp-btn lp-btn-secondary" onClick={onTakeTour} style={{ marginLeft: "12px" }}>
+                Take the tour
+              </button>
+            )}
           </div>
         </div>
 
@@ -640,10 +646,12 @@ function App() {
             <Routes>
             <Route
               path={APP_ROUTES.landing}
-              element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} />}
+              element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} onTakeTour={() => navigate(APP_ROUTES.onboarding)} />}
             />
 
             <Route path={APP_ROUTES.publish} element={<PublishApi />} />
+
+            <Route path={APP_ROUTES.onboarding} element={<OnboardingTour onComplete={() => navigate(APP_ROUTES.dashboard)} />} />
 
             <Route path={APP_ROUTES.dashboard} element={<DashboardPage vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
