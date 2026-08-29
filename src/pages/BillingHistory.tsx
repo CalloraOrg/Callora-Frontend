@@ -25,6 +25,7 @@
 import { useId, useMemo, useState } from 'react';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
 import StatusBadge, { type StatusVariant } from '../components/StatusBadge';
+import { formatUsdcAmount, formatDateShort } from '../utils/format';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -157,27 +158,6 @@ export const MOCK_TRANSACTIONS: BillingTransaction[] = [
 
 const ALL_TYPES: TxType[] = ['Deposit', 'API Call', 'Refund', 'Settlement', 'Fee'];
 const ALL_STATUSES: TxStatus[] = ['success', 'pending', 'error', 'warning'];
-
-function formatUsdcAmount(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: value < 0.01 ? 3 : 2,
-    maximumFractionDigits: value < 0.01 ? 3 : 2,
-  }).format(value);
-}
-
-function formatDateShort(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
 
 function truncateTxHash(hash: string): string {
   if (hash.length <= 14) return hash;

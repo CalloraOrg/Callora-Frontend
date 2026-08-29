@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import Breadcrumb from "../components/Breadcrumb";
 import HelpPopover from "../components/HelpPopover";
+import { formatLatencyMs } from "../utils/format";
 
 type LatencyPoint = {
   label: string;
@@ -100,25 +101,25 @@ export default function LatencyChart() {
           <div className="latency-stat-card">
             <span className="latency-stat-label">Min</span>
             <strong className="latency-stat-value tabular-nums">
-              {stats.min} ms
+              {formatLatencyMs(stats.min)}
             </strong>
           </div>
           <div className="latency-stat-card">
             <span className="latency-stat-label">Avg</span>
             <strong className="latency-stat-value tabular-nums">
-              {stats.avg} ms
+              {formatLatencyMs(stats.avg)}
             </strong>
           </div>
           <div className="latency-stat-card">
             <span className="latency-stat-label">P95</span>
             <strong className="latency-stat-value tabular-nums">
-              {stats.p95} ms
+              {formatLatencyMs(stats.p95)}
             </strong>
           </div>
           <div className="latency-stat-card">
             <span className="latency-stat-label">Max</span>
             <strong className="latency-stat-value tabular-nums">
-              {stats.max} ms
+              {formatLatencyMs(stats.max)}
             </strong>
           </div>
         </div>
@@ -137,9 +138,9 @@ export default function LatencyChart() {
                   <div
                     className={`latency-chart-bar${isHighest ? " latency-chart-bar--peak" : ""}`}
                     style={{ height: `${heightPct}%` }}
-                    title={`${point.label}: ${point.value} ms`}
+                    title={`${point.label}: ${formatLatencyMs(point.value)}`}
                     role="img"
-                    aria-label={`${point.label}: ${point.value} ms`}
+                    aria-label={`${point.label}: ${formatLatencyMs(point.value)}`}
                   />
                   <span className="latency-chart-bar-label">{point.label}</span>
                 </div>
