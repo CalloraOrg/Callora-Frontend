@@ -18,6 +18,7 @@ import { isSensitiveKey } from "../utils/snapshotUrl";
  * This prevents secrets from being visible on screen, saved by the browser,
  * or leaked via shoulder-surfing.
  */
+import { useApiCache } from "../hooks/useApiCache";
 
 export interface EndpointParam {
   name: string;
@@ -49,9 +50,11 @@ export default function TestInBrowser({
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { get, set } = useApiCache<RunResult>();
 
   const panelId = `tib-panel-${endpointUrl.replace(/[^a-z0-9]/gi, "-")}`;
   const triggerId = `tib-trigger-${endpointUrl.replace(/[^a-z0-9]/gi, "-")}`;
+  const cacheKey = `${method}:${endpointUrl}`;
 
   function handleChange(name: string, value: string) {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -78,6 +81,13 @@ export default function TestInBrowser({
         );
       }
 
+      const isCacheable = method.toUpperCase() === "GET";
+      const cached = isCacheable ? get(cacheKey) : null;
+      if (cached) {
+        setResult(cached);
+        return;
+      }
+
       const response = await fetch(url, fetchInit);
       const text = await response.text();
       let body: string;
@@ -86,7 +96,11 @@ export default function TestInBrowser({
       } catch {
         body = text;
       }
-      setResult({ status: response.status, body });
+      const runResult: RunResult = { status: response.status, body };
+      setResult(runResult);
+      if (isCacheable) {
+        set(cacheKey, runResult);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

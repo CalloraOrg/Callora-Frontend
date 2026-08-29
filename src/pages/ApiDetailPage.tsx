@@ -2,13 +2,13 @@ import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import TestInBrowser from "../components/TestInBrowser";
-import Skeleton, { ApiDetailPageSkeleton } from "../components/Skeleton";
+import { ApiDetailPageSkeleton } from "../components/Skeleton";
 import EmbedPreview from "../components/EmbedPreview";
 import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
-import { formatPrice } from "../utils/format";
+import { formatPrice, formatEstimatedCost, formatCount, formatDateShort } from "../utils/format";
 import { Icons } from "../utils/icons";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
@@ -20,7 +20,6 @@ import { CheckIcon } from "../components/icons";
 import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
 import SubscribeButton from "../components/SubscribeButton";
 import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
-import SubscribeCTA from "./SubscribeCTA";
 import { useToast } from "../components/Toast";
 import { useCollections } from "../state/collectionsStore";
 import RelatedApisRail from "../components/RelatedApisRail";
@@ -29,7 +28,6 @@ import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import PlanBadge from "../components/PlanBadge";
 import LiveRegion from "../components/LiveRegion";
-import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
 
 /**
  * ApiDetailPage
@@ -119,7 +117,13 @@ const API_DETAIL_SHORTCUTS = SHORTCUTS.filter(
 
 // ── Endpoint save controls ───────────────────────────────────────────────────
 
-function EndpointSaveButton({ endpointId }: { endpointId: string }) {
+function EndpointSaveButton({
+  endpointId,
+  onAnnounce,
+}: {
+  endpointId: string;
+  onAnnounce?: (message: string) => void;
+}) {
   const {
     collections,
     isEndpointSaved,
@@ -141,10 +145,41 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
   useEffect(() => {
     if (!open) return;
 
+    // Move focus into the dialog (first focusable control, else the dialog
+    // container itself) so keyboard users are not stranded on the trigger.
+    const panel = panelRef.current;
+    const focusable = panel
+      ? Array.from(
+          panel.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        )
+      : [];
+    (focusable[0] ?? panel ?? buttonRef.current)?.focus();
+
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.preventDefault();
         setOpen(false);
         buttonRef.current?.focus();
+        onAnnounce?.("Save endpoint dialog closed");
+        return;
+      }
+      if (e.key === "Tab" && panel) {
+        // Focus trap — keep Tab / Shift+Tab cycling within the dialog.
+        if (focusable.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
 
@@ -156,6 +191,7 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
         !buttonRef.current.contains(e.target as Node)
       ) {
         setOpen(false);
+        onAnnounce?.("Save endpoint dialog closed");
       }
     };
 
@@ -165,7 +201,15 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
       document.removeEventListener("keydown", handleKey);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [open]);
+  }, [open, onAnnounce]);
+
+  const handleToggleOpen = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next) onAnnounce?.("Save endpoint dialog opened");
+      return next;
+    });
+  };
 
   const handleCreateCollection = useCallback(() => {
     const trimmed = newName.trim();
@@ -203,7 +247,7 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
         ref={buttonRef}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((prev) => !prev);
+          handleToggleOpen();
         }}
         className="icon-button"
         aria-label={isSaved ? "Saved endpoint" : "Save endpoint to collection"}
@@ -220,7 +264,8 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
           role="dialog"
           className="endpoint-save-popover"
           aria-modal="true"
-          aria-label="Save endpoint to collection"
+          aria-labelledby="endpoint-save-dialog-title"
+          tabIndex={-1}
           onClick={(e) => e.stopPropagation()}
           style={{
             position: "absolute",
@@ -235,18 +280,19 @@ function EndpointSaveButton({ endpointId }: { endpointId: string }) {
             padding: "var(--mkt-space-lg)",
           }}
         >
-          <p
-            style={{
-              margin: 0,
-              fontSize: "var(--mkt-font-size-micro)",
-              fontWeight: 700,
-              color: "var(--muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-            }}
-          >
-            Save to collection
-          </p>
+            <p
+              id="endpoint-save-dialog-title"
+              style={{
+                margin: 0,
+                fontSize: "var(--mkt-font-size-micro)",
+                fontWeight: 700,
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Save endpoint to collection
+            </p>
 
           {collections.length === 0 && !showNewInput && (
             <div style={{ marginTop: "var(--mkt-space-lg)", display: "flex", flexDirection: "column", gap: "var(--mkt-space-md)" }}>
@@ -352,6 +398,7 @@ export default function ApiDetailPage({ onBack }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
   const [announcement, setAnnouncement] = useState("");
+  const [assertiveAnnouncement, setAssertiveAnnouncement] = useState("");
   const { showToast } = useToast();
 
   const handleTabChange = useCallback((newTab: TabType) => {
@@ -513,8 +560,8 @@ export default function ApiDetailPage({ onBack }: Props) {
   const jsExample = `import fetch from 'node-fetch';
 
 const getApiData = async () => {
-  const response = await fetch('${API_BASE_URL}${firstEndpoint.url}', {
-    method: '${firstEndpoint.method}',
+  const response = await fetch(\`${API_BASE_URL}${firstEndpoint.url}\`, {
+    method: \`${firstEndpoint.method}\`,
     headers: {
       'Authorization': 'Bearer YOUR_API_KEY',
       'Content-Type': 'application/json'
@@ -543,15 +590,12 @@ print(response.json())`;
 
   const allSnippets = { bash: curlExample, javascript: jsExample, python: pyExample };
 
-  const estimatedCost = (n: number) => `$${(n * (api.pricePerRequest ?? 0)).toFixed(2)}`;
+  const estimatedCost = (n: number) => formatEstimatedCost(n * (api.pricePerRequest ?? 0));
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="api-detail-page">
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
-        {isLoading ? "Loading API details…" : `Loaded ${api.name}`}
-      </div>
       <div className="api-detail-container">
         <Breadcrumb
           items={[
@@ -656,7 +700,7 @@ print(response.json())`;
                       {[
                         {
                           label: "Total Requests",
-                          value: (api.stats?.totalCalls ?? 0).toLocaleString(),
+                          value: formatCount(api.stats?.totalCalls ?? 0),
                           color: "var(--text)",
                         },
                         {
@@ -724,7 +768,10 @@ print(response.json())`;
                                       title="Open in Postman"
                                       onClick={() => {
                                         const url = getPostmanImportUrl(ep.method, ep.url, ep.title, API_BASE_URL);
-                                        copyToClipboard(url).then((ok) => showToast(ok ? "Postman import URL copied" : "Failed to copy", ok ? "success" : "error"));
+                                        copyToClipboard(url).then((ok) => {
+                                          showToast(ok ? "Postman import URL copied" : "Failed to copy", ok ? "success" : "error");
+                                          setAssertiveAnnouncement(ok ? "Postman import URL copied to clipboard" : "Failed to copy Postman import URL");
+                                        });
                                       }}
                                     >
                                       <Icons.ExternalLink size={14} />
@@ -737,13 +784,16 @@ print(response.json())`;
                                       title="Open in Insomnia"
                                       onClick={() => {
                                         const url = getInsomniaImportUrl(ep.method, ep.url, ep.title, API_BASE_URL);
-                                        copyToClipboard(url).then((ok) => showToast(ok ? "Insomnia import URL copied" : "Failed to copy", ok ? "success" : "error"));
+                                        copyToClipboard(url).then((ok) => {
+                                          showToast(ok ? "Insomnia import URL copied" : "Failed to copy", ok ? "success" : "error");
+                                          setAssertiveAnnouncement(ok ? "Insomnia import URL copied to clipboard" : "Failed to copy Insomnia import URL");
+                                        });
                                       }}
                                     >
                                       <Icons.ExternalLink size={14} />
                                       <span>Insomnia</span>
                                     </button>
-                                    <EndpointSaveButton endpointId={ep.id} />
+                                    <EndpointSaveButton endpointId={ep.id} onAnnounce={setAnnouncement} />
                                   </div>
                                 </div>
                               </div>
@@ -853,7 +903,7 @@ print(response.json())`;
                       <div style={{ marginTop: "var(--mkt-space-5xl)" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--mkt-space-lg)" }}>
                           <span style={{ fontWeight: 600 }}>Monthly Volume</span>
-                          <span className="tabular-nums" style={{ color: "var(--accent)", fontWeight: 700 }}>{requests.toLocaleString()} Requests</span>
+                          <span className="tabular-nums" style={{ color: "var(--accent)", fontWeight: 700 }}>{formatCount(requests)} Requests</span>
                         </div>
                         <input
                           type="range"
@@ -864,7 +914,7 @@ print(response.json())`;
                           onChange={(e) => {
                             const val = Number(e.target.value);
                             setRequests(val);
-                            setAnnouncement(`Estimated monthly total: ${estimatedCost(val)} for ${val.toLocaleString()} requests`);
+                            setAnnouncement(`Estimated monthly total: ${estimatedCost(val)} for ${formatCount(val)} requests`);
                           }}
                           style={{ width: "100%", height: 6, borderRadius: 3, appearance: "none", background: "var(--line)" }}
                         />
@@ -947,10 +997,8 @@ print(response.json())`;
                         {/* Sort controls: hidden when printing — sort order is irrelevant on paper */}
                         <div
                           className="reviews-sort-controls no-print"
-                          style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}
+                          style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-lg)", marginBottom: "var(--mkt-space-xl)", flexWrap: "wrap" }}
                         >
-                          <label htmlFor="review-sort" style={{ fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-lg)", marginBottom: "var(--mkt-space-xl)", flexWrap: "wrap" }}>
                           <label htmlFor="review-sort" style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)", whiteSpace: "nowrap" }}>
                             Sort by
                           </label>
@@ -979,7 +1027,6 @@ print(response.json())`;
                           </select>
                         </div>
 
-                        <div className="reviews-list" style={{ display: "grid", gap: 16 }}>
                         <div style={{ display: "grid", gap: "var(--mkt-space-xl)" }}>
                           {sortedReviews.map((review) => (
                             <div key={review.id} className="preview-card" style={{ padding: "var(--mkt-space-2xl)" }}>
@@ -1027,7 +1074,7 @@ print(response.json())`;
                                     ))}
                                   </span>
                                   <span style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)", whiteSpace: "nowrap" }}>
-                                    {new Date(review.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                                    {formatDateShort(review.date)}
                                   </span>
                                 </div>
                               </div>
@@ -1035,6 +1082,7 @@ print(response.json())`;
                             </div>
                           ))}
                         </div>
+                      </div>
                       </>
                     )}
                   </section>
@@ -1131,7 +1179,8 @@ print(response.json())`;
         {/* /api-detail-shell */}
       </div>
       {/* /api-detail-container */}
-      <LiveRegion>{announcement}</LiveRegion>
+      <LiveRegion message={announcement} />
+      <LiveRegion assertive message={assertiveAnnouncement} regionId="api-detail-assertive" />
     </div>
   );
 }

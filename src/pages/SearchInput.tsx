@@ -12,6 +12,7 @@
 
 import { useRef, type KeyboardEvent, type ChangeEvent } from 'react';
 import type { StatusVariant } from '../components/StatusBadge';
+import { formatCount } from '../utils/format';
 
 export type SearchStatusFilter = StatusVariant | 'all';
 
@@ -205,7 +206,7 @@ export function SearchInput({
               backgroundColor: 'var(--bg-chip, rgba(255, 255, 255, 0.05))',
             }}
           >
-            ${amount.toLocaleString()}
+            ${formatCount(amount)}
           </span>
         )}
 
