@@ -27,7 +27,8 @@ import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 import { InvoiceCard } from "./pages/InvoiceCard";
 import BillingHistory from "./pages/BillingHistory";
-import { useAccountContext } from "./hooks/useAccountContext";
+ import WebhookDeliveries from "./pages/WebhookDeliveries";
+ import { useAccountContext } from "./hooks/useAccountContext";
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
@@ -128,6 +129,7 @@ const APP_ROUTES = {
   serverError: "/500",
   rateLimitCard: "/rate-limit",
   slaCard: "/marketplace/grantfox-wave-compute/sla",
+  webhookDeliveries: "/webhooks/deliveries",
 } as const;
 
 function createMockHash() {
@@ -592,6 +594,8 @@ function App() {
 
             {/* ── My APIs ─────────────────────────────────────────────── */}
             <Route path={APP_ROUTES.myApis} element={<MyApis />} />
+            
+            <Route path={APP_ROUTES.webhookDeliveries} element={<WebhookDeliveries />} />
 
             {/* ── Plan Badge (issue #529) ──────────────────────────────── */}
             <Route path={APP_ROUTES.planBadge} element={<PlanBadgePage />} />
