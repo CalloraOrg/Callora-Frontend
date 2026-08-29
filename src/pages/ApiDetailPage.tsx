@@ -560,8 +560,8 @@ export default function ApiDetailPage({ onBack }: Props) {
   const jsExample = `import fetch from 'node-fetch';
 
 const getApiData = async () => {
-  const response = await fetch('${API_BASE_URL}${firstEndpoint.url}', {
-    method: '${firstEndpoint.method}',
+  const response = await fetch(\`${API_BASE_URL}${firstEndpoint.url}\`, {
+    method: \`${firstEndpoint.method}\`,
     headers: {
       'Authorization': 'Bearer YOUR_API_KEY',
       'Content-Type': 'application/json'
@@ -997,7 +997,7 @@ print(response.json())`;
                         {/* Sort controls: hidden when printing — sort order is irrelevant on paper */}
                         <div
                           className="reviews-sort-controls no-print"
-                          style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}
+                          style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-lg)", marginBottom: "var(--mkt-space-xl)", flexWrap: "wrap" }}
                         >
                           <label htmlFor="review-sort" style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)", whiteSpace: "nowrap" }}>
                             Sort by
@@ -1027,7 +1027,6 @@ print(response.json())`;
                           </select>
                         </div>
 
-                        <div className="reviews-list" style={{ display: "grid", gap: 16 }}>
                         <div style={{ display: "grid", gap: "var(--mkt-space-xl)" }}>
                           {sortedReviews.map((review) => (
                             <div key={review.id} className="preview-card" style={{ padding: "var(--mkt-space-2xl)" }}>
