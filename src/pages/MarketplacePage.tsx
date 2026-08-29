@@ -386,6 +386,39 @@ export default function MarketplacePage(): JSX.Element {
   ]);
 
   // ── Aria-live announcements (relies on filtered being defined above) ──
+  const prevIsLoading = useRef(isLoading);
+  const prevFetchError = useRef(fetchError);
+  const prevPageIndex = useRef(currentPageIndex);
+
+  useEffect(() => {
+    if (prevIsLoading.current && !isLoading) {
+      if (fetchError) {
+        announce(`Error loading marketplace: ${fetchError}`);
+      } else {
+        announce("Marketplace loaded.");
+      }
+    } else if (!prevIsLoading.current && isLoading) {
+      announce("Loading marketplace...");
+    }
+    prevIsLoading.current = isLoading;
+  }, [isLoading, fetchError, announce]);
+
+  useEffect(() => {
+    if (fetchError && fetchError !== prevFetchError.current && !isLoading) {
+      announce(`Error loading marketplace: ${fetchError}`);
+    }
+    prevFetchError.current = fetchError;
+  }, [fetchError, isLoading, announce]);
+
+  useEffect(() => {
+    if (prevPageIndex.current !== currentPageIndex) {
+      const newStart = totalItemCount > 0 ? currentPageIndex * pageSize + 1 : 0;
+      const newEnd = Math.min((currentPageIndex + 1) * pageSize, totalItemCount);
+      announce(`Page changed. Showing APIs ${newStart} through ${newEnd}.`);
+      prevPageIndex.current = currentPageIndex;
+    }
+  }, [currentPageIndex, pageSize, totalItemCount, announce]);
+
   const prevFilteredCount = useRef(0);
   const isFirstFilterRender = useRef(true);
   useEffect(() => {
@@ -490,7 +523,12 @@ export default function MarketplacePage(): JSX.Element {
   );
 
   if (isLoading) {
-    return <MarketplacePageSkeleton density={density} />;
+    return (
+      <>
+        <MarketplacePageSkeleton density={density} />
+        <LiveRegion message={announcement} />
+      </>
+    );
   }
 
   return (
