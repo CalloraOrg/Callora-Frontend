@@ -4766,6 +4766,13 @@ code,
   }
 }
 
+/* With reduced motion the bar appears/disappears instantly instead of fading. */
+@media (prefers-reduced-motion: reduce) {
+  .route-progress-bar {
+    transition: none;
+  }
+}
+
 /* Skeleton Loading */
 @keyframes shimmer {
   0% {
@@ -4805,6 +4812,27 @@ code,
     linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 16%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
   background-size: 200% 100%;
 }
+
+/* Global reduced-motion fallback (Issue #1005):
+   Skeleton shimmer and spinner rotation are purely decorative. When the
+   user prefers reduced motion, freeze them to static, non-animated
+   surfaces so loading state is still conveyed without animating. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .skeleton--stellar,
+  .api-card-skeleton,
+  [data-theme="light"] .skeleton,
+  [data-theme="light"] .skeleton--stellar {
+    animation: none;
+    background: var(--surface-soft);
+  }
+
+  .button-spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.3);
+  }
+}
+
 /* Filters Sidebar accessibility styles */
 .filter-group {
   margin-bottom: 1rem;
@@ -4860,6 +4888,37 @@ code,
 
 .primary-button.button-loading {
   cursor: not-allowed;
+}
+
+/* ── Webhook Deliveries ──────────────────────────────────────────────
+   Status, error, and stale-data states use the semantic --danger /
+   --warning design tokens (theme-aware contrast) instead of hardcoded
+   colors. The stale fade respects prefers-reduced-motion. */
+.webhook-deliveries-error {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  padding: 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.webhook-deliveries-data {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.webhook-deliveries-data--stale {
+  opacity: 0.6;
+}
+
+.webhook-deliveries-stale-note {
+  color: var(--warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webhook-deliveries-data {
+    transition: none;
+  }
 }
 
 /* Response JSON Skeleton Container */

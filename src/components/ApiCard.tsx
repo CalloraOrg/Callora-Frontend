@@ -14,6 +14,7 @@ import EmptyState from "./EmptyState";
 import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import { useFavorites } from "../hooks/useFavorites";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import type { APIItem } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
@@ -652,11 +653,7 @@ export default function ApiCard({
     setLiveMessage(msg);
   }, []);
 
-  const prefersReducedMotion = useMemo(() => {
-    return typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)")?.matches;
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const { isFavorite, toggleFavorite } = useFavorites();
   const { apis: comparedApis } = useCompareStore();

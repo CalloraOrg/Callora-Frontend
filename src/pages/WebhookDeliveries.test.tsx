@@ -66,4 +66,49 @@ describe('WebhookDeliveries Page', () => {
       expect(screen.getByText('Retry triggered successfully')).toBeInTheDocument();
     });
   });
+
+  it('announces the loading state with role=status', async () => {
+    renderPage();
+
+    const loading = screen.getByText(/Loading deliveries/i);
+    expect(loading.getAttribute('role')).toBe('status');
+  });
+
+  it('announces errors with role=alert and a semantic danger class', async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByText(/Simulate Error Account/i));
+
+    await waitFor(() => {
+      const alert = screen.getByRole('alert');
+      expect(alert.textContent).toMatch(/Failed to fetch from authoritative source/i);
+      expect(alert.className).toContain('webhook-deliveries-error');
+    });
+  });
+
+  it('marks the stale data region busy and uses token-based warning classes', async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText(/dlv_1_1/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Refresh/i));
+
+    const dataRegion = document.querySelector('.webhook-deliveries-data');
+    expect(dataRegion).toBeTruthy();
+
+    await waitFor(() => {
+      expect(dataRegion?.getAttribute('aria-busy')).toBe('true');
+    });
+
+    expect(screen.getByText(/Updating data/i).className).toContain('webhook-deliveries-stale-note');
+    expect(dataRegion?.className).toContain('webhook-deliveries-data--stale');
+
+    await waitFor(() => {
+      expect(dataRegion?.getAttribute('aria-busy')).toBe('false');
+    });
+
+    expect(dataRegion?.className).not.toContain('webhook-deliveries-data--stale');
+  });
 });
