@@ -17,6 +17,7 @@ import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import { LOADING_DELAY_MS } from "../config/constants";
 import {
@@ -92,12 +93,12 @@ export default function MarketplacePage(): JSX.Element {
   // navigation can never overwrite the loading state of a newer one (#989).
   const requestSeqRef = useRef(0);
 
+  // Reactive OS-level reduced-motion preference (single source of truth).
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   useEffect(() => {
     const seq = ++requestSeqRef.current;
     const abortController = new AbortController();
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     trackFetch(
       new Promise<void>((resolve) => {
@@ -119,7 +120,7 @@ export default function MarketplacePage(): JSX.Element {
       }),
     );
     return () => abortController.abort();
-  }, [trackFetch]);
+  }, [trackFetch, prefersReducedMotion]);
 
   useEffect(() => {
     persistDensityPreference(density);

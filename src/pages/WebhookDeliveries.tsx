@@ -63,9 +63,9 @@ export default function WebhookDeliveries() {
         </label>
       </div>
 
-      {status === 'loading' && <p>Loading deliveries...</p>}
+      {status === 'loading' && <p role="status">Loading deliveries...</p>}
       {status === 'error' && (
-        <div style={{ color: 'red', border: '1px solid red', padding: '16px' }}>
+        <div role="alert" className="webhook-deliveries-error">
           <strong>Error:</strong> {error}
           <br/>
           <button onClick={refresh}>Retry Load</button>
@@ -73,8 +73,11 @@ export default function WebhookDeliveries() {
       )}
 
       {(status === 'success' || isStale) && (
-        <div style={{ opacity: isStale ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-          {isStale && <p style={{ color: 'orange' }}>Updating data...</p>}
+        <div
+          className={`webhook-deliveries-data${isStale ? ' webhook-deliveries-data--stale' : ''}`}
+          aria-busy={isStale}
+        >
+          {isStale && <p className="webhook-deliveries-stale-note" role="status">Updating data...</p>}
           
           {deliveries.length === 0 ? (
             <div className="empty-state">No deliveries found.</div>

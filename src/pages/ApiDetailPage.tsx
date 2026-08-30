@@ -6,6 +6,7 @@ import { ApiDetailPageSkeleton } from "../components/Skeleton";
 import EmbedPreview from "../components/EmbedPreview";
 import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 import { formatPrice, formatEstimatedCost, formatCount, formatDateShort } from "../utils/format";
@@ -407,11 +408,7 @@ export default function ApiDetailPage({ onBack }: Props) {
     setAnnouncement(`Showing ${tabLabel} tab`);
   }, []);
 
-  const prefersReducedMotion = useMemo(() => {
-    return typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Extract ID from URL path: /details/[id]
   const id = typeof window !== "undefined" ? window.location.pathname.split("/").filter(Boolean).pop() : undefined;

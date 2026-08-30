@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Skeleton, { ApiUsageSkeleton } from '../components/Skeleton';
 import { formatPrice, formatDuration } from '../utils/format';
 import type { JsonSchema } from '../components/RequestBodyEditor';
@@ -8,6 +8,7 @@ import RequestHistoryPanel from '../components/RequestHistoryPanel';
 import ParamsBuilder from '../components/ParamsBuilder';
 import UsageChart from '../components/UsageChart';
 import { useFetchTracker } from '../hooks/useFetchTracker';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useQuota } from '../hooks/useQuota';
 import PlanNudge from '../components/PlanNudge';
 import CallsHeatmap from '../components/CallsHeatmap';
@@ -250,11 +251,7 @@ export default function ApiUsage() {
     resetExport,
   } = useExportHistory(callHistory, { accountId: currentAccountId });
 
-  const prefersReducedMotion = useMemo(() => {
-    return typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
