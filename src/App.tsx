@@ -12,6 +12,11 @@ import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS } from "./c
 import CompareDrawer from "./components/CompareDrawer";
 import CompareTray from "./components/CompareTray";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import MarketplacePage from "./pages/MarketplacePage";
+import ThemePlayground from "./pages/ThemePlayground";
+import DesignSystemDocs from "./pages/DesignSystemDocs";
+import A11yAudit from "./pages/A11yAudit";
+import InvoicesPage from "./pages/InvoicesPage";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
@@ -148,6 +153,7 @@ const APP_ROUTES = {
   planBadge: "/apis/plan-badge",
   apiUsage: "/api-usage",
   billing: "/billing",
+  invoices: "/invoices",
   billingHistory: "/billing/history",
   documentation: "/documentation",
   status: "/status",
@@ -611,6 +617,10 @@ function App() {
               <NavLink to={APP_ROUTES.billing} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
                 Billing
               </NavLink>
+              <NavLink to={APP_ROUTES.invoices} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+                Invoices
+              </NavLink>
+              <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
               <NavLink 
                 to={APP_ROUTES.billingHistory} 
                 className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
@@ -655,6 +665,8 @@ function App() {
 
             <Route path={APP_ROUTES.dashboard} element={<DashboardPage vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
+
+            <Route path={APP_ROUTES.invoices} element={<InvoicesPage />} />
 
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
 
