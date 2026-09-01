@@ -1,17 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import ApiCard from "../components/ApiCard";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { useFavorites } from "../hooks/useFavorites";
+import { useMarketplaceUrlState } from "../hooks/useMarketplaceUrlState";
+import { useAccountContext } from "../hooks/useAccountContext";
 import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
 import CategoryPills from "../components/CategoryPills";
+import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
 import FiltersSidebar, { ALL_CATEGORIES } from "../components/FiltersSidebar";
+import KbdHint from "../components/KbdHint";
+import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import { LOADING_DELAY_MS } from "../config/constants";
 import {
@@ -19,10 +25,13 @@ import {
   persistDensityPreference,
   type DensityPreference,
 } from "../utils/density";
-import CompareDrawer from "../components/CompareDrawer";
+
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
-import { useCompareStore } from "../state/compareStore";
+import LiveRegion from "../components/LiveRegion";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
+import { useCompareStore } from "../state/compareStore";
+import MarketplacePageSkeleton from "./MarketplacePage.skeleton";
+import { useCursorPagination } from "../hooks/useCursorPagination";
 
 export default function MarketplacePage(): JSX.Element {
   const { apis } = useCompareStore();
@@ -34,174 +43,110 @@ export default function MarketplacePage(): JSX.Element {
     "Marketplace – Callora",
     "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
   );
-  const [search, setSearch] = useState("");
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Single source of truth for every marketplace filter: the URL. The hook
+  // derives each value from `searchParams` on render and only ever writes back
+  // to the URL, so back/forward, refreshes, and deep links can never leave the
+  // UI showing a stale, locally-cached filter (#989).
+  const {
+    query,
+    queryDraft,
+    commitQuery,
+    setQueryDraft,
+    categories,
+    setCategories,
+    statuses,
+    setStatuses,
+    tag,
+    setTag,
+    minPrice,
+    setMinPrice,
+    maxPrice,
+    setMaxPrice,
+    popularity,
+    setPopularity,
+    favoritesOnly,
+    setFavoritesOnly,
+    sort,
+    setSort,
+    clearAll,
+  } = useMarketplaceUrlState();
+
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+
   const [density, setDensity] = useState<DensityPreference>(() =>
     readDensityPreference(),
   );
-  // Debounce search input to prevent excessive re-renders on large lists
-  const debouncedSearch = useDebounce(search, 300);
-  /**
-   * Sort state persisted via URL query parameter ?sort=
-   * Default is "popularity" to match existing behaviour.
-   */
-  const [searchParams, setSearchParams] = useSearchParams();
-  const currentPage = Number(searchParams.get("page") ?? "1");
-  // ── Filter persistence in URL ──────────────────────────────────────────────
-  // Categories are serialised as comma-separated ?categories= param.
-  // Tag, minPrice, maxPrice, popularity are individual params.
-  const [selectedCategories, setSelectedCategoriesRaw] = useState<Set<string>>(
-    () => {
-      const raw = searchParams.get("categories");
-      return raw ? new Set(raw.split(",").filter(Boolean)) : new Set();
-    },
-  );
-  const setSelectedCategories = (next: Set<string>) => {
-    setSelectedCategoriesRaw(next);
-    setSearchParams(
-      (prev) => {
-        if (next.size > 0) prev.set("categories", [...next].join(","));
-        else prev.delete("categories");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
+  const debouncedQuery = useDebounce(query, 300);
 
-  const [selectedTag, setSelectedTagRaw] = useState<string | null>(() =>
-    searchParams.get("tag"),
-  );
-  const setSelectedTag = (tag: string | null) => {
-    setSelectedTagRaw(tag);
-    setSearchParams(
-      (prev) => {
-        if (tag) prev.set("tag", tag);
-        else prev.delete("tag");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const [minPrice, setMinPriceRaw] = useState<number | null>(() => {
-    const v = searchParams.get("minPrice");
-    return v ? Number(v) : null;
-  });
-  const setMinPrice = (v: number | null) => {
-    setMinPriceRaw(v);
-    setSearchParams(
-      (prev) => {
-        if (v !== null) prev.set("minPrice", String(v));
-        else prev.delete("minPrice");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const [maxPrice, setMaxPriceRaw] = useState<number | null>(() => {
-    const v = searchParams.get("maxPrice");
-    return v ? Number(v) : null;
-  });
-  const setMaxPrice = (v: number | null) => {
-    setMaxPriceRaw(v);
-    setSearchParams(
-      (prev) => {
-        if (v !== null) prev.set("maxPrice", String(v));
-        else prev.delete("maxPrice");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const [popularity, setPopularityRaw] = useState<string>(
-    () => searchParams.get("popularity") ?? "any",
-  );
-  const setPopularity = (v: string) => {
-    setPopularityRaw(v);
-    setSearchParams(
-      (prev) => {
-        if (v !== "any") prev.set("popularity", v);
-        else prev.delete("popularity");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-  const { favorites, toggleFavorite, isFavorite } = useFavorites();
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const sortParam = (searchParams.get("sort") ?? "popularity") as SortValue;
-  const setSortParam = (value: SortValue) => {
-    setSearchParams(
-      (prev) => {
-        prev.set("sort", value);
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-  const [shown, setShown] = useState<number>(12);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Ref used to restore focus to the Filters trigger after the sheet closes
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
+  const isInitialMount = useRef(true);
+  // Monotonic sequence that guards the loading transition: only the latest
+  // in-flight load may flip `isLoading` off, so a stale timer from an earlier
+  // navigation can never overwrite the loading state of a newer one (#989).
+  const requestSeqRef = useRef(0);
+
+  // Reactive OS-level reduced-motion preference (single source of truth).
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
+    const seq = ++requestSeqRef.current;
     const abortController = new AbortController();
+
     trackFetch(
       new Promise<void>((resolve) => {
-        const timer = setTimeout(() => {
-          if (!abortController.signal.aborted) {
-            setIsLoading(false);
-            resolve();
-          }
-        }, LOADING_DELAY_MS);
-        abortController.signal.addEventListener("abort", () => {
-          clearTimeout(timer);
+        if (prefersReducedMotion) {
+          if (seq === requestSeqRef.current) setIsLoading(false);
           resolve();
-        });
+        } else {
+          const timer = setTimeout(() => {
+            if (!abortController.signal.aborted) {
+              if (seq === requestSeqRef.current) setIsLoading(false);
+              resolve();
+            }
+          }, LOADING_DELAY_MS);
+          abortController.signal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+        }
       }),
     );
     return () => abortController.abort();
-  }, [trackFetch]);
+  }, [trackFetch, prefersReducedMotion]);
 
   useEffect(() => {
     persistDensityPreference(density);
   }, [density]);
 
-  /**
-   * Determine if any filters are currently active.
-   * Used to distinguish between "no APIs exist" vs "filters too narrow" empty states.
-   */
   const hasActiveFilters = () => {
     return (
-      search.trim() !== "" ||
-      selectedCategories.size > 0 ||
-      selectedTag !== null ||
+      query.trim() !== "" ||
+      categories.size > 0 ||
+      tag !== null ||
       minPrice !== null ||
       maxPrice !== null ||
       popularity !== "any" ||
-      favoritesOnly
+      favoritesOnly ||
+      statuses.size > 0
     );
   };
 
-  /**
-   * Count of actively-applied filter dimensions — shown as a badge on the
-   * mobile Filters trigger button.
-   */
   const activeFilterCount =
-    selectedCategories.size +
+    categories.size +
     (minPrice !== null ? 1 : 0) +
     (maxPrice !== null ? 1 : 0) +
     (popularity !== "any" ? 1 : 0) +
-    (favoritesOnly ? 1 : 0);
+    (favoritesOnly ? 1 : 0) +
+    (statuses.size > 0 ? 1 : 0);
 
-  /**
-   * Handle retry for fetch errors.
-   * Clears error state and simulates refetch.
-   */
   const handleRetryFetch = async () => {
     setFetchError(null);
     setIsLoading(true);
@@ -209,12 +154,38 @@ export default function MarketplacePage(): JSX.Element {
     setIsLoading(false);
   };
 
+  const allTags = useMemo(() => getAllUniqueTags(), []);
+
+  // ── Aria-live announcements for screen readers ───────────────────────
+  const [announcement, setAnnouncement] = useState("");
+  const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const announce = useCallback((msg: string) => {
+    if (announceTimerRef.current) clearTimeout(announceTimerRef.current);
+    setAnnouncement(msg);
+    announceTimerRef.current = setTimeout(() => setAnnouncement(""), 3000);
+  }, []);
+
+  // Account-switch reset. Marketplace filters are scoped to the active account
+  // (favorites, category availability, etc.), so when the account changes we
+  // clear every filter + cursor from the URL. This guarantees the new account
+  // starts from authoritative, non-stale state instead of inheriting a previous
+  // account's selections (stale-state guard for #989).
+  const { account } = useAccountContext();
+  const accountIdRef = useRef(account?.id);
+  useEffect(() => {
+    if (accountIdRef.current === account?.id) return;
+    accountIdRef.current = account?.id;
+    clearAll();
+    announce("Switched account. Marketplace filters were reset.");
+  }, [account?.id, clearAll, announce]);
+
   // Filter and sort items
   const filtered = useMemo(() => {
     let items = MOCK_APIS.slice();
 
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.toLowerCase();
       items = items.filter((a) => {
         return (
           a.name.toLowerCase().includes(q) ||
@@ -225,20 +196,22 @@ export default function MarketplacePage(): JSX.Element {
       });
     }
 
-    if (selectedCategories.size > 0) {
-      items = items.filter((a) => selectedCategories.has(a.category ?? ""));
+    if (categories.size > 0) {
+      items = items.filter((a) => categories.has(a.category ?? ""));
+    }
+
+    if (statuses.size > 0) {
+      items = items.filter((a) => a.status && statuses.has(a.status));
     }
 
     if (favoritesOnly) {
       items = items.filter((a) => favorites.includes(a.id));
     }
 
-    if (selectedTag) {
-      const normalizedSelectedTag = selectedTag.toLowerCase();
+    if (tag) {
+      const normalizedTag = tag.toLowerCase();
       items = items.filter((a) =>
-        (a.tags || []).some(
-          (tag) => tag.toLowerCase() === normalizedSelectedTag,
-        ),
+        (a.tags || []).some((t) => t.toLowerCase() === normalizedTag),
       );
     }
 
@@ -261,18 +234,17 @@ export default function MarketplacePage(): JSX.Element {
       );
     }
 
-    // explicit sort options driven by the URL ?sort= param
-    if (sortParam === "price-asc")
+    if (sort === "price-asc")
       items = items.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
-    if (sortParam === "latency-asc")
+    if (sort === "latency-asc")
       items = items.sort(
         (a, b) =>
           (a.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER) -
           (b.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER),
       );
-    if (sortParam === "popularity")
+    if (sort === "popularity")
       items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
-    if (sortParam === "newest")
+    if (sort === "newest")
       items = items.sort(
         (a, b) =>
           Date.parse(b.createdAt ?? "1970-01-01") -
@@ -281,82 +253,181 @@ export default function MarketplacePage(): JSX.Element {
 
     return items;
   }, [
-    debouncedSearch,
-    selectedCategories,
-    selectedTag,
+    debouncedQuery,
+    categories,
+    tag,
     minPrice,
     maxPrice,
     popularity,
     favoritesOnly,
-    sortParam,
+    sort,
+    statuses,
   ]);
 
+  // ── Cursor pagination ──────────────────────────────────────────────────
+  const initialCursor = searchParams.get("cursor");
+  const {
+    pageItems,
+    hasNextPage,
+    hasPreviousPage,
+    currentPageIndex,
+    totalItemCount,
+    goToNextPage,
+    goToPreviousPage,
+    resetCursor,
+    currentCursor,
+  } = useCursorPagination(filtered, pageSize, initialCursor);
+
+  // Sync cursor to URL
   useEffect(() => {
-    setShown(12);
+    setSearchParams(
+      (prev) => {
+        if (currentCursor) {
+          prev.set("cursor", currentCursor);
+        } else {
+          prev.delete("cursor");
+        }
+        return prev;
+      },
+      { replace: true },
+    );
+  }, [currentCursor, setSearchParams]);
+
+  // Reset cursor when filters change (skip initial mount)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    resetCursor();
   }, [
-    debouncedSearch,
-    selectedCategories,
-    selectedTag,
+    debouncedQuery,
+    categories,
+    tag,
     minPrice,
     maxPrice,
     popularity,
-    sortParam,
+    sort,
+    statuses,
+    favoritesOnly,
+    resetCursor,
   ]);
 
-  const handleTagClick = (tag: string) => {
-    setSelectedTag(
-      selectedTag?.toLowerCase() === tag.toLowerCase() ? null : tag,
-    );
+  // ── Aria-live announcements (relies on filtered being defined above) ──
+  const prevIsLoading = useRef(isLoading);
+  const prevFetchError = useRef(fetchError);
+  const prevPageIndex = useRef(currentPageIndex);
+
+  useEffect(() => {
+    if (prevIsLoading.current && !isLoading) {
+      if (fetchError) {
+        announce(`Error loading marketplace: ${fetchError}`);
+      } else {
+        announce("Marketplace loaded.");
+      }
+    } else if (!prevIsLoading.current && isLoading) {
+      announce("Loading marketplace...");
+    }
+    prevIsLoading.current = isLoading;
+  }, [isLoading, fetchError, announce]);
+
+  useEffect(() => {
+    if (fetchError && fetchError !== prevFetchError.current && !isLoading) {
+      announce(`Error loading marketplace: ${fetchError}`);
+    }
+    prevFetchError.current = fetchError;
+  }, [fetchError, isLoading, announce]);
+
+  useEffect(() => {
+    if (prevPageIndex.current !== currentPageIndex) {
+      const newStart = totalItemCount > 0 ? currentPageIndex * pageSize + 1 : 0;
+      const newEnd = Math.min((currentPageIndex + 1) * pageSize, totalItemCount);
+      announce(`Page changed. Showing APIs ${newStart} through ${newEnd}.`);
+      prevPageIndex.current = currentPageIndex;
+    }
+  }, [currentPageIndex, pageSize, totalItemCount, announce]);
+
+  const prevFilteredCount = useRef(0);
+  const isFirstFilterRender = useRef(true);
+  useEffect(() => {
+    if (isFirstFilterRender.current) {
+      isFirstFilterRender.current = false;
+      return;
+    }
+    const prev = prevFilteredCount.current;
+    if (prev !== filtered.length) {
+      if (filtered.length === 0 && prev > 0) {
+        announce("No APIs match the current filters.");
+      } else if (filtered.length > 0 && prev === 0) {
+        announce(`${filtered.length} API${filtered.length !== 1 ? "s" : ""} found.`);
+      }
+      prevFilteredCount.current = filtered.length;
+    }
+  }, [filtered.length, announce]);
+
+  const prevTag = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevTag.current;
+    if (tag !== prev) {
+      if (tag) {
+        announce(`Filtering by tag: ${tag}`);
+      } else {
+        announce("Tag filter removed.");
+      }
+      prevTag.current = tag;
+    }
+  }, [tag, announce]);
+
+  const handleTagClick = (clickedTag: string) => {
+    setTag(tag?.toLowerCase() === clickedTag.toLowerCase() ? null : clickedTag);
   };
-
-  // Calculate total pages
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-
-  // Clamp current page to valid range
-  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
-
-  // Slice items for current page
-  const displayedItems = useMemo(() => {
-    const start = (validCurrentPage - 1) * pageSize;
-    const end = start + pageSize;
-    return filtered.slice(start, end);
-  }, [filtered, validCurrentPage, pageSize]);
 
   // Handlers
   const toggleCategory = (c: string) => {
-    const copy = new Set(selectedCategories);
+    const copy = new Set(categories);
     if (copy.has(c)) copy.delete(c);
     else copy.add(c);
-    setSelectedCategories(copy);
-    setSearchParams({ page: "1" });
+    setCategories(copy);
+  };
+
+  const toggleStatus = (s: string) => {
+    const copy = new Set(statuses);
+    if (copy.has(s)) copy.delete(s);
+    else copy.add(s);
+    setStatuses(copy);
   };
 
   const clearCategories = () => {
-    setSelectedCategories(new Set());
-    setSearchParams({ page: "1" });
+    setCategories(new Set());
   };
 
   const clearFilters = () => {
-    setSelectedCategories(new Set());
-    setSelectedTag(null);
-    setMinPrice(null);
-    setMaxPrice(null);
-    setPopularity("any");
-    setFavoritesOnly(false);
-    setSortParam("popularity");
-    setSearch("");
-    setShown(12);
+    clearAll();
+    announce("All filters cleared. Showing all APIs.");
+    setPageSize(12);
   };
 
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setSearchParams({ page: page.toString() });
-    }
+  const handlePageChange = () => {
+    const seq = ++requestSeqRef.current;
+    setIsPageLoading(true);
+    requestAnimationFrame(() => {
+      if (seq === requestSeqRef.current) setIsPageLoading(false);
+    });
+  };
+
+  const handleGoNext = () => {
+    handlePageChange();
+    goToNextPage();
+  };
+
+  const handleGoPrevious = () => {
+    handlePageChange();
+    goToPreviousPage();
   };
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
-    setSearchParams({ page: "1" });
+    resetCursor();
   };
 
   const handleViewDetails = (api: APIItem) => {
@@ -364,38 +435,20 @@ export default function MarketplacePage(): JSX.Element {
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
+  const startItem = totalItemCount > 0 ? currentPageIndex * pageSize + 1 : 0;
+  const endItem = Math.min(
+    (currentPageIndex + 1) * pageSize,
+    totalItemCount,
+  );
 
-  // If page is invalid, update URL
-  useEffect(() => {
-    if (validCurrentPage !== currentPage) {
-      setSearchParams({ page: validCurrentPage.toString() });
-    }
-  }, [validCurrentPage, currentPage, setSearchParams]);
-
-  // Reset page when filters change
-  useEffect(() => {
-    if (!isLoading) {
-      setSearchParams({ page: "1" });
-    }
-  }, [
-    debouncedSearch,
-    selectedCategories,
-    minPrice,
-    maxPrice,
-    popularity,
-    sortParam,
-    setSearchParams,
-    isLoading,
-  ]);
-
-  const startItem = (validCurrentPage - 1) * pageSize + 1;
-  const endItem = Math.min(validCurrentPage * pageSize, filtered.length);
+  if (isLoading) {
+    return (
+      <>
+        <MarketplacePageSkeleton density={density} />
+        <LiveRegion message={announcement} />
+      </>
+    );
+  }
 
   return (
     <div className="marketplace-page">
@@ -404,7 +457,7 @@ export default function MarketplacePage(): JSX.Element {
         <h1>API Marketplace</h1>
         <div className="marketplace-search-row">
           <div className="marketplace-search">
-            <SearchBar value={search} onChange={setSearch} />
+            <SearchBar value={queryDraft} onChange={commitQuery} />
           </div>
           <div
             className="marketplace-density-toggle"
@@ -429,7 +482,7 @@ export default function MarketplacePage(): JSX.Element {
             </button>
           </div>
         </div>
-        <SortDropdown value={sortParam} onChange={setSortParam} />
+        <SortDropdown value={sort} onChange={setSort} />
       </div>
 
       {/* Rail of APIs with the most recent usage */}
@@ -439,7 +492,7 @@ export default function MarketplacePage(): JSX.Element {
       <div className="marketplace-layout">
         <aside className="marketplace-sidebar">
           <FiltersSidebar
-            selectedCategories={selectedCategories}
+            selectedCategories={categories}
             toggleCategory={toggleCategory}
             minPrice={minPrice}
             maxPrice={maxPrice}
@@ -450,34 +503,51 @@ export default function MarketplacePage(): JSX.Element {
             clearFilters={clearFilters}
             favoritesOnly={favoritesOnly}
             toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+            selectedStatuses={statuses}
+            toggleStatus={toggleStatus}
             resultCount={filtered.length}
           />
         </aside>
 
         <main
-          className="marketplace-results"
-          style={isTrayVisible ? { paddingBottom: "80px" } : {}}
+          className={
+            isTrayVisible
+              ? "marketplace-results marketplace-results--tray-open"
+              : "marketplace-results"
+          }
         >
           <div className="marketplace-toolbar">
             <div className="marketplace-count">
               {filtered.length === 0 ? (
-                <>Showing 0 of 0 APIs</>
+                <>
+                  Showing{" "}
+                  <span className="numeric-tabular">0</span>
+                  {" "}of{" "}
+                  <span className="numeric-tabular">0</span>
+                  {" "}APIs
+                </>
               ) : (
                 <>
-                  Showing {startItem}-{endItem} of {filtered.length} APIs
+                  Showing{" "}
+                  <span className="numeric-tabular">{startItem}</span>
+                  {"–"}
+                  <span className="numeric-tabular">{endItem}</span>
+                  {" "}of{" "}
+                  <span className="numeric-tabular">{filtered.length}</span>
+                  {" "}APIs
                 </>
               )}
-              {selectedTag && (
+              {tag && (
                 <span className="marketplace-active-tag" aria-live="polite">
-                  Filtered by tag: #{selectedTag}
+                  Filtered by tag: #{tag}
                 </span>
               )}
             </div>
 
             <div className="marketplace-actions">
               <select
-                value={sortParam}
-                onChange={(e) => setSortParam(e.target.value as SortValue)}
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortValue)}
               >
                 <option value="relevance">Relevance</option>
                 <option value="priceAsc">Price: low → high</option>
@@ -486,7 +556,6 @@ export default function MarketplacePage(): JSX.Element {
                 <option value="newest">Newest</option>
               </select>
 
-              {/* Mobile Filters trigger — hidden on desktop via CSS */}
               <button
                 ref={filtersTriggerRef}
                 className="ghost-button marketplace-filter-button"
@@ -497,7 +566,7 @@ export default function MarketplacePage(): JSX.Element {
                 Filters
                 {activeFilterCount > 0 && (
                   <span
-                    className="marketplace-filter-badge"
+                    className="marketplace-filter-badge numeric-tabular"
                     aria-label={`${activeFilterCount} active filter${activeFilterCount !== 1 ? "s" : ""}`}
                   >
                     {activeFilterCount}
@@ -509,63 +578,100 @@ export default function MarketplacePage(): JSX.Element {
 
           <CategoryPills
             categories={ALL_CATEGORIES}
-            selectedCategories={selectedCategories}
+            selectedCategories={categories}
             toggleCategory={toggleCategory}
             clearCategories={clearCategories}
           />
 
+          <ApiTagFilter
+            tags={allTags}
+            selectedTag={tag}
+            onTagChange={setTag}
+          />
+
           {fetchError ? (
             <EmptyState variant="error" onRetry={handleRetryFetch} />
-          ) : isLoading ? (
-            <div className="marketplace-grid" aria-label="Loading APIs">
-              {Array.from({ length: pageSize }).map((_, index) => (
-                <ApiCard key={index} loading />
-              ))}
-            </div>
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}
-              title={favoritesOnly ? "No favorites yet" : undefined}
+              title={
+                favoritesOnly
+                  ? "No favorites yet"
+                  : hasActiveFilters()
+                    ? "No results found"
+                    : "No APIs available"
+              }
               message={
                 favoritesOnly
                   ? "Try starring some APIs to see them here!"
-                  : undefined
+                  : hasActiveFilters()
+                    ? "Try adjusting your filters or clear them to see all available APIs."
+                    : "The marketplace is empty right now. Check back soon for new integrations!"
               }
               onClearFilters={hasActiveFilters() ? clearFilters : undefined}
+              action={
+                !hasActiveFilters() && !favoritesOnly
+                  ? {
+                      label: "Clear all filters",
+                      onClick: clearFilters,
+                    }
+                  : undefined
+              }
+              secondaryAction={
+                favoritesOnly
+                  ? {
+                      label: "Browse all APIs",
+                      onClick: () => setFavoritesOnly(false),
+                    }
+                  : hasActiveFilters()
+                    ? {
+                        label: "Browse all APIs",
+                        onClick: clearFilters,
+                      }
+                    : undefined
+              }
             />
           ) : (
             <div className="marketplace-grid">
-              {displayedItems.map((a) => (
+              {pageItems.map((a) => (
                 <ApiCard
                   key={a.id}
                   api={a}
+                  density={density}
                   onViewDetails={handleViewDetails}
                   onTagClick={handleTagClick}
-                  activeTag={selectedTag}
+                  activeTag={tag}
                 />
               ))}
             </div>
           )}
 
-          {/* Bottom pagination */}
+          {/* Cursor-based pagination */}
           {filtered.length > 0 && (
             <Pagination
-              currentPage={validCurrentPage}
-              totalPages={totalPages}
+              mode="cursor"
+              currentPageIndex={currentPageIndex}
+              hasNextPage={hasNextPage}
+              hasPreviousPage={hasPreviousPage}
+              totalItemCount={totalItemCount}
               pageSize={pageSize}
-              onPageChange={handlePageChange}
+              onGoNext={handleGoNext}
+              onGoPrevious={handleGoPrevious}
               onPageSizeChange={handlePageSizeChange}
             />
           )}
         </main>
       </div>
 
+      {/* Screen-reader announcement region */}
+      <LiveRegion message={announcement} />
+
       {/* Mobile bottom-sheet — only rendered when open */}
       <FiltersBottomSheet
         open={showFiltersMobile}
         onClose={() => setShowFiltersMobile(false)}
         resultCount={filtered.length}
-        selectedCategories={selectedCategories}
+        selectedCategories={categories}
         toggleCategory={toggleCategory}
         minPrice={minPrice}
         maxPrice={maxPrice}
@@ -576,7 +682,14 @@ export default function MarketplacePage(): JSX.Element {
         clearFilters={clearFilters}
         favoritesOnly={favoritesOnly}
         toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+        selectedStatuses={statuses}
+        toggleStatus={toggleStatus}
         triggerRef={filtersTriggerRef}
+      />
+
+      {/* Keyboard shortcuts hint */}
+      <KbdHint
+        shortcuts={SHORTCUTS.filter((s) => s.category === "Marketplace")}
       />
     </div>
   );

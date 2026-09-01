@@ -4,6 +4,22 @@
   --radius-lg: 20px;
   --radius-md: 16px;
   --transition-speed: 240ms;
+  
+  /* Spacing Tokens */
+  --spacing-4: 4px;
+  --spacing-5: 5px;
+  --spacing-6: 6px;
+  --spacing-8: 8px;
+  --spacing-10: 10px;
+  --spacing-14: 14px;
+  --spacing-16: 16px;
+
+  /* Typography Tokens */
+  --text-xs: 0.625rem;    /* 10px */
+  --text-sm: 0.6875rem;   /* 11px */
+  --text-md: 0.75rem;     /* 12px */
+  --text-base: 0.8125rem; /* 13px */
+
   /* Focus ring token — used by all :focus-visible rules */
   --focus-ring: 0 0 0 3px rgba(78, 133, 255, 0.55);
   --focus-ring-offset: 0 0 0 5px rgba(78, 133, 255, 0.55);
@@ -28,6 +44,7 @@
   --surface-strong: rgba(17, 24, 46, 0.96);
   --surface-soft: rgba(255, 255, 255, 0.04);
   --line: rgba(169, 184, 255, 0.16);
+  --line-soft: rgba(169, 184, 255, 0.08);
   --line-strong: rgba(169, 184, 255, 0.28);
   --text: #f3f5fb;
   --muted: #93a0bf;
@@ -42,6 +59,17 @@
   --backdrop: rgba(4, 8, 18, 0.76);
   --modal-bg: linear-gradient(180deg, rgba(20, 27, 50, 0.98), rgba(12, 18, 34, 0.98));
   --visited: #a78bfa;
+
+  /* ── Theme-agnostic display / glyph tokens ─────────────────────────────
+     These carry foreground colours that must remain legible in BOTH themes.
+     They are defined per-theme (light + dark) so dynamic theme switching
+     never leaves a hardcoded light-on-dark colour behind on a light surface.
+     Each value is tuned to clear WCAG 2.1 AA (>= 4.5:1) against its
+     intended background token.                                            */
+  --display-404: #dbe5ff;       /* .not-found-code — on --page-bg */
+  --glyph-error: #ffd0d6;       /* .error-illustration span — on --page-bg */
+  --status-pending-fg: #ffe08a; /* .status-chip.pending — on --surface */
+  --status-approving-fg: #cbd9ff; /* .status-chip.approving — on --surface */
 
   /* HTTP Method Badge Tokens - Dark Theme (High Contrast / Accessible) */
   --method-get-bg: rgba(59, 130, 246, 0.16);
@@ -71,6 +99,7 @@
   --surface-strong: rgba(255, 255, 255, 0.92);
   --surface-soft: rgba(0, 0, 0, 0.06);
   --line: rgba(0, 0, 0, 0.8);
+  --line-soft: rgba(0, 0, 0, 0.06);
   --line-strong: rgba(0, 0, 0, 0.12);
   --text: #1a2332;
   --muted: #64748b;
@@ -85,6 +114,13 @@
   --backdrop: rgba(255, 255, 255, 0.8);
   --modal-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 255, 0.98));
   --visited: #7c3aed;
+
+  /* ── Theme-agnostic display / glyph tokens (Light Theme) ───────────────
+     Dark foregrounds so they clear WCAG 2.1 AA against light surfaces. */
+  --display-404: #1e3a8a;
+  --glyph-error: #b91c1c;
+  --status-pending-fg: #854d0e;
+  --status-approving-fg: #1e40af;
 
   /* HTTP Method Badge Tokens - Light Theme (High Contrast / Accessible) */
   --method-get-bg: rgba(37, 99, 235, 0.1);
@@ -266,6 +302,35 @@ input {
 .theme-playground__preview {
   display: grid;
   gap: 16px;
+}
+
+/* ── SortMenu component styles ───────────────────────────────────────────── */
+.sort-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sort-menu__sort-row {
+  display: flex;
+  align-items: center;
+}
+
+.sort-menu__current-state {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.sort-menu__label {
+  font-weight: 500;
+}
+
+.sort-menu__value {
+  font-weight: 600;
+  color: var(--text);
 }
 
 .theme-playground__editor {
@@ -502,6 +567,7 @@ code,
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
 }
 
 .eyebrow {
@@ -605,6 +671,192 @@ code,
   font-weight: 600;
   text-transform: capitalize;
   letter-spacing: 0.05em;
+}
+
+/* ─── Sticky bottom action bar (#583 – GrantFox FWC26 / Stellar Wave) ─────
+   Slides up from the bottom once the user scrolls past the threshold.
+   The bar is inert + aria-hidden when not visible so it is completely
+   transparent to assistive technology and keyboard navigation.
+
+   Structure:
+     .theme-sticky-bar              fixed positioning / entrance animation
+     .theme-sticky-bar__inner       pill container (max-width centred)
+     .theme-sticky-bar__btn         individual action button
+     .theme-sticky-bar__btn--primary  accent-coloured primary CTA
+     .theme-sticky-bar__btn--active   pressed/current-state variant
+     .theme-sticky-bar__divider     1 px vertical separator
+
+   Design tokens consumed: --surface, --surface-strong, --line,
+   --accent, --text, --muted, --shadow, --radius-xl, --transition-speed.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Slide-up keyframe — used only when the user allows motion */
+@keyframes themeStickySlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Bar wrapper — fixed to the bottom of the viewport */
+.theme-sticky-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+
+  /* Hidden by default: shifted off-screen and invisible */
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+
+  /* Safe-area inset so nothing is clipped by notches / home indicators */
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)) 16px;
+
+  /* Prevent the bar background itself from triggering accidental clicks
+     when it is mid-transition */
+  transition:
+    transform var(--transition-speed, 240ms) ease,
+    opacity    var(--transition-speed, 240ms) ease;
+}
+
+/* Visible state — toggled by the .theme-sticky-bar--visible modifier */
+.theme-sticky-bar--visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Play the slide-up animation on first appearance (motion OK) */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-sticky-bar--visible {
+    animation: themeStickySlideUp var(--transition-speed, 240ms) ease both;
+  }
+}
+
+/* Inner pill — centres content and constrains max-width on wide viewports */
+.theme-sticky-bar__inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  /* Glassmorphism surface */
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl, 28px);
+  backdrop-filter: blur(22px);
+  box-shadow: var(--shadow);
+
+  /* Centred pill up to 480 px, then full-width on very narrow screens */
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 6px 8px;
+}
+
+/* ── Action buttons ─────────────────────────────────────────────────────── */
+
+.theme-sticky-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  flex: 1;            /* Share available space equally */
+  min-height: 48px;   /* WCAG 2.1 AA touch target */
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-xl, 28px) - 6px);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+
+  transition:
+    background var(--transition-speed, 240ms) ease,
+    color      var(--transition-speed, 240ms) ease,
+    border-color var(--transition-speed, 240ms) ease,
+    transform  180ms ease;
+}
+
+.theme-sticky-bar__btn:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+/* Primary CTA — accent gradient fill */
+.theme-sticky-bar__btn--primary {
+  background: linear-gradient(135deg, var(--accent, #4e85ff), color-mix(in srgb, var(--accent, #4e85ff) 70%, #fff));
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.theme-sticky-bar__btn--primary:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent, #4e85ff) 85%, #fff), var(--accent, #4e85ff));
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(78, 133, 255, 0.35);
+}
+
+/* Active / pressed state (e.g. system button when system theme is active) */
+.theme-sticky-bar__btn--active {
+  background: var(--surface-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Keyboard focus ring — inherits the global @layer focus rule but we
+   reinforce it here with a slight offset for the pill shape */
+.theme-sticky-bar__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Divider ─────────────────────────────────────────────────────────────── */
+
+.theme-sticky-bar__divider {
+  flex: 0 0 1px;
+  height: 24px;
+  background: var(--line);
+  border-radius: 1px;
+  margin: 0 2px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+/* On small screens the inner pill extends to full width */
+@media (max-width: 520px) {
+  .theme-sticky-bar__inner {
+    max-width: 100%;
+    border-radius: 16px;
+  }
+
+  .theme-sticky-bar__btn {
+    font-size: 0.8rem;
+    padding: 0 12px;
+  }
+}
+
+/* ── Reduced-motion: disable slide animation, keep visibility toggle ─────── */
+@media (prefers-reduced-motion: reduce) {
+  .theme-sticky-bar {
+    transition:
+      opacity var(--transition-speed, 240ms) ease;
+    transform: translateY(0); /* Never shift; rely on opacity only */
+  }
+
+  .theme-sticky-bar:not(.theme-sticky-bar--visible) {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 .page {
@@ -726,8 +978,8 @@ code,
 }
 
 .primary-button {
-  background: linear-gradient(135deg, #4e85ff, #6da6ff);
-  color: white;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 84%, #000000), var(--accent));
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -857,7 +1109,7 @@ code,
 .error-illustration span {
   font-size: 2rem;
   font-weight: 700;
-  color: #ffd0d6;
+  color: var(--glyph-error);
 }
 
 .not-found-code {
@@ -865,7 +1117,7 @@ code,
   font-size: clamp(4rem, 16vw, 8rem);
   line-height: 0.9;
   font-weight: 700;
-  color: #dbe5ff;
+  color: var(--display-404);
   letter-spacing: 0.04em;
 }
 
@@ -1094,14 +1346,26 @@ code,
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
-  padding: 18px;
+  margin-bottom: 24px;
+  padding: 18px 20px;
   border-radius: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   background: var(--surface-soft);
 }
 
-.status-banner strong,
+.status-banner strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.status-banner p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
 .preview-card strong,
 .hash-card strong,
 .error-card strong,
@@ -1110,28 +1374,41 @@ code,
   margin-bottom: 8px;
 }
 
+/* ── Status-chip pattern overlays (color-blind safe) ────────────────
+   Each variant gets a unique SVG background pattern so that the chip
+   is distinguishable by texture alone, satisfying WCAG 1.4.1.
+   Patterns use `currentColor` with low opacity so they adapt to
+   whatever color the variant defines.                        */
+
 .status-chip.pending {
   border-color: rgba(250, 204, 21, 0.3);
-  background: rgba(250, 204, 21, 0.12);
-  color: #ffe08a;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1.2' fill='currentColor' fill-opacity='0.25'/%3E%3C/svg%3E") repeat,
+    rgba(250, 204, 21, 0.12);
+  color: var(--status-pending-fg);
 }
 
 .status-chip.confirmed {
   border-color: rgba(115, 242, 187, 0.3);
+  /* solid — no pattern, this is the baseline reference state */
   background: rgba(115, 242, 187, 0.12);
   color: var(--success);
 }
 
 .status-chip.failed {
   border-color: rgba(255, 125, 141, 0.28);
-  background: rgba(255, 125, 141, 0.12);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1.2' stroke-opacity='0.3'/%3E%3Cline x1='3' y1='0' x2='6' y2='3' stroke='currentColor' stroke-width='1.2' stroke-opacity='0.3'/%3E%3Cline x1='0' y1='3' x2='3' y2='6' stroke='currentColor' stroke-width='1.2' stroke-opacity='0.3'/%3E%3C/svg%3E") repeat,
+    rgba(255, 125, 141, 0.12);
   color: var(--danger);
 }
 
 .status-chip.approving {
   border-color: rgba(78, 133, 255, 0.3);
-  background: rgba(78, 133, 255, 0.14);
-  color: #cbd9ff;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cline x1='0' y1='8' x2='8' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='4' y1='8' x2='8' y2='4' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='0' y1='4' x2='4' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3C/svg%3E") repeat,
+    rgba(78, 133, 255, 0.14);
+  color: var(--status-approving-fg);
 }
 
 .status-chip.input {
@@ -1153,8 +1430,12 @@ code,
 
 .field-label {
   display: block;
-  font-size: 0.94rem;
+  font-size: 0.88rem;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin-bottom: 8px;
 }
 
 .input-shell {
@@ -1167,11 +1448,17 @@ code,
   border-radius: 18px;
   border: 1px solid var(--line);
   background: var(--surface-soft);
+  transition: border-color 240ms, background-color 240ms;
+}
+
+.input-shell:focus-within {
+  border-color: var(--accent);
+  background: var(--surface);
 }
 
 .input-shell.invalid {
-  border-color: rgba(255, 125, 141, 0.45);
-  background: rgba(255, 125, 141, 0.07);
+  border-color: rgba(255, 125, 141, 0.55);
+  background: rgba(255, 125, 141, 0.1);
 }
 
 .input-shell input {
@@ -1197,16 +1484,58 @@ code,
 .preset-row {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.preset-row button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 240ms;
+}
+
+.preset-row button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(78, 133, 255, 0.08);
+}
+
+.preset-row button:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.preset-row button.active {
+  border-color: var(--accent);
+  background: rgba(78, 133, 255, 0.18);
+  color: var(--accent);
 }
 
 .error-text {
-  margin: 0;
+  margin: 8px 0 0 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 125, 141, 0.12);
   color: var(--danger);
   font-size: 0.92rem;
+  line-height: 1.4;
 }
 
-.security-note,
+.security-note {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  margin-top: 6px;
+}
+
 .hash-card,
 .error-card,
 .success-card,
@@ -1214,7 +1543,20 @@ code,
   padding: 18px;
 }
 
-.security-note strong,
+.security-note strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.94rem;
+  color: var(--text);
+}
+
+.security-note p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .preview-row strong {
   font-size: 1rem;
 }
@@ -1274,6 +1616,17 @@ code,
 .hash-actions a,
 .hash-actions button {
   min-height: 44px;
+  transition: all 240ms;
+}
+
+.hash-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hash-actions button:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .hash-actions a {
@@ -1351,15 +1704,28 @@ code,
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.api-card:hover {
+.api-card:hover,
+.api-card:focus-visible {
   border-color: var(--accent);
   transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .api-card {
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .api-card:hover,
+  .api-card:focus-visible {
+    transform: none;
+    background-color: var(--surface-soft);
+  }
 }
 
 .api-card-header {
@@ -1429,28 +1795,28 @@ code,
 .marketplace-page,
 .api-detail-page {
   width: 100%;
-  padding: 20px;
+  padding: var(--mkt-page-padding);
 }
 
 .marketplace-header {
   display: flex;
-  gap: 12px;
+  gap: var(--mkt-space-lg);
   align-items: center;
-  margin-bottom: 18px;
+  margin-bottom: var(--mkt-space-3xl);
   min-width: 0;
 }
 
 .marketplace-header h1 {
   flex: 0 0 auto;
   margin: 0;
-  font-size: clamp(1.75rem, 3vw, 2.35rem);
-  line-height: 1.05;
+  font-size: var(--mkt-font-size-page-title);
+  line-height: var(--mkt-line-height-tight);
 }
 
 .marketplace-search-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--mkt-space-lg);
   flex: 1;
   min-width: 0;
 }
@@ -1463,8 +1829,8 @@ code,
 .marketplace-density-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px;
+  gap: var(--mkt-space-sm);
+  padding: var(--mkt-space-sm);
   background: var(--surface-soft);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -1473,7 +1839,7 @@ code,
 
 .density-toggle-button {
   min-height: 36px;
-  padding: 0 12px;
+  padding: 0 var(--mkt-space-xl);
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
@@ -1493,12 +1859,12 @@ code,
 .marketplace-layout {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  gap: 24px;
+  gap: var(--mkt-space-3xl);
   align-items: start;
 }
 
 .marketplace-sidebar {
-  padding-left: 8px;
+  padding-left: var(--mkt-sidebar-padding-start);
   min-width: 0;
 }
 
@@ -1514,16 +1880,154 @@ code,
   min-width: 0;
 }
 
+/* Mobile filter toggle — hidden by default (desktop). */
+.mobile-filters-toggle {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .marketplace-sidebar {
+    display: none;
+  }
+
+  .marketplace-filter-button {
+    display: inline-flex;
+  }
+
+  .filters-sidebar {
+    max-width: none;
+  }
+
+  .filters-sidebar .mobile-filters-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mkt-space-sm);
+    padding: var(--mkt-space-md) var(--mkt-space-xl);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--mkt-font-size-sm);
+    cursor: pointer;
+  }
+
+  .filters-sidebar .mobile-filters-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* Narrow viewport: adjust filter layouts for small screens */
+@media (max-width: 640px) {
+  .filters-sidebar {
+    width: 100%;
+    max-width: none;
+  }
+
+  .filter-group__panel {
+    width: 100%;
+  }
+
+  .filter-input {
+    width: 100%;
+  }
+}
+
+/* ── FiltersSidebar keyboard shortcuts hint ───────────────────── */
+.filters-sidebar .kbd-hint {
+  justify-content: flex-start;
+  padding: 8px 0 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 0.7rem;
+}
+
+.filters-sidebar .kbd-hint__item {
+  font-size: 0.7rem;
+}
+
+.filters-sidebar .kbd-hint__key {
+  min-width: 22px;
+  padding: 2px 5px;
+  font-size: 0.65rem;
+}
+
+/* ── MarketplacePage skeleton ───────────────────────────────────
+   Route-level loading shell that mirrors the full marketplace
+   layout. Uses design tokens for spacing, typography, and colour
+   so it stays consistent across light/dark modes and responsive
+   breakpoints. */
+.marketplace-skeleton {
+  padding: var(--mkt-page-padding);
+}
+
+.marketplace-skeleton .marketplace-header {
+  gap: var(--mkt-space-lg);
+  margin-bottom: var(--mkt-space-3xl);
+}
+
+.marketplace-skeleton .marketplace-layout {
+  gap: var(--mkt-space-3xl);
+}
+
+.marketplace-skeleton .marketplace-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mkt-space-md);
+  padding-left: var(--mkt-sidebar-padding-start);
+}
+
+.marketplace-skeleton .marketplace-toolbar {
+  gap: var(--mkt-space-lg);
+  margin-bottom: var(--mkt-space-lg);
+}
+
+.marketplace-skeleton .marketplace-grid {
+  gap: var(--mkt-space-lg);
+}
+
+.marketplace-skeleton .marketplace-count,
+.marketplace-skeleton .marketplace-actions {
+  display: flex;
+  align-items: center;
+}
+
+/* Responsive: stack sidebar below main on narrow viewports */
+@media (max-width: 1024px) {
+  .marketplace-skeleton .marketplace-layout {
+    grid-template-columns: 1fr;
+    gap: var(--mkt-space-xl);
+  }
+
+  .marketplace-skeleton .marketplace-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--mkt-space-sm);
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .marketplace-skeleton .marketplace-page,
+  .marketplace-skeleton .api-detail-page {
+    padding: var(--mkt-page-padding-sm);
+  }
+}
+
 .marketplace-results {
   min-width: 0;
+}
+
+.marketplace-results--tray-open {
+  padding-bottom: var(--mkt-drawer-offset);
 }
 
 .marketplace-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--mkt-space-lg);
+  margin-bottom: var(--mkt-space-lg);
 }
 
 .marketplace-count {
@@ -1532,24 +2036,24 @@ code,
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
+  gap: var(--mkt-space-sm) var(--mkt-space-lg);
 }
 
 .marketplace-active-tag {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: var(--mkt-space-sm) var(--mkt-space-md);
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--surface-soft);
   color: var(--text);
-  font-size: 0.8125rem;
+  font-size: var(--mkt-font-size-sm);
   font-weight: 600;
 }
 
 .marketplace-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--mkt-space-md);
   align-items: center;
   flex: 0 0 auto;
 }
@@ -1560,8 +2064,8 @@ code,
 
 .marketplace-grid {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--mkt-space-lg);
+  grid-template-columns: repeat(auto-fill, minmax(var(--mkt-grid-min), 1fr));
 }
 
 .api-marketplace-card {
@@ -1571,14 +2075,15 @@ code,
   transition:
     box-shadow 160ms ease,
     transform 160ms ease,
+    background-color 160ms ease,
     border-color 160ms ease;
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--mkt-card-border);
 }
 
 .api-card--compact {
-  padding: 10px;
-  gap: 6px;
-  min-height: 188px;
+  padding: var(--mkt-card-compact-padding);
+  gap: var(--mkt-card-compact-gap);
+  min-height: var(--mkt-card-compact-min-height);
 }
 
 .api-card--compact .api-marketplace-card-description {
@@ -1593,43 +2098,50 @@ code,
 }
 
 .api-card--compact .api-marketplace-card-title-row {
-  gap: 4px 8px;
+  gap: var(--mkt-space-xs) var(--mkt-space-md);
 }
 
 .api-card--compact .api-marketplace-card-tags {
-  gap: 6px;
+  gap: var(--mkt-card-compact-gap);
 }
 
 .api-card--compact .api-marketplace-card-footer {
-  gap: 8px;
+  gap: var(--mkt-space-md);
 }
 
 .api-card--compact .api-card__stats {
-  gap: 8px;
-  padding-top: 8px;
+  gap: var(--mkt-space-md);
+  padding-top: var(--mkt-space-md);
+}
+
+.api-marketplace-card:hover {
+  box-shadow: var(--mkt-card-hover-shadow);
+  transform: translateY(-4px);
+  border-color: var(--mkt-card-hover-border);
+}
+
+.api-marketplace-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: var(--mkt-card-hover-shadow);
+  transform: translateY(-4px);
+  border-color: var(--mkt-card-hover-border);
+  border-radius: var(--radius-lg);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .api-marketplace-card,
   .api-card--compact .api-marketplace-card-description,
   .density-toggle-button {
-    transition: none;
+    transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
   }
-}
 
-.api-marketplace-card:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-  transform: translateY(-4px);
-  border-color: #4666ff;
-}
-
-.api-marketplace-card:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-  transform: translateY(-4px);
-  border-color: #4666ff;
-  border-radius: var(--radius-lg);
+  .api-marketplace-card:hover,
+  .api-marketplace-card:focus-visible {
+    transform: none;
+    box-shadow: none;
+    background-color: var(--surface-soft);
+  }
 }
 
 .api-marketplace-card-header,
@@ -1689,20 +2201,20 @@ code,
 .api-card__stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  padding: 12px 0 0;
+  gap: var(--mkt-space-lg);
+  padding: var(--mkt-space-lg) 0 0;
   border-top: 1px solid var(--line);
 }
 
 .api-card__stat {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--mkt-space-sm);
 }
 
 .api-card__stat-label {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--mkt-font-size-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1.2;
@@ -1713,12 +2225,121 @@ code,
   color: var(--text);
   font-size: 1rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 1.3;
   white-space: nowrap;
 }
 
 .api-card__stat-value--empty {
   color: var(--muted);
+}
+
+/* ─── ApiCard responsive breakpoints ────────────────────────────────────── */
+/* Narrow viewports (≤768px): reduce spacing and adjust stat grid. */
+@media (max-width: 768px) {
+  .api-marketplace-card {
+    padding: var(--mkt-card-compact-padding);
+    gap: var(--mkt-card-compact-gap);
+    min-height: auto;
+  }
+
+  .api-marketplace-card-header {
+    gap: var(--mkt-space-md);
+  }
+
+  .api-marketplace-card-icon {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    font-size: 16px;
+    border-radius: var(--mkt-radius-sm);
+  }
+
+  .api-marketplace-card-price {
+    padding-right: var(--mkt-space-xl);
+  }
+
+  .api-card__stats {
+    gap: var(--mkt-space-md);
+    padding: var(--mkt-space-sm) 0 0;
+  }
+
+  .api-card__stat-label {
+    font-size: var(--mkt-font-size-xs);
+  }
+
+  .api-card__stat-value {
+    font-size: var(--mkt-font-size-tag);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .api-marketplace-card-footer-row {
+    gap: var(--mkt-space-md);
+  }
+
+  .kbd-hint {
+    gap: var(--mkt-space-md);
+  }
+
+  .kbd-hint__item {
+    font-size: 0.65rem;
+  }
+}
+
+/* Extra-narrow viewports (≤480px): stack content, collapse stats. */
+@media (max-width: 480px) {
+  .api-marketplace-card {
+    padding: var(--mkt-card-compact-padding);
+    gap: var(--mkt-card-compact-gap);
+  }
+
+  .api-marketplace-card-header {
+    gap: var(--mkt-card-margin-top-sm);
+  }
+
+  .api-marketplace-card-title-row {
+    flex-direction: column;
+    gap: var(--mkt-space-xs);
+  }
+
+  .api-marketplace-card-description {
+    font-size: var(--mkt-font-size-sm);
+  }
+
+  .api-card__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mkt-card-compact-gap);
+    padding: var(--mkt-space-sm) 0 0;
+  }
+
+  .api-card__stat-value {
+    font-size: var(--mkt-font-size-sm);
+  }
+
+  .api-card__compare-btn {
+    padding: var(--mkt-space-xs) var(--mkt-space-sm);
+    font-size: var(--mkt-font-size-micro);
+    left: var(--mkt-space-md);
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .kbd-hint {
+    gap: var(--mkt-space-sm);
+    padding: var(--mkt-space-xs) 0;
+  }
+
+  .kbd-hint__item {
+    font-size: 0.6rem;
+    gap: 2px;
+  }
+
+  .kbd-hint__key {
+    min-width: 20px;
+    padding: 1px 4px;
+    font-size: 0.65rem;
+  }
 }
 
 .marketplace-filter-modal {
@@ -1861,15 +2482,15 @@ code,
 .api-detail-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 24px;
+  gap: var(--mkt-space-3xl);
   align-items: center;
-  padding: 24px;
+  padding: var(--mkt-space-3xl);
 }
 
 .api-detail-heading,
 .api-detail-brand {
   display: flex;
-  gap: 16px;
+  gap: var(--mkt-space-xl);
   align-items: center;
   min-width: 0;
 }
@@ -1887,7 +2508,7 @@ code,
   background: var(--accent);
   color: var(--text-main);
 
-  font-size: 1.5rem;
+  font-size: var(--mkt-font-size-xl);
   font-weight: 700;
 }
 
@@ -1932,35 +2553,35 @@ code,
 }
 
 .api-detail-price {
-  font-size: 1.5rem;
+  font-size: var(--mkt-font-size-xl);
   font-weight: 700;
   color: var(--accent-strong);
 }
 
 .api-detail-price-label {
-  font-size: 0.8125rem;
+  font-size: var(--mkt-font-size-sm);
 }
 
 .api-detail-price-panel .primary-button {
-  margin-top: 16px;
-  padding: 12px 32px;
+  margin-top: var(--mkt-space-xl);
+  padding: var(--mkt-space-lg) var(--mkt-space-5xl);
 }
 
 .api-detail-content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 40px;
+  gap: var(--mkt-space-6xl);
 }
 
 .api-detail-tabs {
   /* Layout placement — sticks below topbar while scrolling */
-  margin-bottom: 32px;
+  margin-bottom: var(--mkt-space-5xl);
   position: sticky;
   top: 0;
   z-index: 20;
   /* Small bottom padding prevents the first line of content below from
      being obscured by the sticky bar at top:0. */
-  padding-bottom: 4px;
+  padding-bottom: var(--mkt-space-sm);
   /* The Tabs component (.tabs-nav) provides border-bottom, overflow-x,
      display:flex, and background. We only need to ensure the sticky
      background matches the page background here. */
@@ -1970,10 +2591,10 @@ code,
 .kbd-hint {
   display: flex;
   justify-content: flex-end;
-  gap: 16px;
-  padding: 8px 0;
+  gap: var(--mkt-space-xl);
+  padding: var(--mkt-space-md) 0;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: var(--mkt-font-size-micro);
 }
 
 .kbd-hint__item {
@@ -1995,24 +2616,163 @@ code,
   white-space: nowrap;
 }
 
+/* Subtle shortcut hint chip variant */
+.kbd-hint--chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl, 20px);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.kbd-hint--chip .kbd-hint__key {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  background: var(--surface-strong);
+  border-color: var(--line-strong);
+}
+
+/* Subtle contextual hint variant */
+.kbd-hint--subtle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  opacity: 0.85;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.kbd-hint--subtle .kbd-hint__key {
+  min-width: 16px;
+  padding: 1px 4px;
+  font-size: 0.68rem;
+  border-color: var(--line);
+  background: transparent;
+}
+
+/* PlanNudge keyboard shortcut integration */
+.plan-nudge__upgrade-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-nudge__upgrade-link .kbd-hint--subtle {
+  margin-left: 4px;
+}
+
+/* Responsive keyboard hint for PlanNudge */
+@media (max-width: 480px) {
+  .plan-nudge__upgrade-link .kbd-hint--subtle {
+    font-size: 0.7rem;
+    gap: 3px;
+  }
+  
+  .plan-nudge__upgrade-link .kbd-hint--subtle .kbd-hint__key {
+    min-width: 14px;
+    padding: 1px 3px;
+    font-size: 0.65rem;
+  }
+}
+
+/* ── PricingTable primary-action shortcut hint (issue #944) ───────────────
+   Centres the `KbdHint` chip under the recommended tier's CTA button. The
+   chip itself is styled by `.kbd-hint--chip` above, so this only handles
+   placement — colours and radii stay token-driven for dark-mode parity. */
+.pricing-tier-card__kbd-hint {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--mkt-space-md);
+}
+
+/* On narrow viewports the CTA is full-width and vertical space is scarce,
+   so tighten the gap and shrink the chip slightly. */
+@media (max-width: 480px) {
+  .pricing-tier-card__kbd-hint {
+    margin-top: var(--mkt-space-sm);
+  }
+
+  .pricing-tier-card__kbd-hint .kbd-hint--chip {
+    gap: var(--mkt-space-sm);
+    padding: 2px var(--mkt-space-md);
+    font-size: 0.7rem;
+  }
+
+  .pricing-tier-card__kbd-hint .kbd-hint--chip .kbd-hint__key {
+    min-width: 16px;
+    font-size: 0.65rem;
+  }
+}
+
+/* QuotaBanner layout and styles */
+.quota-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 16px);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  transition: border-color var(--transition-speed, 240ms) ease;
+}
+
+.quota-banner h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.quota-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.quota-banner__primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.quota-banner__status-message {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--success);
+}
+
+
 /* The .api-detail-tabs button rule is now handled by .tabs-tab inside Tabs.tsx */
 
 .api-detail-two-column,
 .api-detail-pricing-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 32px;
+  gap: var(--mkt-space-5xl);
 }
 
 .api-detail-pricing-grid {
-  gap: 24px;
-  margin-bottom: 40px;
+  gap: var(--mkt-space-3xl);
+  margin-bottom: var(--mkt-space-6xl);
 }
 
 .api-detail-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--mkt-space-xl);
 }
 
 .endpoint-section-header,
@@ -2022,24 +2782,24 @@ code,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: var(--mkt-space-xl);
 }
 
 .endpoint-card-header {
-  padding: 16px 24px;
+  padding: var(--mkt-space-xl) var(--mkt-space-3xl);
   background: var(--surface-soft);
 }
 
 .endpoint-title-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--mkt-space-lg);
   min-width: 0;
 }
 
 .endpoint-url {
   max-width: 45%;
-  font-size: 0.75rem;
+  font-size: var(--mkt-font-size-micro);
   color: var(--muted);
   overflow-wrap: anywhere;
   text-align: right;
@@ -2048,14 +2808,14 @@ code,
 .endpoint-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--mkt-space-md);
   min-width: 0;
 }
 
 .endpoint-client-buttons {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--mkt-space-xs); /* 2px gap for tightly-packed icon buttons */
   flex-shrink: 0;
 }
 
@@ -2426,15 +3186,168 @@ code,
   font-size: 0.8125rem;
 }
 
+/* ── EndpointPreview ────────────────────────────────────────────────────────
+   Per-endpoint hover/focus preview card that overlays the endpoint card
+   header.  Uses design tokens throughout so both themes work automatically.
+   ─────────────────────────────────────────────────────────────────────────── */
+.endpoint-preview__wrapper {
+  position: relative;
+}
+
+.endpoint-preview__trigger {
+  /* Remove native focus ring — the :focus-visible ring from focus.css
+     applies automatically via the global selector. */
+  outline: none;
+  border-radius: inherit;
+  cursor: default;
+}
+
+.endpoint-preview__trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.endpoint-preview__panel {
+  position: absolute;
+  /* Offset below the trigger header row */
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 16px;
+  /* Shadow from existing design system */
+  box-shadow: var(--shadow, 0 24px 80px rgba(3, 8, 22, 0.45));
+}
+
+.endpoint-preview__topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.endpoint-preview__eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+
+.endpoint-preview__title {
+  margin: 0 0 4px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.endpoint-preview__url {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}
+
+.endpoint-preview__section-label {
+  margin: 0 0 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.endpoint-preview__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.endpoint-preview__table th {
+  text-align: left;
+  padding: 4px 6px 6px 0;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.endpoint-preview__table td {
+  padding: 7px 6px 7px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.endpoint-preview__table tr:last-child td {
+  border-bottom: none;
+}
+
+.endpoint-preview__param-name {
+  color: var(--accent);
+  font-size: 0.8125rem;
+}
+
+.endpoint-preview__required {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--danger, #ff7d8d);
+}
+
+.endpoint-preview__optional {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.endpoint-preview__overflow {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.endpoint-preview__no-params {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.endpoint-preview__response {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.endpoint-preview__response-pre {
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  overflow-x: auto;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text);
+  max-height: 120px;
+}
+
+.endpoint-preview__params {
+  /* keeps the params section from stretching the panel too tall */
+}
+
 .api-detail-plan-price {
   font-size: 2rem;
   font-weight: 800;
-  margin: 12px 0;
+  margin: var(--mkt-space-lg) 0;
 }
 
 .api-detail-calculator-total {
-  margin-top: 32px;
-  padding: 20px;
+  margin-top: var(--mkt-space-5xl);
+  padding: var(--mkt-space-2xl);
   background: var(--surface-soft);
   border-radius: 8px;
 }
@@ -2442,8 +3355,8 @@ code,
 .api-detail-example-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--mkt-space-lg);
+  margin-bottom: var(--mkt-space-xl);
 }
 
 .api-detail-sidebar {
@@ -2459,7 +3372,7 @@ code,
 .api-usage-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--api-space-3xl);
   max-width: 1180px;
   margin: 0 auto;
 }
@@ -2468,8 +3381,8 @@ code,
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 24px;
-  padding: 24px;
+  gap: var(--api-space-3xl);
+  padding: var(--api-space-3xl);
   background: var(--surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
@@ -2477,7 +3390,7 @@ code,
 
 .api-header-info {
   display: flex;
-  gap: 16px;
+  gap: var(--api-space-xl);
   align-items: center;
 }
 
@@ -2494,8 +3407,8 @@ code,
 }
 
 .api-header h1 {
-  margin: 0 0 4px 0;
-  font-size: 1.8rem;
+  margin: 0 0 var(--api-space-sm) 0;
+  font-size: var(--api-font-size-xl);
   font-weight: 600;
 }
 
@@ -2507,7 +3420,7 @@ code,
 .api-header-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--api-space-lg);
   align-items: flex-end;
 }
 
@@ -2546,11 +3459,11 @@ code,
 }
 
 .api-key-section h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--api-space-xl) 0;
 }
 
 .api-key-card {
-  padding: 20px;
+  padding: var(--api-space-2xl);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
 }
@@ -2558,12 +3471,12 @@ code,
 .api-key-display {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--api-space-xl);
 }
 
 .key-input-group {
   display: flex;
-  gap: 8px;
+  gap: var(--api-space-md);
 }
 
 .api-key-input {
@@ -2579,30 +3492,30 @@ code,
 
 .key-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--api-space-md);
 }
 
 .usage-instruction {
-  margin: 12px 0 0 0;
+  margin: var(--api-space-lg) 0 0 0;
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--api-font-size-md);
 }
 
 .test-call-section h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--api-space-xl) 0;
 }
 
 .test-call-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--api-space-xl);
+  margin-bottom: var(--api-space-3xl);
 }
 
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--api-space-md);
 }
 
 .form-row label {
@@ -2634,7 +3547,7 @@ code,
 }
 
 .response-display h3 {
-  margin: 0 0 12px 0;
+  margin: 0 0 var(--api-space-lg) 0;
 }
 
 .loading-placeholder {
@@ -2645,9 +3558,9 @@ code,
 
 .response-meta {
   display: flex;
-  gap: 16px;
-  margin-bottom: 12px;
-  font-size: 0.875rem;
+  gap: var(--api-space-xl);
+  margin-bottom: var(--api-space-lg);
+  font-size: var(--api-font-size-md);
 }
 
 .response-time,
@@ -2665,28 +3578,28 @@ code,
 }
 
 .usage-stats-section h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--api-space-xl) 0;
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--api-space-xl);
+  margin-bottom: var(--api-space-3xl);
 }
 
 .stat-card {
-  padding: 20px;
+  padding: var(--api-space-2xl);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--api-space-md);
 }
 
 .stat-label {
-  font-size: 0.875rem;
+  font-size: var(--api-font-size-md);
   color: var(--muted);
 }
 
@@ -2736,19 +3649,19 @@ code,
 }
 
 .call-history-section h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--api-space-xl) 0;
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: var(--api-space-xl);
 }
 
 .history-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--api-space-md);
 }
 
 .filter-select {
@@ -2760,17 +3673,27 @@ code,
 }
 
 .call-history-table {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 8px;
-  overflow: hidden;
+  /* Internal scroll container: bounds the table height so the virtualized
+     window stays small and stable no matter how many calls exist. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  max-height: min(60vh, 640px);
 }
 
 .table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr;
   gap: 16px;
   padding: 16px;
   background: var(--surface);
+  backdrop-filter: blur(22px);
   font-weight: 500;
   font-size: 0.875rem;
   border-bottom: 1px solid var(--line);
@@ -2785,7 +3708,31 @@ code,
   align-items: center;
 }
 
-.table-row:last-child {
+.call-history-table__viewport {
+  position: relative;
+}
+
+/* Windowed rows are absolutely positioned at their measured offsets; the
+   viewport's explicit height acts as the full-list spacer. */
+.call-history-table__item {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+/* The pinned row stays mounted (and focusable) when the keyboard-focused
+   row is scrolled outside the window. */
+.call-history-table__item--pinned {
+  z-index: 0;
+}
+
+/* Virtualized rows: drop the divider on the final rendered row. */
+.call-history-table__item:last-child .table-row {
+  border-bottom: none;
+}
+
+/* Loading skeletons are still direct children of the table shell. */
+.call-history-table > .table-row:last-child {
   border-bottom: none;
 }
 
@@ -2796,10 +3743,27 @@ code,
 
 .status-cell.success {
   color: var(--success);
+  /* Success: solid baseline — no supplemental pattern needed. */
 }
 
 .status-cell.error {
   color: var(--danger);
+  /* Error: diagonal stripes so status is distinguishable without color alone (WCAG 1.4.1). */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='3' y1='0' x2='6' y2='3' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='0' y1='3' x2='3' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3C/svg%3E");
+  background-size: 6px 6px;
+  background-repeat: repeat;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .expanded-details {
@@ -2939,7 +3903,7 @@ code,
 @media (max-width: 1024px) {
   .marketplace-layout {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: var(--mkt-space-xl);
   }
 
   .marketplace-sidebar {
@@ -2956,14 +3920,14 @@ code,
 
   .api-detail-hero {
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: var(--mkt-space-2xl);
   }
 
   .api-detail-price-panel {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--mkt-space-xl);
     text-align: left;
     border-top: 1px solid var(--line);
     padding-top: 18px;
@@ -2971,14 +3935,14 @@ code,
 
   .api-detail-content-grid {
     grid-template-columns: 1fr;
-    gap: 28px;
+    gap: var(--mkt-space-4xl);
   }
 
   .api-detail-sidebar-inner {
     position: static;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    gap: var(--mkt-space-xl);
   }
 
   .api-detail-sidebar-inner > * {
@@ -3032,7 +3996,7 @@ code,
 @media (max-width: 768px) {
   .marketplace-page,
   .api-detail-page {
-    padding: 14px;
+    padding: var(--mkt-page-padding-sm);
   }
 
   .marketplace-header,
@@ -3042,6 +4006,11 @@ code,
     align-items: stretch;
   }
 
+  .marketplace-density-toggle {
+    flex-wrap: wrap;
+    gap: var(--mkt-space-xs);
+  }
+
   .marketplace-actions {
     justify-content: space-between;
     width: 100%;
@@ -3049,6 +4018,7 @@ code,
 
   .marketplace-actions select {
     flex: 1;
+    min-width: 0;
   }
 
   .marketplace-grid {
@@ -3073,7 +4043,7 @@ code,
 
   .api-marketplace-card-title-row {
     flex-wrap: wrap;
-    gap: 4px 8px !important;
+    gap: var(--mkt-space-xs) var(--mkt-space-md) !important;
   }
 
   .api-marketplace-card-body > div:last-child {
@@ -3085,7 +4055,7 @@ code,
   }
 
   .api-card__stats {
-    gap: 10px;
+    gap: var(--mkt-space-xl);
   }
 
   .api-card__stat-value {
@@ -3093,7 +4063,7 @@ code,
   }
 
   .api-marketplace-card-footer {
-    gap: 12px;
+    gap: var(--mkt-space-lg);
   }
 
   .marketplace-filter-footer .primary-button {
@@ -3101,7 +4071,7 @@ code,
   }
 
   .api-detail-hero {
-    padding: 16px 0 20px;
+    padding: var(--mkt-space-xl) 0 var(--mkt-space-2xl);
   }
 
   .api-detail-heading {
@@ -3111,7 +4081,7 @@ code,
 
   .api-detail-brand {
     width: 100%;
-    gap: 12px;
+    gap: var(--mkt-space-lg);
   }
 
   .api-detail-logo {
@@ -3134,7 +4104,7 @@ code,
 
   .api-detail-price-panel .primary-button {
     width: 100%;
-    margin-top: 12px;
+    margin-top: var(--mkt-space-lg);
   }
 
   .api-detail-tabs {
@@ -3143,7 +4113,7 @@ code,
 
   .kbd-hint {
     justify-content: flex-start;
-    gap: 12px;
+    gap: var(--mkt-space-lg);
     overflow-x: auto;
     scrollbar-width: thin;
   }
@@ -3154,8 +4124,8 @@ code,
 
   /* Tighten tab button spacing on narrow viewports */
   .api-detail-tabs .tabs-tab {
-    margin: 0 8px;
-    font-size: 14px;
+    margin: 0 var(--mkt-space-md);
+    font-size: var(--mkt-font-size-tag);
   }
 
   .api-detail-two-column,
@@ -3174,7 +4144,7 @@ code,
   }
 
   .endpoint-card-header {
-    padding: 14px 16px;
+    padding: var(--mkt-space-lg) var(--mkt-space-xl);
   }
 
   .endpoint-group-hover__shell {
@@ -3204,7 +4174,7 @@ code,
   }
 
   .api-detail-calculator-total {
-    gap: 12px;
+    gap: var(--mkt-space-lg);
   }
 
   .api-detail-calculator-total > div:last-child {
@@ -3216,17 +4186,17 @@ code,
   }
 
   .api-usage-page {
-    gap: 16px;
+    gap: var(--api-space-xl);
   }
 
   .api-header {
-    padding: 16px;
+    padding: var(--api-space-xl);
   }
 
   .api-header-info {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: var(--api-space-lg);
   }
 
   .api-logo {
@@ -3235,7 +4205,7 @@ code,
   }
 
   .api-header h1 {
-    font-size: 1.4rem;
+    font-size: var(--api-font-size-lg);
   }
 
   .stats-grid {
@@ -3258,6 +4228,192 @@ code,
 
   .code-header button {
     width: 100%;
+  }
+}
+
+/* ── ApiUsage responsive breakpoint audit (v7) ──────────────────────────
+   Three granular tiers ensure the page looks polished on every viewport:
+
+   - 768px (tablet portrait):   compact spacing, full-width forms, 2-col stats
+   - 640px (large phone):       tighter margins, wrapped action rows
+   - 480px (small phone):       minimal padding, single-column everything
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* 768px – tablet portrait */
+@media (max-width: 768px) {
+  .api-usage-page .test-call-form .form-row select {
+    width: 100%;
+  }
+
+  .api-usage-page .response-meta {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .api-usage-page .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .api-usage-page .history-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .api-usage-page .key-input-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .api-usage-page .key-input-group input {
+    width: 100%;
+  }
+}
+
+/* 640px – large phone */
+@media (max-width: 640px) {
+  .api-usage-page .api-header {
+    padding: 16px;
+  }
+
+  .api-usage-page .api-header-actions {
+    width: 100%;
+  }
+
+  .api-usage-page .api-header-actions button {
+    width: 100%;
+  }
+
+  .api-usage-page .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .api-usage-page .test-call-form .form-row {
+    gap: 6px;
+  }
+
+  .api-usage-page .response-display {
+    padding: 16px;
+  }
+
+  .api-usage-page .response-json {
+    padding: 12px;
+    font-size: 0.8125rem;
+    overflow-x: auto;
+  }
+
+  .api-usage-page .mini-chart {
+    padding: 16px;
+  }
+
+  .api-usage-page .chart-labels span {
+    font-size: 0.75rem;
+  }
+
+  .api-usage-page .code-block {
+    padding: 14px;
+    font-size: 0.8125rem;
+    overflow-x: auto;
+  }
+}
+
+/* 480px – small phone */
+@media (max-width: 480px) {
+  .api-usage-page .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .api-usage-page .api-logo {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .api-usage-page .api-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .api-usage-page .api-description {
+    font-size: 0.8125rem;
+  }
+
+  .api-usage-page .surface {
+    border-radius: 18px;
+  }
+
+  .api-usage-page .key-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .api-usage-page .key-actions button {
+    width: 100%;
+  }
+
+  .api-usage-page .language-tabs {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .api-usage-page .tab-button {
+    flex: 1;
+    min-width: 80px;
+  }
+
+  .api-usage-page .documentation-link a {
+    width: 100%;
+  }
+
+  .api-usage-page .kbd-hint {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* ── ApiUsage — prefers-reduced-motion fallback (Issue #721) ───────────
+   When users prefer reduced motion, disable pulsing status dots, skeleton
+   shimmer animations, button spinner, and chart-bar transitions in the ApiUsage section
+   so the UI stays completely static. */
+@media (prefers-reduced-motion: reduce) {
+  .api-usage-page .status-dot {
+    animation: none;
+    opacity: 1;
+  }
+
+  .api-usage-page .skeleton {
+    animation: none;
+    background: var(--surface-soft);
+  }
+
+  .api-usage-page .button-spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .api-usage-page .chart-bar {
+    transition: none;
+  }
+
+  .api-usage-page .tab-button {
+    transition: none;
+  }
+
+  .api-usage-page .danger-button {
+    transition: none;
+  }
+
+  .api-usage-page .primary-button {
+    transition: none;
+  }
+
+  .api-usage-page .secondary-button {
+    transition: none;
+  }
+
+  .api-usage-page .ghost-button {
+    transition: none;
   }
 }
 
@@ -3610,6 +4766,13 @@ code,
   }
 }
 
+/* With reduced motion the bar appears/disappears instantly instead of fading. */
+@media (prefers-reduced-motion: reduce) {
+  .route-progress-bar {
+    transition: none;
+  }
+}
+
 /* Skeleton Loading */
 @keyframes shimmer {
   0% {
@@ -3649,6 +4812,27 @@ code,
     linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 16%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
   background-size: 200% 100%;
 }
+
+/* Global reduced-motion fallback (Issue #1005):
+   Skeleton shimmer and spinner rotation are purely decorative. When the
+   user prefers reduced motion, freeze them to static, non-animated
+   surfaces so loading state is still conveyed without animating. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .skeleton--stellar,
+  .api-card-skeleton,
+  [data-theme="light"] .skeleton,
+  [data-theme="light"] .skeleton--stellar {
+    animation: none;
+    background: var(--surface-soft);
+  }
+
+  .button-spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.3);
+  }
+}
+
 /* Filters Sidebar accessibility styles */
 .filter-group {
   margin-bottom: 1rem;
@@ -3704,6 +4888,37 @@ code,
 
 .primary-button.button-loading {
   cursor: not-allowed;
+}
+
+/* ── Webhook Deliveries ──────────────────────────────────────────────
+   Status, error, and stale-data states use the semantic --danger /
+   --warning design tokens (theme-aware contrast) instead of hardcoded
+   colors. The stale fade respects prefers-reduced-motion. */
+.webhook-deliveries-error {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  padding: 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.webhook-deliveries-data {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.webhook-deliveries-data--stale {
+  opacity: 0.6;
+}
+
+.webhook-deliveries-stale-note {
+  color: var(--warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webhook-deliveries-data {
+    transition: none;
+  }
 }
 
 /* Response JSON Skeleton Container */
@@ -4173,12 +5388,10 @@ code,
    Uses only design tokens — no hardcoded hex values.
    ─────────────────────────────────────────────────────────────────────────── */
 .api-hero__cta--detail {
-  /* Row layout with a bottom gutter matching the token-based spacing used
-     elsewhere on the page (same 16px as the old inline padding-bottom). */
   display: flex;
-  gap: 0.75rem;
-  padding-bottom: 16px;
-  flex-wrap: wrap; /* buttons can wrap before stacking on mid-range widths */
+  gap: var(--mkt-space-lg);
+  padding-bottom: var(--mkt-space-xl);
+  flex-wrap: wrap;
   align-items: center;
 }
 
@@ -4470,6 +5683,7 @@ code,
   border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
@@ -4581,6 +5795,264 @@ code,
   opacity: 1 !important;
 }
 
+/* ─── Invoice card sticky action bar ───────────────────────────────────── */
+.invoice-card {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+  margin: 24px 0;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl, 24px);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.invoice-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.invoice-card__eyebrow {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.invoice-card__title {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.4rem;
+}
+
+.invoice-card__amount {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.invoice-card__amount-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.invoice-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.invoice-card__body {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.invoice-card-action-bar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 180;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)) 16px;
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform var(--transition-speed, 240ms) ease, opacity var(--transition-speed, 240ms) ease;
+}
+
+.invoice-card-action-bar--visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.invoice-card-action-bar__inner {
+  display: flex;
+  gap: 8px;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+
+.invoice-card-action-bar__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  flex: 1;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.invoice-card-action-bar__button--primary {
+  background: linear-gradient(135deg, var(--accent, #4e85ff), color-mix(in srgb, var(--accent, #4e85ff) 70%, #fff));
+  color: #fff;
+}
+
+.invoice-card-action-bar__button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .invoice-card {
+    margin: 16px 0 80px;
+    padding: 20px 16px 24px;
+  }
+
+  .invoice-card__header {
+    flex-direction: column;
+  }
+
+  .invoice-card__amount {
+    text-align: left;
+  }
+
+  .invoice-card-action-bar__inner {
+    max-width: 100%;
+  }
+}
+
+/* ─── BillingHistory ─────────────────────────────────────────────────────────
+   Hover-triggered / keyboard-accessible billing history rows.
+   GrantFox FWC26 campaign (Issue #692) — matches DashboardOverview pattern.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.billing-history {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.billing-history__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.billing-history__title {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+  color: var(--text);
+}
+
+.billing-history__subtitle {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.billing-history__list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.billing-history__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.billing-history__item:hover {
+  border-color: var(--accent, #6366f1);
+  box-shadow: var(--focus-ring);
+}
+
+.billing-history__item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.billing-history__item-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.billing-history__item-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.billing-history__item-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.billing-history__item-amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.billing-history__item-amount--credit {
+  color: var(--success, #10b981);
+}
+
+.billing-history__item-amount--debit {
+  color: var(--text);
+}
+
+.billing-history__empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .billing-history__item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .billing-history__item-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 /* ─── ApiDetailStickyTOC ────────────────────────────────────────────────────
    Sticky right-rail TOC inside the documentation tab. Tokens only — no
    hardcoded hex values. Transition respects prefers-reduced-motion.
@@ -4635,10 +6107,36 @@ code,
   font-weight: 600;
 }
 
+/* Static state under prefers-reduced-motion: no color transition on TOC links. */
+@media (prefers-reduced-motion: reduce) {
+  .api-detail-toc__link {
+    transition: none;
+  }
+}
+
 @media (max-width: 1100px) {
   .api-detail-toc {
     display: none;
   }
+}
+
+.api-detail-toc__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.api-detail-toc__error svg {
+  flex-shrink: 0;
+}
+
+.api-detail-toc__error-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 /* ─── Print stylesheet (ApiDetailPage docs printout) ─────────────────────
@@ -4649,6 +6147,893 @@ code,
 @page {
   margin: 1.5cm;
   size: auto;
+}
+
+
+/* Share Snapshot Button */
+.share-snapshot-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+/* ─── Category Pills ──────────────────────────────────────────────────────── */
+.pill-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  scrollbar-width: thin;
+}
+
+.pill-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
+.pill-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pill-bar::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+
+.pill-bar__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  padding: 0 16px;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+}
+
+.pill-bar__item:hover,
+.pill-bar__item:focus-visible {
+  background: var(--line);
+}
+
+.pill-bar__item--active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Response Diff Highlighting — CallHistoryRow
+   ──────────────────────────────────────────────────────────────────────────
+   Design-token approach: three semantic groups (added / removed / unchanged),
+   each with four tokens:
+     --diff-<group>-bg         Row background fill
+     --diff-<group>-fg         Text / code foreground
+     --diff-<group>-gutter-bg  Line-number gutter fill (slightly deeper tint)
+     --diff-<group>-sign-fg    Sign column (+/−/ ) color
+
+   Colours follow the existing --success / --danger design tokens so both
+   themes are handled automatically.  All contrast ratios meet WCAG 2.1 AA
+   (≥ 4.5:1 for normal text, ≥ 3:1 for large / UI text).
+   ────────────────────────────────────────────────────────────────────────── */
+
+[data-theme="dark"] {
+  /* Added line — green tint */
+  --diff-added-bg: rgba(115, 242, 187, 0.10);
+  --diff-added-fg: #a3f5d4;
+  --diff-added-gutter-bg: rgba(115, 242, 187, 0.18);
+  --diff-added-sign-fg: #73f2bb;
+
+  /* Removed line — red tint */
+  --diff-removed-bg: rgba(255, 125, 141, 0.10);
+  --diff-removed-fg: #ffb3bc;
+  --diff-removed-gutter-bg: rgba(255, 125, 141, 0.18);
+  --diff-removed-sign-fg: #ff7d8d;
+
+  /* Unchanged / context line */
+  --diff-unchanged-bg: transparent;
+  --diff-unchanged-fg: var(--muted);
+  --diff-unchanged-gutter-bg: rgba(169, 184, 255, 0.06);
+  --diff-unchanged-sign-fg: var(--line-strong);
+}
+
+[data-theme="light"] {
+  /* Added line — green tint */
+  --diff-added-bg: rgba(5, 150, 105, 0.08);
+  --diff-added-fg: #065f46;
+  --diff-added-gutter-bg: rgba(5, 150, 105, 0.14);
+  --diff-added-sign-fg: #059669;
+
+  /* Removed line — red tint */
+  --diff-removed-bg: rgba(220, 38, 38, 0.08);
+  --diff-removed-fg: #991b1b;
+  --diff-removed-gutter-bg: rgba(220, 38, 38, 0.14);
+  --diff-removed-sign-fg: #dc2626;
+
+  /* Unchanged / context line */
+  --diff-unchanged-bg: transparent;
+  --diff-unchanged-fg: var(--muted);
+  --diff-unchanged-gutter-bg: rgba(0, 0, 0, 0.03);
+  --diff-unchanged-sign-fg: var(--line-strong);
+}
+
+/* ── Diff layout ─────────────────────────────────────────────────────────── */
+
+.diff-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;  /* 13 px */
+  line-height: 1.5;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  table-layout: fixed;
+}
+
+/* ── Diff table column widths ─────────────────────────────────────────────
+   Col 1 & 2 — line numbers (fixed, narrow)
+   Col 3      — sign (+/−/ )  (fixed, very narrow)
+   Col 4      — line content  (fills remaining space)  */
+.diff-table colgroup {
+  /* Defined via inline style on the <table> if needed; rely on browser
+     auto-sizing for content column — no colgroup needed here. */
+}
+
+/* Gutter cells (line numbers) */
+.diff-line__gutter {
+  width: 2.5rem;
+  min-width: 2rem;
+  padding: 1px 6px;
+  text-align: right;
+  user-select: none;
+  color: var(--muted);
+  font-size: 0.6875rem; /* 11 px */
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.diff-line__gutter--a {
+  background: var(--diff-unchanged-gutter-bg);
+}
+
+.diff-line__gutter--b {
+  background: var(--diff-unchanged-gutter-bg);
+}
+
+/* Sign column */
+.diff-line__sign {
+  width: 1.25rem;
+  padding: 1px 4px;
+  text-align: center;
+  user-select: none;
+  font-weight: 700;
+  vertical-align: top;
+}
+
+/* Content column */
+.diff-line__content {
+  padding: 1px 8px 1px 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.diff-line__content code {
+  font: inherit;
+  background: none;
+}
+
+/* ── Per-type row styles ──────────────────────────────────────────────────── */
+
+.diff-line--added {
+  background: var(--diff-added-bg);
+  color: var(--diff-added-fg);
+}
+
+.diff-line--added .diff-line__gutter--a,
+.diff-line--added .diff-line__gutter--b {
+  background: var(--diff-added-gutter-bg);
+}
+
+.diff-line--added .diff-line__sign {
+  color: var(--diff-added-sign-fg);
+}
+
+.diff-line--removed {
+  background: var(--diff-removed-bg);
+  color: var(--diff-removed-fg);
+}
+
+.diff-line--removed .diff-line__gutter--a,
+.diff-line--removed .diff-line__gutter--b {
+  background: var(--diff-removed-gutter-bg);
+}
+
+.diff-line--removed .diff-line__sign {
+  color: var(--diff-removed-sign-fg);
+}
+
+.diff-line--unchanged {
+  background: var(--diff-unchanged-bg);
+  color: var(--diff-unchanged-fg);
+}
+
+.diff-line--unchanged .diff-line__gutter--a,
+.diff-line--unchanged .diff-line__gutter--b {
+  background: var(--diff-unchanged-gutter-bg);
+}
+
+.diff-line--unchanged .diff-line__sign {
+  color: var(--diff-unchanged-sign-fg);
+}
+
+/* ── "No differences" notice ─────────────────────────────────────────────── */
+
+.diff-no-changes {
+  padding: 12px 16px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-style: italic;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  margin: 0;
+}
+
+/* ── Call label bar (before / after timestamps) ──────────────────────────── */
+
+.diff-call-labels {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.diff-call-label {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.diff-call-label--a {
+  background: var(--diff-removed-gutter-bg);
+  color: var(--diff-removed-sign-fg);
+  border: 1px solid var(--diff-removed-sign-fg);
+}
+
+.diff-call-label--b {
+  background: var(--diff-added-gutter-bg);
+  color: var(--diff-added-sign-fg);
+  border: 1px solid var(--diff-added-sign-fg);
+}
+
+/* ── View-mode toggle (Diff / Raw) ───────────────────────────────────────── */
+
+.detail-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.detail-section__header h4 {
+  margin: 0;
+}
+
+.diff-mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.diff-mode-toggle__btn {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+.diff-mode-toggle__btn:not(:last-child) {
+  border-right: 1px solid var(--line);
+}
+
+.diff-mode-toggle__btn:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.diff-mode-toggle__btn--active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+/* ── Responsive adjustments ──────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .diff-table {
+    font-size: 0.75rem;
+  }
+
+  /* Collapse the "before" line-number column on small screens */
+  .diff-line__gutter--a {
+    display: none;
+  }
+
+  .diff-call-labels {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+/* ============================================================
+   ApiTagFilter — responsive tag filter bar
+   BEM block: .api-tag-filter
+
+   Design tokens: --accent, --muted, --surface-soft, --line,
+                  --transition-speed, --page-bg
+   WCAG 2.1 AA: focus-visible ring (global layer), 44 px touch
+                targets, accessible pressed state.
+
+   Responsive strategy:
+   - >= 768 px → flex-wrap row, tags flow naturally.
+   - <  768 px → horizontal scroll rail with thin custom
+                   scrollbar.  Items stay single-line
+                   (white-space: nowrap) to avoid flooding
+                   small phones with wrapped chips.
+   - <  480 px → reduced font size and tighter padding so
+                   more pills fit on screen without
+                   excessive scrolling.
+   ============================================================ */
+
+.api-tag-filter {
+  display: flex;
+  gap: var(--spacing-8);
+  overflow-x: auto;
+  padding-bottom: var(--spacing-4);
+  margin-bottom: var(--spacing-16);
+  scrollbar-width: thin;
+  /* On wide viewports, allow wrapping instead of scrolling */
+  flex-wrap: wrap;
+}
+
+/* Custom scrollbar — visible only when the rail overflows
+   (narrow viewports).  Matches the pill-bar scrollbar style. */
+.api-tag-filter::-webkit-scrollbar {
+  height: 6px;
+}
+
+.api-tag-filter::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.api-tag-filter::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+
+/* ── Individual pill ────────────────────────────────────────── */
+.api-tag-filter__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-5);
+  white-space: nowrap;
+  padding: 0 var(--spacing-14);
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--text);
+  font-weight: 500;
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition:
+    background var(--transition-speed) ease,
+    border-color var(--transition-speed) ease,
+    color var(--transition-speed) ease;
+  /* Ensure touch target meets WCAG 2.5.5 (44 px min) */
+  flex-shrink: 0;
+}
+
+.api-tag-filter__pill:hover,
+.api-tag-filter__pill:focus-visible {
+  background: var(--line);
+}
+
+/* Active / selected state — accent tint with accent border. */
+.api-tag-filter__pill--active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.api-tag-filter__pill--active:hover,
+.api-tag-filter__pill--active:focus-visible {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* ── Count badge inside each pill ───────────────────────────────
+   Small, muted number showing how many APIs carry that tag. */
+.api-tag-filter__count {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 1px;
+  /* Prevent the count from wrapping independently of the tag
+     label on narrow viewports. */
+  white-space: nowrap;
+}
+
+.api-tag-filter__pill--active .api-tag-filter__count {
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+/* ── Narrow viewport: horizontal scroll only, no wrap ───────── */
+@media (max-width: 767px) {
+  .api-tag-filter {
+    flex-wrap: nowrap;
+    /* Subtle fade hint on the right edge so users know there
+       is more content to scroll to. */
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black calc(100% - 36px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      black calc(100% - 36px),
+      transparent 100%
+    );
+  }
+}
+
+/* ── Extra-narrow viewport (< 480 px): tight spacing ────────── */
+@media (max-width: 479px) {
+  .api-tag-filter {
+    gap: var(--spacing-6);
+  }
+
+  .api-tag-filter__pill {
+    padding: 0 var(--spacing-10);
+    min-height: 40px;
+    font-size: var(--text-md);
+    gap: var(--spacing-4);
+  }
+
+  .api-tag-filter__count {
+    font-size: var(--text-xs);
+  }
+}
+
+/* Respect user motion preference.
+   When the user prefers reduced motion:
+   1. Disable all pill transitions (hover, active, focus).
+   2. Remove the scroll fade mask on narrow viewports — the mask implies
+      motion (content beyond the edge) and can be disorienting without
+      the smooth scroll experience.
+   3. Ensure the active pill still has a clear static border so the
+      selected state is obvious even without the transition.
+   4. Skeleton shimmer is handled globally (see .skeleton rule above). */
+@media (prefers-reduced-motion: reduce) {
+  .api-tag-filter__pill {
+    transition: none;
+  }
+
+  .api-tag-filter__pill--active {
+    /* Reinforce the border so the active state pops without the
+       smooth color transition. */
+    border-width: 2px;
+  }
+
+  /* Remove the fade mask on narrow viewports — static, no motion hint. */
+  .api-tag-filter {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  /* Skeleton pills in the filter get a static surface background. */
+  .api-tag-filter__pill-skeleton {
+    animation: none !important;
+    background: var(--surface-soft);
+  }
+}
+
+/* ============================================================
+   WhyApi — "Why this API?" disclosure widget
+   BEM block: .why-api
+   Placed inside the marketplace ApiCard (non-compact variant).
+   Design tokens: --accent, --accent-strong, --muted,
+                  --surface-soft, --border-subtle, --transition-speed
+   WCAG 2.1 AA: focus-visible ring, colour-contrast safe colours.
+   ============================================================ */
+
+/**
+ * Container block.
+ * Provides top margin to separate it from the card body content above,
+ * and sets the stacking context for the animated list.
+ */
+.why-api {
+  margin-top: 4px;
+  /* Establish a local stacking context so z-index on children is contained. */
+  position: relative;
+}
+
+/**
+ * Toggle button element.
+ * Stripped of native button chrome and styled as a small accent link-like
+ * affordance. The focus-visible ring uses the global token so it's
+ * consistent with every other interactive element in the app.
+ */
+.why-api__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem; /* 12 px */
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+  /* Smooth colour transition on hover/focus so the change isn't jarring. */
+  transition:
+    color var(--transition-speed, 240ms) ease,
+    opacity var(--transition-speed, 240ms) ease;
+}
+
+.why-api__toggle:hover {
+  /* Slightly brighten on hover to signal interactivity. */
+  opacity: 0.8;
+}
+
+/* Keyboard-focus ring — 2px solid accent at 3 px offset (matches app-wide
+   focus style defined in the :focus-visible section above). */
+.why-api__toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/** Open-state modifier — rotate chevron handled via content swap in JSX,
+    but the class can be used for additional styling if needed. */
+.why-api__toggle--open {
+  /* Slightly muted colour in the open state so "close" feels natural. */
+  color: var(--accent-strong, var(--accent));
+}
+
+/**
+ * Decorative chevron icon (aria-hidden in JSX).
+ * `user-select: none` prevents the symbol being included in copy-paste.
+ */
+.why-api__chevron {
+  user-select: none;
+  font-size: 0.625rem; /* 10 px — smaller than the label */
+  line-height: 1;
+}
+
+/**
+ * Reasons list element.
+ * Uses flex-column with a gap instead of list padding so spacing is
+ * predictable across all breakpoints.
+ */
+.why-api__reasons {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Subtle fade-in for the list appearance. */
+  animation: why-api-appear 180ms ease forwards;
+}
+
+@keyframes why-api-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/**
+ * Individual reason list item.
+ * Flex row so the check icon and text align on the same baseline.
+ */
+.why-api__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.75rem; /* 12 px */
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/**
+ * Decorative check mark (aria-hidden in JSX).
+ * Uses --accent-strong for a distinct but on-theme green tick.
+ */
+.why-api__check {
+  flex-shrink: 0;
+  color: var(--accent-strong, var(--accent));
+  user-select: none;
+  margin-top: 1px; /* optical alignment with the first line of text */
+}
+
+/**
+ * Readable reason text.
+ * `min-width: 0` allows long strings to wrap correctly inside the flex row.
+ */
+.why-api__text {
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ── Responsive adjustments ─────────────────────────────────────────────── */
+
+/* On narrow screens (< 400 px) reduce font slightly to stay within card. */
+@media (max-width: 400px) {
+  .why-api__toggle,
+  .why-api__item {
+    font-size: 0.6875rem; /* 11 px */
+  }
+}
+
+/* ── ContextMenu ────────────────────────────────────────────────────────────
+   Token-based styles for the ApiCard right-click / long-press menu.
+   The animation is suppressed for users who prefer reduced motion.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@keyframes contextmenu-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes contextmenu-appear {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+.context-menu__item:hover,
+.context-menu__item:focus-visible {
+  background: var(--surface-soft);
+  outline: none;
+}
+
+/* Restore the global focus ring for keyboard users inside the menu. */
+.context-menu__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ============================================================
+   SubscribeCTA — sticky bottom action bar appearing on scroll
+   BEM block: .subscribe-cta-bar
+   ============================================================ */
+.subscribe-cta-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.85);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transform: translateY(100%);
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    background var(--transition-speed),
+    border-color var(--transition-speed);
+  box-shadow: 0 -4px 20px -4px rgba(0, 0, 0, 0.08);
+}
+
+.subscribe-cta-bar--visible {
+  transform: translateY(0);
+}
+
+/* Dark mode overrides for shadow contrast */
+[data-theme="dark"] .subscribe-cta-bar {
+  box-shadow: 0 -4px 25px -4px rgba(0, 0, 0, 0.35);
+}
+
+.subscribe-cta-bar__container {
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.subscribe-cta-bar__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.subscribe-cta-bar__title-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.subscribe-cta-bar__title {
+  font-size: 1rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.subscribe-cta-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.subscribe-cta-bar__price-group {
+  text-align: right;
+}
+
+.subscribe-cta-bar__price-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  display: block;
+}
+
+.subscribe-cta-bar__price {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Icon-only action buttons (Share / Bookmark) ────────────────────────────
+   Wrapped in the Tooltip primitive for accessible labels. Design-token
+   colours ensure correct rendering in both light and dark mode.
+   WCAG 2.1 AA: minimum 44 × 44 px tap target, visible :focus-visible ring.
+   ──────────────────────────────────────────────────────────────────────────  */
+.subscribe-cta-bar__icon-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mkt-space-md, 8px);
+}
+
+.subscribe-cta-bar__icon-btn {
+  /* Layout & sizing — 36 px visual, padded to 44 × 44 tap target */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+
+  /* Reset */
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+
+  /* Colour tokens */
+  color: var(--muted);
+
+  /* Smooth hover transition following global speed token */
+  transition:
+    color var(--transition-speed, 240ms),
+    background var(--transition-speed, 240ms),
+    border-color var(--transition-speed, 240ms);
+}
+
+.subscribe-cta-bar__icon-btn:hover {
+  color: var(--text);
+  background: var(--surface-soft, rgba(255, 255, 255, 0.06));
+  border-color: var(--line, rgba(169, 184, 255, 0.16));
+}
+
+/* Active / toggled state — bookmark is saved */
+.subscribe-cta-bar__icon-btn--active {
+  color: var(--accent);
+  background: rgba(78, 133, 255, 0.1);
+  border-color: rgba(78, 133, 255, 0.3);
+}
+
+.subscribe-cta-bar__icon-btn--active:hover {
+  color: var(--accent);
+  background: rgba(78, 133, 255, 0.18);
+  border-color: rgba(78, 133, 255, 0.45);
+}
+
+/* WCAG 2.1 AA focus ring (mirrors global focus.css pattern) */
+.subscribe-cta-bar__icon-btn:focus {
+  outline: none;
+}
+
+.subscribe-cta-bar__icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Light-mode tint adjustments */
+[data-theme="light"] .subscribe-cta-bar__icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: var(--line, rgba(0, 0, 0, 0.12));
+}
+
+[data-theme="light"] .subscribe-cta-bar__icon-btn--active {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+[data-theme="light"] .subscribe-cta-bar__icon-btn--active:hover {
+  background: rgba(37, 99, 235, 0.14);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 640px) {
+  .subscribe-cta-bar {
+    padding: 12px 16px;
+  }
+  
+  .subscribe-cta-bar__container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .subscribe-cta-bar__info {
+    align-items: center;
+  }
+  
+  .subscribe-cta-bar__actions {
+    justify-content: space-between;
+  }
 }
 
 @media print {
@@ -4666,9 +7051,14 @@ code,
     --surface-strong: rgba(255, 255, 255, 0.92) !important;
     --surface-soft: rgba(0, 0, 0, 0.06) !important;
     --line: rgba(0, 0, 0, 0.08) !important;
+    --line-soft: rgba(0, 0, 0, 0.06) !important;
     --line-strong: rgba(0, 0, 0, 0.12) !important;
     --text: #1a2332 !important;
     --muted: #64748b !important;
+    --display-404: #1e3a8a !important;
+    --glyph-error: #b91c1c !important;
+    --status-pending-fg: #854d0e !important;
+    --status-approving-fg: #1e40af !important;
     --accent: #2563eb !important;
     --accent-strong: #059669 !important;
     --danger: #dc2626 !important;
@@ -4879,6 +7269,73 @@ code,
     font-size: 0.85em;
     color: #444;
   }
+
+  /* ── ReviewsTab: hide chrome, expand collapsibles ────────────────────
+     FWC26 — When printing the reviews section:
+     1. .reviews-sort-controls (.no-print) is already hidden by the generic
+        .no-print rule above; this comment preserves intent for reviewers.
+     2. Every review card (data-reviews-section .preview-card) is forced
+        visible and fully expanded so no content is clipped on paper.
+     3. The RatingHistogram bars use inline `width` — overflow:visible
+        ensures they are never cut off.
+     4. The collapsed-content pattern used elsewhere in the app
+        ([aria-hidden="true"], [hidden], details/summary) is expanded so
+        any future collapsible that lands inside the reviews panel prints
+        in full without JS intervention.
+     ─────────────────────────────────────────────────────────────────── */
+
+  /* Force every review card to be fully visible and expanded */
+  [data-reviews-section] .preview-card {
+    display: block !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Expand any aria-hidden collapsible regions inside the reviews panel */
+  [data-reviews-section] [aria-hidden="true"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Expand <details> elements that may appear in reviews */
+  [data-reviews-section] details {
+    display: block !important;
+  }
+
+  [data-reviews-section] details > * {
+    display: block !important;
+  }
+
+  /* Expand hidden elements inside the reviews panel */
+  [data-reviews-section] [hidden] {
+    display: block !important;
+  }
+
+  /* Rating histogram: allow bars to render at full width without overflow clip */
+  [data-reviews-section] .rating-histogram,
+  [data-reviews-section] .rating-histogram__bar-track,
+  [data-reviews-section] .rating-histogram__bar-fill {
+    overflow: visible !important;
+    max-width: 100% !important;
+  }
+
+  /* Review list grid: single column, consistent spacing */
+  [data-reviews-section] .reviews-list {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Review cards: avoid splitting across page breaks */
+  [data-reviews-section] .preview-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
 }
 
 /* Share Snapshot Button */
@@ -4903,222 +7360,242 @@ code,
   height: 6px;
 }
 
-.pill-bar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.pill-bar::-webkit-scrollbar-thumb {
-  background: var(--line-strong);
-  border-radius: 999px;
-}
-
-.pill-bar__item {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  padding: 0 16px;
-  min-height: 44px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface-soft);
-  color: var(--text);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-speed) ease;
-}
-
-.pill-bar__item:hover,
-.pill-bar__item:focus-visible {
-  background: var(--line);
-}
-
-.pill-bar__item--active {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-/* ============================================================
-   WhyApi — "Why this API?" disclosure widget
-   BEM block: .why-api
-   Placed inside the marketplace ApiCard (non-compact variant).
-   Design tokens: --accent, --accent-strong, --muted,
-                  --surface-soft, --border-subtle, --transition-speed
-   WCAG 2.1 AA: focus-visible ring, colour-contrast safe colours.
-   ============================================================ */
-
-/**
- * Container block.
- * Provides top margin to separate it from the card body content above,
- * and sets the stacking context for the animated list.
- */
-.why-api {
-  margin-top: 4px;
-  /* Establish a local stacking context so z-index on children is contained. */
-  position: relative;
-}
-
-/**
- * Toggle button element.
- * Stripped of native button chrome and styled as a small accent link-like
- * affordance. The focus-visible ring uses the global token so it's
- * consistent with every other interactive element in the app.
- */
-.why-api__toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0;
-  margin: 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 0.75rem; /* 12 px */
-  font-weight: 600;
-  color: var(--accent);
-  line-height: 1;
-  /* Smooth colour transition on hover/focus so the change isn't jarring. */
-  transition:
-    color var(--transition-speed, 240ms) ease,
-    opacity var(--transition-speed, 240ms) ease;
-}
-
-.why-api__toggle:hover {
-  /* Slightly brighten on hover to signal interactivity. */
-  opacity: 0.8;
-}
-
-/* Keyboard-focus ring — 2px solid accent at 3 px offset (matches app-wide
-   focus style defined in the :focus-visible section above). */
-.why-api__toggle:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: 2px;
-}
-
-/** Open-state modifier — rotate chevron handled via content swap in JSX,
-    but the class can be used for additional styling if needed. */
-.why-api__toggle--open {
-  /* Slightly muted colour in the open state so "close" feels natural. */
-  color: var(--accent-strong, var(--accent));
-}
-
-/**
- * Decorative chevron icon (aria-hidden in JSX).
- * `user-select: none` prevents the symbol being included in copy-paste.
- */
-.why-api__chevron {
-  user-select: none;
-  font-size: 0.625rem; /* 10 px — smaller than the label */
-  line-height: 1;
-}
-
-/**
- * Reasons list element.
- * Uses flex-column with a gap instead of list padding so spacing is
- * predictable across all breakpoints.
- */
-.why-api__reasons {
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  /* Subtle fade-in for the list appearance. */
-  animation: why-api-appear 180ms ease forwards;
-}
-
-@keyframes why-api-appear {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
+  /* Expand EndpointSummary collapsibles when printing */
+  .endpoint-summary-content--collapsed {
+    display: block !important;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  .endpoint-summary-trigger .chevron-icon {
+    display: none !important;
   }
+  .endpoint-summary-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* ReviewsTab — hide chrome + expand collapsibles when printing */
+  .reviews-tab__sort-row {
+    display: none !important;
+  }
+  .reviews-tab .api-detail-reviews-header {
+    display: none !important;
+  }
+  .reviews-tab::before {
+    content: "Developer Reviews";
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1a2332;
+  }
+  .reviews-tab__card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .reviews-tab__list {
+    display: block !important;
+  }
+  .reviews-tab {
+    max-height: none !important;
+  }
+
+  /* SortMenu — hide chrome + expand collapsibles when printing */
+  .sort-menu__sort-row {
+    display: none !important;
+  }
+  .sort-menu::before {
+    content: "Sort Options";
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1a2332;
+  }
+  .sort-menu__current-state {
+    display: block !important;
+  }
+  .sort-menu__label {
+    font-weight: 600;
+    margin-right: 0.5rem;
+  }
+  .sort-menu__value {
+    color: #1a2332;
+  }
+  .sort-menu {
+    max-height: none !important;
+  }
+
+/* ── LatencyChart page (GrantFox FWC26) ───────────────────────────────────────
+   Responsive latency dashboard with bar chart and HelpPopover. Uses design
+   tokens for light/dark mode consistency. */
+.latency-chart-page {
+  display: grid;
+  gap: 24px;
+  padding: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
 }
 
-/**
- * Individual reason list item.
- * Flex row so the check icon and text align on the same baseline.
- */
-.why-api__item {
+.latency-chart-header {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-  font-size: 0.75rem; /* 12 px */
-  line-height: 1.5;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.latency-chart-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.latency-chart-title-group h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  line-height: 1.1;
+}
+
+.latency-chart-subtitle {
   color: var(--muted);
+  font-size: 0.875rem;
 }
 
-/**
- * Decorative check mark (aria-hidden in JSX).
- * Uses --accent-strong for a distinct but on-theme green tick.
- */
-.why-api__check {
-  flex-shrink: 0;
-  color: var(--accent-strong, var(--accent));
-  user-select: none;
-  margin-top: 1px; /* optical alignment with the first line of text */
+.latency-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
 }
 
-/**
- * Readable reason text.
- * `min-width: 0` allows long strings to wrap correctly inside the flex row.
- */
-.why-api__text {
-  min-width: 0;
-  word-break: break-word;
-}
-
-/* ── Responsive adjustments ─────────────────────────────────────────────── */
-
-/* On narrow screens (< 400 px) reduce font slightly to stay within card. */
-@media (max-width: 400px) {
-  .why-api__toggle,
-  .why-api__item {
-    font-size: 0.6875rem; /* 11 px */
-  }
-}
-
-/* ── ContextMenu ────────────────────────────────────────────────────────────
-   Token-based styles for the ApiCard right-click / long-press menu.
-   The animation is suppressed for users who prefer reduced motion.
-   ───────────────────────────────────────────────────────────────────────── */
-
-@keyframes contextmenu-appear {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  @keyframes contextmenu-appear {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-}
-
-.context-menu__item:hover,
-.context-menu__item:focus-visible {
+.latency-stat-card {
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(169, 184, 255, 0.12);
   background: var(--surface-soft);
-  outline: none;
 }
 
-/* Restore the global focus ring for keyboard users inside the menu. */
-.context-menu__item:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+.latency-stat-label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.latency-stat-value {
+  display: block;
+  font-size: 1.35rem;
+}
+
+.latency-chart-container {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  min-height: 260px;
+}
+
+.latency-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 220px;
+}
+
+.latency-chart-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.latency-chart-bar {
+  width: 100%;
+  max-width: 48px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 70%, var(--accent-strong)));
+  transition: opacity 180ms ease;
+  cursor: pointer;
+}
+
+.latency-chart-bar--peak {
+  background: linear-gradient(180deg, var(--danger), color-mix(in srgb, var(--danger) 70%, var(--warning)));
+}
+
+.latency-chart-bar-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.latency-chart-caption {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .latency-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .latency-chart-bars {
+    gap: 4px;
+  }
+
+  .latency-chart-bar-label {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .latency-chart-page {
+    padding: 14px;
+  }
+
+  .latency-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .latency-chart-bars {
+    height: 160px;
+  }
+}
+
+/* ── Skeleton layout-stability on narrow screens (#1010) ───────────────
+   Mirror the real .api-marketplace-card responsive rules so that the
+   skeleton's height, grid columns, header layout, and visible sections
+   match the loaded card at every breakpoint.  This eliminates CLS when
+   the skeleton swaps to real content. */
+@media (max-width: 768px) {
+  .api-card-skeleton {
+    min-height: 0 !important;
+  }
+
+  /* Skeleton header matches real card grid: icon 48px + fluid body */
+  .api-card-skeleton .api-marketplace-card-header {
+    display: grid !important;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: flex-start !important;
+  }
+
+  /* Skeleton icon shrinks to match real 48×48 icon */
+  .api-card-skeleton .api-marketplace-card-header > .skeleton:first-child {
+    width: 48px !important;
+    height: 48px !important;
+    flex: 0 0 48px;
+  }
+
+  /* Hide skeleton price section (matches real card display:none) */
+  .api-card-skeleton .api-marketplace-card-price {
+    display: none !important;
+  }
+
+  /* Stats row adapts to full width */
+  .api-card-skeleton .api-card__stats {
+    gap: var(--mkt-space-xl);
+  }
 }

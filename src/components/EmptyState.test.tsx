@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EmptyState from "./EmptyState";
 import type { EmptyStateSize, EmptyStateVariant } from "./EmptyState";
@@ -15,7 +15,7 @@ describe("EmptyState", () => {
   });
 
   describe("variants", () => {
-    const variants: EmptyStateVariant[] = ["empty", "filtered", "error"];
+    const variants: EmptyStateVariant[] = ["empty", "api-card", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
 
     it.each(variants)("renders the %s variant illustration", (variant) => {
       render(<EmptyState variant={variant} />);
@@ -28,8 +28,13 @@ describe("EmptyState", () => {
       render(<EmptyState variant={variant} />);
       const titles = {
         empty: /No APIs available/i,
+        "api-card": /API unavailable/i,
+        "api-detail": /API not found/i,
         filtered: /No results found/i,
         error: /Failed to load APIs/i,
+        "plan-badge": /No plan selected/i,
+        "risk-gauge": /No risk data yet/i,
+        "quota-banner": /No quota configured/i,
       };
       expect(screen.getByText(titles[variant])).toBeTruthy();
     });
@@ -44,6 +49,65 @@ describe("EmptyState", () => {
       );
       expect(screen.getByText("Custom Title")).toBeTruthy();
       expect(screen.getByText("Custom message body")).toBeTruthy();
+    });
+
+    it("applies headingId to the title element for aria-labelledby wiring", () => {
+      render(
+        <EmptyState
+          variant="quota-banner"
+          headingId="quota-banner-empty-heading"
+        />,
+      );
+      const heading = document.getElementById("quota-banner-empty-heading");
+      expect(heading).toBeTruthy();
+      expect(heading?.tagName.toLowerCase()).toBe("h2");
+      expect(heading?.textContent).toMatch(/No quota configured/i);
+    });
+  });
+
+  describe("quota-banner variant (issue #702 / b#025)", () => {
+    it("uses design-token strokes and fills — no hardcoded hex", () => {
+      const { container } = render(
+        <EmptyState variant="quota-banner" size="default" />,
+      );
+      const svg = container.querySelector("svg");
+      expect(svg).toBeTruthy();
+      expect(/#[0-9a-f]{3,8}/i.test(svg?.outerHTML ?? "")).toBe(false);
+      expect(
+        (svg?.querySelectorAll('[stroke="var(--muted)"]').length ?? 0) >= 2,
+      ).toBe(true);
+      expect(
+        (svg?.querySelectorAll('[stroke="var(--accent)"]').length ?? 0) +
+          (svg?.querySelectorAll('[fill="var(--accent)"]').length ?? 0) >=
+          1,
+      ).toBe(true);
+    });
+
+    it("renders gauge + bar motifs for the quota empty metaphor", () => {
+      const { container } = render(<EmptyState variant="quota-banner" />);
+      const svg = container.querySelector("svg");
+      expect(svg?.querySelectorAll("path").length).toBeGreaterThanOrEqual(2);
+      expect(svg?.querySelectorAll("rect").length).toBeGreaterThanOrEqual(2);
+      expect(svg?.querySelector("line")).toBeTruthy();
+    });
+
+    it("uses compact default message when size is compact", () => {
+      render(<EmptyState variant="quota-banner" size="compact" />);
+      expect(
+        screen.getByText(/Set a quota to track your API usage limits/i),
+      ).toBeTruthy();
+    });
+
+    it("fires the custom Set up quota action", () => {
+      const onClick = vi.fn();
+      render(
+        <EmptyState
+          variant="quota-banner"
+          action={{ label: "Set up quota", onClick }}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Set up quota/i }));
+      expect(onClick).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -129,6 +193,95 @@ describe("EmptyState", () => {
     });
   });
 
+  describe("copy-to-clipboard affordance (Issue #733)", () => {
+    const originalClipboard = navigator.clipboard;
+
+    beforeEach(() => {
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+      });
+    });
+
+    afterEach(() => {
+      Object.assign(navigator, { clipboard: originalClipboard });
+    });
+
+    it("renders a copy button next to the message when clipboard is supported", () => {
+      render(<EmptyState variant="error" message="Something went wrong" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      expect(copyBtn).toBeTruthy();
+      expect(copyBtn.textContent).toBe("Copy");
+    });
+
+    it("copies the message text to clipboard on button click", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<EmptyState variant="error" message="Error details to copy" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      fireEvent.click(copyBtn);
+
+      // Wait for microtask
+      await vi.waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith("Error details to copy");
+      });
+    });
+
+    it("shows 'Copied!' feedback after successful copy", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<EmptyState variant="error" message="test message" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      fireEvent.click(copyBtn);
+
+      await vi.waitFor(() => {
+        expect(copyBtn.textContent).toBe("Copied!");
+      });
+    });
+
+    it("has an accessible aria-label on the copy button", () => {
+      render(<EmptyState variant="filtered" message="Copy this text" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      expect(copyBtn.getAttribute("aria-label")).toBe('Copy "Copy this text"');
+    });
+
+    it("does not render copy button when clipboard API is unsupported", () => {
+      Object.assign(navigator, { clipboard: undefined });
+      render(<EmptyState variant="error" message="Unsupported" />);
+      expect(screen.queryByTestId("empty-state-copy-button")).toBeNull();
+    });
+
+    it("renders copy button in compact size as well", () => {
+      render(
+        <EmptyState
+          variant="filtered"
+          size="compact"
+          message="Compact copy"
+        />,
+      );
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      expect(copyBtn).toBeTruthy();
+      expect(copyBtn.textContent).toBe("Copy");
+    });
+
+    it("announces copy status to screen readers via aria-live region", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<EmptyState variant="error" message="Announce this" />);
+      const copyBtn = screen.getByTestId("empty-state-copy-button");
+      fireEvent.click(copyBtn);
+
+      await vi.waitFor(() => {
+        const status = screen.getByRole("status");
+        expect(status.textContent).toBe("Message copied.");
+      });
+    });
+  });
+
   describe("error variant — onRetry", () => {
     it("renders retry button when onRetry is provided", () => {
       const onRetry = vi.fn();
@@ -137,17 +290,14 @@ describe("EmptyState", () => {
     });
 
     it("calls onRetry exactly once per click and handles async", async () => {
-      const onRetry = vi.fn(() => new Promise((r) => setTimeout(r, 10)));
+      let resolveRetry!: () => void;
+      const onRetry = vi.fn(() => new Promise<void>((r) => (resolveRetry = r)));
       render(<EmptyState variant="error" onRetry={onRetry} />);
       const btn = screen.getByText(/^Retry$/);
       fireEvent.click(btn);
       expect(onRetry).toHaveBeenCalledTimes(1);
-      while (
-        onRetry.mock.calls.length &&
-        !(await onRetry.mock.results[0]?.value)
-      ) {
-        await new Promise((r) => setTimeout(r, 5));
-      }
+      resolveRetry();
+      await new Promise((r) => setTimeout(r, 20));
     });
 
     it("shows loading state while retrying (aria-busy)", async () => {
@@ -156,7 +306,7 @@ describe("EmptyState", () => {
       render(<EmptyState variant="error" onRetry={onRetry} />);
       const btn = screen.getByText(/^Retry$/);
       fireEvent.click(btn);
-      expect(btn.getAttribute("disabled")).toBeTruthy();
+      expect(btn.hasAttribute("disabled")).toBe(true);
       expect(btn.getAttribute("aria-busy")).toBe("true");
       expect(btn.textContent).toMatch(/Retrying/);
       resolveRetry();
@@ -199,7 +349,7 @@ describe("EmptyState", () => {
     });
 
     it("nested SVG illustrations also carry aria-hidden (WCAG 1.1.1 Non-text Content)", () => {
-      const variants: EmptyStateVariant[] = ["empty", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-card", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
       variants.forEach((variant) => {
         const { container, unmount } = render(<EmptyState variant={variant} />);
         const svgs = container.querySelectorAll("svg");
@@ -211,7 +361,7 @@ describe("EmptyState", () => {
     });
 
     it("SVG illustrations use strokeLinecap='round' for consistent v7 line-art style", () => {
-      const variants: EmptyStateVariant[] = ["empty", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-card", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
       variants.forEach((variant) => {
         const { container, unmount } = render(
           <EmptyState variant={variant} size="default" />,
@@ -249,6 +399,15 @@ describe("EmptyState", () => {
       expect(svg).toBeTruthy();
       const accentFills = svg?.querySelectorAll('[fill="var(--accent)"]');
       expect((accentFills?.length ?? 0) >= 2).toBe(true);
+    });
+
+    it("api-detail illustration uses tokenized API card and plug motifs", () => {
+      const { container } = render(<EmptyState variant="api-detail" />);
+      const svg = container.querySelector("svg");
+      expect(svg?.querySelector("rect")).toBeTruthy();
+      expect(
+        (svg?.querySelectorAll('[stroke="var(--accent)"]').length ?? 0) >= 1,
+      ).toBe(true);
     });
 
     it("error illustration uses var(--accent) for the exclamation caret highlight", () => {
@@ -303,7 +462,7 @@ describe("EmptyState", () => {
     });
 
     it("no illustration contains hardcoded hex colors — all strokes/fills reference design tokens", () => {
-      const variants: EmptyStateVariant[] = ["empty", "filtered", "error"];
+      const variants: EmptyStateVariant[] = ["empty", "api-card", "api-detail", "filtered", "error", "plan-badge", "risk-gauge", "quota-banner"];
       const hexRe = /#[0-9a-f]{3,8}/i;
       variants.forEach((variant) => {
         const { container, unmount } = render(<EmptyState variant={variant} />);
@@ -312,6 +471,146 @@ describe("EmptyState", () => {
         expect(hexRe.test(html)).toBe(false);
         unmount();
       });
+    });
+  });
+
+  describe("loading skeleton", () => {
+    it("renders EmptyStateSkeleton when loading prop is true", () => {
+      const { container } = render(<EmptyState loading />);
+      const skeleton = container.querySelector(".empty-state-skeleton");
+      expect(skeleton).toBeTruthy();
+      expect(skeleton?.getAttribute("aria-busy")).toBe("true");
+      expect(skeleton?.getAttribute("aria-label")).toBe("Loading empty state");
+      
+      const shimmerElements = skeleton?.querySelectorAll(".skeleton");
+      expect(shimmerElements?.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("applies compact classes/styles for compact size skeleton", () => {
+      const { container } = render(<EmptyState loading size="compact" />);
+      const skeleton = container.querySelector(".empty-state-skeleton");
+      expect(skeleton?.classList.contains("empty-state-skeleton--compact")).toBe(true);
+      expect((skeleton as HTMLElement).style.padding).toBe("16px 12px");
+    });
+
+    it("applies default styles and min-height for default size skeleton", () => {
+      const { container } = render(<EmptyState loading size="default" />);
+      const skeleton = container.querySelector(".empty-state-skeleton");
+      expect(skeleton?.classList.contains("empty-state-skeleton--compact")).toBe(false);
+      expect((skeleton as HTMLElement).style.minHeight).toBe("300px");
+      expect((skeleton as HTMLElement).style.padding).toBe("48px 32px");
+    });
+
+    it("renders action button placeholder only when hasAction is determined", () => {
+      const { container: noAction } = render(<EmptyState loading />);
+      const initialSkeletonsCount = noAction.querySelectorAll(".skeleton").length;
+
+      const { container: withAction } = render(
+        <EmptyState loading action={{ label: "Go", onClick: () => {} }} />
+      );
+      const withActionSkeletonsCount = withAction.querySelectorAll(".skeleton").length;
+      expect(withActionSkeletonsCount).toBe(initialSkeletonsCount + 1);
+    });
+  });
+
+  describe("copy-to-clipboard", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("renders copy button when copyable is true and message is present", () => {
+      render(<EmptyState copyable message="Copy this text" />);
+      expect(screen.getByLabelText("Copy message to clipboard")).toBeTruthy();
+    });
+
+    it("does not render copy button when copyable is false (default)", () => {
+      render(<EmptyState message="No copy here" />);
+      expect(screen.queryByLabelText("Copy message to clipboard")).toBeNull();
+    });
+
+    it("copies the message text to clipboard on click", async () => {
+      render(<EmptyState copyable message="Test message" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Test message");
+    });
+
+    it("shows 'Copied' feedback after clicking", async () => {
+      render(<EmptyState copyable message="Some text" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(btn.textContent).toMatch(/Copied/);
+    });
+
+    it("announces copy success via aria-live region", async () => {
+      render(<EmptyState copyable message="Announce this" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      const liveRegion = screen.getByText("Message copied to clipboard");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion.getAttribute("aria-live")).toBe("polite");
+    });
+
+    it("reverts 'Copied' feedback after 2 seconds", async () => {
+      render(<EmptyState copyable message="Revert test" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      expect(btn.textContent).toMatch(/Copied/);
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(btn.textContent).toMatch(/Copy/);
+    });
+
+    it("copies the resolved message (message prop takes precedence over description)", async () => {
+      render(
+        <EmptyState
+          copyable
+          message="Primary message"
+          description="Deprecated description"
+        />,
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Copy message to clipboard"));
+      });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Primary message");
+    });
+
+    it("copies the default message when no custom message is provided", async () => {
+      render(<EmptyState variant="empty" copyable />);
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Copy message to clipboard"));
+      });
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        "Check back soon for new integrations.",
+      );
+    });
+
+    it("renders copy button with compact size styling", () => {
+      render(<EmptyState copyable size="compact" message="Compact copy" />);
+      const btn = screen.getByLabelText("Copy message to clipboard");
+      expect(btn).toBeTruthy();
+      expect(btn.style.fontSize).toBe("0.75rem");
     });
   });
 });

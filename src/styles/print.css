@@ -1,0 +1,39 @@
+/* Print stylesheet: hide UI chrome and expand collapsibles for printing SortMenu */
+
+@media print {
+  /* Hide application chrome */
+  .no-print,
+  .sort-menu-header,
+  .sort-menu-actions,
+  button.ghost-button,
+  button.primary-button {
+    display: none !important;
+  }
+
+  /* Ensure details-based collapsibles show their content when printing */
+  .sort-collapsible details > * {
+    display: block !important;
+    visibility: visible !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Hide summary controls when printing to avoid duplicate controls */
+  .sort-collapsible summary {
+    display: none !important;
+  }
+
+  /* Make printed text clear and use light color scheme for consistent prints */
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Remove any unnecessary outlines/box-shadows that don't print well */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}

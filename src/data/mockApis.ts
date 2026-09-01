@@ -32,6 +32,7 @@ export type APIItem = {
   ratingDistribution?: Record<number, number>;
   hourlyHealth?: ("operational" | "degraded" | "down")[];
   reviews?: Review[];
+  sparklineValues?: number[];
 };
 
 
@@ -70,6 +71,7 @@ export const MOCK_APIS: APIItem[] = [
         title: "Get Forecast",
         url: "/v1/forecast",
         method: "GET",
+        group: "Forecast",
         params: [
           { name: "lat", type: "number", required: true },
           { name: "lon", type: "number", required: true },
@@ -81,13 +83,38 @@ export const MOCK_APIS: APIItem[] = [
         title: "Historical Weather",
         url: "/v1/history",
         method: "GET",
+        group: "Forecast",
         params: [{ name: "date", type: "string", required: true }],
         response: '{ "date": "2026-03-01", "summary": { ... } }',
+      },
+      {
+        id: "alerts-create",
+        title: "Create Weather Alert",
+        url: "/v1/alerts",
+        method: "POST",
+        group: "Alerts",
+        params: [
+          { name: "location", type: "string", required: true },
+          { name: "conditions", type: "array", required: false },
+        ],
+        response: '{ "alert_id": "12345", "status": "active" }',
+      },
+      {
+        id: "alerts-delete",
+        title: "Delete Weather Alert",
+        url: "/v1/alerts/{id}",
+        method: "DELETE",
+        group: "Alerts",
+        params: [
+          { name: "id", type: "string", required: true },
+        ],
+        response: '{ "status": "deleted" }',
       },
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
     ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
     hourlyHealth: Array(24).fill("operational").map((_, i) => i === 12 || i === 13 ? "degraded" : "operational"),
+    sparklineValues: [15, 17, 16, 19, 21, 20, 24, 25, 23, 26, 28, 27],
   },
   {
     id: "pay-qr",
@@ -107,7 +134,45 @@ export const MOCK_APIS: APIItem[] = [
     usageCount: 880000,
     features: ["PCI-compliant", "Low-latency captures"],
     useCases: ["Checkout", "Subscriptions"],
-    endpoints: [],
+    endpoints: [
+      {
+        id: "payment-create",
+        title: "Create Payment",
+        url: "/v1/payments",
+        method: "POST",
+        group: "Payments",
+        params: [
+          { name: "amount", type: "number", required: true },
+          { name: "currency", type: "string", required: true },
+          { name: "card_token", type: "string", required: true },
+        ],
+        response: '{ "payment_id": "pay_123", "status": "processed" }',
+      },
+      {
+        id: "payment-refund",
+        title: "Refund Payment",
+        url: "/v1/payments/{id}/refund",
+        method: "POST",
+        group: "Payments",
+        params: [
+          { name: "id", type: "string", required: true },
+          { name: "amount", type: "number", required: false },
+        ],
+        response: '{ "refund_id": "ref_456", "status": "processed" }',
+      },
+      {
+        id: "webhook-register",
+        title: "Register Webhook",
+        url: "/v1/webhooks",
+        method: "POST",
+        group: "Webhooks",
+        params: [
+          { name: "url", type: "string", required: true },
+          { name: "events", type: "array", required: true },
+        ],
+        response: '{ "webhook_id": "wh_789", "status": "active" }',
+      },
+    ],
     stats: { totalCalls: 880000, avgResponseMs: 260, uptimePct: 99.9 },
     reviews: [
       {
@@ -128,6 +193,7 @@ export const MOCK_APIS: APIItem[] = [
       },
     ],
     hourlyHealth: Array(24).fill("operational"),
+    sparklineValues: [30, 28, 35, 32, 40, 38, 45, 42, 50, 48, 55, 52],
   },
   {
     id: "msg-01",
@@ -147,7 +213,47 @@ export const MOCK_APIS: APIItem[] = [
     usageCount: 1200000,
     features: ["Bulk sending", "Delivery webhooks"],
     useCases: ["Notifications", "Two-factor auth"],
-    endpoints: [],
+    endpoints: [
+      {
+        id: "sms-send",
+        title: "Send SMS",
+        url: "/v1/sms",
+        method: "POST",
+        group: "Messaging",
+        params: [
+          { name: "to", type: "string", required: true },
+          { name: "message", type: "string", required: true },
+          { name: "from", type: "string", required: false },
+        ],
+        response: '{ "message_id": "msg_001", "status": "sent" }',
+      },
+      {
+        id: "email-send",
+        title: "Send Email",
+        url: "/v1/email",
+        method: "POST",
+        group: "Messaging",
+        params: [
+          { name: "to", type: "string", required: true },
+          { name: "subject", type: "string", required: true },
+          { name: "body", type: "string", required: true },
+        ],
+        response: '{ "email_id": "email_002", "status": "queued" }',
+      },
+      {
+        id: "template-create",
+        title: "Create Template",
+        url: "/v1/templates",
+        method: "POST",
+        group: "Templates",
+        params: [
+          { name: "name", type: "string", required: true },
+          { name: "content", type: "string", required: true },
+          { name: "type", type: "string", required: true },
+        ],
+        response: '{ "template_id": "tpl_003", "status": "active" }',
+      },
+    ],
     stats: { totalCalls: 1200000, avgResponseMs: 120, uptimePct: 99.99 },
     reviews: [
       {
@@ -160,6 +266,7 @@ export const MOCK_APIS: APIItem[] = [
       },
     ],
     hourlyHealth: Array(24).fill("operational").map((_, i) => i > 18 && i < 22 ? "down" : "operational"),
+    sparklineValues: [8, 10, 9, 12, 14, 13, 16, 17, 15, 18, 20, 19],
   },
   // minimal demo items
   ...Array.from({ length: 10 }).map((_, i) => {

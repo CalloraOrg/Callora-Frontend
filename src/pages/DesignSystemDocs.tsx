@@ -335,7 +335,7 @@ const COMPONENT_DOCS: ComponentDoc[] = [
     id: "status-chip",
     name: "Status Chip",
     description:
-      "Inline badge that surfaces transaction or system state at a glance. Colour is token-driven; text always carries the label so colour is never the sole indicator.",
+      "Inline badge that surfaces transaction or system state at a glance. Colour is token-driven; text always carries the label so colour is never the sole indicator. Each variant also carries a unique SVG background pattern (dots, cross-hatch, or diagonal stripes) so the state remains distinguishable to color-blind users (WCAG 1.4.1).",
     tokens: ["--success", "--danger", "--warning", "--radius-full"],
     props: [
       {

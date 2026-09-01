@@ -1,14 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
-import ApiUsage from "./ApiUsage";
-import Dashboard from "./components/Dashboard";
-import MyApis from "./pages/MyApis";
 import RouteProgressBar from "./components/RouteProgressBar";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
-import PublishApi from "./pages/PublishApi";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut } from "./utils/format";
 import DepositPreview from "./components/DepositPreview";
@@ -21,11 +17,61 @@ import ThemePlayground from "./pages/ThemePlayground";
 import DesignSystemDocs from "./pages/DesignSystemDocs";
 import A11yAudit from "./pages/A11yAudit";
 import InvoicesPage from "./pages/InvoicesPage";
+import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
+import { useAccountContext } from "./hooks/useAccountContext";
+
+// Route splitting: dynamic imports for all heavy page routes
+const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
+const PublishApi = lazy(() => import("./pages/PublishApi"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const ApiUsage = lazy(() => import("./pages/ApiUsage"));
+const MyApis = lazy(() => import("./pages/MyApis"));
+const PlanBadgePage = lazy(() => import("./pages/PlanBadge"));
+const ThemePlayground = lazy(() => import("./pages/ThemePlayground"));
+const DesignSystemDocs = lazy(() => import("./pages/DesignSystemDocs"));
+const A11yAudit = lazy(() => import("./pages/A11yAudit"));
+const RateLimitCard = lazy(() => import("./pages/RateLimitCard"));
+const BillingHistory = lazy(() => import("./pages/BillingHistory"));
+const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
+const InvoiceCard = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.InvoiceCard })));
+
+// Prefetch cache map to ensure modules are loaded on hover / focus without delaying critical interaction
+const routePrefetchers: Record<string, () => Promise<any>> = {
+  "/marketplace": () => import("./pages/MarketplacePage"),
+  "/publish": () => import("./pages/PublishApi"),
+  "/dashboard": () => import("./pages/DashboardPage"),
+  "/api-usage": () => import("./pages/ApiUsage"),
+  "/apis/my-apis": () => import("./pages/MyApis"),
+  "/apis/plan-badge": () => import("./pages/PlanBadge"),
+  "/billing/history": () => import("./pages/BillingHistory"),
+  "/theme-playground": () => import("./pages/ThemePlayground"),
+  "/design-system/docs": () => import("./pages/DesignSystemDocs"),
+  "/a11y-audit": () => import("./pages/A11yAudit"),
+  "/rate-limit": () => import("./pages/RateLimitCard"),
+  "/webhooks/deliveries": () => import("./pages/WebhookDeliveries"),
+};
+
+export function prefetchRoute(path: string) {
+  const prefetcher = routePrefetchers[path];
+  if (prefetcher) {
+    prefetcher().catch(() => {
+      // Ignore prefetch failures gracefully
+    });
+  }
+}
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
+
+const STAGE_LABELS: Record<DepositStage, string> = {
+  input: "Enter Amount",
+  approving: "Approving",
+  pending: "Pending",
+  confirmed: "Confirmed",
+  failed: "Failed",
+};
 
 type Feature = {
   icon: string;
@@ -104,14 +150,20 @@ const APP_ROUTES = {
   marketplace: "/marketplace",
   publish: "/publish",
   myApis: "/apis/my-apis",
+  planBadge: "/apis/plan-badge",
   apiUsage: "/api-usage",
   billing: "/billing",
   invoices: "/invoices",
+  billingHistory: "/billing/history",
   documentation: "/documentation",
   status: "/status",
   themePlayground: "/theme-playground",
   designSystem: "/design-system/docs",
   serverError: "/500",
+  rateLimitCard: "/rate-limit",
+  slaCard: "/marketplace/grantfox-wave-compute/sla",
+  webhookDeliveries: "/webhooks/deliveries",
+  onboarding: "/onboarding",
 } as const;
 
 function createMockHash() {
@@ -132,7 +184,7 @@ function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
   return hasValidAmount ? "Review transaction preview" : "Enter a deposit amount";
 }
 
-function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () => void; onPublishApi: () => void }) {
+function LandingPage({ onStartUsingApis, onPublishApi, onTakeTour }: { onStartUsingApis: () => void; onPublishApi: () => void; onTakeTour?: () => void }) {
   return (
     <div className="lp-shell">
       <header className="lp-section lp-hero" aria-labelledby="hero-title">
@@ -151,6 +203,11 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
             <button className="lp-btn lp-btn-secondary" onClick={onPublishApi}>
               Publish Your API
             </button>
+            {onTakeTour && (
+              <button className="lp-btn lp-btn-secondary" onClick={onTakeTour} style={{ marginLeft: "12px" }}>
+                Take the tour
+              </button>
+            )}
           </div>
         </div>
 
@@ -266,15 +323,19 @@ function App() {
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
     [APP_ROUTES.myApis]: "My APIs – Callora",
     [APP_ROUTES.billing]: "Billing – Callora",
+    [APP_ROUTES.billingHistory]: "Billing History – Callora",
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
+    [APP_ROUTES.endpointSummary]: "Endpoint Summary – Callora",
   };
   const routeDescriptionMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
     [APP_ROUTES.dashboard]: "Your Callora dashboard showing balances, recent activity and quick actions.",
     [APP_ROUTES.billing]: "Manage your USDC vault, deposit funds, and view transaction status.",
+    [APP_ROUTES.billingHistory]: "View your full USDC transaction history with on-chain details, filters, and hover previews.",
     "/api-usage": "Monitor API usage, request stats, and view call history.",
     [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
+    [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
   };
   const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
@@ -401,9 +462,11 @@ function App() {
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
-  const openDeposit = () => {
+  const openDeposit = (presetAmount?: number) => {
     navigate(APP_ROUTES.billing);
-    resetFlow(amountInput, selectedPreset);
+    const nextAmount = presetAmount !== undefined ? String(presetAmount) : amountInput;
+    const nextPreset: number | "custom" = presetAmount !== undefined ? presetAmount : selectedPreset;
+    resetFlow(nextAmount, nextPreset);
     setIsDepositOpen(true);
   };
 
@@ -527,13 +590,28 @@ function App() {
 
           <div className="topbar-actions">
             <nav className="nav" aria-label="Primary navigation">
-              <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.dashboard} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.dashboard)}
+                onFocus={() => prefetchRoute(APP_ROUTES.dashboard)}
+              >
                 Dashboard
               </NavLink>
-              <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.marketplace} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.marketplace)}
+                onFocus={() => prefetchRoute(APP_ROUTES.marketplace)}
+              >
                 Marketplace
               </NavLink>
-              <NavLink to={APP_ROUTES.myApis} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.myApis} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.myApis)}
+                onFocus={() => prefetchRoute(APP_ROUTES.myApis)}
+              >
                 My APIs
               </NavLink>
               <NavLink to={APP_ROUTES.billing} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
@@ -543,31 +621,62 @@ function App() {
                 Invoices
               </NavLink>
               <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.billingHistory} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.billingHistory)}
+                onFocus={() => prefetchRoute(APP_ROUTES.billingHistory)}
+              >
+                Billing History
+              </NavLink>
+              <NavLink 
+                to={APP_ROUTES.themePlayground} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.themePlayground)}
+                onFocus={() => prefetchRoute(APP_ROUTES.themePlayground)}
+              >
                 Theme Playground
               </NavLink>
-              <NavLink to={APP_ROUTES.designSystem} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              <NavLink 
+                to={APP_ROUTES.designSystem} 
+                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.designSystem)}
+                onFocus={() => prefetchRoute(APP_ROUTES.designSystem)}
+              >
                 Design System
               </NavLink>
             </nav>
+            <AccountSwitcher />
             <ThemeToggle />
           </div>
         </header>
 
         <main id="main-content" role="main" className="page">
-          <Routes>
+          <Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
+            <Routes>
             <Route
               path={APP_ROUTES.landing}
-              element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} />}
+              element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} onTakeTour={() => navigate(APP_ROUTES.onboarding)} />}
             />
 
             <Route path={APP_ROUTES.publish} element={<PublishApi />} />
 
-            <Route path={APP_ROUTES.dashboard} element={<Dashboard vaultBalance={vaultBalance} walletBalance={walletBalance} openDeposit={openDeposit} />} />
+            <Route path={APP_ROUTES.onboarding} element={<OnboardingTour onComplete={() => navigate(APP_ROUTES.dashboard)} />} />
+
+            <Route path={APP_ROUTES.dashboard} element={<DashboardPage vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
 
             <Route path={APP_ROUTES.invoices} element={<InvoicesPage />} />
 
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
+
+            {/* ── My APIs ─────────────────────────────────────────────── */}
+            <Route path={APP_ROUTES.myApis} element={<MyApis />} />
+            
+            <Route path={APP_ROUTES.webhookDeliveries} element={<WebhookDeliveries />} />
+
+            {/* ── Plan Badge (issue #529) ──────────────────────────────── */}
+            <Route path={APP_ROUTES.planBadge} element={<PlanBadgePage />} />
 
             <Route
               path={APP_ROUTES.billing}
@@ -598,6 +707,8 @@ function App() {
                       </article>
                     </div>
 
+                    <InvoiceCard invoiceNumber="INV-1001" amountDue="$4,200" dueDate="Due in 7 days" />
+
                     <div className="info-row">
                       <div className="info-card">
                         <h2>Preset funding options</h2>
@@ -617,11 +728,11 @@ function App() {
                   <aside className="surface prototype-panel">
                     <p className="eyebrow">Prototype state preview</p>
                     <h2>Review both success and failure flows.</h2>
-                    <div className="outcome-toggle">
-                      <button className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
+                    <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
+                      <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
                         Confirmed path
                       </button>
-                      <button className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
+                      <button role="radio" aria-checked={demoOutcome === "failed"} className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
                         Failed path
                       </button>
                     </div>
@@ -665,8 +776,14 @@ function App() {
 
             <Route path="/a11y-audit" element={<A11yAudit />} />
 
+            <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
+
+            {/* ── Billing History (FWC26) ──────────────────────────────── */}
+            <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />
+
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
-          </Routes>
+            </Routes>
+          </Suspense>
         </main>
 
         <footer className="surface app-footer no-print" role="contentinfo">
@@ -720,12 +837,12 @@ function App() {
 
               <div className="modal-body">
                 <div className="stage-strip" aria-label="Transaction flow status">
-                  {["input", "approving", "pending", demoOutcome === "confirmed" ? "confirmed" : "failed"].map((item) => {
+                  {(["input", "approving", "pending", demoOutcome === "confirmed" ? "confirmed" : "failed"] as const).map((item) => {
                     const isActive = item === depositStage || (item === "input" && depositStage === "input" && hasValidAmount);
 
                     return (
                       <span key={item} className={`stage-pill ${isActive ? "active" : ""}`}>
-                        {item}
+                        {STAGE_LABELS[item]}
                       </span>
                     );
                   })}
@@ -736,7 +853,7 @@ function App() {
                     <strong>{stageLabel}</strong>
                     <p>{statusMessage}</p>
                   </div>
-                  <span className={`status-chip ${depositStage}`}>{depositStage}</span>
+                  <span className={`status-chip ${depositStage}`}>{STAGE_LABELS[depositStage]}</span>
                 </div>
 
                 <div className="modal-grid">
@@ -766,9 +883,10 @@ function App() {
                         disabled={isBusy}
                         placeholder="0.00"
                         aria-describedby="deposit-help"
+                        aria-invalid={validationMessage.length > 0 && depositStage === "input"}
                       />
                       <span>USDC</span>
-                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy}>
+                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy} aria-label={`Set maximum amount: ${formatUsdShortcut(walletBalance)}`}>
                         Max
                       </button>
                     </div>
@@ -779,13 +897,13 @@ function App() {
 
                     {validationMessage && depositStage === "input" && <p className="error-text">{validationMessage}</p>}
 
-                    <div className="preset-row">
+                    <div className="preset-row" role="radiogroup" aria-label="Deposit amount preset">
                       {PRESET_AMOUNTS.map((preset) => (
-                        <button key={preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
+                        <button key={preset} role="radio" aria-checked={selectedPreset === preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
                           ${preset}
                         </button>
                       ))}
-                      <button className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy}>
+                      <button role="radio" aria-checked={selectedPreset === "custom"} className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy}>
                         Custom
                       </button>
                     </div>
@@ -878,7 +996,7 @@ function App() {
                     Deposit another amount
                   </button>
                 ) : (
-                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy}>
+                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
                     {depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
                   </button>
                 )}
@@ -892,6 +1010,69 @@ function App() {
         )}
       </div>
     </ToastProvider>
+  );
+}
+
+function AccountSwitcher() {
+  const { account, accounts, switchAccount } = useAccountContext();
+  const [open, setOpen] = useState(false);
+
+  if (accounts.length === 0) return null;
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        className="ghost-button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        style={{ fontSize: 13 }}
+      >
+        {account ? account.label : "Switch account"}
+      </button>
+      {open && (
+        <ul
+          role="listbox"
+          aria-label="Accounts"
+          style={{
+            position: "absolute",
+            right: 0,
+            top: "100%",
+            marginTop: 8,
+            padding: 8,
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            listStyle: "none",
+            minWidth: 180,
+            zIndex: 1000,
+          }}
+        >
+          {accounts.map((acc) => (
+            <li
+              key={acc.id}
+              role="option"
+              aria-selected={account?.id === acc.id}
+              onClick={() => {
+                switchAccount(acc.id);
+                setOpen(false);
+              }}
+              style={{
+                padding: "8px 12px",
+                cursor: "pointer",
+                borderRadius: 4,
+                background: account?.id === acc.id ? "var(--accent)" : "transparent",
+                color: account?.id === acc.id ? "#fff" : "var(--text)",
+                fontSize: 13,
+              }}
+            >
+              {acc.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

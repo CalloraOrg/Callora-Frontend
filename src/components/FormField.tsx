@@ -56,7 +56,8 @@ export default function FormField({
   const errorId = `${id}-error`;
   const hintId = hint ? `${id}-hint` : undefined;
 
-  const describedBy = [hintId, errorId].filter(Boolean).join(' ');
+  const existingDescribedBy = children.props['aria-describedby'];
+  const describedBy = [existingDescribedBy, hintId, errorId].filter(Boolean).join(' ');
 
   const enhancedChild = React.cloneElement(children, {
     'aria-invalid': status === 'error' ? true : undefined,

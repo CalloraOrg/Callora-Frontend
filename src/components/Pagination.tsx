@@ -1,4 +1,5 @@
-interface PaginationProps {
+interface OffsetPaginationProps {
+  mode?: "offset";
   currentPage: number;
   totalPages: number;
   pageSize: number;
@@ -6,25 +7,47 @@ interface PaginationProps {
   onPageSizeChange: (size: number) => void;
 }
 
-export function Pagination({
+interface CursorPaginationProps {
+  mode: "cursor";
+  currentPageIndex: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  totalItemCount: number;
+  pageSize: number;
+  onGoNext: () => void;
+  onGoPrevious: () => void;
+  onPageSizeChange: (size: number) => void;
+}
+
+type PaginationProps = OffsetPaginationProps | CursorPaginationProps;
+
+export function Pagination(props: PaginationProps) {
+  if (props.mode === "cursor") {
+    return <CursorPagination {...props} />;
+  }
+  return <OffsetPagination {...props} />;
+}
+
+function OffsetPagination({
   currentPage,
   totalPages,
   pageSize,
   onPageChange,
   onPageSizeChange,
-}: PaginationProps) {
-  // Helper: generate page numbers with ellipses
+}: OffsetPaginationProps) {
+  if (totalPages <= 1) {
+    return null;
+  }
+
   const getPageNumbers = () => {
     const pages = [];
     const maxVisible = 7;
 
     if (totalPages <= maxVisible) {
-      // Show all pages if <= 7
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
     } else {
-      // Always show first page, last page, and current ± neighbors
       const leftBound = Math.max(2, currentPage - 1);
       const rightBound = Math.min(totalPages - 1, currentPage + 1);
 
@@ -53,7 +76,6 @@ export function Pagination({
   return (
     <nav aria-label="Pagination" className="pagination-nav">
       <div className="pagination-controls">
-        {/* Items per page selector */}
         <div className="page-size-selector">
           <label htmlFor="page-size" className="page-size-label">
             Items per page:
@@ -70,9 +92,7 @@ export function Pagination({
           </select>
         </div>
 
-        {/* Pagination buttons */}
         <div className="pagination-buttons">
-          {/* First button */}
           <button
             className="pagination-button ghost-button"
             onClick={() => onPageChange(1)}
@@ -82,7 +102,6 @@ export function Pagination({
             First
           </button>
 
-          {/* Prev button */}
           <button
             className="pagination-button ghost-button"
             onClick={() => onPageChange(currentPage - 1)}
@@ -92,7 +111,6 @@ export function Pagination({
             Prev
           </button>
 
-          {/* Page numbers */}
           <div className="page-numbers">
             {pageNumbers.map((page, index) => (
               <span key={index} className="page-number-wrapper">
@@ -114,7 +132,6 @@ export function Pagination({
             ))}
           </div>
 
-          {/* Next button */}
           <button
             className="pagination-button ghost-button"
             onClick={() => onPageChange(currentPage + 1)}
@@ -124,7 +141,6 @@ export function Pagination({
             Next
           </button>
 
-          {/* Last button */}
           <button
             className="pagination-button ghost-button"
             onClick={() => onPageChange(totalPages)}
@@ -135,7 +151,6 @@ export function Pagination({
           </button>
         </div>
 
-        {/* Mobile page indicator (360px) */}
         <div className="mobile-page-indicator">
           <span>
             Page {currentPage} of {totalPages}
@@ -143,96 +158,184 @@ export function Pagination({
         </div>
       </div>
 
-      {/* Pagination styles */}
-      <style>{`
-        .pagination-nav {
-          width: 100%;
-          margin: 24px 0;
-        }
-        .pagination-controls {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 16px;
-          flex-wrap: wrap;
-        }
-        .page-size-selector {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .page-size-label {
-          font-size: 0.875rem;
-          color: var(--muted);
-        }
-        .page-size-select {
-          padding: 8px 12px;
-          border-radius: 12px;
-          border: 1px solid var(--line);
-          background: var(--surface-soft);
-          color: var(--text);
-          font-size: 0.875rem;
-          cursor: pointer;
+      <PaginationStyles />
+    </nav>
+  );
+}
+
+function CursorPagination({
+  currentPageIndex,
+  hasNextPage,
+  hasPreviousPage,
+  totalItemCount,
+  pageSize,
+  onGoNext,
+  onGoPrevious,
+  onPageSizeChange,
+}: CursorPaginationProps) {
+  const displayPage = currentPageIndex + 1;
+  const maxPages =
+    totalItemCount > 0 ? Math.ceil(totalItemCount / pageSize) : 1;
+
+  return (
+    <nav aria-label="Pagination" className="pagination-nav">
+      <div className="pagination-controls">
+        <div className="page-size-selector">
+          <label htmlFor="page-size" className="page-size-label">
+            Items per page:
+          </label>
+          <select
+            id="page-size"
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            className="page-size-select"
+          >
+            <option value={12}>12</option>
+            <option value={24}>24</option>
+            <option value={48}>48</option>
+          </select>
+        </div>
+
+        <div className="pagination-buttons">
+          <button
+            className="pagination-button ghost-button"
+            onClick={onGoPrevious}
+            disabled={!hasPreviousPage}
+            aria-label="Previous page"
+          >
+            Prev
+          </button>
+
+          <span className="cursor-page-indicator" aria-current="page">
+            <span className="numeric-tabular">{displayPage}</span>
+            {" / "}
+            <span className="numeric-tabular">{maxPages}</span>
+          </span>
+
+          <button
+            className="pagination-button ghost-button"
+            onClick={onGoNext}
+            disabled={!hasNextPage}
+            aria-label="Next page"
+          >
+            Next
+          </button>
+        </div>
+
+        <div className="mobile-page-indicator">
+          <span>
+            Page{" "}
+            <span className="numeric-tabular">{displayPage}</span>
+            {" of "}
+            <span className="numeric-tabular">{maxPages}</span>
+          </span>
+        </div>
+      </div>
+
+      <PaginationStyles />
+    </nav>
+  );
+}
+
+function PaginationStyles() {
+  return (
+    <style>{`
+      .pagination-nav {
+        width: 100%;
+        margin: 24px 0;
+      }
+      .pagination-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .page-size-selector {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .page-size-label {
+        font-size: 0.875rem;
+        color: var(--muted);
+      }
+      .page-size-select {
+        padding: 8px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: var(--surface-soft);
+        color: var(--text);
+        font-size: 0.875rem;
+        cursor: pointer;
+      }
+      .pagination-buttons {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .pagination-button {
+        min-height: 40px;
+        padding: 0 12px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: var(--surface-soft);
+        color: var(--text);
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .pagination-button:hover:not(:disabled) {
+        background: var(--line);
+      }
+      .pagination-button.current-page {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }
+      .pagination-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .page-numbers {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .ellipsis {
+        color: var(--muted);
+        padding: 0 8px;
+      }
+      .cursor-page-indicator {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0 12px;
+        font-size: 0.875rem;
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+      .mobile-page-indicator {
+        display: none;
+        color: var(--muted);
+        font-size: 0.875rem;
+      }
+      @media (max-width: 360px) {
+        .page-size-selector,
+        .pagination-buttons .page-numbers,
+        .pagination-buttons button:not(.ghost-button:nth-child(2)):not(.ghost-button:nth-child(4)) {
+          display: none;
         }
         .pagination-buttons {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .pagination-button {
-          min-height: 40px;
-          padding: 0 12px;
-          border-radius: 12px;
-          border: 1px solid var(--line);
-          background: var(--surface-soft);
-          color: var(--text);
-          font-size: 0.875rem;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        .pagination-button:hover:not(:disabled) {
-          background: var(--line);
-        }
-        .pagination-button.current-page {
-          background: var(--accent);
-          color: white;
-          border-color: var(--accent);
-        }
-        .pagination-button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-        .page-numbers {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-        .ellipsis {
-          color: var(--muted);
-          padding: 0 8px;
+          gap: 12px;
         }
         .mobile-page-indicator {
-          display: none;
-          color: var(--muted);
-          font-size: 0.875rem;
+          display: block;
         }
-        @media (max-width: 360px) {
-          .page-size-selector,
-          .pagination-buttons .page-numbers,
-          .pagination-buttons button:not(.ghost-button:nth-child(2)):not(.ghost-button:nth-child(4)) {
-            display: none;
-          }
-          .pagination-buttons {
-            gap: 12px;
-          }
-          .mobile-page-indicator {
-            display: block;
-          }
-          .pagination-controls {
-            justify-content: center;
-          }
+        .pagination-controls {
+          justify-content: center;
         }
-      `}</style>
-    </nav>
+      }
+    `}</style>
   );
 }

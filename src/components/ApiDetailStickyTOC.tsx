@@ -1,70 +1,58 @@
-/**
- * ApiDetailStickyTOC.tsx
- *
- * Sticky right-rail Table of Contents for the ApiDetailPage documentation tab.
- * Highlights the active section as the user scrolls using IntersectionObserver.
- *
- * Accessibility: keyboard-navigable anchor links, aria-current="location" on
- * the active item, respects prefers-reduced-motion via CSS transition.
- */
+import { useEffect, useState, type MouseEvent } from "react";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import "./ApiDetailStickyTOC.css";
 
-import { useEffect, useRef, useState } from "react";
+export interface TocSection { id: string; label: string; }
+interface ApiDetailStickyTOCProps { sections: TocSection[]; }
+const compactTocQuery = "(max-width: 1023px)";
 
-export interface TocSection {
-  id: string;
-  label: string;
-}
-
-interface ApiDetailStickyTOCProps {
-  sections: TocSection[];
-}
-
+/** Accessible, responsive in-page navigation for API detail sections. */
 export function ApiDetailStickyTOC({ sections }: ApiDetailStickyTOCProps) {
-  const [activeId, setActiveId] = useState<string | null>(sections[0]?.id ?? null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
+  const [activeId, setActiveId] = useState(sections[0]?.id ?? null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const [isCompact, setIsCompact] = useState(false);
 
   useEffect(() => {
-    observerRef.current?.disconnect();
+    const compactToc = window.matchMedia(compactTocQuery);
+    const syncCompact = () => setIsCompact(compactToc.matches);
+    syncCompact();
+    compactToc.addEventListener("change", syncCompact);
+    return () => compactToc.removeEventListener("change", syncCompact);
+  }, []);
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting);
-        if (visible.length > 0) {
-          // Pick the topmost visible heading.
-          const topEntry = visible.reduce((a, b) => (a.boundingClientRect.top < b.boundingClientRect.top ? a : b));
-          setActiveId(topEntry.target.id);
-        }
-      },
-      { rootMargin: "0px 0px -60% 0px", threshold: 0.1 },
-    );
-
-    sections.forEach(({ id }) => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-
-    observerRef.current = observer;
+  useEffect(() => {
+    if (!sections.length) return;
+    const observer = new IntersectionObserver((entries) => {
+      const visibleEntries = entries.filter((entry) => entry.isIntersecting);
+      if (!visibleEntries.length) return;
+      const closestToTop = visibleEntries.reduce((closest, entry) => entry.boundingClientRect.top < closest.boundingClientRect.top ? entry : closest);
+      setActiveId(closestToTop.target.id);
+    }, { rootMargin: "-12% 0px -65% 0px", threshold: [0, 0.1, 0.5] });
+    sections.forEach(({ id }) => { const section = document.getElementById(id); if (section) observer.observe(section); });
     return () => observer.disconnect();
   }, [sections]);
 
-  if (sections.length === 0) return null;
-
-  return (
-    <nav aria-label="On this page" className="api-detail-toc no-print">
-      <p className="api-detail-toc__heading">On this page</p>
-      <ol className="api-detail-toc__list">
-        {sections.map(({ id, label }) => (
-          <li key={id} className="api-detail-toc__item">
-            <a
-              href={`#${id}`}
-              aria-current={activeId === id ? "location" : undefined}
-              className={activeId === id ? "api-detail-toc__link api-detail-toc__link--active" : "api-detail-toc__link"}
-            >
-              {label}
-            </a>
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
+  if (!sections.length) return null;
+  const jumpToSection = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
+    event.preventDefault();
+    const section = document.getElementById(id);
+    if (!section) return;
+    window.history.replaceState(null, "", `#${id}`);
+    if (typeof section.scrollIntoView === "function") {
+      section.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+    }
+    setActiveId(id);
+    // Move focus to the target heading so keyboard and screen-reader users
+    // land on the referenced section (deterministic in-page navigation).
+    section.setAttribute("tabindex", "-1");
+    section.focus();
+  };
+  const links = <ol className="api-detail-toc__list">{sections.map(({ id, label }) => {
+    const isActive = activeId === id;
+    return <li key={id} className="api-detail-toc__item"><a href={`#${id}`} aria-current={isActive ? "location" : undefined} className={isActive ? "api-detail-toc__link api-detail-toc__link--active" : "api-detail-toc__link"} style={{ transition: prefersReducedMotion ? "none" : "color 200ms ease" }} onClick={(event) => jumpToSection(event, id)}>{label}</a></li>;
+  })}</ol>;
+  if (isCompact) return <details className="api-detail-toc api-detail-toc--compact no-print"><summary className="api-detail-toc__heading">On this page</summary>{links}</details>;
+  return <nav aria-label="On this page" className="api-detail-toc no-print"><p className="api-detail-toc__heading">On this page</p>{links}</nav>;
 }
+
+export { ApiDetailStickyTOC as StickyToc };

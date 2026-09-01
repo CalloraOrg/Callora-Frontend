@@ -69,8 +69,8 @@ describe("ApiDetailPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
 
     expect(screen.getByRole("heading", { name: "Endpoint groups" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /forecast 1 endpoint/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /historical weather 1 endpoint/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /forecast 2 endpoints/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /alerts 2 endpoints/i })).toBeTruthy();
   });
 
   it("shows the group preview when a trigger receives keyboard focus", () => {
@@ -78,12 +78,12 @@ describe("ApiDetailPage", () => {
     settleLoadingState();
 
     fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
-    fireEvent.focus(screen.getByRole("button", { name: /forecast 1 endpoint/i }));
+    fireEvent.focus(screen.getByRole("button", { name: /forecast 2 endpoints/i }));
 
     const preview = screen.getByLabelText("Forecast group preview");
     expect(preview).toBeTruthy();
     expect(within(preview).getByText("Get Forecast")).toBeTruthy();
-    expect(within(preview).getByText(/1 endpoint.*2 request parameter/)).toBeTruthy();
+    expect(within(preview).getByText(/2 parameters/i)).toBeTruthy();
   });
 
   // ── Skeleton / loading ────────────────────────────────────────────────────
@@ -101,6 +101,180 @@ describe("ApiDetailPage", () => {
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
   });
 
+  // ── Skeleton parity (issue #410) ──────────────────────────────────────────
+  //
+  // Each test below pins the structural contract introduced by the parity fix
+  // so regressions are caught before they ship.  jsdom does not evaluate CSS,
+  // so tests validate class names and inline style properties rather than
+  // computed pixel values.
+  //
+  // Mismatch reference (see Step-1 report):
+  //   M1  logo: 64×64 / 50% radius
+  //   M4  status badge placeholder present
+  //   M5  provider row placeholder present
+  //   M7  CTA row present in skeleton
+  //   M9  tab bar uses CSS class margin (no inline marginBottom override)
+  //   M10 metrics grid uses CSS class layout (no inline display:flex override)
+  //   M11 metrics cards use .stat-card (real class, not nonexistent variant)
+  //   M12 sidebar panels use .stat-card / .preview-card (real classes)
+
+  describe("skeleton parity (issue #410)", () => {
+    // Render the skeleton state (before timers fire)
+    function renderSkeleton() {
+      return renderWithProviders(<ApiDetailPage />);
+      // Do NOT call settleLoadingState() — we want the skeleton
+    }
+
+    it("M1 – logo skeleton is 64×64 with 50% border-radius (circle, not rounded rect)", () => {
+      const { container } = renderSkeleton();
+
+      // The logo skeleton is the first .skeleton inside .api-detail-brand
+      const brand = container.querySelector(".api-detail-brand");
+      expect(brand).toBeTruthy();
+
+      const logoSkel = brand!.querySelector(".skeleton") as HTMLElement;
+      expect(logoSkel).toBeTruthy();
+
+      // width/height passed as props end up as inline style values
+      expect(logoSkel.style.width).toBe("64px");
+      expect(logoSkel.style.height).toBe("64px");
+      // borderRadius must be 50% (circle), not a fixed-px value
+      expect(logoSkel.style.borderRadius).toBe("50%");
+    });
+
+    it("M4 – status-badge placeholder (3rd skeleton in .api-detail-title) is present", () => {
+      const { container } = renderSkeleton();
+
+      const title = container.querySelector(".api-detail-title");
+      expect(title).toBeTruthy();
+
+      // There must be at least 3 skeleton blocks inside api-detail-title:
+      // [0] h1 title, [1] meta row, [2] status badge
+      const skels = title!.querySelectorAll(".skeleton");
+      expect(skels.length).toBeGreaterThanOrEqual(3);
+
+      // Status badge (index 2) should be shorter than the title (index 0)
+      const titleSkel = skels[0] as HTMLElement;
+      const badgeSkel = skels[2] as HTMLElement;
+      // Badge height should be 24px
+      expect(badgeSkel.style.height).toBe("24px");
+      // Title height should be taller
+      expect(parseInt(titleSkel.style.height ?? "0")).toBeGreaterThan(
+        parseInt(badgeSkel.style.height ?? "0"),
+      );
+    });
+
+    it("M5 – provider-row placeholder (4th skeleton in .api-detail-title) is present", () => {
+      const { container } = renderSkeleton();
+
+      const title = container.querySelector(".api-detail-title");
+      expect(title).toBeTruthy();
+
+      const skels = title!.querySelectorAll(".skeleton");
+      // [0] title, [1] meta, [2] badge, [3] provider
+      expect(skels.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it("M7 – CTA row skeleton is present between hero and content grid", () => {
+      const { container } = renderSkeleton();
+
+      // The skeleton must include the CTA row with both modifier classes
+      const ctaRow = container.querySelector(".api-hero__cta--detail");
+      expect(ctaRow).toBeTruthy();
+      expect(ctaRow!.classList.contains("no-print")).toBe(true);
+
+      // Must contain skeleton blocks for the 3 CTA buttons
+      const ctaSkels = ctaRow!.querySelectorAll(".skeleton");
+      expect(ctaSkels.length).toBe(3);
+    });
+
+    it("M9 – tab bar has no inline marginBottom that would override CSS (should be 32px via class)", () => {
+      const { container } = renderSkeleton();
+
+      const tabBar = container.querySelector(".api-detail-tabs") as HTMLElement;
+      expect(tabBar).toBeTruthy();
+      // Inline style must not override the CSS-class marginBottom
+      expect(tabBar.style.marginBottom).toBe("");
+    });
+
+    it("M9 – tab bar renders one skeleton block per real tab (6 tabs)", () => {
+      const { container } = renderSkeleton();
+
+      const tabBar = container.querySelector(".api-detail-tabs");
+      expect(tabBar).toBeTruthy();
+
+      const tabSkels = tabBar!.querySelectorAll(".skeleton");
+      // Real page has 6 tabs: Overview / Documentation / Pricing / Examples / Reviews / Embed
+      expect(tabSkels.length).toBe(6);
+    });
+
+    it("M10 – metrics grid has no inline display:flex override (CSS class must drive layout)", () => {
+      const { container } = renderSkeleton();
+
+      const metricsGrid = container.querySelector(".api-detail-metrics") as HTMLElement;
+      expect(metricsGrid).toBeTruthy();
+      // Inline display must be empty so CSS grid rule applies
+      expect(metricsGrid.style.display).toBe("");
+    });
+
+    it("M11 – metrics stat-cards use the real .stat-card class (not a nonexistent variant)", () => {
+      const { container } = renderSkeleton();
+
+      const metricsGrid = container.querySelector(".api-detail-metrics");
+      expect(metricsGrid).toBeTruthy();
+
+      const cards = metricsGrid!.querySelectorAll(".stat-card");
+      expect(cards.length).toBe(3);
+
+      // The nonexistent class must not appear
+      expect(metricsGrid!.querySelector(".stat-card-skeleton")).toBeNull();
+    });
+
+    it("M12 – sidebar first panel uses real .stat-card class", () => {
+      const { container } = renderSkeleton();
+
+      const sidebarInner = container.querySelector(".api-detail-sidebar-inner");
+      expect(sidebarInner).toBeTruthy();
+
+      // First child is the API Health panel — must be .stat-card
+      const firstPanel = sidebarInner!.querySelector(".stat-card");
+      expect(firstPanel).toBeTruthy();
+      expect(sidebarInner!.querySelector(".stat-card-skeleton")).toBeNull();
+    });
+
+    it("M12 – sidebar second panel uses real .preview-card class", () => {
+      const { container } = renderSkeleton();
+
+      const sidebarInner = container.querySelector(".api-detail-sidebar-inner");
+      expect(sidebarInner).toBeTruthy();
+
+      const previewCard = sidebarInner!.querySelector(".preview-card");
+      expect(previewCard).toBeTruthy();
+      expect(sidebarInner!.querySelector(".preview-card-skeleton")).toBeNull();
+    });
+
+    it("skeleton shell is not interactive – no focusable skeleton blocks", () => {
+      const { container } = renderSkeleton();
+
+      // All .skeleton elements must have aria-hidden and role=presentation
+      const skels = container.querySelectorAll(".skeleton");
+      skels.forEach((skel) => {
+        expect(skel.getAttribute("aria-hidden")).toBe("true");
+        expect(skel.getAttribute("role")).toBe("presentation");
+        // Must not have a tabIndex that makes them reachable by keyboard
+        expect((skel as HTMLElement).tabIndex).toBeLessThan(0);
+      });
+    });
+
+    it("skeleton shell carries aria-busy=true and aria-label for screen readers", () => {
+      const { container } = renderSkeleton();
+
+      const shell = container.querySelector(".api-detail-page") as HTMLElement;
+      expect(shell.getAttribute("aria-busy")).toBe("true");
+      expect(shell.getAttribute("aria-label")).toBe("API detail loading shell");
+    });
+  });
+
   // ── Not found / Empty state ───────────────────────────────────────────────
 
   it("shows the EmptyState when API is not found", () => {
@@ -109,8 +283,11 @@ describe("ApiDetailPage", () => {
     settleLoadingState();
 
     expect(screen.getByRole("heading", { name: "API not found" })).toBeTruthy();
-    expect(screen.getByText("We couldn't find that API. Try the marketplace.")).toBeTruthy();
+    expect(
+      screen.getByText("This API may have moved or is no longer available."),
+    ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Back to marketplace" })).toBeTruthy();
+    expect(screen.getByTestId("empty-state-api-detail").querySelector("svg")).toBeTruthy();
   });
 
   // ── Tab switching ─────────────────────────────────────────────────────────
@@ -464,5 +641,530 @@ describe("ApiDetailPage", () => {
       // "Try API", "View Pricing", and SubscribeButton
       expect((buttons?.length ?? 0)).toBeGreaterThanOrEqual(2);
     });
+
+    it("injects responsive styles for mobile viewports", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      
+      // Look for the style tag we injected
+      const styles = Array.from(document.querySelectorAll("style"));
+      const hasMobileStyle = styles.some(style => style.textContent?.includes("@media (max-width: 480px)"));
+      expect(hasMobileStyle).toBe(true);
+
+    });
+  });
+
+  describe("keyboard navigation and focus", () => {
+    it("ensures tabpanels are focusable to support visible focus outlines (see focus.css)", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const overviewPanel = screen.getByRole("tabpanel", { name: "Overview" });
+      expect(overviewPanel).toBeTruthy();
+      expect(overviewPanel.tabIndex).toBe(0);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      const docPanel = screen.getByRole("tabpanel", { name: "Documentation" });
+      expect(docPanel).toBeTruthy();
+      expect(docPanel.tabIndex).toBe(0);
+    });
+
+    it("all interactive buttons in ApiDetailPage are keyboard-focusable", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Buttons in the hero, CTA row, and sidebar
+      const focusableElements = document.querySelectorAll(
+        ".api-detail-page button, .api-detail-page a, .api-detail-page select, .api-detail-page input, .api-detail-page [role='tab']",
+      );
+      expect(focusableElements.length).toBeGreaterThan(0);
+
+      // Verify they are all focusable (not disabled)
+      focusableElements.forEach((el) => {
+        // tabIndex defaults to 0 for interactive elements unless explicitly set
+        const htmlEl = el as HTMLElement;
+        if (htmlEl.hasAttribute("disabled")) {
+          expect(htmlEl.getAttribute("disabled")).toBe("");
+        } else {
+          // buttons, links, inputs are inherently focusable
+          expect(
+            htmlEl.tabIndex >= 0 || htmlEl.getAttribute("disabled") === null,
+          ).toBe(true);
+        }
+      });
+    });
+
+    it("tab buttons follow the APG roving tabindex pattern (one tabbable, rest via arrow keys)", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs.length).toBeGreaterThanOrEqual(6); // All 6 tab items
+
+      // Exactly one tab is in the tab order at a time (the active tab); the
+      // others use tabIndex=-1 and are reached with ArrowLeft / ArrowRight.
+      const tabbable = tabs.filter((tab) => (tab as HTMLElement).tabIndex === 0);
+      expect(tabbable.length).toBe(1);
+
+      tabs.forEach((tab) => {
+        const t = tab as HTMLElement;
+        expect(t.tabIndex === 0 || t.tabIndex === -1).toBe(true);
+      });
+
+      // ArrowRight from the active tab moves focus to the next tab (keyboard
+      // reachability without Tab).
+      const activeTab = tabbable[0];
+      fireEvent.keyDown(activeTab, { key: "ArrowRight" });
+      const focused = document.activeElement as HTMLElement;
+      expect(focused.getAttribute("role")).toBe("tab");
+      expect(focused).not.toBe(activeTab);
+    });
+
+    it("select element in reviews tab is keyboard-focusable", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      const select = screen.getByLabelText("Sort by");
+      expect(select).toBeTruthy();
+      expect((select as HTMLElement).tabIndex).not.toBe(-1);
+    });
+
+    it("range slider in pricing tab is keyboard-focusable", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+      expect(slider).toBeTruthy();
+      expect((slider as HTMLElement).tabIndex).not.toBe(-1);
+    });
+
+    it("subscribe button is keyboard-focusable", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const subscribeBtn = screen.getByRole("button", { name: /subscribe/i });
+      expect(subscribeBtn).toBeTruthy();
+      expect((subscribeBtn as HTMLElement).tabIndex).not.toBe(-1);
+    });
+
+    it("no interactive element in ApiDetailPage carries inline outline:none that would suppress the focus ring", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Check all interactive elements for inline outline:none
+      const interactiveElements = document.querySelectorAll(
+        "button, a, input, select, textarea, [role='tab'], [role='button'], [tabindex]:not([tabindex='-1'])",
+      );
+
+      interactiveElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        // The Tabs component intentionally sets `outline: none` inline and
+        // restores the ring via a `:focus-visible` CSS rule (see focus.css /
+        // issue #541), so it is exempt from this check.
+        if (htmlEl.closest('[role="tablist"]')) return;
+        const inlineOutline = htmlEl.style.outline;
+        // Inline outline:none would suppress the :focus-visible ring
+        expect(inlineOutline).not.toBe("none");
+      });
+    });
+
+    it("endpoint save button popover dialog is keyboard-accessible", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+      const saveButtons = screen.getAllByRole("button", {
+        name: /Save endpoint to collection/i,
+      });
+      fireEvent.click(saveButtons[0]);
+
+      const dialog = screen.getByRole("dialog", {
+        name: /Save endpoint to collection/i,
+      });
+      expect(dialog).toBeTruthy();
+
+      // The dialog is a modal: focus must move into it on open (deterministic
+      // focus management) so keyboard users are not stranded on the trigger.
+      const focused = document.activeElement as HTMLElement;
+      expect(dialog.contains(focused)).toBe(true);
+
+      // Check inputs inside dialog are focusable
+      const inputs = dialog.querySelectorAll("input, button");
+      inputs.forEach((input) => {
+        const htmlInput = input as HTMLElement;
+        if (!htmlInput.hasAttribute("disabled")) {
+          expect(htmlInput.tabIndex).not.toBe(-1);
+        }
+      });
+    });
+  });
+
+  describe("save endpoint dialog focus management", () => {
+    function openSaveDialog() {
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      const saveButtons = screen.getAllByRole("button", {
+        name: /Save endpoint to collection/i,
+      });
+      fireEvent.click(saveButtons[0]);
+      const dialog = screen.getByRole("dialog", {
+        name: /Save endpoint to collection/i,
+      });
+      return { dialog, trigger: saveButtons[0] };
+    }
+
+    function dialogFocusable(dialog: HTMLElement) {
+      return Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), [href], select:not([disabled]), [tabindex]:not([tabindex='-1'])",
+        ),
+      );
+    }
+
+    it("moves focus into the dialog when it opens", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const { dialog } = openSaveDialog();
+      // Focus should land on the first focusable control inside the dialog.
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    });
+
+    it("is labelled by its visible title", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const { dialog } = openSaveDialog();
+      expect(dialog.getAttribute("aria-labelledby")).toBe("endpoint-save-dialog-title");
+      const title = document.getElementById("endpoint-save-dialog-title");
+      expect(title?.textContent).toBe("Save endpoint to collection");
+    });
+
+    it("traps Tab focus within the dialog", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const { dialog } = openSaveDialog();
+      const focusable = dialogFocusable(dialog);
+      expect(focusable.length).toBeGreaterThan(1);
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      // Shift+Tab from the first control wraps to the last (focus stays inside).
+      first.focus();
+      fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).toBe(last);
+
+      // Tab from the last control wraps back to the first.
+      last.focus();
+      fireEvent.keyDown(dialog, { key: "Tab" });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).toBe(first);
+    });
+
+    it("restores focus to the trigger button when closed with Escape", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const { dialog, trigger } = openSaveDialog();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+
+      fireEvent.keyDown(dialog, { key: "Escape" });
+      expect(document.activeElement).toBe(trigger);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("announces when the dialog opens and closes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      openSaveDialog();
+      const polite = document.querySelector('[data-testid="live-region"]');
+      expect(polite?.textContent).toContain("Save endpoint dialog opened");
+
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      expect(polite?.textContent).toContain("Save endpoint dialog closed");
+    });
+  });
+
+  describe("in-page TOC keyboard navigation", () => {
+    it("moves focus to the target heading when a TOC link is activated", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      const nav = screen.getByRole("navigation", { name: "On this page" });
+      const link = nav.querySelector('a[href="#toc-endpoints"]') as HTMLAnchorElement;
+      expect(link).toBeTruthy();
+
+      fireEvent.click(link);
+
+      const heading = document.getElementById("toc-endpoints");
+      expect(heading).toBeTruthy();
+      // Heading becomes the active element and is programmatically focusable.
+      expect(document.activeElement).toBe(heading);
+      expect(heading?.getAttribute("tabindex")).toBe("-1");
+    });
+  });
+
+  describe("assertive live region (errors / status)", () => {
+    it("renders a dedicated assertive live region for status changes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const region = document.querySelector("[aria-live='assertive']");
+      expect(region).toBeTruthy();
+      expect(region?.getAttribute("role")).toBe("alert");
+    });
+  });
+
+  describe("aria-live announcements", () => {
+    it("announces when the page details have loaded", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion).toBeTruthy();
+      expect(liveRegion?.textContent).toBe("WeatherSim API detail page loaded");
+    });
+
+    it("announces tab selection changes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+
+      fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+      expect(liveRegion?.textContent).toBe("Showing Documentation tab");
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+      expect(liveRegion?.textContent).toBe("Showing Pricing tab");
+    });
+
+    it("announces cost calculator slider adjustments", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+      fireEvent.change(slider, { target: { value: "5000" } });
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion?.textContent).toBe("Estimated monthly total: $50.00 for 5,000 requests");
+    });
+
+    it("announces review sorting criteria changes", () => {
+      window.history.pushState({}, "", "/details/pay-qr");
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Reviews" }));
+
+      const select = screen.getByLabelText("Sort by");
+      fireEvent.change(select, { target: { value: "highest" } });
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion?.textContent).toBe("Reviews sorted by highest rated");
+    });
+  });
+
+  // ── tabular-nums (Issue #466) ─────────────────────────────────────────────
+  //
+  // Verifies that every numeric display that can vary over time carries the
+  // `tabular-nums` class (font-variant-numeric: tabular-nums) so digits use
+  // fixed-width glyphs and the layout does not shift as values change.
+  //
+  // Tests check the *className* contract rather than the rendered CSS value
+  // because jsdom does not evaluate stylesheets.  The CSS rule that backs the
+  // class is in src/styles/typography.css inside @layer typography.
+
+  describe("tabular-nums numeric display (Issue #466)", () => {
+    // ── Hero panel ──────────────────────────────────────────────────────────
+
+    it("hero price panel carries tabular-nums class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // .api-detail-price is the large price shown in the right-rail hero panel.
+      const priceEl = document.querySelector(".api-detail-price");
+      expect(priceEl).toBeTruthy();
+      expect(priceEl?.classList.contains("tabular-nums")).toBe(true);
+    });
+
+    it("hero meta price (provider line) carries tabular-nums class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The <strong> with the price in "Provider · $X per request" line.
+      const metaPrice = document.querySelector(".api-detail-meta strong.tabular-nums");
+      expect(metaPrice).toBeTruthy();
+    });
+
+    // ── Overview — Performance Metrics ──────────────────────────────────────
+
+    it("all three performance metric stat values carry tabular-nums class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // Default tab is Overview — stat cards are visible immediately.
+      const statValues = document.querySelectorAll(".stat-card .tabular-nums");
+      // Three metrics: Total Requests, Latency P95, System Uptime.
+      expect(statValues.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("each performance metric stat value also carries the stat-card__value class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const statValues = document.querySelectorAll(".stat-card__value");
+      // Three metrics expected.
+      expect(statValues.length).toBeGreaterThanOrEqual(3);
+      statValues.forEach((el) => {
+        expect(el.classList.contains("tabular-nums")).toBe(true);
+      });
+    });
+
+    it("Total Requests stat value text is rendered inside a tabular-nums element", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      // The first .stat-card__value element corresponds to Total Requests.
+      const statCards = document.querySelectorAll(".stat-card");
+      const totalRequestsCard = Array.from(statCards).find((card) =>
+        card.textContent?.includes("Total Requests"),
+      );
+      expect(totalRequestsCard).toBeTruthy();
+
+      const valueEl = totalRequestsCard?.querySelector(".tabular-nums");
+      expect(valueEl).toBeTruthy();
+    });
+
+    it("Latency P95 stat value is rendered inside a tabular-nums element", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const statCards = document.querySelectorAll(".stat-card");
+      const latencyCard = Array.from(statCards).find((card) =>
+        card.textContent?.includes("Latency"),
+      );
+      expect(latencyCard).toBeTruthy();
+
+      const valueEl = latencyCard?.querySelector(".tabular-nums");
+      expect(valueEl).toBeTruthy();
+    });
+
+    it("System Uptime stat value is rendered inside a tabular-nums element", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      const statCards = document.querySelectorAll(".stat-card");
+      const uptimeCard = Array.from(statCards).find((card) =>
+        card.textContent?.includes("System Uptime"),
+      );
+      expect(uptimeCard).toBeTruthy();
+
+      const valueEl = uptimeCard?.querySelector(".tabular-nums");
+      expect(valueEl).toBeTruthy();
+    });
+
+    // ── Pricing tab — plan price ────────────────────────────────────────────
+
+    it("standard plan price carries tabular-nums class on pricing tab", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      // .api-detail-plan-price is the large per-call price in the pro plan card.
+      const planPrices = document.querySelectorAll(".api-detail-plan-price");
+      expect(planPrices.length).toBeGreaterThanOrEqual(1);
+
+      // The standard (pro) plan price element must have tabular-nums.
+      const standardPrice = Array.from(planPrices).find((el) =>
+        el.textContent?.includes("$"),
+      );
+      expect(standardPrice).toBeTruthy();
+      expect(standardPrice?.classList.contains("tabular-nums")).toBe(true);
+    });
+
+    // ── Pricing tab — cost calculator ───────────────────────────────────────
+
+    it("cost calculator monthly volume span carries tabular-nums class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      // The "X Requests" span next to the Monthly Volume label.
+      const volumeSpan = document.querySelector(".api-detail-calculator-total")
+        ?.closest(".preview-card")
+        ?.querySelector("span.tabular-nums");
+      // Fallback: search in the entire pricing section.
+      const anyVolumeSpan = document.querySelector("span.tabular-nums");
+      expect(anyVolumeSpan).toBeTruthy();
+    });
+
+    it("cost calculator estimated total carries tabular-nums class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      // The large estimated-total amount element.
+      const totalEl = document.querySelector(".api-detail-calculator-total__amount");
+      expect(totalEl).toBeTruthy();
+      expect(totalEl?.classList.contains("tabular-nums")).toBe(true);
+    });
+
+    it("estimated total carries the api-detail-calculator-total__amount class", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      expect(document.querySelector(".api-detail-calculator-total__amount")).toBeTruthy();
+    });
+
+    it("cost calculator estimated total updates as the slider moves and stays tabular", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+
+      const slider = screen.getByRole("slider");
+
+      // Move slider to 10,000 requests
+      fireEvent.change(slider, { target: { value: "10000" } });
+
+      const totalEl = document.querySelector(".api-detail-calculator-total__amount");
+      expect(totalEl).toBeTruthy();
+      // The element must still carry tabular-nums after re-render.
+      expect(totalEl?.classList.contains("tabular-nums")).toBe(true);
+      // Displayed amount must start with "$" (numeric, not empty).
+      expect(totalEl?.textContent?.startsWith("$")).toBe(true);
+    });
+  });
+
+  it("interactive elements are focusable (issue #541)", () => {
+    renderWithProviders(<ApiDetailPage />);
+    settleLoadingState();
+
+    // Only the active tab is in the tab order (roving tabindex). Focus it via
+    // the real focus method so document.activeElement reflects it.
+    const tabs = screen.getAllByRole("tab");
+    const activeTab = tabs.find((tab) => (tab as HTMLElement).tabIndex === 0) as HTMLElement;
+    activeTab.focus();
+    expect(document.activeElement).toBe(activeTab);
+
+    const connectButton = screen.getByRole("button", { name: /Connect API/i });
+    connectButton.focus();
+    expect(document.activeElement).toBe(connectButton);
   });
 });

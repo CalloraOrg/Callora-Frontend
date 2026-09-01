@@ -1,0 +1,68 @@
+.api-detail-toc {
+  align-self: start;
+  position: sticky;
+  top: 1.5rem;
+  z-index: 1;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.api-detail-toc__heading {
+  margin: 0 0 0.75rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.api-detail-toc__list {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.api-detail-toc__link {
+  display: block;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.375rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.api-detail-toc__link:hover,
+.api-detail-toc__link:focus-visible {
+  color: var(--text);
+  background: var(--surface-soft);
+}
+
+.api-detail-toc__link--active {
+  color: var(--accent);
+  background: var(--surface-soft);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .api-detail-toc__link {
+    transition: color var(--transition-speed) ease, background var(--transition-speed) ease;
+  }
+}
+
+@media (max-width: 1023px) {
+  .api-detail-toc.api-detail-toc--compact {
+    display: block;
+    position: static;
+    width: 100%;
+    margin-block: 1rem;
+  }
+
+  .api-detail-toc--compact > summary {
+    cursor: pointer;
+  }
+
+  .api-detail-toc--compact[open] > summary {
+    margin-bottom: 0.75rem;
+  }
+}

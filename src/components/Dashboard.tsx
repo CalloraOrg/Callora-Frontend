@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import Skeleton from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import UsageGauge from '../components/UsageGauge';
+import LiveRegion from '../components/LiveRegion';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { formatUsdc, formatPrice } from '../utils/format';
 import { LOADING_DELAY_MS } from '../config/constants';
 import { usePinnedApis, pinnedApisStore } from '../state/pinnedApis';
@@ -14,7 +16,11 @@ import MOCK_APIS from '../data/mockApis';
 interface DashboardProps {
   vaultBalance: number;
   walletBalance: number;
-  openDeposit: () => void;
+  /** Optional average cost per call (USDC) used for runway estimation. */
+  costPerCall?: number;
+  /** Average daily calls used for runway-to-days conversion. Defaults to 100. */
+  callsPerDay?: number;
+  openDeposit: (presetAmount?: number) => void;
 }
 
 interface ActivityItem {
@@ -23,11 +29,33 @@ interface ActivityItem {
   date: string; // ISO string
 }
 
-export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: DashboardProps) {
+/**
+ * Screen-reader copy describing the recent-activity data transition.
+ * Announced via a polite live region so loading/success/empty changes are
+ * semantically announced without stealing focus.
+ */
+export function describeActivityAnnouncement(
+  isLoading: boolean,
+  activity: ActivityItem[] | null,
+): string | undefined {
+  if (isLoading) return 'Loading recent activity.';
+  if (!activity) return undefined;
+  return activity.length === 0 ? 'No recent activity yet.' : 'Recent activity loaded.';
+}
+
+export default function Dashboard({
+  vaultBalance,
+  walletBalance,
+  costPerCall,
+  callsPerDay,
+  openDeposit,
+}: DashboardProps) {
   const navigate = useNavigate();
   const [activity, setActivity] = useState<ActivityItem[] | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
-  // Simulate data fetch with a timeout
+  // Simulate data fetch with a timeout. Under reduced motion the delay is
+  // skipped entirely so the loading skeleton is not flashed on screen.
   useEffect(() => {
     const timer = setTimeout(() => {
       // Mock data – you can replace with real API call later
@@ -37,9 +65,9 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
         { type: 'deposit', amount: 100, date: new Date(Date.now() - 2 * 86400000).toISOString() },
       ];
       setActivity(mock);
-    }, LOADING_DELAY_MS);
+    }, prefersReducedMotion ? 0 : LOADING_DELAY_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [prefersReducedMotion]);
 
   const isLoading = activity === null;
   const totalUsage = activity?.reduce((sum, item) => (item.type === 'usage' ? sum + item.amount : sum), 0) ?? 0;
@@ -69,11 +97,15 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
         used={totalUsage}
         limit={vaultBalance}
         unit="USDC"
+        costPerCall={costPerCall}
+        callsPerDay={callsPerDay}
       />
 
       {/* Quick actions */}
       <div className="dashboard-actions">
-        <button className="primary-button no-print" onClick={openDeposit}>Deposit</button>
+        <button className="primary-button no-print" onClick={() => openDeposit()}>Deposit</button>
+        <button className="secondary-button dashboard-quick-topup" onClick={() => openDeposit(50)} aria-label="Quick top-up with 50 USDC">+ $50 Top-up</button>
+        <button className="secondary-button dashboard-quick-topup" onClick={() => openDeposit(100)} aria-label="Quick top-up with 100 USDC">+ $100 Top-up</button>
         <button className="secondary-button" onClick={() => navigate('/marketplace')}>Browse APIs</button>
         <button className="secondary-button" onClick={() => navigate('/api-usage')}>View Usage</button>
       </div>
@@ -118,8 +150,12 @@ export default function Dashboard({ vaultBalance, walletBalance, openDeposit }: 
       </div>
 
       {/* Recent Activity */}
-      <div className="dashboard-activity">
+      <div className="dashboard-activity" aria-busy={isLoading}>
         <h3 className="eyebrow">Recent activity</h3>
+        <LiveRegion
+          regionId="dashboard-activity"
+          message={describeActivityAnnouncement(isLoading, activity)}
+        />
         {isLoading && (
           <div className="activity-skeletons">
             {[...Array(3)].map((_, i) => (

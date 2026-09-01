@@ -335,3 +335,168 @@ describe('no-theme-transition escape hatch', () => {
     expect(el.classList.contains('no-theme-transition')).toBe(true);
   });
 });
+
+// ── ThemeStickyBar (#583 – sticky bottom action bar) ─────────────────────────
+/**
+ * Tests for the sticky bottom action bar introduced in issue #583
+ * (GrantFox FWC26 / Stellar Wave campaign).
+ *
+ * The bar appears once the inline toggle button scrolls out of the viewport
+ * and exposes two primary theme actions: cycle theme and reset to system.
+ *
+ * We use a mocked IntersectionObserver to simulate visibility changes.
+ */
+
+let observerCallback: IntersectionObserverCallback;
+
+function buildIntersectionObserverMock() {
+  return vi.fn().mockImplementation((callback: IntersectionObserverCallback) => {
+    observerCallback = callback;
+    return {
+      observe: vi.fn(),
+      unobserve: vi.fn(),
+      disconnect: vi.fn(),
+    };
+  });
+}
+
+function triggerIntersection(isIntersecting: boolean) {
+  act(() => {
+    observerCallback([{ isIntersecting } as IntersectionObserverEntry], {} as IntersectionObserver);
+  });
+}
+
+describe('ThemeStickyBar', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'IntersectionObserver', {
+      writable: true,
+      configurable: true,
+      value: buildIntersectionObserverMock(),
+    });
+  });
+
+  it('renders the sticky bar element in the DOM', () => {
+    renderWithTheme();
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar).toBeDefined();
+  });
+
+  it('is NOT visible (missing --visible modifier) before scrolling', () => {
+    renderWithTheme();
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.classList.contains('theme-sticky-bar--visible')).toBe(false);
+  });
+
+  it('becomes visible after scrolling past the 120 px threshold', () => {
+    renderWithTheme();
+    triggerIntersection(false);
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.classList.contains('theme-sticky-bar--visible')).toBe(true);
+  });
+
+  it('hides again when user scrolls back above the threshold', () => {
+    renderWithTheme();
+
+    triggerIntersection(false);
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.classList.contains('theme-sticky-bar--visible')).toBe(true);
+
+    triggerIntersection(true);
+    expect(bar.classList.contains('theme-sticky-bar--visible')).toBe(false);
+  });
+
+  it('has aria-hidden="true" when not scrolled', () => {
+    renderWithTheme();
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('has aria-hidden="false" when scrolled past threshold', () => {
+    renderWithTheme();
+    triggerIntersection(false);
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.getAttribute('aria-hidden')).toBe('false');
+  });
+
+  it('has role="toolbar" and a descriptive aria-label', () => {
+    renderWithTheme();
+    const bar = screen.getByTestId('theme-sticky-bar');
+    expect(bar.getAttribute('role')).toBe('toolbar');
+    expect(bar.getAttribute('aria-label')).toBe('Theme controls');
+  });
+
+  it('cycle button (#theme-sticky-cycle) cycles dark → light on click', () => {
+    renderWithTheme();
+
+    triggerIntersection(false);
+
+    const cycleBtn = document.getElementById('theme-sticky-cycle');
+    expect(cycleBtn).not.toBeNull();
+
+    const headerBtn = screen.getByRole('button', { hidden: true, name: /toggle theme/i });
+    expect(headerBtn.textContent).toContain('dark');
+
+    act(() => { fireEvent.click(cycleBtn!); });
+    act(() => { vi.runAllTimers(); });
+
+    expect(headerBtn.textContent).toContain('light');
+  });
+
+  it('reset button (#theme-sticky-reset) resets theme to "system"', () => {
+    renderWithTheme();
+    triggerIntersection(false);
+
+    const resetBtn = document.getElementById('theme-sticky-reset');
+    expect(resetBtn).not.toBeNull();
+
+    act(() => { fireEvent.click(resetBtn!); });
+    act(() => { vi.runAllTimers(); });
+
+    const label = document.querySelector('.theme-toggle-label');
+    expect(label?.textContent).toBe('system');
+  });
+
+  it('reset button has aria-pressed="true" when theme is already "system"', () => {
+    renderWithTheme();
+    triggerIntersection(false);
+
+    const resetBtn = document.getElementById('theme-sticky-reset');
+    act(() => { fireEvent.click(resetBtn!); });
+    act(() => { vi.runAllTimers(); });
+
+    expect(resetBtn!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('cycle button has aria-pressed="true" in dark mode', () => {
+    renderWithTheme();
+    triggerIntersection(false);
+    const cycleBtn = document.getElementById('theme-sticky-cycle');
+    expect(cycleBtn!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('cycle button carries the --primary class', () => {
+    renderWithTheme();
+    triggerIntersection(false);
+    const cycleBtn = document.getElementById('theme-sticky-cycle');
+    expect(cycleBtn!.classList.contains('theme-sticky-bar__btn--primary')).toBe(true);
+  });
+
+  it('disconnects IntersectionObserver on unmount (no memory leak)', () => {
+    const disconnectSpy = vi.fn();
+
+    Object.defineProperty(window, 'IntersectionObserver', {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockImplementation(() => ({
+        observe: vi.fn(),
+        unobserve: vi.fn(),
+        disconnect: disconnectSpy,
+      })),
+    });
+
+    const { unmount } = renderWithTheme();
+    unmount();
+
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+  });
+});

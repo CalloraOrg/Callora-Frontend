@@ -1,9 +1,26 @@
 import { render, screen, fireEvent, act, within } from "@testing-library/react";
-import ApiCard from "./ApiCard";
+import ApiCard, { ApiCardSkeleton } from "./ApiCard";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
 import type { APIItem } from "../data/mockApis";
 import { pinnedApisStore } from "../state/pinnedApis";
+
+// Mock matchMedia globally for ApiCard tests
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    })),
+  });
+}
 
 /* ── Mocks ─────────────────────────────────────────────────────────────────
    vi.mock factories are hoisted to the top of the file by Vitest, so they
@@ -30,7 +47,72 @@ vi.mock("../state/compareStore", () => ({
   },
 }));
 
+/* ── Shared fixture ─────────────────────────────────────────────────────── */
+
+const mockApi: APIItem = {
+  id: "api-1",
+  name: "Stellar Metering API",
+  description: "A mock API for testing.",
+  tags: ["weather", "forecast", "geo"],
+  pricePerRequest: 0.01,
+  provider: { name: "Acme Labs" },
+  endpoints: [{ id: "meter", url: "/api/v1/meter", method: "GET", title: "Meter" }],
+};
+
 /* ── Test suites ─────────────────────────────────────────────────────────── */
+
+describe('ApiCard Reduced Motion Accessibility', () => {
+  const mockApi = {
+    id: 'test-1',
+    name: 'Test API',
+    description: 'A test description',
+    endpoints: [{ url: '/api/v1/test' }],
+    tags: []
+  };
+
+  const setupMatchMedia = (matches: boolean) => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(query => ({
+        matches: query === '(prefers-reduced-motion: reduce)' ? matches : false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+  };
+
+  afterAll(() => {
+    Object.defineProperty(window, 'matchMedia', { writable: true, value: undefined });
+  });
+
+  it('renders standard layout without reduced motion', () => {
+    setupMatchMedia(false);
+    render(<ApiCard api={mockApi as any} />);
+    
+    const favButton = screen.getByLabelText('Add to favorites');
+    expect(favButton.style.transition).toContain('transform');
+  });
+
+  it('respects prefers-reduced-motion and provides a static outline/color fallback on hover', () => {
+    setupMatchMedia(true);
+    render(<ApiCard api={mockApi as any} />);
+    
+    const favButton = screen.getByLabelText('Add to favorites');
+    
+    expect(favButton).toBeInTheDocument();
+    
+    expect(favButton.style.transition).toContain('background 100ms');
+    expect(favButton.style.transition).not.toContain('transform');
+    
+    fireEvent.focus(favButton);
+    expect(favButton.style.outline).toContain('solid');
+  });
+});
 
 describe("ApiCard — Context Menu", () => {
   beforeEach(() => {
@@ -206,14 +288,6 @@ describe("ApiCard — Accessibility and Tag Chips", () => {
 });
 
 describe("ApiCard reduced motion", () => {
-  const mockApi: APIItem = {
-    id: "api-1",
-    name: "Stellar Metering API",
-    endpoint: "/api/v1/meter",
-    description: "A mock API for testing.",
-    tags: ["weather", "forecast", "geo"],
-    pricePerRequest: 0.01,
-  };
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -286,3 +360,192 @@ describe("ApiCard reduced motion", () => {
     window.matchMedia = origMatchMedia;
   });
 });
+
+describe("ApiCard skeleton", () => {
+  it("includes sparkline placeholder to match final card layout", () => {
+    render(<ApiCard loading />);
+    const cards = document.querySelectorAll(".api-card-skeleton");
+    expect(cards.length).toBe(1);
+    expect(screen.getByText("Loading API")).toBeTruthy();
+  });
+
+  it("renders color stripe placeholder matching final card identity stripe", () => {
+    const { container } = render(<ApiCard loading />);
+    const stripe = container.querySelector('[aria-hidden="true"]')?.closest('span');
+    expect(stripe?.style?.borderRadius).toContain("radius-lg");
+  });
+
+  it("renders action button placeholders at expected positions", () => {
+    const { container } = render(<ApiCard loading />);
+    // 4 absolute-positioned button placeholders (bookmark, pin, favorite, compare)
+    const placeholders = container.querySelectorAll('.skeleton--stellar');
+    // We should have many skeletons; the absolute ones are at z-index 1
+    const absoluteWrappers = container.querySelectorAll('[style*="z-index: 1"]');
+    expect(absoluteWrappers.length).toBe(4);
+  });
+
+  it("renders only one sparkline section (no duplicate)", () => {
+    const { container } = render(<ApiCard loading />);
+    // There should be exactly one sparkline section with width 90
+    const sparklines = container.querySelectorAll('.skeleton--stellar');
+    const width90 = Array.from(sparklines).filter(
+      (el) => (el as HTMLElement).style.width === '90px'
+    );
+    expect(width90.length).toBe(1);
+  });
+
+  it("renders WhyApi placeholder in comfortable mode", () => {
+    const { container } = render(<ApiCard loading />);
+    // In comfortable mode there should be skeleton lines for WhyApi (height 14px)
+    const height14 = container.querySelectorAll('.skeleton--stellar[style*="height: 14px"]');
+    // Description lines + WhyApi lines + stat labels
+    expect(height14.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("hides WhyApi placeholder in compact mode", () => {
+    const { container } = render(<ApiCard loading density="compact" />);
+    // In compact mode, WhyApi is not rendered — fewer total skeletons than comfortable
+    const skeletons = container.querySelectorAll(".skeleton--stellar");
+    // Compact has ~21 skeletons vs comfortable ~26
+    expect(skeletons.length).toBeLessThan(24);
+  });
+
+  it("applies compact class when density is compact", () => {
+    render(<ApiCard loading density="compact" />);
+    const card = document.querySelector('.api-card-skeleton');
+    expect(card?.className).toContain('api-card--compact');
+  });
+
+  it("does not apply compact class in comfortable mode", () => {
+    render(<ApiCard loading density="comfortable" />);
+    const card = document.querySelector('.api-card-skeleton');
+    expect(card?.className).not.toContain('api-card--compact');
+  });
+
+  it("uses tone stellar for themed skeleton appearance", () => {
+    const { container } = render(<ApiCard loading />);
+    const skeletons = container.querySelectorAll(".skeleton--stellar");
+    expect(skeletons.length).toBeGreaterThan(0);
+  });
+});
+
+describe("ApiCard responsiveness", () => {
+  const mockApi: APIItem = {
+    id: "api-resp",
+    name: "Responsive API",
+    endpoints: ["/api/resp"],
+    description: "Responsive test API.",
+    tags: ["test"],
+    pricePerRequest: 0,
+    provider: {
+      name: "",
+      url: undefined,
+      avatar: undefined
+    }
+  };
+
+  function mockViewportWidth(isMobile: boolean) {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => {
+      if (query === "(max-width: 768px)") {
+        return {
+          matches: isMobile,
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(() => false),
+        };
+      }
+      return {
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(() => false),
+      };
+    });
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("applies compact mode styling on narrow viewports", () => {
+    mockViewportWidth(true); // Simulate mobile
+    render(<ApiCard api={mockApi} density="comfortable" />);
+    
+    // Even if density="comfortable", the card should have the compact class on narrow viewports
+    const card = screen.getByRole("button", { name: /View details for Responsive API/i });
+    expect(card.className).toContain("api-card--compact");
+  });
+
+  it("retains comfortable mode styling on wide viewports by default", () => {
+    mockViewportWidth(false); // Simulate desktop
+    render(<ApiCard api={mockApi} density="comfortable" />);
+     
+    const card = screen.getByRole("button", { name: /View details for Responsive API/i });
+    expect(card.className).not.toContain("api-card--compact");
+  });
+});
+
+describe("ApiCard status badges and color-blind patterns", () => {
+  it("renders the operational status badge with solid baseline pattern", () => {
+    const apiWithStatus: APIItem = {
+      id: "api-1",
+      name: "Stellar Metering API",
+      description: "A mock API for testing.",
+      tags: ["weather", "forecast", "geo"],
+      pricePerRequest: 0.01,
+      provider: { name: "Acme Labs" },
+      endpoints: [{ id: "meter", url: "/api/v1/meter", method: "GET", title: "Meter" }],
+      status: "operational",
+    };
+    render(<ApiCard api={apiWithStatus} />);
+    const badge = screen.getByRole("img", { name: "Operational" });
+    expect(badge).toBeTruthy();
+    expect(badge.getAttribute("data-pattern")).toBe("baseline");
+    expect(badge.className).toContain("sb-pattern-operational");
+  });
+
+  it("renders the degraded status badge with opposite-stripes pattern", () => {
+    const apiWithStatus: APIItem = {
+      id: "api-1",
+      name: "Stellar Metering API",
+      description: "A mock API for testing.",
+      tags: ["weather", "forecast", "geo"],
+      pricePerRequest: 0.01,
+      provider: { name: "Acme Labs" },
+      endpoints: [{ id: "meter", url: "/api/v1/meter", method: "GET", title: "Meter" }],
+      status: "degraded",
+    };
+    render(<ApiCard api={apiWithStatus} />);
+    const badge = screen.getByRole("img", { name: "Degraded" });
+    expect(badge).toBeTruthy();
+    expect(badge.getAttribute("data-pattern")).toBe("opposite-stripes");
+    expect(badge.className).toContain("sb-pattern-degraded");
+  });
+
+  it("renders the maintenance status badge with dots pattern", () => {
+    const apiWithStatus: APIItem = {
+      id: "api-1",
+      name: "Stellar Metering API",
+      description: "A mock API for testing.",
+      tags: ["weather", "forecast", "geo"],
+      pricePerRequest: 0.01,
+      provider: { name: "Acme Labs" },
+      endpoints: [{ id: "meter", url: "/api/v1/meter", method: "GET", title: "Meter" }],
+      status: "maintenance",
+    };
+    render(<ApiCard api={apiWithStatus} />);
+    const badge = screen.getByRole("img", { name: "Maintenance" });
+    expect(badge).toBeTruthy();
+    expect(badge.getAttribute("data-pattern")).toBe("dots");
+    expect(badge.className).toContain("sb-pattern-maintenance");
+  });
+});
+

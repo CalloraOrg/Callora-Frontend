@@ -2,16 +2,17 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { AccountProvider } from "./hooks/useAccountContext";
 import RouteProgressBar from "./components/RouteProgressBar";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { ToastProvider } from "./components/Toast";
 import "./index.css";
-import "./styles/tokens.css";
-import "./styles/typography.css";
-import "./styles/patterns.css";
-import "./styles/typography.css";
+import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
+import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
+import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
+import LatencyChart from "./pages/LatencyChart";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
@@ -27,10 +28,12 @@ async function renderRoute() {
     <React.StrictMode>
       <ThemeProvider>
         <CollectionsProvider>
-          <BrowserRouter>
-            <RouteProgressBar />
-            <ToastProvider>{children}</ToastProvider>
-          </BrowserRouter>
+          <AccountProvider>
+            <BrowserRouter>
+              <RouteProgressBar />
+              <ToastProvider>{children}</ToastProvider>
+            </BrowserRouter>
+          </AccountProvider>
         </CollectionsProvider>
       </ThemeProvider>
     </React.StrictMode>
@@ -72,16 +75,23 @@ async function renderRoute() {
     return;
   }
 
+  if (pathname.startsWith("/latency-chart")) {
+    root.render(wrap(<LatencyChart />));
+    return;
+  }
+
   // Default: render the existing App
   root.render(
     <React.StrictMode>
       <BrowserRouter>
         <ThemeProvider>
           <CollectionsProvider>
-            <RouteProgressBar />
-            <ToastProvider>
-              <App />
-            </ToastProvider>
+            <AccountProvider>
+              <RouteProgressBar />
+              <ToastProvider>
+                <App />
+              </ToastProvider>
+            </AccountProvider>
           </CollectionsProvider>
         </ThemeProvider>
       </BrowserRouter>

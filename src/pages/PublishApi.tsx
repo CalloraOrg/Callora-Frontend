@@ -1,8 +1,13 @@
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import OpenAPIImport from '../components/OpenAPIImport';
 import type { ParsedEndpoint } from '../components/OpenAPIImport';
 import FormField from '../components/FormField';
 import type { FieldStatus } from '../components/FormField';
+import useDocumentTitle from '../hooks/useDocumentTitle';
+import { useFormPersistence } from '../hooks/useFormPersistence';
+import { useSessionExpiry } from '../hooks/useSessionExpiry';
+import { useBeforeUnload } from '../hooks/useBeforeUnload';
+import SessionExpiryBanner from '../components/SessionExpiryBanner';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,6 +31,8 @@ type ValidatedFields = Exclude<keyof PublishFormState, 'description' | 'endpoint
 type TouchedState = Record<ValidatedFields, boolean>;
 
 type ValidationErrors = Partial<Record<ValidatedFields, string>>;
+
+const PUBLISH_FORM_DRAFT_KEY = 'callora:publish-form:draft';
 
 const INITIAL_FORM: PublishFormState = {
   apiName: '',
@@ -132,12 +139,30 @@ function fieldStatus(
  * appear only after a field is blurred or the form is submitted.
  */
 export default function PublishApi() {
+  useDocumentTitle('Publish API');
   const [form, setForm] = useState<PublishFormState>(INITIAL_FORM);
   const [touched, setTouched] = useState<TouchedState>(INITIAL_TOUCHED);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const importSectionId = useId();
+
+  // ── Session expiry & form persistence ────────────────────────────────
+  const { clearDraft, wasRestored } = useFormPersistence(
+    PUBLISH_FORM_DRAFT_KEY,
+    form as unknown as Record<string, unknown>,
+    setForm as unknown as React.Dispatch<React.SetStateAction<Record<string, unknown>>>,
+    { restoreOnMount: true },
+  );
+  const { isExpired, dismiss: dismissExpiry, countdown, signalExpiry } = useSessionExpiry();
+
+  const hasUnsavedChanges = useMemo(() => {
+    return form.apiName !== '' || form.baseUrl !== '' || form.category !== '' ||
+           form.description !== '' || form.pricePerCall !== '' ||
+           form.endpoints.length > 0;
+  }, [form]);
+
+  useBeforeUnload(hasUnsavedChanges);
 
   const errors = validateForm(form);
   const isFormValid = Object.keys(errors).length === 0;
@@ -190,6 +215,7 @@ export default function PublishApi() {
       setTouched({ apiName: true, baseUrl: true, category: true, pricePerCall: true });
       if (!isFormValid) return;
       setSubmitted(true);
+      clearDraft();
     },
     [isFormValid],
   );
@@ -218,6 +244,7 @@ export default function PublishApi() {
                 setSubmitAttempted(false);
                 setSubmitted(false);
                 setImportOpen(false);
+                clearDraft();
               }}
             >
               Publish another API
@@ -230,9 +257,24 @@ export default function PublishApi() {
 
   // ── Main form ──────────────────────────────────────────────────────────
 
+  // ── Simulate a 401 for demo purposes ─────────────────────────────────
+  const handleSimulateExpiry = useCallback(() => {
+    signalExpiry();
+  }, [signalExpiry]);
+
   return (
     <>
       <style>{STYLES}</style>
+      <SessionExpiryBanner
+        isVisible={isExpired}
+        countdown={countdown}
+        onDismiss={dismissExpiry}
+      />
+      {wasRestored && !isExpired && (
+        <div className="pa-draft-restored" role="status" aria-live="polite">
+          Draft restored from a previous session.
+        </div>
+      )}
       <div className="pa-shell">
         <header className="pa-page-header">
           <p className="pa-eyebrow">Developer tools</p>
@@ -276,6 +318,38 @@ export default function PublishApi() {
             </div>
           )}
         </section>
+
+        {/* ── Draft restored notice (with dismiss) ─────────────── */}
+        {wasRestored && !isExpired && (
+          <div className="pa-draft-banner surface">
+            <span aria-hidden="true">💾</span>
+            <span>Your previous draft has been restored. Your form data is being saved automatically.</span>
+            <button
+              type="button"
+              className="pa-btn-secondary pa-draft-dismiss"
+              onClick={() => {
+                clearDraft();
+                setForm(INITIAL_FORM);
+                setTouched(INITIAL_TOUCHED);
+                setSubmitAttempted(false);
+              }}
+            >
+              Clear draft
+            </button>
+          </div>
+        )}
+
+        {/* ── Session expiry simulation (demo) ──────────────────── */}
+        <div className="pa-demo-controls surface">
+          <p className="pa-demo-label">Session controls (demo)</p>
+          <button
+            type="button"
+            className="pa-btn-secondary"
+            onClick={handleSimulateExpiry}
+          >
+            Simulate session expiry
+          </button>
+        </div>
 
         {/* ── Publish form ───────────────────────────────────────── */}
         <form
@@ -868,6 +942,66 @@ const STYLES = `
 
   /* ── Responsive ─────────────────────────────────────────────────────── */
 
+  /* ── Draft restored banner ─────────────────────────────────────────── */
+
+  .pa-draft-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    color: var(--text, #f3f5fb);
+    border: 1px solid rgba(78, 133, 255, 0.25);
+  }
+
+  .pa-draft-banner span:first-child {
+    font-size: 1.1rem;
+  }
+
+  .pa-draft-dismiss {
+    margin-left: auto;
+    min-height: 32px;
+    font-size: 0.8rem;
+    padding: 0 12px;
+  }
+
+  .pa-draft-restored {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 100;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: var(--surface-strong, #0e1427);
+    border: 1px solid var(--line, rgba(169,184,255,0.16));
+    font-size: 0.82rem;
+    color: var(--muted, #93a0bf);
+    animation: pa-fade-out 3s ease forwards;
+  }
+
+  @keyframes pa-fade-out {
+    0%, 70% { opacity: 1; }
+    100% { opacity: 0; pointer-events: none; }
+  }
+
+  /* ── Demo controls ─────────────────────────────────────────────────── */
+
+  .pa-demo-controls {
+    padding: 14px 18px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .pa-demo-label {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--muted, #93a0bf);
+    font-weight: 600;
+  }
+
   @media (max-width: 600px) {
     .pa-shell {
       padding: 4px 0 32px;
@@ -901,6 +1035,10 @@ const STYLES = `
 
     .pa-btn-primary {
       width: 100%;
+    }
+
+    .pa-draft-banner {
+      flex-wrap: wrap;
     }
   }
 `;
