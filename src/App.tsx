@@ -20,6 +20,7 @@ import MarketplacePage from "./pages/MarketplacePage";
 import ThemePlayground from "./pages/ThemePlayground";
 import DesignSystemDocs from "./pages/DesignSystemDocs";
 import A11yAudit from "./pages/A11yAudit";
+import InvoicesPage from "./pages/InvoicesPage";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 
@@ -105,6 +106,7 @@ const APP_ROUTES = {
   myApis: "/apis/my-apis",
   apiUsage: "/api-usage",
   billing: "/billing",
+  invoices: "/invoices",
   documentation: "/documentation",
   status: "/status",
   themePlayground: "/theme-playground",
@@ -537,6 +539,9 @@ function App() {
               <NavLink to={APP_ROUTES.billing} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
                 Billing
               </NavLink>
+              <NavLink to={APP_ROUTES.invoices} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+                Invoices
+              </NavLink>
               <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
                 Theme Playground
               </NavLink>
@@ -559,6 +564,8 @@ function App() {
 
             <Route path={APP_ROUTES.dashboard} element={<Dashboard vaultBalance={vaultBalance} walletBalance={walletBalance} openDeposit={openDeposit} />} />
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
+
+            <Route path={APP_ROUTES.invoices} element={<InvoicesPage />} />
 
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
 
