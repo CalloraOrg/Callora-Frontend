@@ -33,6 +33,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - **Endpoint hover preview**: On the API Detail documentation tab, hovering or focusing an individual endpoint card header reveals a compact floating panel showing the HTTP method badge, endpoint URL, parameter table (name / type / required), and an optional response-shape snippet. Keyboard accessible (Escape dismisses); all colours from design tokens. See `src/components/EndpointPreview.tsx`.
 - **Generic BottomSheet with visible drag handle** (GrantFox FWC26): `src/components/BottomSheet.tsx` is a reusable bottom-sheet dialog with a persistent pill-shaped drag handle. The pill widens and brightens on hover and during active drag. Supports two snap points (`"half"` / `"full"`), a `footer` slot, focus trap, Escape / backdrop dismiss, focus restore, body scroll lock, and full `prefers-reduced-motion` support. All colours use design tokens. See [docs/BottomSheet-drag-handle.md](docs/BottomSheet-drag-handle.md).
 - **Reduced-motion data transitions** (Issue #1005): Loading skeletons, spinners, the route-progress bar, stale-data fades, and the dashboard activity fetch all respect `prefers-reduced-motion` via a shared `usePrefersReducedMotion` hook + a global CSS fallback. Dashboard activity and webhook-delivery loading/error/stale changes are announced through `role="status"` / `role="alert"` live regions. See [docs/data-transitions-reduced-motion.md](docs/data-transitions-reduced-motion.md).
+- **Route splitting and prefetching** (Issue #1155): every heavy page in `src/App.tsx` is a `lazy()` chunk behind one shared `Suspense` boundary, and a `routePrefetchers` map warms a page's chunk on nav-link hover/focus. Adding a page means updating both the lazy import and the prefetch map. See [docs/RouteSplitting.md](docs/RouteSplitting.md).
 
 ## Keyboard shortcuts
 
@@ -146,6 +147,7 @@ callora-frontend/
 │   └── vite-env.d.ts
 ├── docs/
 │   ├── UI-Design-System.md
+│   ├── RouteSplitting.md    # Lazy chunks, the prefetch map, and adding a lazy route
 │   └── ResponseDiff.md      # Response diff highlighting (CallHistoryRow)
 ├── index.html
 ├── package.json
