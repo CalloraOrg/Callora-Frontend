@@ -10,23 +10,31 @@ import {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("generateIdempotencyKey", () => {
   it("prepends the provided prefix", () => {
-    expect(generateIdempotencyKey("rotate").startsWith("rotate-")).toBe(true);
+    expect(generateIdempotencyKey("rotate")).toMatch(
+      /^rotate-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+$/,
+    );
   });
 
   it("defaults to the 'idem' prefix", () => {
     expect(generateIdempotencyKey().startsWith("idem-")).toBe(true);
   });
 
-  it("produces unique keys across calls", () => {
+  it("produces 10,000 unique prefixed keys in a rapid burst", () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+
     const seen = new Set<string>();
-    for (let i = 0; i < 1000; i += 1) {
-      seen.add(generateIdempotencyKey("rotate"));
+    for (let i = 0; i < 10_000; i += 1) {
+      const key = generateIdempotencyKey("rotate");
+      expect(key).toMatch(/^rotate-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+$/);
+      seen.add(key);
     }
-    expect(seen.size).toBe(1000);
+    expect(seen.size).toBe(10_000);
   });
 });
 
@@ -45,6 +53,8 @@ describe("InFlightGuard", () => {
     const p2 = guard.run("rotate-key", task);
     const p3 = guard.run("rotate-key", task);
 
+    expect(p2).toBe(p1);
+    expect(p3).toBe(p1);
     expect(guard.size()).toBe(1);
     expect(guard.isRunning("rotate-key")).toBe(true);
 
@@ -194,10 +204,23 @@ describe("withRetry", () => {
         },
         { maxRetries: 2, baseDelayMs: 1, delay },
       ),
-    ).rejects.toThrow("always fails");
+    ).rejects.toBe(err);
 
     expect(calls).toBe(3);
     expect(delay).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry when maxRetries is zero", async () => {
+    const err = new Error("first attempt failed");
+    const task = vi.fn().mockRejectedValue(err);
+    const delay = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      withRetry(task, { maxRetries: 0, baseDelayMs: 1, delay }),
+    ).rejects.toBe(err);
+
+    expect(task).toHaveBeenCalledTimes(1);
+    expect(delay).not.toHaveBeenCalled();
   });
 
   it("honors the shouldRetry predicate to stop immediately", async () => {
