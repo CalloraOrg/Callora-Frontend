@@ -14,7 +14,6 @@ import CompareTray from "./components/CompareTray";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
-import { ToastProvider } from "./components/Toast";
 import { useAccountContext } from "./hooks/useAccountContext";
 
 // Route splitting: dynamic imports for all heavy page routes
@@ -567,7 +566,6 @@ function App() {
   };
 
   return (
-    <ToastProvider>
       <div className="app-shell">
         <RouteProgressBar />
         <a href="#main-content" className="skip-link">
@@ -997,7 +995,6 @@ function App() {
           </div>
         )}
       </div>
-    </ToastProvider>
   );
 }
 
