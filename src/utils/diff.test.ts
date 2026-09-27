@@ -254,3 +254,117 @@ describe('hasDifferences', () => {
     expect(hasDifferences(lines)).toBe(true);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Large-payload stress coverage (issue #1127)
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The LCS table is `(m + 1) × (n + 1)`, and the walk over it used to be
+ * recursive — a multi-thousand-line pair exhausted the call stack and threw
+ * `RangeError: Maximum call stack size exceeded`. These cases pin the
+ * behaviour of the linearised walk and its documented size budget.
+ */
+
+/** Number of lines the acceptance criteria require to diff cleanly. */
+const REQUIRED_LINE_COUNT = 3_000;
+
+/**
+ * Size at which the O(n·m) table itself becomes the limiting factor rather
+ * than the diff algorithm: 5 000 lines is 25M cells, the largest payload this
+ * implementation is expected to handle.
+ */
+const MAX_SUPPORTED_LINE_COUNT = 5_000;
+
+/** Deterministic `lineCount`-line payload; `mutateAt` rewrites one line. */
+function buildPayload(lineCount: number, mutateAt = -1): string {
+  const lines: string[] = new Array<string>(lineCount);
+  for (let i = 0; i < lineCount; i++) {
+    lines[i] = `line ${i.toString().padStart(5, "0")} :: ${(i * 2654435761) % 100000}`;
+  }
+  if (mutateAt >= 0 && mutateAt < lineCount) {
+    lines[mutateAt] = `${lines[mutateAt]} # changed`;
+  }
+  return lines.join("\n");
+}
+
+function countByType(lines: DiffLine[], type: DiffLine["type"]): number {
+  return lines.filter((line) => line.type === type).length;
+}
+
+describe("computeDiff large payloads", () => {
+  it(`diffs a ${REQUIRED_LINE_COUNT}-line payload without a RangeError`, () => {
+    const before = buildPayload(REQUIRED_LINE_COUNT);
+    const after = buildPayload(REQUIRED_LINE_COUNT, REQUIRED_LINE_COUNT / 2);
+
+    let lines: DiffLine[] = [];
+    expect(() => {
+      lines = computeDiff(before, after);
+    }).not.toThrow(RangeError);
+
+    // One changed line is reported as one removal + one addition, and nothing
+    // else is disturbed.
+    expect(countByType(lines, "removed")).toBe(1);
+    expect(countByType(lines, "added")).toBe(1);
+    expect(countByType(lines, "unchanged")).toBe(REQUIRED_LINE_COUNT - 1);
+    expect(hasDifferences(lines)).toBe(true);
+  }, 30_000);
+
+  it(`documents the maximum supported size: ${MAX_SUPPORTED_LINE_COUNT} lines complete`, () => {
+    const before = buildPayload(MAX_SUPPORTED_LINE_COUNT);
+    const after = buildPayload(MAX_SUPPORTED_LINE_COUNT, MAX_SUPPORTED_LINE_COUNT - 1);
+
+    let lines: DiffLine[] = [];
+    expect(() => {
+      lines = computeDiff(before, after);
+    }).not.toThrow(RangeError);
+
+    expect(countByType(lines, "removed")).toBe(1);
+    expect(countByType(lines, "added")).toBe(1);
+  }, 60_000);
+
+  it("returns only unchanged lines for identical large inputs", () => {
+    const payload = buildPayload(REQUIRED_LINE_COUNT);
+
+    const lines = computeDiff(payload, payload);
+
+    expect(lines).toHaveLength(REQUIRED_LINE_COUNT);
+    expect(lines.every((line) => line.type === "unchanged")).toBe(true);
+    expect(hasDifferences(lines)).toBe(false);
+    expect(lines[REQUIRED_LINE_COUNT - 1]).toEqual({
+      type: "unchanged",
+      value: payload.split("\n")[REQUIRED_LINE_COUNT - 1],
+      lineA: REQUIRED_LINE_COUNT,
+      lineB: REQUIRED_LINE_COUNT,
+    });
+  });
+
+  it("short-circuits identical large inputs without building an LCS table", () => {
+    const payload = buildPayload(REQUIRED_LINE_COUNT);
+
+    const started = performance.now();
+    computeDiff(payload, payload);
+    const elapsed = performance.now() - started;
+
+    // Building and walking a 3,000 × 3,000 table takes far longer than the
+    // straight map the identical-input fast path performs.
+    expect(elapsed).toBeLessThan(250);
+  });
+
+  it("keeps line numbers consistent in a large fully-rewritten payload", () => {
+    const before = buildPayload(1_000);
+    const after = Array.from({ length: 1_000 }, (_, i) => `rewritten ${i}`).join("\n");
+
+    const lines = computeDiff(before, after);
+
+    expect(countByType(lines, "removed")).toBe(1_000);
+    expect(countByType(lines, "added")).toBe(1_000);
+    expect(countByType(lines, "unchanged")).toBe(0);
+    const removals = lines.filter((line) => line.type === "removed");
+    const additions = lines.filter((line) => line.type === "added");
+    expect(removals[999].lineA).toBe(1_000);
+    expect(removals[999].lineB).toBeNull();
+    expect(additions[999].lineB).toBe(1_000);
+    expect(additions[999].lineA).toBeNull();
+  });
+});
