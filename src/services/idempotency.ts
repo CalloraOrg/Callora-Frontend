@@ -21,9 +21,22 @@ export function isTimeoutError(error: unknown): error is TimeoutError {
 }
 
 let idemCounter = 0;
+
+function generateSecureRandomSuffix(): string {
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi?.getRandomValues) {
+    throw new Error("Web Crypto is required to generate an idempotency key.");
+  }
+
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
+}
+
 export function generateIdempotencyKey(prefix = "idem"): string {
   idemCounter += 1;
-  const rand = Math.random().toString(36).slice(2, 10);
+  const rand = generateSecureRandomSuffix();
   return `${prefix}-${Date.now().toString(36)}-${idemCounter.toString(36)}-${rand}`;
 }
 export class InFlightGuard<T = unknown> {
