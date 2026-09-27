@@ -21,10 +21,10 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import { LOADING_DELAY_MS } from "../config/constants";
 import {
-  readDensityPreference,
-  persistDensityPreference,
+  getDensityPreference,
+  setDensityPreference,
   type DensityPreference,
-} from "../utils/density";
+} from "../state/uiPrefs";
 
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
 import LiveRegion from "../components/LiveRegion";
@@ -76,8 +76,8 @@ export default function MarketplacePage(): JSX.Element {
 
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
 
-  const [density, setDensity] = useState<DensityPreference>(() =>
-    readDensityPreference(),
+  const [density, setDensity] = useState<DensityPreference>(
+    getDensityPreference,
   );
   const debouncedQuery = useDebounce(query, 300);
 
@@ -123,7 +123,7 @@ export default function MarketplacePage(): JSX.Element {
   }, [trackFetch, prefersReducedMotion]);
 
   useEffect(() => {
-    persistDensityPreference(density);
+    setDensityPreference(density);
   }, [density]);
 
   const hasActiveFilters = () => {
