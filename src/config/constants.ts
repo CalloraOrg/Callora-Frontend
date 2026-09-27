@@ -19,6 +19,16 @@ export const MIN_DEPOSIT = 10;
 /** Low balance warning threshold in USDC. */
 export const LOW_BALANCE_USD = 15;
 
+/**
+ * localStorage key for the low-balance banner snooze record.
+ * Stores `{ balance, dismissedAt }` JSON so dismissal persists across
+ * route changes until the balance moves or the TTL expires.
+ */
+export const LOW_BALANCE_SNOOZE_KEY = "callora-low-balance-snoozed";
+
+/** Low-balance banner snooze window (ms), mirroring useQuota's 24 h TTL. */
+export const LOW_BALANCE_SNOOZE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 /** Human-readable network fee shown in the deposit preview. */
 export const NETWORK_FEE = "0.00001 XLM";
 
