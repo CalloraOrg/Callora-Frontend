@@ -65,6 +65,37 @@ Key principles:
 
 3. Open [http://localhost:5173](http://localhost:5173).
 
+No `.env` file is required — every variable has a working default.
+
+## Configuration
+
+All configuration is read from `VITE_*` environment variables. Copy
+[`.env.example`](.env.example) to `.env.local` and adjust as needed:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable | Default | Purpose |
+| -------- | ------- | ------- |
+| `VITE_API_BASE_URL` | *(empty)* | API origin. Empty keeps requests relative so the dev server proxies them; set an absolute origin to call a backend directly (requires CORS). |
+| `VITE_STELLAR_NETWORK` | `testnet` | One of `testnet`, `mainnet`, `futurenet`. Unrecognised values fall back to `testnet` with a dev warning. |
+| `VITE_DEV_API_PROXY_TARGET` | `http://localhost:3000` | Dev-server-only: where `/api` is proxied. Never inlined into the bundle. |
+
+In development, `vite.config.ts` proxies `/api` to
+`VITE_DEV_API_PROXY_TARGET`, so the browser only ever talks to
+`localhost:5173` and **no CORS setup is needed**. Paths are forwarded without
+rewriting, and the value is read at startup, so a one-off override works too:
+
+```bash
+VITE_DEV_API_PROXY_TARGET=https://api.staging.callora.com npm run dev
+```
+
+Every `VITE_*` value is inlined into the shipped bundle and is therefore public
+— never put a secret in one. See [docs/Configuration.md](docs/Configuration.md)
+for the full reference, including where each value is read in code and how to
+add a new variable.
+
 ## Print stylesheet
 
 Added `src/styles/print.css` to hide UI chrome and expand collapsible
@@ -146,7 +177,9 @@ callora-frontend/
 │   └── vite-env.d.ts
 ├── docs/
 │   ├── UI-Design-System.md
+│   ├── Configuration.md     # VITE_* variables and the dev /api proxy
 │   └── ResponseDiff.md      # Response diff highlighting (CallHistoryRow)
+├── .env.example            # Documented, committed environment template
 ├── index.html
 ├── package.json
 ├── tsconfig.json
