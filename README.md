@@ -101,57 +101,24 @@ by removing interactive controls and making content fully visible. (Closes #708)
 | `*`                 | 404 not found                             |
 | `/marketplace/grantfox-wave-compute/sla` | GrantFox Wave Compute API SLA details (FWC26) |
 
+
 ## Project layout
 
-```
-callora-frontend/
-├── src/
-│   ├── App.tsx              # Router, layout, and route definitions
-│   ├── main.tsx             # Entry point
-│   ├── index.css            # Global styles and design tokens
-│   ├── ThemeContext.tsx      # Light/dark theme context
-│   ├── ThemeToggle.tsx      # Theme toggle component
-│   ├── ApiUsage.tsx         # API usage analytics view
-│   ├── config/              # Shared app configuration
-│   │   └── constants.ts     # App constants (URLs, deposit limits, loading delay)
-│   ├── components/          # Shared UI components
-│   │   ├── ApiCard.tsx
-│   │   ├── Breadcrumb.tsx
-│   │   ├── CodeExample.tsx
-│   │   ├── CommandPalette.css
-│   │   ├── CommandPalette.test.tsx
-│   │   ├── CommandPalette.tsx
-│   │   ├── CommandPalette_MANUAL_TEST_PLAN.md
-│   │   ├── Dashboard.tsx
-│   │   ├── EmptyState.tsx
-│   │   ├── EndpointGroupHover.tsx
-│   │   ├── EndpointPreview.tsx
-│   │   ├── FiltersSidebar.tsx
-│   │   ├── NotFound.tsx
-│   │   ├── SearchBar.tsx
-│   │   ├── ServerError.tsx
-│   │   ├── ServerErrorDemo.tsx
-│   │   └── Skeleton.tsx
-│   ├── pages/               # Standalone page components
-│   │   ├── ApiDetailPage.tsx
-│   │   ├── MarketplacePage.tsx
-│   │   └── RateLimitCard.tsx  # (Issue #537) Rate-limit quota card with middle-ellipsis breadcrumb
-│   ├── hooks/               # Custom React hooks
-│   │   └── useDebounce.ts
-│   ├── data/                # Static and mock data
-│   │   └── mockApis.ts
-│   ├── utils/               # Utility functions
-│   │   ├── diff.ts          # Line-level diff engine (computeDiff, diffJson, hasDifferences)
-│   │   └── format.ts        # Currency formatters (formatUsdc, formatUsdShortcut, formatPrice)
-│   └── vite-env.d.ts
-├── docs/
-│   ├── UI-Design-System.md
-│   └── ResponseDiff.md      # Response diff highlighting (CallHistoryRow)
-├── index.html
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
-```
+- **`src/`**
+  - `main.tsx` — Application entry point
+  - `App.tsx` — Router, layout, and route definitions
+  - **`api/`** — API client configurations and network request handlers
+  - **`components/`** — Shared UI components following the [UI Design System](docs/UI-Design-System.md)
+  - **`config/`** — Shared application configuration and environment constants
+  - **`data/`** — Static assets and mock data definitions
+  - **`hooks/`** — Custom React hooks for shared logic
+  - **`pages/`** — Standalone route-level page components
+  - **`services/`** — Core business logic and external service integrations
+  - **`state/`** — Zustand state management slices and global stores
+  - **`styles/`** — Global CSS, design tokens, and utility classes
+  - **`utils/`** — Pure utility functions (e.g., [Response Diff Engine](docs/ResponseDiff.md))
+- **`docs/`** — Technical documentation and architecture records
+
 
 This repo is part of [Callora](https://github.com/your-org/callora). Backend and contracts live in separate repos: `callora-backend`, `callora-contracts`.
 
