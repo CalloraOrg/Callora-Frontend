@@ -1162,6 +1162,44 @@ code,
   color: var(--muted);
 }
 
+.not-found-search-results {
+  display: grid;
+  gap: 8px;
+}
+
+.not-found-search-results p {
+  margin: 0;
+}
+
+.not-found-search-results ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.not-found-search-results a {
+  display: inline-block;
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.92rem;
+  transition:
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.not-found-search-results a:hover,
+.not-found-search-results a:focus-visible {
+  background: rgba(78, 133, 255, 0.12);
+  transform: translateY(-1px);
+}
+
 .not-found-links {
   margin-top: 22px;
   display: flex;
