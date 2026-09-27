@@ -6,7 +6,7 @@ import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
-import { formatUsdc, formatUsdShortcut } from "./utils/format";
+import { formatUsdc, formatUsdShortcut, normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
 import DepositPreview from "./components/DepositPreview";
 import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS } from "./config/constants";
 import CompareDrawer from "./components/CompareDrawer";
@@ -394,6 +394,7 @@ function App() {
   const [statusMessage, setStatusMessage] = useState("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   const [submittedAmount, setSubmittedAmount] = useState<number | null>(null);
   const [submittedStartingBalance, setSubmittedStartingBalance] = useState<number | null>(null);
+  const [amountHint, setAmountHint] = useState<string | null>(null);
 
   const timersRef = useRef<number[]>([]);
 
@@ -453,6 +454,7 @@ function App() {
     setCopied(false);
     setSubmittedAmount(null);
     setSubmittedStartingBalance(null);
+    setAmountHint(null);
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
@@ -488,8 +490,13 @@ function App() {
   const handleAmountChange = (value: string, preset: number | "custom" = "custom") => {
     if (isBusy) return;
 
-    const sanitized = value.replace(/[^\d.]/g, "");
-    resetFlow(sanitized, preset);
+    const { value: normalized, truncated } = normalizeUsdcAmountInput(value);
+    resetFlow(normalized, preset);
+    setAmountHint(
+      truncated
+        ? `USDC on Stellar supports ${USDC_DECIMALS} decimal places, so the amount was rounded down to ${normalized}.`
+        : null,
+    );
   };
 
   const handlePresetClick = (value: number) => {
@@ -870,7 +877,7 @@ function App() {
                         onChange={(event) => handleAmountChange(event.target.value)}
                         disabled={isBusy}
                         placeholder="0.00"
-                        aria-describedby="deposit-help"
+                        aria-describedby={amountHint ? "deposit-help deposit-amount-hint" : "deposit-help"}
                         aria-invalid={validationMessage.length > 0 && depositStage === "input"}
                       />
                       <span>USDC</span>
@@ -882,6 +889,12 @@ function App() {
                     <p id="deposit-help" className="helper-text">
                       Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom deposits settle into your vault after wallet approval.
                     </p>
+
+                    {amountHint && (
+                      <p id="deposit-amount-hint" className="helper-text" role="status">
+                        {amountHint}
+                      </p>
+                    )}
 
                     {validationMessage && depositStage === "input" && <p className="error-text">{validationMessage}</p>}
 
