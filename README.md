@@ -79,11 +79,33 @@ by removing interactive controls and making content fully visible. (Closes #708)
 **QuotaBanner empty state (WCAG 2.1 AA, Issue #702 / b#025):** When `showEmptyState` and `onSetupQuota` are set, `QuotaBanner` renders `EmptyState` `variant="quota-banner"` (gauge + bars illustration). The illustration is `aria-hidden`; the section is labelled via `aria-labelledby` → `headingId="quota-banner-empty-heading"`. The "Set up quota" CTA guides configuration. See `docs/QuotaBanner-EmptyState.md`.
 ## Scripts
 
-| Command           | Description                         |
-| ----------------- | ----------------------------------- |
-| `npm run dev`     | Start dev server (port 5173)        |
-| `npm run build`   | TypeScript check + production build |
-| `npm run preview` | Serve production build locally      |
+| Command                | Description                                    |
+| ---------------------- | ---------------------------------------------- |
+| `npm run dev`          | Start dev server (port 5173)                   |
+| `npm run build`        | TypeScript check + production build            |
+| `npm run preview`      | Serve production build locally                 |
+| `npm test`             | Run the Vitest suite in watch mode             |
+| `npm run test:coverage`| Run the suite once and write a coverage report |
+
+### Running tests
+
+Vitest discovers `src/**/*.test.{ts,tsx}`. Commands for the common cases:
+
+```bash
+npm test                                  # watch mode, re-runs on change
+npm test -- --run                         # single pass, no watch
+npm test -- --run src/components/Pagination.test.tsx   # one file
+npm test -- --run -t "clamps the page"    # one test by name
+npm run test:coverage                     # single pass + coverage report
+```
+
+`vitest.config.ts` provides the defaults: `globals: true` (so `describe`,
+`it`, and `expect` need no import), the `jsdom` environment, `src/setupTests.ts`
+for shared matchers and cleanup, and CSS handling for components that import
+stylesheets. Coverage output is written to `coverage/`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#testing) for what to test before opening
+a pull request.
 
 ## Routes
 
