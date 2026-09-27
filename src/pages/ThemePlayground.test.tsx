@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../ThemeContext";
 import ThemePlayground from "./ThemePlayground";
@@ -67,5 +67,123 @@ describe("ThemePlayground", () => {
     expect(
       screen.getByRole("button", { name: /reset to defaults/i }),
     ).toBeTruthy();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Contrast validation (issue #1065)
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe("ThemePlayground contrast validation", () => {
+  it("shows a numeric ratio and a passing verdict for both pairs by default", () => {
+    renderPlayground();
+
+    const textBadge = screen.getByTestId("contrast-text-on-surface");
+    expect(textBadge.textContent).toMatch(/text on surface/i);
+    expect(textBadge.textContent).toMatch(/\d+\.\d{2}:1/);
+    expect(screen.getByTestId("contrast-text-on-surface-status").textContent).toBe(
+      "Passes AA",
+    );
+
+    const accentBadge = screen.getByTestId("contrast-accent-on-surface");
+    expect(accentBadge.textContent).toMatch(/accent on surface/i);
+    expect(accentBadge.textContent).toMatch(/\d+\.\d{2}:1/);
+    expect(screen.getByTestId("contrast-accent-on-surface-status").textContent).toBe(
+      "Passes AA",
+    );
+  });
+
+  it("labels a pair that drops below 4.5:1 as Fails AA", () => {
+    renderPlayground();
+
+    // Accent equal to the surface colour ⇒ ratio 1.00:1.
+    fireEvent.change(screen.getByLabelText(/accent hex value/i), {
+      target: { value: "#0f172a" },
+    });
+
+    const accentBadge = screen.getByTestId("contrast-accent-on-surface");
+    expect(accentBadge.textContent).toMatch(/1\.00:1/);
+    expect(screen.getByTestId("contrast-accent-on-surface-status").textContent).toBe(
+      "Fails AA",
+    );
+    // The unaffected pair still passes.
+    expect(screen.getByTestId("contrast-text-on-surface-status").textContent).toBe(
+      "Passes AA",
+    );
+  });
+
+  it("recomputes the text-on-surface ratio when the surface token changes", () => {
+    renderPlayground();
+
+    fireEvent.change(screen.getByLabelText(/surface hex value/i), {
+      target: { value: "#ffffff" },
+    });
+
+    expect(screen.getByTestId("contrast-text-on-surface-status").textContent).toBe(
+      "Fails AA",
+    );
+    expect(screen.getByTestId("contrast-text-on-surface").textContent).toMatch(
+      /1\.00:1/,
+    );
+  });
+
+  it("shows an inline invalid-colour error instead of NaN", () => {
+    renderPlayground();
+
+    fireEvent.change(screen.getByLabelText(/accent hex value/i), {
+      target: { value: "#zzzzzz" },
+    });
+
+    const accentBadge = screen.getByTestId("contrast-accent-on-surface");
+    expect(accentBadge.textContent).toMatch(/invalid colour/i);
+    expect(accentBadge.textContent).not.toMatch(/NaN/);
+    expect(screen.getByTestId("contrast-accent-on-surface-status").textContent).toBe(
+      "Invalid colour",
+    );
+  });
+
+  it("warns on export when any pair fails AA", async () => {
+    renderPlayground();
+
+    fireEvent.change(screen.getByLabelText(/accent hex value/i), {
+      target: { value: "#0f172a" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /export css/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contrast-export-warning").textContent).toMatch(
+        /fails wcag aa/i,
+      );
+    });
+    expect(screen.getByTestId("contrast-export-warning").textContent).toMatch(
+      /accent on surface/i,
+    );
+  });
+
+  it("does not warn on export while both pairs pass AA", async () => {
+    renderPlayground();
+
+    fireEvent.click(screen.getByRole("button", { name: /export css/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("contrast-export-warning")).toBeNull();
+    });
+  });
+
+  it("clears a previous export warning once a token is edited", async () => {
+    renderPlayground();
+
+    fireEvent.change(screen.getByLabelText(/accent hex value/i), {
+      target: { value: "#0f172a" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /export css/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("contrast-export-warning")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText(/accent hex value/i), {
+      target: { value: "#1ed6a4" },
+    });
+    expect(screen.queryByTestId("contrast-export-warning")).toBeNull();
   });
 });
