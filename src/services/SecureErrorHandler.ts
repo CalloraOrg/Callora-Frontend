@@ -72,6 +72,14 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
  * These patterns are used to sanitize error messages before display or logging.
  */
 const SENSITIVE_PATTERNS = [
+  // JSON-shaped credentials, e.g. in serialized request/response bodies:
+  // "password": "value" / "api_key":"value". The key is preserved so the
+  // surrounding JSON stays valid after redaction. Runs before the generic
+  // patterns below so quoted secret values are claimed first.
+  {
+    pattern: /(\"(?:password|passwd|pwd|secret|token|api_?key|access_?token|refresh_?token|client_?secret|authorization|private_?key)\"\s*:\s*)\"[^\"]*\"/gi,
+    replacement: '$1"[REDACTED]"',
+  },
   // API keys
   { pattern: /\b(ck_live_|sk_|pk_)[a-zA-Z0-9_]{20,}\b/g, replacement: '[REDACTED_KEY]' },
   // Bearer tokens
