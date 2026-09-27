@@ -1,8 +1,13 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
+import LiveRegion from "../components/LiveRegion";
 import StatusBadge from "../components/StatusBadge";
 import TokenEditor from "../components/TokenEditor";
+import useCopy from "../hooks/useCopy";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+
+/** How long (ms) the copy/download status stays visible before clearing. */
+const STATUS_DURATION_MS = 2_000;
 
 const DEFAULT_TOKENS = {
   primary: "#4e85ff",
@@ -15,6 +20,34 @@ type TokenKey = keyof typeof DEFAULT_TOKENS;
 export default function ThemePlayground() {
   useDocumentTitle('Theme Playground');
   const [tokens, setTokens] = useState(DEFAULT_TOKENS);
+  const { copied, handleCopy } = useCopy();
+  // Set when a copy attempt is rejected (clipboard unavailable/denied);
+  // cleared on the next successful copy so the download fallback stays
+  // offered while the clipboard is unusable.
+  const [copyFailed, setCopyFailed] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-clear the status message; cancelled on unmount to avoid updates
+  // on an unmounted component.
+  useEffect(() => {
+    return () => {
+      if (statusTimerRef.current !== null) {
+        clearTimeout(statusTimerRef.current);
+        statusTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const scheduleStatusClear = () => {
+    if (statusTimerRef.current !== null) {
+      clearTimeout(statusTimerRef.current);
+    }
+    statusTimerRef.current = setTimeout(() => {
+      setAnnouncement("");
+      statusTimerRef.current = null;
+    }, STATUS_DURATION_MS);
+  };
 
   const cssPreview = useMemo(
     () =>
@@ -47,11 +80,38 @@ export default function ThemePlayground() {
   };
 
   const exportCss = async () => {
-    const css = cssPreview;
+    const success = await handleCopy(cssPreview);
 
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(css);
+    if (success) {
+      setCopyFailed(false);
+      setAnnouncement("Theme CSS copied to clipboard");
+      scheduleStatusClear();
+    } else {
+      setCopyFailed(true);
+      setAnnouncement(
+        "Copying to the clipboard failed. Use the Download .css button instead.",
+      );
+      scheduleStatusClear();
     }
+  };
+
+  const downloadCss = () => {
+    // Anchor click + Blob keeps the export fully client-side (no network, no
+    // third-party involvement); the object URL is revoked immediately after
+    // the click is dispatched.
+    const url = URL.createObjectURL(
+      new Blob([cssPreview], { type: "text/css" }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "callora-theme.css";
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+
+    setAnnouncement("Theme CSS downloaded as callora-theme.css");
+    scheduleStatusClear();
   };
 
   return (
@@ -70,8 +130,9 @@ export default function ThemePlayground() {
             className="secondary-button"
             type="button"
             onClick={() => void exportCss()}
+            aria-label={copied ? "Export CSS — copied" : undefined}
           >
-            Export CSS
+            {copied ? "Copied" : "Export CSS"}
           </button>
           <button
             className="primary-button"
@@ -82,6 +143,27 @@ export default function ThemePlayground() {
           </button>
         </div>
       </div>
+
+      {/* Announces copy success/failure and download outcomes to screen
+          readers (WCAG 2.1 SC 4.1.3). */}
+      <LiveRegion
+        message={announcement}
+        assertive={copyFailed}
+      />
+
+      {copyFailed && (
+        <p className="theme-playground__export-error" role="alert">
+          Couldn't copy to your clipboard. Use the{' '}
+          <button
+            className="theme-playground__download-btn"
+            type="button"
+            onClick={downloadCss}
+          >
+            Download .css
+          </button>{' '}
+          fallback instead.
+        </p>
+      )}
 
       <div className="theme-playground__layout">
         <div
