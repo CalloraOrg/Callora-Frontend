@@ -1,12 +1,29 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
 function encodeCursor(id: string): string {
-  return btoa(id);
+  const bytes = new TextEncoder().encode(id);
+  let binary = "";
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 function decodeCursor(cursor: string): string {
   try {
-    return atob(cursor);
+    const base64 = cursor.replace(/-/g, "+").replace(/_/g, "/");
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64) || base64.length % 4 === 1) {
+      return "";
+    }
+
+    const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="));
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
     return "";
   }
