@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { useAccountId, useInvalidateCache } from "./useAccount";
 import { getCache, setCache, type CacheEntry } from "../utils/offlineApiCache";
 
@@ -28,7 +28,9 @@ export function useApiCache<T = unknown>() {
       if (key) {
         if (typeof window !== "undefined") {
           try {
-            window.localStorage.removeItem(`callora_api_cache_${accountId}_${key}`);
+            window.localStorage.removeItem(
+              `callora_api_cache_${accountId}_${key}`,
+            );
           } catch {
             /* ignore */
           }
@@ -39,11 +41,6 @@ export function useApiCache<T = unknown>() {
     },
     [accountId, invalidateCache],
   );
-
-  useEffect(() => {
-    if (!accountId) return;
-    invalidateCache(accountId);
-  }, [accountId, invalidateCache]);
 
   return { get, set, invalidate, accountId };
 }
