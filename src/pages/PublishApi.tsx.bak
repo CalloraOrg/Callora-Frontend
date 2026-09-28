@@ -7,7 +7,6 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 import { useFormPersistence } from '../hooks/useFormPersistence';
 import { useSessionExpiry } from '../hooks/useSessionExpiry';
 import { useBeforeUnload } from '../hooks/useBeforeUnload';
-console.log("PublishApi render");
 import SessionExpiryBanner from '../components/SessionExpiryBanner';
 
 // ---------------------------------------------------------------------------
@@ -210,7 +209,6 @@ export default function PublishApi() {
 
   const handleSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
-      console.log("handleSubmit called");
       e.preventDefault();
       setSubmitAttempted(true);
       // Touch all validated fields so errors become visible

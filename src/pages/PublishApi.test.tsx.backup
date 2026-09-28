@@ -1,0 +1,136 @@
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import PublishApi from './PublishApi';
+import { vi } from 'vitest';
+let callCount = 0;
+vi.mock("react", () => {
+  const actual = vi.importActual("react");
+  return {
+    ...actual,
+    useState: vi.fn((initial) => {
+      callCount++;
+      switch (callCount) {
+        case 1: return [INITIAL_FORM, vi.fn()];
+        case 2: return [INITIAL_TOUCHED, vi.fn()];
+        case 3: return [false, vi.fn()];
+        case 4: return [false, vi.fn()];
+        case 5: return [true, vi.fn()]; // submitted
+        case 6: return [false, vi.fn()]; // banner showBanner
+        default: return [initial, vi.fn()];
+      }
+    }},
+    useId: vi.fn(() => "mock-id"),
+    useCallback: vi.fn((callback, deps) => callback),
+    useMemo: vi.fn((factory, deps) => factory())
+  };
+});
+
+
+// Mock OpenAPIImport
+vi.mock('../components/OpenAPIImport', () => ({
+  default: vi.fn(() => <div data-testid='mock-openapi-import' />),
+}));
+
+// Mock hooks with factory that returns new objects each call (as before)
+vi.mock('../hooks/useFormPersistence', () => ({
+  useFormPersistence: vi.fn(() => ({
+    clearDraft: vi.fn(),
+    wasRestored: false,
+    hasDraft: false,
+  })),
+}));
+vi.mock('../hooks/useSessionExpiry', () => ({
+  useSessionExpiry: vi.fn(() => ({
+    isExpired: false,
+    dismiss: vi.fn(),
+    countdown: null,
+    signalExpiry: vi.fn(),
+  })),
+}));
+vi.mock('../hooks/useDocumentTitle', () => ({
+  default: vi.fn(),
+}));
+vi.mock('../hooks/useBeforeUnload', () => ({
+  useBeforeUnload: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('PublishApi - basic tests', () => {
+  test('renders the form with initial values', () => {
+    render(<PublishApi />);
+    expect(screen.getByLabelText(/api name/i)).toHaveValue('');
+    expect(screen.getByLabelText(/base url/i)).toHaveValue('');
+    expect(screen.getByLabelText(/category/i)).toHaveValue('');
+    expect(screen.getByLabelText(/price per call/i)).toHaveValue('');
+    expect(screen.getByLabelText(/description/i)).toHaveValue('');
+  });
+
+  test('shows https error for http:// base URL on blur', async () => {
+    render(<PublishApi />);
+    const baseUrlInput = screen.getByLabelText(/base url/i);
+    fireEvent.change(baseUrlInput, { target: { value: 'http://example.com' } });
+    fireEvent.blur(baseUrlInput);
+    expect(screen.getByText(/base url must use the https scheme/i)).toBeInTheDocument();
+  });
+
+  test('shows valid URL error for malformed URL on blur', async () => {
+    render(<PublishApi />);
+    const baseUrlInput = screen.getByLabelText(/base url/i);
+    fireEvent.change(baseUrlInput, { target: { value: 'not a url' } });
+    fireEvent.blur(baseUrlInput);
+    expect(screen.getByText(/enter a valid url/i)).toBeInTheDocument();
+  });
+
+  test('shows price error for negative number on blur', async () => {
+    render(<PublishApi />);
+    const priceInput = screen.getByLabelText(/price per call/i);
+    fireEvent.change(priceInput, { target: { value: '-1' } });
+    fireEvent.blur(priceInput);
+    expect(screen.getByText(/price per call must be 0 or greater/i)).toBeInTheDocument();
+  });
+
+  test('shows price error for non-numeric value on blur', async () => {
+    render(<PublishApi />);
+    const priceInput = screen.getByLabelText(/price per call/i);
+    fireEvent.change(priceInput, { target: { value: 'abc' } });
+    fireEvent.blur(priceInput);
+    expect(screen.getByText(/price per call must be 0 or greater/i)).toBeInTheDocument();
+  });
+
+  test('shows category error when no category selected on blur', async () => {
+    render(<PublishApi />);
+    const categorySelect = screen.getByLabelText(/category/i);
+    fireEvent.change(categorySelect, { target: { value: '' } });
+    fireEvent.blur(categorySelect);
+    expect(screen.getByText(/please select a category/i)).toBeInTheDocument();
+  });
+
+  test('errors are hidden before blur', async () => {
+    render(<PublishApi />);
+    const baseUrlInput = screen.getByLabelText(/base url/i);
+    fireEvent.change(baseUrlInput, { target: { value: 'http://example.com' } });
+    // Do not blur
+    expect(screen.queryByText(/base url must use the https scheme/i)).not.toBeInTheDocument();
+  });
+
+  test('submitting reveals all field errors', async () => {
+    render(<PublishApi />);
+    const submitButton = screen.getByRole('button', { name: /publish api/i });
+    fireEvent.click(submitButton);
+    expect(screen.getByText(/api name is required/i)).toBeInTheDocument();
+    expect(screen.getByText(/base url is required/i)).toBeInTheDocument();
+    expect(screen.getByText(/please select a category/i)).toBeInTheDocument();
+    expect(screen.queryByText(/price per call must be 0 or greater/i)).not.toBeInTheDocument();
+  });
+});
+
+
+test('valid submission renders success screen', () => {
+  render(<PublishApi />);
+  expect(screen.getByText(/api submitted for review/i)).toBeInTheDocument();
+  expect(screen.getByText(/test api/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /publish another api/i })).toBeInTheDocument();
+});

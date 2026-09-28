@@ -1,0 +1,171 @@
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import PublishApi from './PublishApi';
+import { vi } from 'vitest';
+
+// Constants from component
+const INITIAL_FORM = {
+  apiName: '',
+  baseUrl: '',
+  category: '',
+  description: '',
+  pricePerCall: '',
+  endpoints: [],
+};
+const INITIAL_TOUCHED = {
+  apiName: false,
+  baseUrl: false,
+  category: false,
+  pricePerCall: false,
+};
+
+// Mock OpenAPIImport
+vi.mock('../components/OpenAPIImport', () => ({
+  default: vi.fn(() => <div data-testid='mock-openapi-import' />),
+}));
+
+// Mock hooks with factory that returns new objects each call (as before)
+vi.mock('../hooks/useFormPersistence', () => ({
+  useFormPersistence: vi.fn(() => ({
+    clearDraft: vi.fn(),
+    wasRestored: false,
+    hasDraft: false,
+  })),
+}));
+vi.mock('../hooks/useSessionExpiry', () => ({
+  useSessionExpiry: vi.fn(() => ({
+    isExpired: false,
+    dismiss: vi.fn(),
+    countdown: null,
+    signalExpiry: vi.fn(),
+  })),
+}));
+vi.mock('../hooks/useDocumentTitle', () => ({
+  default: vi.fn(),
+}));
+vi.mock('../hooks/useBeforeUnload', () => ({
+  useBeforeUnload: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('PublishApi - basic tests', () => {
+  test('renders the form with initial values', () => {
+    render(<PublishApi />);
+    expect(screen.getByLabelText(/api name/i)).toHaveValue('');
+    expect(screen.getByLabelText(/base url/i)).toHaveValue('');
+    expect(screen.getByLabelText(/category/i)).toHaveValue('');
+    expect(screen.getByLabelText(/price per call/i)).toHaveValue('');
+    expect(screen.getByLabelText(/description/i)).toHaveValue('');
+  });
+
+  test('shows https error for http:// base URL on blur', async () => {
+    render(<PublishApi />);
+    const baseUrlInput = screen.getByLabelText(/base url/i);
+    fireEvent.change(baseUrlInput, { target: { value: 'http://example.com' } });
+    fireEvent.blur(baseUrlInput);
+    expect(screen.getByText(/base url must use the https scheme/i)).toBeInTheDocument();
+  });
+
+  test('shows valid URL error for malformed URL on blur', async () => {
+    render(<PublishApi />);
+    const baseUrlInput = screen.getByLabelText(/base url/i);
+    fireEvent.change(baseUrlInput, { target: { value: 'not a url' } });
+    fireEvent.blur(baseUrlInput);
+    expect(screen.getByText(/enter a valid url/i)).toBeInTheDocument();
+  });
+
+  test('shows price error for negative number on blur', async () => {
+    render(<PublishApi />);
+    const priceInput = screen.getByLabelText(/price per call/i);
+    fireEvent.change(priceInput, { target: { value: '-1' } });
+    fireEvent.blur(priceInput);
+    expect(screen.getByText(/price per call must be 0 or greater/i)).toBeInTheDocument();
+  });
+
+  test('shows price error for non-numeric value on blur', async () => {
+    render(<PublishApi />);
+    const priceInput = screen.getByLabelText(/price per call/i);
+    fireEvent.change(priceInput, { target: { value: 'abc' } });
+    fireEvent.blur(priceInput);
+    expect(screen.getByText(/price per call must be 0 or greater/i)).toBeInTheDocument();
+  });
+
+  test('shows category error when no category selected on blur', async () => {
+    render(<PublishApi />);
+    const categorySelect = screen.getByLabelText(/category/i);
+    fireEvent.change(categorySelect, { target: { value: '' } });
+    fireEvent.blur(categorySelect);
+    expect(screen.getByText(/please select a category/i)).toBeInTheDocument();
+  });
+
+  test('errors are hidden before blur', async () => {
+    render(<PublishApi />);
+    const baseUrlInput = screen.getByLabelText(/base url/i);
+    fireEvent.change(baseUrlInput, { target: { value: 'http://example.com' } });
+    // Do not blur
+    expect(screen.queryByText(/base url must use the https scheme/i)).not.toBeInTheDocument();
+  });
+
+  test('submitting reveals all field errors', async () => {
+    render(<PublishApi />);
+    const submitButton = screen.getByRole('button', { name: /publish api/i });
+    fireEvent.click(submitButton);
+    expect(screen.getByText(/api name is required/i)).toBeInTheDocument();
+    expect(screen.getByText(/base url is required/i)).toBeInTheDocument();
+    expect(screen.getByText(/please select a category/i)).toBeInTheDocument();
+    expect(screen.queryByText(/price per call must be 0 or greater/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('Valid submission test (mocking submitted state)', () => {
+  let useStateSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    // Mock useState to control submitted state
+    useStateSpy = vi.spyOn(React, 'useState');
+    console.log('useState spy created:', useStateSpy);
+    useStateSpy.mockImplementation((initialValue: any) => {
+      // Track call order to return appropriate values
+      if (!useStateSpy.callCount) {
+        useStateSpy.callCount = 0;
+      }
+      useStateSpy.callCount++;
+      console.log(`useState call #${useStateSpy.callCount}: initialValue =`, initialValue);
+      // Order of useState calls in render:
+      // 1. form (PublishApi)
+      // 2. touched (PublishApi)
+      // 3. submitAttempted (PublishApi)
+      // 4. importOpen (PublishApi)
+      // 5. submitted (PublishApi)
+      // 6. showBanner (SessionExpiryBanner)
+      switch (useStateSpy.callCount) {
+        case 1: return [INITIAL_FORM, vi.fn()];
+        case 2: return [INITIAL_TOUCHED, vi.fn()];
+        case 3: return [false, vi.fn()];
+        case 4: return [false, vi.fn()];
+        case 5: return [true, vi.fn()]; // submitted
+        case 6: return [false, vi.fn()]; // banner showBanner (initially false)
+        default: return [initialValue, vi.fn()];
+      }
+    });
+  });
+
+  afterEach(() => {
+    console.log('useState spy call count:', useStateSpy.callCount);
+    vi.restoreAllMocks();
+  });
+
+  test('renders success screen when submitted is true', () => {
+    console.log('Rendering PublishApi with submitted mocked true');
+    render(<PublishApi />);
+    // Debug: log the submitted state value from the setter? Not possible.
+    // Instead, we can check if the success screen is rendered.
+    const successHeading = screen.getByText(/api submitted for review/i);
+    console.log('Success heading found:', successHeading);
+    expect(successHeading).toBeInTheDocument();
+    expect(screen.getByText(/test api/i)).toBeInTheDocument(); // API name in success message
+    expect(screen.getByRole('button', { name: /publish another api/i })).toBeInTheDocument();
+  });
+});
