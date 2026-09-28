@@ -37,6 +37,7 @@ Example: `git checkout -b feature/api-search-filters`
 2. Make your changes, following the guidelines below.
 3. Run `npm run build` to confirm no TypeScript errors.
 4. Open a pull request against `main` with a clear description of what changed and why.
+5. [ ] Run `npm test -- --run` to validate that all tests pass.
 
 ## Design system
 
@@ -54,12 +55,15 @@ Key rules:
 - Provide `aria-label` or visible text for icon-only controls.
 - Verify your changes in both light and dark modes (use the theme toggle in the top bar).
 
-## Testing
+### Testing
 
-A test runner is being introduced — see the Vitest setup issue for progress. Once merged, tests will run via:
+The project uses Vitest, jsdom, and Testing Library. 
 
-```bash
-npm run test
-```
+*   **Naming and Location:** Test files must be named `*.test.tsx` or `*.test.ts`. Place them either immediately next to the source file they are testing or within a dedicated `tests/` directory.
+*   **Test Setup (`src/setupTests.ts`):** This file is responsible for the global test environment configuration. This includes importing `jest-dom` matchers, running global cleanup between tests, and configuring mock environments.
+*   **Fake Timers:** If your components or utilities rely on time-based operations (like `setTimeout`, `setInterval`, or `Date`), you must use Vitest's fake timers (`vi.useFakeTimers()`) to prevent flakiness and ensure fast execution.
+*   **Pre-PR Validation:** You are required to run the full test suite locally before opening a pull request. Execute the following command:
 
-Until then, manually verify the affected routes load and behave correctly after your changes.
+    ```bash
+    npm test -- --run
+    ```
