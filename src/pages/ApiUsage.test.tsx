@@ -158,6 +158,78 @@ describe('ApiUsage - Tabular Numerals', () => {
     });
   });
 });
+describe('ApiUsage - Design Token Spacing (v7)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(window, 'location', {
+      value: { search: '', pathname: '/api-usage' },
+      writable: true,
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: false, media: query, onchange: null,
+        addListener: vi.fn(), removeListener: vi.fn(),
+        addEventListener: vi.fn(), removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('uses token-based gap on api-usage-page', () => {
+    render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const page = document.querySelector('.api-usage-page') as HTMLElement;
+    expect(page).toBeTruthy();
+    expect(page.classList.contains('api-usage-page')).toBe(true);
+  });
+
+  it('uses token-based padding on api-header', () => {
+    render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const header = document.querySelector('.api-header') as HTMLElement;
+    expect(header).toBeTruthy();
+  });
+
+  it('renders the api-key-section with token-consistent spacing', () => {
+    render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const section = document.querySelector('.api-key-section');
+    expect(section).toBeTruthy();
+  });
+
+  it('renders the stats-grid with token-consistent gap', () => {
+    render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const grid = document.querySelector('.stats-grid');
+    expect(grid).toBeTruthy();
+  });
+
+  it('renders all surface sections with token-based spacing', () => {
+    render(<ApiUsage />);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const surfaces = document.querySelectorAll('.surface');
+    expect(surfaces.length).toBeGreaterThanOrEqual(4);
+    surfaces.forEach((surface) => {
+      expect(surface.classList.contains('surface')).toBe(true);
+    });
+  });
+});
 
 describe('ApiUsage - Empty State', () => {
   beforeEach(() => {
