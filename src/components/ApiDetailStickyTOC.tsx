@@ -1,25 +1,23 @@
 import { useEffect, useState, type MouseEvent } from "react";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import "./ApiDetailStickyTOC.css";
 
 export interface TocSection { id: string; label: string; }
 interface ApiDetailStickyTOCProps { sections: TocSection[]; }
-const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
 const compactTocQuery = "(max-width: 1023px)";
 
 /** Accessible, responsive in-page navigation for API detail sections. */
 export function ApiDetailStickyTOC({ sections }: ApiDetailStickyTOCProps) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? null);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [isCompact, setIsCompact] = useState(false);
 
   useEffect(() => {
-    const reducedMotion = window.matchMedia(reducedMotionQuery);
     const compactToc = window.matchMedia(compactTocQuery);
-    const syncPreferences = () => { setPrefersReducedMotion(reducedMotion.matches); setIsCompact(compactToc.matches); };
-    syncPreferences();
-    reducedMotion.addEventListener("change", syncPreferences);
-    compactToc.addEventListener("change", syncPreferences);
-    return () => { reducedMotion.removeEventListener("change", syncPreferences); compactToc.removeEventListener("change", syncPreferences); };
+    const syncCompact = () => setIsCompact(compactToc.matches);
+    syncCompact();
+    compactToc.addEventListener("change", syncCompact);
+    return () => compactToc.removeEventListener("change", syncCompact);
   }, []);
 
   useEffect(() => {
@@ -40,12 +38,18 @@ export function ApiDetailStickyTOC({ sections }: ApiDetailStickyTOCProps) {
     const section = document.getElementById(id);
     if (!section) return;
     window.history.replaceState(null, "", `#${id}`);
-    section.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+    if (typeof section.scrollIntoView === "function") {
+      section.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+    }
     setActiveId(id);
+    // Move focus to the target heading so keyboard and screen-reader users
+    // land on the referenced section (deterministic in-page navigation).
+    section.setAttribute("tabindex", "-1");
+    section.focus();
   };
   const links = <ol className="api-detail-toc__list">{sections.map(({ id, label }) => {
     const isActive = activeId === id;
-    return <li key={id} className="api-detail-toc__item"><a href={`#${id}`} aria-current={isActive ? "location" : undefined} className={isActive ? "api-detail-toc__link api-detail-toc__link--active" : "api-detail-toc__link"} onClick={(event) => jumpToSection(event, id)}>{label}</a></li>;
+    return <li key={id} className="api-detail-toc__item"><a href={`#${id}`} aria-current={isActive ? "location" : undefined} className={isActive ? "api-detail-toc__link api-detail-toc__link--active" : "api-detail-toc__link"} style={{ transition: prefersReducedMotion ? "none" : "color 200ms ease" }} onClick={(event) => jumpToSection(event, id)}>{label}</a></li>;
   })}</ol>;
   if (isCompact) return <details className="api-detail-toc api-detail-toc--compact no-print"><summary className="api-detail-toc__heading">On this page</summary>{links}</details>;
   return <nav aria-label="On this page" className="api-detail-toc no-print"><p className="api-detail-toc__heading">On this page</p>{links}</nav>;

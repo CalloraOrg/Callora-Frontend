@@ -80,6 +80,8 @@ const TOUR_STEPS: TourStep[] = [
 
 const TOTAL_STEPS = TOUR_STEPS.length;
 
+const CHECKPOINT_KEY = "callora_onboarding_checkpoint";
+
 /* ─── Component ────────────────────────────────────────────────────────── */
 
 interface OnboardingTourProps {
@@ -88,16 +90,34 @@ interface OnboardingTourProps {
    * link). Callers typically navigate to the dashboard or close the overlay.
    */
   onComplete?: () => void;
+  /**
+   * Persist the current step to localStorage so the tour can be resumed
+   * after a refresh or navigation away.
+   */
+  persistKey?: string;
 }
 
-export default function OnboardingTour({ onComplete }: OnboardingTourProps) {
+export default function OnboardingTour({ onComplete, persistKey = CHECKPOINT_KEY }: OnboardingTourProps) {
   useDocumentTitle(
     "Getting Started – Callora",
     "A short guided tour that introduces the Callora API marketplace to new users.",
   );
 
-  /** Zero-indexed current step. */
-  const [activeStep, setActiveStep] = useState(0);
+  const [activeStep, setActiveStep] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    try {
+      const stored = localStorage.getItem(persistKey);
+      if (stored !== null) {
+        const parsed = JSON.parse(stored);
+        if (typeof parsed === "number" && parsed >= 0 && parsed < TOTAL_STEPS) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Ignore parse errors and fall back to step 0
+    }
+    return 0;
+  });
 
   /** Whether the tour has been finished. */
   const [isComplete, setIsComplete] = useState(false);
@@ -107,36 +127,70 @@ export default function OnboardingTour({ onComplete }: OnboardingTourProps) {
   const doneButtonRef = useRef<HTMLButtonElement | HTMLAnchorElement | null>(null);
   const skipLinkRef = useRef<HTMLAnchorElement>(null);
 
+  const persistStep = useCallback(
+    (step: number) => {
+      if (typeof window === "undefined") return;
+      try {
+        localStorage.setItem(persistKey, JSON.stringify(step));
+      } catch {
+        // Ignore storage errors
+      }
+    },
+    [persistKey],
+  );
+
+  const clearCheckpoint = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(persistKey);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [persistKey]);
+
   /** Move to the next step, or complete the tour on the last step. */
   const handleNext = useCallback(() => {
-    if (activeStep < TOTAL_STEPS - 1) {
-      setActiveStep((s) => s + 1);
-    } else {
-      setIsComplete(true);
-    }
-  }, [activeStep]);
+    setActiveStep((s) => {
+      const next = s + 1;
+      if (next >= TOTAL_STEPS) {
+        setIsComplete(true);
+        clearCheckpoint();
+        return s;
+      }
+      persistStep(next);
+      return next;
+    });
+  }, [persistStep, clearCheckpoint]);
 
   /** Move to the previous step. */
   const handleBack = useCallback(() => {
-    if (activeStep > 0) {
-      setActiveStep((s) => s - 1);
-    }
-  }, [activeStep]);
+    setActiveStep((s) => {
+      const prev = Math.max(s - 1, 0);
+      persistStep(prev);
+      return prev;
+    });
+  }, [persistStep]);
 
   /** Jump directly to a specific step via the stepper tabs. */
-  const handleStepSelect = useCallback((index: number) => {
-    setActiveStep(index);
-  }, []);
+  const handleStepSelect = useCallback(
+    (index: number) => {
+      setActiveStep(index);
+      persistStep(index);
+    },
+    [persistStep],
+  );
 
   /** Skip the tour entirely. */
   const handleSkip = useCallback(() => {
+    clearCheckpoint();
     onComplete?.();
-  }, [onComplete]);
+  }, [onComplete, clearCheckpoint]);
 
   /** Complete the tour from the final screen. */
   const handleDone = useCallback(() => {
+    clearCheckpoint();
     onComplete?.();
-  }, [onComplete]);
+  }, [onComplete, clearCheckpoint]);
 
   /**
    * Keyboard arrow navigation for the stepper tab list (WAI-ARIA tabs pattern):
@@ -149,19 +203,31 @@ export default function OnboardingTour({ onComplete }: OnboardingTourProps) {
     (e: KeyboardEvent<HTMLDivElement>) => {
       if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         e.preventDefault();
-        setActiveStep((s) => Math.max(s - 1, 0));
+        setActiveStep((s) => {
+          const prev = Math.max(s - 1, 0);
+          persistStep(prev);
+          return prev;
+        });
       } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
-        setActiveStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
+        setActiveStep((s) => {
+          const next = Math.min(s + 1, TOTAL_STEPS - 1);
+          persistStep(next);
+          return next;
+        });
       } else if (e.key === "Home") {
         e.preventDefault();
-        setActiveStep(0);
+        const first = 0;
+        setActiveStep(first);
+        persistStep(first);
       } else if (e.key === "End") {
         e.preventDefault();
-        setActiveStep(TOTAL_STEPS - 1);
+        const last = TOTAL_STEPS - 1;
+        setActiveStep(last);
+        persistStep(last);
       }
     },
-    [],
+    [persistStep],
   );
 
   // Move focus to the step panel whenever the active step changes so that
@@ -542,6 +608,7 @@ export default function OnboardingTour({ onComplete }: OnboardingTourProps) {
                 onClick={() => {
                   setIsComplete(false);
                   setActiveStep(0);
+                  persistStep(0);
                 }}
                 aria-label="Restart the onboarding tour from the beginning"
               >

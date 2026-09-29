@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import RouteProgressBar from "./RouteProgressBar";
 import {
   startRouteLoading,
@@ -9,10 +9,26 @@ import {
 } from "../hooks/useRouteLoading";
 
 describe("RouteProgressBar", () => {
+  const originalMatchMedia = window.matchMedia;
+
   afterEach(() => {
     cleanup();
     stopRouteLoading();
+    window.matchMedia = originalMatchMedia;
   });
+
+  function mockReducedMotion(reduce: boolean) {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: reduce && (query === "(prefers-reduced-motion: reduce)" || query.includes("reduce")),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+  }
 
   it("renders nothing by default", () => {
     const { container } = render(<RouteProgressBar />);
@@ -126,5 +142,55 @@ describe("RouteProgressBar", () => {
 
     const indicator = document.querySelector(".route-progress-bar-indicator");
     expect(indicator).toBeTruthy();
+  });
+
+  it("removes the progress bar immediately after loading when prefers-reduced-motion is active", async () => {
+    mockReducedMotion(true);
+
+    render(<RouteProgressBar />);
+
+    act(() => {
+      startRouteLoading();
+    });
+
+    expect(screen.getByRole("progressbar")).toBeTruthy();
+
+    act(() => {
+      stopRouteLoading();
+    });
+
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("progressbar")).toBeNull();
+      },
+      { timeout: 100 },
+    );
+  });
+
+  it("keeps the 240ms exit delay when motion is not reduced", async () => {
+    mockReducedMotion(false);
+
+    render(<RouteProgressBar />);
+
+    act(() => {
+      startRouteLoading();
+    });
+
+    expect(screen.getByRole("progressbar")).toBeTruthy();
+
+    act(() => {
+      stopRouteLoading();
+    });
+
+    // Still present briefly after loading stops (delayed fade-out).
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(screen.getByRole("progressbar")).toBeTruthy();
+
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("progressbar")).toBeNull();
+      },
+      { timeout: 500 },
+    );
   });
 });

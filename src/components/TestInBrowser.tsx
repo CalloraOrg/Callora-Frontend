@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isSensitiveKey } from "../utils/snapshotUrl";
 
 /**
  * TestInBrowser
@@ -10,7 +11,14 @@ import { useState } from "react";
  * Accessibility: the trigger button has an aria-expanded attribute and the
  * panel is labelled via aria-labelledby so it is announced correctly by
  * screen readers (WCAG 2.1 AA).
+ *
+ * SECURITY: parameter inputs whose names look like credentials (API keys,
+ * tokens, passwords, etc.) are rendered as password-type inputs so the values
+ * are masked in the UI and excluded from browser autocomplete suggestions.
+ * This prevents secrets from being visible on screen, saved by the browser,
+ * or leaked via shoulder-surfing.
  */
+import { useApiCache } from "../hooks/useApiCache";
 
 export interface EndpointParam {
   name: string;
@@ -42,9 +50,11 @@ export default function TestInBrowser({
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { get, set } = useApiCache<RunResult>();
 
   const panelId = `tib-panel-${endpointUrl.replace(/[^a-z0-9]/gi, "-")}`;
   const triggerId = `tib-trigger-${endpointUrl.replace(/[^a-z0-9]/gi, "-")}`;
+  const cacheKey = `${method}:${endpointUrl}`;
 
   function handleChange(name: string, value: string) {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -71,6 +81,13 @@ export default function TestInBrowser({
         );
       }
 
+      const isCacheable = method.toUpperCase() === "GET";
+      const cached = isCacheable ? get(cacheKey) : null;
+      if (cached) {
+        setResult(cached);
+        return;
+      }
+
       const response = await fetch(url, fetchInit);
       const text = await response.text();
       let body: string;
@@ -79,7 +96,11 @@ export default function TestInBrowser({
       } catch {
         body = text;
       }
-      setResult({ status: response.status, body });
+      const runResult: RunResult = { status: response.status, body };
+      setResult(runResult);
+      if (isCacheable) {
+        set(cacheKey, runResult);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -155,7 +176,13 @@ export default function TestInBrowser({
               style={{ display: "grid", gap: 10, marginBottom: 14 }}
               aria-label="Endpoint parameters"
             >
-              {params.map((p) => (
+              {params.map((p) => {
+                // Mask inputs whose parameter name looks like a credential so
+                // the value is hidden in the UI and not offered by browser
+                // autocomplete.  Uses the same pattern list as snapshotUrl so
+                // the masking and redaction logic stay in sync.
+                const sensitive = isSensitiveKey(p.name);
+                return (
                 <label
                   key={p.name}
                   style={{
@@ -184,14 +211,24 @@ export default function TestInBrowser({
                       }}
                     >
                       {p.type}
+                      {sensitive && (
+                        <span
+                          aria-label="sensitive — value will be masked"
+                          style={{ marginLeft: 4, color: "var(--warning, #f59e0b)" }}
+                          title="This parameter looks like a credential and will be masked"
+                        >
+                          🔒
+                        </span>
+                      )}
                     </span>
                   </span>
                   <input
-                    type="text"
+                    type={sensitive ? "password" : "text"}
                     placeholder={p.required ? "Required" : "Optional"}
                     value={values[p.name] ?? ""}
                     onChange={(e) => handleChange(p.name, e.target.value)}
-                    aria-label={`${p.name} parameter value`}
+                    aria-label={`${p.name} parameter value${sensitive ? " (sensitive — masked)" : ""}`}
+                    autoComplete={sensitive ? "new-password" : "off"}
                     style={{
                       padding: "6px 10px",
                       borderRadius: 6,
@@ -202,7 +239,8 @@ export default function TestInBrowser({
                     }}
                   />
                 </label>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>

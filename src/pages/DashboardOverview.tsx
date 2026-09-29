@@ -22,6 +22,7 @@ import EmptyState from '../components/EmptyState';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
 import { formatUsdc, formatPrice } from '../utils/format';
 import { formatBalance, UNKNOWN_BALANCE_LABEL } from '../utils/balance';
+import { formatUsdc, formatPrice, formatTimeString } from '../utils/format';
 import { LOADING_DELAY_MS } from '../config/constants';
 import { usePinnedApis, pinnedApisStore } from '../state/pinnedApis';
 import MOCK_APIS from '../data/mockApis';
@@ -382,7 +383,7 @@ export function DashboardOverview({
                     { label: 'Amount', value: `${formatUsdc(item.amount)} USDC` },
                     { label: 'Type', value: item.type.toUpperCase() },
                   ],
-                  lastActive: new Date(item.date).toLocaleTimeString(),
+                  lastActive: formatTimeString(new Date(item.date)),
                 };
 
                 return (

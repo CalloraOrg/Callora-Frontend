@@ -41,6 +41,11 @@
  *    - tabpanel has aria-live="polite" for announcements
  *    - tablist carries an aria-label containing step count
  *    - Each tab has aria-controls pointing to the panel id
+ *
+ * 8. Checkpoint / resume behavior
+ *    - Active step is persisted to localStorage
+ *    - On mount, tour resumes from the persisted step
+ *    - Clearing or completing the tour removes the persisted checkpoint
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -55,19 +60,37 @@ import OnboardingTour from "./OnboardingTour";
 const readFile = (p: string) =>
   readFileSync(resolve(process.cwd(), p), "utf8");
 
-function renderTour(onComplete = vi.fn()) {
-  return render(<OnboardingTour onComplete={onComplete} />);
+function renderTour(onComplete = vi.fn(), persistKey = "callora_onboarding_checkpoint") {
+  return render(<OnboardingTour onComplete={onComplete} persistKey={persistKey} />);
 }
 
-/* ── 1. Rendering & initial state ────────────────────────────────────── */
+function clearStorage(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Ignore
+  }
+}
+
+function clearAllOnboardingStorage() {
+  clearStorage("callora_onboarding_checkpoint");
+  clearStorage("callora_test_onboarding_checkpoint");
+}
+
+describe("OnboardingTour", () => {
+  beforeEach(() => {
+    clearAllOnboardingStorage();
+  });
+
+  /* ── 1. Rendering & initial state ────────────────────────────────────── */
 
 describe("OnboardingTour — rendering", () => {
+
   it("renders the skip-tour link as the first focusable element", () => {
     renderTour();
     const skip = screen.getByRole("link", { name: /skip.*tour/i });
     expect(skip).toBeInTheDocument();
 
-    // Verify it appears before the first tab button in the DOM
     const firstTab = screen.getAllByRole("tab")[0];
     expect(
       skip.compareDocumentPosition(firstTab) &
@@ -78,7 +101,6 @@ describe("OnboardingTour — rendering", () => {
   it("renders the correct number of stepper tabs", () => {
     renderTour();
     const tabs = screen.getAllByRole("tab");
-    // 5 steps defined in TOUR_STEPS
     expect(tabs).toHaveLength(5);
   });
 
@@ -124,7 +146,6 @@ describe("OnboardingTour — button navigation", () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: /go to step 2/i }));
-    // Second step is now active
     const tabs = screen.getAllByRole("tab");
     expect(tabs[1]).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText(/get your api key/i)).toBeInTheDocument();
@@ -134,9 +155,7 @@ describe("OnboardingTour — button navigation", () => {
     renderTour();
     const user = userEvent.setup();
 
-    // Advance to step 2 first
     await user.click(screen.getByRole("button", { name: /go to step 2/i }));
-    // Now go back
     await user.click(screen.getByRole("button", { name: /go to previous/i }));
 
     const tabs = screen.getAllByRole("tab");
@@ -146,9 +165,6 @@ describe("OnboardingTour — button navigation", () => {
 
   it("hides the Back button on the first step", () => {
     renderTour();
-    // The Back button is visibility:hidden + disabled on step 1.
-    // getByRole excludes inaccessible / disabled elements, so we query
-    // directly on the DOM class name instead.
     const back = document.querySelector(
       ".tour-nav-button--ghost",
     ) as HTMLElement;
@@ -161,7 +177,6 @@ describe("OnboardingTour — button navigation", () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: /go to step 2/i }));
-    // After advancing, the Back button is no longer disabled or hidden
     const back = screen.getByRole("button", { name: /go to previous onboarding step/i });
     expect(back).toHaveStyle({ visibility: "visible" });
   });
@@ -170,7 +185,6 @@ describe("OnboardingTour — button navigation", () => {
     renderTour();
     const user = userEvent.setup();
 
-    // Click through all steps to reach the last one
     for (let i = 0; i < 4; i++) {
       const nextBtn = screen.getByRole("button", {
         name: /go to step|go to step/i,
@@ -187,14 +201,14 @@ describe("OnboardingTour — button navigation", () => {
     renderTour();
     const user = userEvent.setup();
 
-    // Navigate to the last step
     for (let i = 0; i < 4; i++) {
       const nextBtn = document.querySelector(".tour-nav-button--primary") as HTMLElement;
       await user.click(nextBtn);
     }
 
-    // Click Finish
-    const finishBtn = document.querySelector(".tour-nav-button--primary") as HTMLElement;
+    const finishBtn = document.querySelector(
+      ".tour-nav-button--primary",
+    ) as HTMLElement;
     await user.click(finishBtn);
 
     expect(screen.getByTestId("tour-complete")).toBeInTheDocument();
@@ -208,7 +222,6 @@ describe("OnboardingTour — stepper tab keyboard navigation", () => {
   it("moves to the next step on ArrowRight", () => {
     renderTour();
     const tabList = screen.getByRole("tablist");
-    // Focus the tablist then fire arrow right
     fireEvent.keyDown(tabList, { key: "ArrowRight" });
     const tabs = screen.getAllByRole("tab");
     expect(tabs[1]).toHaveAttribute("aria-selected", "true");
@@ -216,10 +229,8 @@ describe("OnboardingTour — stepper tab keyboard navigation", () => {
 
   it("moves to the previous step on ArrowLeft", () => {
     renderTour();
-    // First advance to step 2
     const tabList = screen.getByRole("tablist");
     fireEvent.keyDown(tabList, { key: "ArrowRight" });
-    // Now go back
     fireEvent.keyDown(tabList, { key: "ArrowLeft" });
     const tabs = screen.getAllByRole("tab");
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
@@ -236,10 +247,8 @@ describe("OnboardingTour — stepper tab keyboard navigation", () => {
   it("jumps to the first step on Home key", () => {
     renderTour();
     const tabList = screen.getByRole("tablist");
-    // Advance to step 3 first
     fireEvent.keyDown(tabList, { key: "ArrowRight" });
     fireEvent.keyDown(tabList, { key: "ArrowRight" });
-    // Home should jump back to step 1
     fireEvent.keyDown(tabList, { key: "Home" });
     const tabs = screen.getAllByRole("tab");
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
@@ -299,8 +308,6 @@ describe("OnboardingTour — skip link", () => {
 
     const clickEvent = new MouseEvent("click", { bubbles: true, cancelable: true });
     skip.dispatchEvent(clickEvent);
-    // onComplete may or may not be called via dispatchEvent but default should
-    // be preventable — the real test is that the component handles it without error
     expect(skip).toBeInTheDocument();
   });
 });
@@ -341,9 +348,7 @@ describe("OnboardingTour — completion screen", () => {
   it("restarts the tour when 'Restart tour' is clicked", async () => {
     const { user } = await reachCompletion();
     await user.click(screen.getByRole("button", { name: /restart.*tour/i }));
-    // Completion screen gone
     expect(screen.queryByTestId("tour-complete")).not.toBeInTheDocument();
-    // Back on step 1
     const tabs = screen.getAllByRole("tab");
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
   });
@@ -408,16 +413,13 @@ describe("OnboardingTour — ARIA attributes", () => {
     renderTour();
     const user = userEvent.setup();
     const tabList = screen.getByRole("tablist");
-    // Jump to last step
     fireEvent.keyDown(tabList, { key: "End" });
-    // Finish button should now be present
     expect(
       screen.getByRole("button", { name: /finish onboarding tour$/i }),
     ).toBeInTheDocument();
   });
 
   it("'Go to Dashboard' done button has an accessible name", async () => {
-    // Reach completion
     renderTour();
     const user = userEvent.setup();
     for (let i = 0; i < 4; i++) {
@@ -476,7 +478,6 @@ describe("focus.css @layer focus — OnboardingTour selectors", () => {
   });
 
   it("uses the accent token for every OnboardingTour focus ring", () => {
-    // Extract the OnboardingTour section of focus.css
     const tourSection = css.slice(
       css.indexOf(".onboarding-tour__skip:focus-visible"),
     );
@@ -491,9 +492,8 @@ describe("focus.css @layer focus — OnboardingTour selectors", () => {
   });
 
   it("OnboardingTour rules are inside the @layer focus block", () => {
-    // Verify the closing brace of @layer focus comes after our selectors
     const layerStart = css.indexOf("@layer focus {");
-    const layerEnd = css.lastIndexOf("}"); // last } closes the layer
+    const layerEnd = css.lastIndexOf("}");
     const skipRulePos = css.indexOf(".onboarding-tour__skip:focus-visible");
     expect(skipRulePos).toBeGreaterThan(layerStart);
     expect(skipRulePos).toBeLessThan(layerEnd);
@@ -506,12 +506,112 @@ describe("OnboardingTour.tsx — :focus-visible only (no bare :focus)", () => {
   const src = readFile("src/pages/OnboardingTour.tsx");
 
   it("does not set outline:none unconditionally on any element", () => {
-    // Allow outline: none inside a :focus { } block but not as a top-level style prop
     expect(src).not.toMatch(/style=\{[^}]*outline:\s*['"]none['"]/);
   });
 
   it("does not include a bare :focus selector in inline <style>", () => {
-    // The scoped <style> block in OnboardingTour must use :focus-visible not bare :focus
     expect(src).not.toMatch(/:focus\s*\{[^:]/);
   });
+});
+
+/* ── 9. Checkpoint / resume behavior ─────────────────────────────────── */
+
+describe("OnboardingTour — checkpoint and resume", () => {
+  const persistKey = "callora_test_onboarding_checkpoint";
+
+  it("persists the active step to localStorage", async () => {
+    renderTour(vi.fn(), persistKey);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /go to step 2/i }));
+    await user.click(screen.getByRole("button", { name: /go to step 3/i }));
+
+    const stored = localStorage.getItem(persistKey);
+    expect(stored).not.toBeNull();
+    expect(JSON.parse(stored)).toBe(2);
+  });
+
+  it("resumes from the persisted step on mount", () => {
+    localStorage.setItem(persistKey, JSON.stringify(3));
+
+    renderTour(vi.fn(), persistKey);
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs[3]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(/fund your vault/i)).toBeInTheDocument();
+  });
+
+  it("clears the checkpoint when the tour is completed", async () => {
+    renderTour(vi.fn(), persistKey);
+    const user = userEvent.setup();
+
+    for (let i = 0; i < 4; i++) {
+      const primaryBtn = document.querySelector(
+        ".tour-nav-button--primary",
+      ) as HTMLElement;
+      await user.click(primaryBtn);
+    }
+    const finishBtn = document.querySelector(
+      ".tour-nav-button--primary",
+    ) as HTMLElement;
+    await user.click(finishBtn);
+
+    expect(localStorage.getItem(persistKey)).toBeNull();
+  });
+
+  it("clears the checkpoint when the tour is skipped", async () => {
+    renderTour(vi.fn(), persistKey);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("link", { name: /skip.*tour/i }));
+
+    expect(localStorage.getItem(persistKey)).toBeNull();
+  });
+
+  it("defaults to step 0 when no checkpoint exists", () => {
+    renderTour(vi.fn(), persistKey);
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(/welcome to callora/i)).toBeInTheDocument();
+  });
+
+  it("defaults to step 0 when stored checkpoint is invalid", () => {
+    localStorage.setItem(persistKey, JSON.stringify("invalid"));
+
+    renderTour(vi.fn(), persistKey);
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("defaults to step 0 when stored checkpoint is out of range", () => {
+    localStorage.setItem(persistKey, JSON.stringify(99));
+
+    renderTour(vi.fn(), persistKey);
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("updates the checkpoint when restarting from the completion screen", async () => {
+    renderTour(vi.fn(), persistKey);
+    const user = userEvent.setup();
+
+    for (let i = 0; i < 4; i++) {
+      const primaryBtn = document.querySelector(
+        ".tour-nav-button--primary",
+      ) as HTMLElement;
+      await user.click(primaryBtn);
+    }
+    const finishBtn = document.querySelector(
+      ".tour-nav-button--primary",
+    ) as HTMLElement;
+    await user.click(finishBtn);
+
+    await user.click(screen.getByRole("button", { name: /restart.*tour/i }));
+
+    expect(localStorage.getItem(persistKey)).toBe(JSON.stringify(0));
+  });
+});
 });

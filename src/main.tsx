@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { AccountProvider } from "./hooks/useAccountContext";
 import RouteProgressBar from "./components/RouteProgressBar";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { ToastProvider } from "./components/Toast";
@@ -29,12 +30,16 @@ async function renderRoute() {
       <ThemeProvider>
         <AccountProvider>
           <CollectionsProvider>
+        <CollectionsProvider>
+          <AccountProvider>
             <BrowserRouter>
               <RouteProgressBar />
               <ToastProvider>{children}</ToastProvider>
             </BrowserRouter>
           </CollectionsProvider>
         </AccountProvider>
+          </AccountProvider>
+        </CollectionsProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
@@ -87,12 +92,16 @@ async function renderRoute() {
         <ThemeProvider>
           <AccountProvider>
             <CollectionsProvider>
+          <CollectionsProvider>
+            <AccountProvider>
               <RouteProgressBar />
               <ToastProvider>
                 <App />
               </ToastProvider>
             </CollectionsProvider>
           </AccountProvider>
+            </AccountProvider>
+          </CollectionsProvider>
         </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,
