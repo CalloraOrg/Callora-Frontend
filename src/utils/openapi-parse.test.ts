@@ -346,3 +346,206 @@ describe('parseOpenApiSpec — endpoint extraction', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// $ref resolution (local components)
+// ---------------------------------------------------------------------------
+
+describe('parseOpenApiSpec — $ref parameters (JSON)', () => {
+  it('resolves parameters referenced via #/components/parameters', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.3',
+      info: { title: 'Ref API', version: '1.0.0' },
+      paths: {
+        '/users/{id}': {
+          get: {
+            summary: 'Get user',
+            parameters: [{ $ref: '#/components/parameters/UserId' }],
+          },
+        },
+      },
+      components: {
+        parameters: {
+          UserId: {
+            name: 'id',
+            in: 'path',
+            required: true,
+            description: 'User id',
+            schema: { type: 'string' },
+          },
+        },
+      },
+    });
+
+    const result = parseOpenApiSpec(spec, 'ref.json');
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.endpoints[0].parameters).toEqual([
+      {
+        name: 'id',
+        in: 'path',
+        required: true,
+        description: 'User id',
+      },
+    ]);
+    // No fatal errors for a successful local resolve.
+    expect(result.errors.filter((e) => e.message.includes('Unresolved'))).toHaveLength(0);
+  });
+
+  it('merges path-level and operation-level resolved parameters', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.0',
+      paths: {
+        '/items/{id}': {
+          parameters: [{ $ref: '#/components/parameters/ItemId' }],
+          get: {
+            parameters: [
+              {
+                name: 'verbose',
+                in: 'query',
+                required: false,
+              },
+            ],
+          },
+        },
+      },
+      components: {
+        parameters: {
+          ItemId: { name: 'id', in: 'path', required: true },
+        },
+      },
+    });
+
+    const result = parseOpenApiSpec(spec, 'merge.json');
+    const names = result.endpoints[0].parameters?.map((p) => p.name);
+    expect(names).toEqual(['id', 'verbose']);
+  });
+
+  it('reports cyclic refs as a non-fatal warning and still returns endpoints', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.0',
+      paths: {
+        '/cycle': {
+          get: {
+            parameters: [{ $ref: '#/components/parameters/A' }],
+          },
+        },
+      },
+      components: {
+        parameters: {
+          A: { $ref: '#/components/parameters/B' },
+          B: { $ref: '#/components/parameters/A' },
+        },
+      },
+    });
+
+    const result = parseOpenApiSpec(spec, 'cycle.json');
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.endpoints[0].parameters ?? []).toHaveLength(0);
+    expect(result.errors.some((e) => /cyclic/i.test(e.message))).toBe(true);
+  });
+
+  it('reports remote refs without fetching and does not throw', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.0',
+      paths: {
+        '/remote': {
+          get: {
+            parameters: [
+              { $ref: 'https://example.com/params.json#/UserId' },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(() => parseOpenApiSpec(spec, 'remote.json')).not.toThrow();
+    const result = parseOpenApiSpec(spec, 'remote.json');
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.errors.some((e) => /remote|external|not fetched/i.test(e.message))).toBe(
+      true,
+    );
+  });
+
+  it('reports unresolved local refs as non-fatal errors', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.0',
+      paths: {
+        '/missing': {
+          get: {
+            parameters: [{ $ref: '#/components/parameters/DoesNotExist' }],
+          },
+        },
+      },
+      components: { parameters: {} },
+    });
+
+    const result = parseOpenApiSpec(spec, 'missing.json');
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.errors.some((e) => /unresolved/i.test(e.message))).toBe(true);
+  });
+
+  it('resolves requestBody schema $ref to a schema name hint', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.0',
+      paths: {
+        '/users': {
+          post: {
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/User' },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: {
+        schemas: {
+          User: { type: 'object', title: 'User' },
+        },
+      },
+    });
+
+    const result = parseOpenApiSpec(spec, 'body.json');
+    expect(result.endpoints[0].requestBodySchema).toBe('User');
+  });
+});
+
+describe('parseOpenApiSpec — $ref parameters (YAML)', () => {
+  it('resolves local parameter $ref from a YAML spec', () => {
+    const yaml = `
+openapi: 3.0.3
+info:
+  title: YAML Ref API
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      summary: Get pet
+      parameters:
+        - $ref: '#/components/parameters/PetId'
+components:
+  parameters:
+    PetId:
+      name: petId
+      in: path
+      required: true
+      description: Pet identifier
+`;
+
+    const result = parseOpenApiSpec(yaml, 'ref.yaml');
+    expect(result.errors.filter((e) => /unresolved|cyclic|remote/i.test(e.message))).toHaveLength(
+      0,
+    );
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.endpoints[0].parameters).toEqual([
+      {
+        name: 'petId',
+        in: 'path',
+        required: true,
+        description: 'Pet identifier',
+      },
+    ]);
+  });
+});
