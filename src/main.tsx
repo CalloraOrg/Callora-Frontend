@@ -5,6 +5,7 @@ import App from "./App";
 import RouteProgressBar from "./components/RouteProgressBar";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { ToastProvider } from "./components/Toast";
+import { AccountProvider } from "./hooks/useAccount";
 import "./index.css";
 import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
@@ -26,12 +27,14 @@ async function renderRoute() {
   const wrap = (children: React.ReactNode) => (
     <React.StrictMode>
       <ThemeProvider>
-        <CollectionsProvider>
-          <BrowserRouter>
-            <RouteProgressBar />
-            <ToastProvider>{children}</ToastProvider>
-          </BrowserRouter>
-        </CollectionsProvider>
+        <AccountProvider>
+          <CollectionsProvider>
+            <BrowserRouter>
+              <RouteProgressBar />
+              <ToastProvider>{children}</ToastProvider>
+            </BrowserRouter>
+          </CollectionsProvider>
+        </AccountProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
@@ -82,12 +85,14 @@ async function renderRoute() {
     <React.StrictMode>
       <BrowserRouter>
         <ThemeProvider>
-          <CollectionsProvider>
-            <RouteProgressBar />
-            <ToastProvider>
-              <App />
-            </ToastProvider>
-          </CollectionsProvider>
+          <AccountProvider>
+            <CollectionsProvider>
+              <RouteProgressBar />
+              <ToastProvider>
+                <App />
+              </ToastProvider>
+            </CollectionsProvider>
+          </AccountProvider>
         </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,

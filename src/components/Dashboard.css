@@ -394,6 +394,28 @@
   color: var(--danger);
 }
 
+/* ─── Balance card states: loading skeleton / error + retry ────────────── */
+.dashboard-card__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.dashboard-card__state-value {
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.dashboard-card__state-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 /* ─── Mobile responsive polish for new sections ────────────────────────── */
 @media (max-width: 720px) {
   .usage-gauge__runway dl {

@@ -394,3 +394,123 @@ describe('DashboardOverview — accessibility (WCAG 2.1 AA, #581)', () => {
     expect(container.querySelector('.dashboard-overview-container')).toBeTruthy();
   });
 });
+
+// ─── Balances: loading, failed, and known states ─────────────────────────────
+
+describe('DashboardOverview — balance request states', () => {
+  afterEach(cleanup);
+
+  it('renders a loading skeleton instead of a fabricated zero while balances load', () => {
+    renderOverview({ vaultBalance: null, walletBalance: null, balancesStatus: 'loading' });
+
+    expect(screen.getByTestId('vault-balance-loading')).toBeTruthy();
+    expect(screen.getByTestId('wallet-balance-loading')).toBeTruthy();
+    expect(screen.getByTestId('dashboard-card-vault').getAttribute('data-balance-state')).toBe('loading');
+    expect(screen.queryByText(/0\.00 USDC/)).toBeNull();
+    expect(screen.queryByTestId('vault-balance-error')).toBeNull();
+  });
+
+  it('derives the loading state when null balances arrive without an explicit status', () => {
+    renderOverview({ vaultBalance: null, walletBalance: null });
+
+    expect(screen.getByTestId('dashboard-card-vault').getAttribute('data-balance-state')).toBe('loading');
+  });
+
+  it('renders an inline retry and the failure reason when the request failed', () => {
+    renderOverview({
+      vaultBalance: null,
+      walletBalance: null,
+      balancesStatus: 'error',
+      balancesError: 'The balances service responded with 503.',
+    });
+
+    expect(screen.getByTestId('vault-balance-error')).toBeTruthy();
+    expect(screen.getByTestId('wallet-balance-error')).toBeTruthy();
+    expect(screen.getAllByText('The balances service responded with 503.').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /^Retry$/i }).length).toBeGreaterThan(0);
+  });
+
+  it('never renders $0.00 for an unknown balance', () => {
+    renderOverview({ vaultBalance: null, walletBalance: null, balancesStatus: 'error' });
+
+    expect(screen.getByTestId('dashboard-card-vault').textContent).not.toContain('0.00');
+    expect(screen.getByTestId('dashboard-card-wallet').textContent).not.toContain('0.00');
+  });
+
+  it('falls back to a default message when no error text is supplied', () => {
+    renderOverview({ vaultBalance: null, walletBalance: null, balancesStatus: 'error' });
+
+    expect(screen.getAllByText(/balances could not be loaded/i).length).toBeGreaterThan(0);
+  });
+
+  it('invokes onRetryBalances when the inline retry is clicked', () => {
+    const onRetry = vi.fn();
+    renderOverview({
+      vaultBalance: null,
+      walletBalance: null,
+      balancesStatus: 'error',
+      onRetryBalances: onRetry,
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^Retry$/i })[0]);
+
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not crash when retry is pressed without a retry handler', () => {
+    renderOverview({ vaultBalance: null, walletBalance: null, balancesStatus: 'error' });
+
+    expect(() => fireEvent.click(screen.getAllByRole('button', { name: /^Retry$/i })[0])).not.toThrow();
+  });
+
+  it('hides the low-balance banner while balances are loading', () => {
+    renderOverview({ vaultBalance: null, walletBalance: null, balancesStatus: 'loading' });
+
+    expect(screen.queryByText(/Low balance warning/i)).toBeNull();
+  });
+
+  it('hides the low-balance banner when the request failed', () => {
+    renderOverview({ vaultBalance: null, walletBalance: null, balancesStatus: 'error' });
+
+    expect(screen.queryByText(/Low balance warning/i)).toBeNull();
+  });
+
+  it('shows the low-balance banner when the fetched balance is genuinely low', () => {
+    renderOverview({ vaultBalance: 2, walletBalance: 500, balancesStatus: 'ready' });
+
+    expect(screen.getByText(/Low balance warning/i)).toBeTruthy();
+    expect(screen.getByText('2.00 USDC')).toBeTruthy();
+  });
+
+  it('renders the fetched balances once ready', () => {
+    renderOverview({ vaultBalance: 91.5, walletBalance: 120.25, balancesStatus: 'ready' });
+
+    expect(screen.getByTestId('dashboard-card-vault').textContent).toContain('91.50 USDC');
+    expect(screen.getByTestId('dashboard-card-wallet').textContent).toContain('120.25 USDC');
+  });
+
+  it('replaces the usage gauge with a placeholder while balances are unknown', () => {
+    renderOverview({ vaultBalance: null, walletBalance: null, balancesStatus: 'loading' });
+
+    expect(screen.getByTestId('usage-gauge-unavailable')).toBeTruthy();
+    expect(screen.queryByRole('progressbar')).toBeNull();
+  });
+
+  it('restores the usage gauge when balances resolve', () => {
+    renderOverview({ vaultBalance: 500, walletBalance: 100, balancesStatus: 'ready' });
+
+    expect(screen.queryByTestId('usage-gauge-unavailable')).toBeNull();
+    expect(screen.getByRole('progressbar')).toBeTruthy();
+  });
+
+  it('keeps a real zero balance visible in the preview tooltip', () => {
+    renderOverview({ vaultBalance: 0, walletBalance: 0, balancesStatus: 'ready' });
+
+    const vaultTrigger = screen.getByRole('button', {
+      name: /preview details for usdc vault overview/i,
+    });
+    fireEvent.focus(vaultTrigger);
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent('0.00 USDC');
+  });
+});
