@@ -87,19 +87,34 @@ by removing interactive controls and making content fully visible. (Closes #708)
 
 ## Routes
 
-| Path                | Description                               |
-| ------------------- | ----------------------------------------- |
-| `/`                 | Landing page                              |
-| `/dashboard`        | Developer dashboard                       |
-| `/marketplace`      | API marketplace                           |
-| `/billing`          | USDC deposit and settlements              |
-| `/api-usage`        | API usage analytics                       |
-| `/apis/my-apis`     | Published APIs management                 |
-| `/apis/plan-badge`  | Plan-tier badge assignment and empty state |
-| `/theme-playground` | Live theme token playground for designers |
-| `/500`              | Server error page                         |
-| `*`                 | 404 not found                             |
-| `/marketplace/grantfox-wave-compute/sla` | GrantFox Wave Compute API SLA details (FWC26) |
+Most pages are registered in `src/App.tsx`: the `APP_ROUTES` map and the `<Route>` elements that use it. On every full page load `src/main.tsx` checks the URL first and renders a few paths itself, outside the `App` shell. It matches by prefix, so `/marketplace/anything` also shows the marketplace. The "Rendered by" column shows which file serves each path.
+
+| Path | Description | Rendered by | Notes |
+| ---- | ----------- | ----------- | ----- |
+| `/` | Landing page | `App.tsx` | |
+| `/onboarding` | Guided multi-step tour for new users | `App.tsx` | |
+| `/dashboard` | Developer dashboard | `App.tsx` | |
+| `/marketplace` | API marketplace | `main.tsx`, `App.tsx` | `main.tsx` serves full page loads |
+| `/details/:id` | API detail page: overview, documentation, pricing, examples, reviews and embed tabs | `main.tsx` | `App.tsx` has no route for it; links push the URL and dispatch `popstate` |
+| `/publish` | Publish a new API listing | `main.tsx`, `App.tsx` | `main.tsx` serves full page loads |
+| `/apis/my-apis` | Published APIs management | `App.tsx` | |
+| `/apis/plan-badge` | Plan-tier badge assignment and empty state | `App.tsx` | |
+| `/api-usage` | API usage analytics | `App.tsx` | |
+| `/billing` | USDC deposit and settlements | `App.tsx` | |
+| `/billing/history` | Paginated history of past USDC billing transactions | `App.tsx` | |
+| `/webhooks/deliveries` | Webhook delivery log | `App.tsx` | |
+| `/documentation` | Documentation landing page | `App.tsx` | Placeholder copy |
+| `/status` | System status | `App.tsx` | Placeholder copy |
+| `/latency-chart` | API latency chart with min, average and P95 | `main.tsx` | Not linked from the app yet |
+| `/theme-playground` | Live theme token playground for designers | `App.tsx` | Internal tool |
+| `/design-system/docs` | UI component catalogue with live examples | `App.tsx` | Internal tool |
+| `/a11y-audit` | Accessibility audit board | `App.tsx` | Internal tool |
+| `/500` | Server error page | `App.tsx` | Demo only |
+| `/rate-limit` | Rate-limit configuration card | `App.tsx` | Demo only |
+| `/marketplace/grantfox-wave-compute/sla` | GrantFox Wave Compute API SLA details (FWC26) | `main.tsx` | Not wired up yet: it is in `APP_ROUTES`, but no `<Route>` renders `SlaCard`, so a page load here shows the marketplace |
+| `*` | 404 not found | `App.tsx` | Unmatched paths that reach `App.tsx` |
+
+When you add a route (an `APP_ROUTES` entry, a `<Route>` in `src/App.tsx` or a path check in `src/main.tsx`), add a row here. `src/readme-routes.test.ts` fails when a route in the code is missing from this table or a row names a path the code doesn't serve.
 
 ## Project layout
 
