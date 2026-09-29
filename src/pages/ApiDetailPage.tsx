@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import TestInBrowser from "../components/TestInBrowser";
@@ -402,6 +403,9 @@ export default function ApiDetailPage({ onBack }: Props) {
   const [assertiveAnnouncement, setAssertiveAnnouncement] = useState("");
   const { showToast } = useToast();
 
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
   const handleTabChange = useCallback((newTab: TabType) => {
     setTab(newTab);
     const tabLabel = TAB_ITEMS.find((t) => t.id === newTab)?.label ?? newTab;
@@ -409,9 +413,6 @@ export default function ApiDetailPage({ onBack }: Props) {
   }, []);
 
   const prefersReducedMotion = usePrefersReducedMotion();
-
-  // Extract ID from URL path: /details/[id]
-  const id = typeof window !== "undefined" ? window.location.pathname.split("/").filter(Boolean).pop() : undefined;
 
   const api = useMemo(() => findApiById(id), [id]);
   useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
@@ -507,6 +508,13 @@ export default function ApiDetailPage({ onBack }: Props) {
     return () => clearTimeout(timer);
   }, [prefersReducedMotion]);
 
+  // Reset tab state and loading when the id param changes so switching
+  // related APIs does not show stale content.
+  useEffect(() => {
+    setTab("overview");
+    setIsLoading(true);
+  }, [id]);
+
   useEffect(() => {
     if (!isLoading && api) {
       setAnnouncement(`${api.name} detail page loaded`);
@@ -529,7 +537,7 @@ export default function ApiDetailPage({ onBack }: Props) {
             variant="api-detail"
             action={{
               label: "Back to marketplace",
-              onClick: () => (window.location.href = "/marketplace"),
+              onClick: () => navigate("/marketplace"),
             }}
           />
         </div>
@@ -1164,7 +1172,7 @@ print(response.json())`;
                   currentApi={api}
                   allApis={MOCK_APIS}
                   onSelect={(related) => {
-                    window.location.href = `/details/${related.id}`;
+                    navigate(`/details/${related.id}`);
                   }}
                 />
               </div>
