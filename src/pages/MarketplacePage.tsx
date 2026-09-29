@@ -15,11 +15,15 @@ import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
-import MOCK_APIS, { type APIItem } from "../data/mockApis";
+import type { APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
-import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useFetchTracker } from "../hooks/useFetchTracker";
-import { LOADING_DELAY_MS } from "../config/constants";
+import {
+  CATALOG_CACHE_KEY,
+  fetchCatalog,
+  isCatalogAbortError,
+} from "../api/catalogApi";
+import { getCache, setCache } from "../utils/offlineApiCache";
 import {
   readDensityPreference,
   persistDensityPreference,
@@ -85,42 +89,91 @@ export default function MarketplacePage(): JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [isPageLoading, setIsPageLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<APIItem[]>([]);
+  // True when `catalog` came from the offline cache because the live request
+  // failed. The list is still rendered — an outage should not blank the page —
+  // but it is labelled so nobody mistakes it for fresh data.
+  const [isShowingStaleData, setIsShowingStaleData] = useState(false);
 
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
   const isInitialMount = useRef(true);
   // Monotonic sequence that guards the loading transition: only the latest
-  // in-flight load may flip `isLoading` off, so a stale timer from an earlier
-  // navigation can never overwrite the loading state of a newer one (#989).
+  // in-flight load may flip `isLoading` off, so a stale response from an
+  // earlier request can never overwrite the state of a newer one (#989).
   const requestSeqRef = useRef(0);
+  // Same idea, scoped to the pagination spinner, which is a much shorter-lived
+  // concern than the catalogue request and must not share its sequence.
+  const pageChangeSeqRef = useRef(0);
+  // The controller for the request that is currently in flight, so a retry can
+  // cancel its predecessor and unmount can cancel the live one.
+  const abortRef = useRef<AbortController | null>(null);
 
-  // Reactive OS-level reduced-motion preference (single source of truth).
-  const prefersReducedMotion = usePrefersReducedMotion();
+  // The catalogue cache is account-scoped (see offlineApiCache), matching the
+  // rest of the app's per-account isolation. The fallback id keeps the page
+  // working when it is rendered outside an AccountProvider.
+  const { account } = useAccountContext();
+  const cacheOwnerId = account?.id ?? "marketplace";
+
+  const runCatalogFetch = useCallback(
+    async (seq: number, controller: AbortController) => {
+      const { signal } = controller;
+      const readCachedCatalog = (): APIItem[] =>
+        getCache<APIItem[]>(cacheOwnerId, CATALOG_CACHE_KEY) ?? [];
+
+      try {
+        const items = await trackFetch(fetchCatalog(signal));
+        // A superseded request (or an unmount) must never write state.
+        if (signal.aborted || seq !== requestSeqRef.current) return;
+        setCatalog(items);
+        setIsShowingStaleData(false);
+        setFetchError(null);
+        setCache(cacheOwnerId, CATALOG_CACHE_KEY, items);
+      } catch (err) {
+        if (signal.aborted || isCatalogAbortError(err)) return;
+        if (seq !== requestSeqRef.current) return;
+
+        const cached = readCachedCatalog();
+        if (cached.length > 0) {
+          // Outage with a usable cache: keep the last good list on screen and
+          // flag it, rather than replacing a working page with an error.
+          setCatalog(cached);
+          setIsShowingStaleData(true);
+          setFetchError(null);
+        } else {
+          setCatalog([]);
+          setIsShowingStaleData(false);
+          setFetchError(
+            err instanceof Error
+              ? err.message
+              : "We encountered an error fetching the marketplace. Please try again.",
+          );
+        }
+      } finally {
+        if (!signal.aborted && seq === requestSeqRef.current) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [cacheOwnerId, trackFetch],
+  );
+
+  const startCatalogFetch = useCallback(() => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const seq = ++requestSeqRef.current;
+    setIsLoading(true);
+    setFetchError(null);
+    return runCatalogFetch(seq, controller);
+  }, [runCatalogFetch]);
 
   useEffect(() => {
-    const seq = ++requestSeqRef.current;
-    const abortController = new AbortController();
-
-    trackFetch(
-      new Promise<void>((resolve) => {
-        if (prefersReducedMotion) {
-          if (seq === requestSeqRef.current) setIsLoading(false);
-          resolve();
-        } else {
-          const timer = setTimeout(() => {
-            if (!abortController.signal.aborted) {
-              if (seq === requestSeqRef.current) setIsLoading(false);
-              resolve();
-            }
-          }, LOADING_DELAY_MS);
-          abortController.signal.addEventListener("abort", () => {
-            clearTimeout(timer);
-            resolve();
-          });
-        }
-      }),
-    );
-    return () => abortController.abort();
-  }, [trackFetch, prefersReducedMotion]);
+    void startCatalogFetch();
+    return () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, [startCatalogFetch]);
 
   useEffect(() => {
     persistDensityPreference(density);
@@ -147,14 +200,13 @@ export default function MarketplacePage(): JSX.Element {
     (favoritesOnly ? 1 : 0) +
     (statuses.size > 0 ? 1 : 0);
 
-  const handleRetryFetch = async () => {
-    setFetchError(null);
-    setIsLoading(true);
-    await trackFetch(new Promise((resolve) => setTimeout(resolve, 500)));
-    setIsLoading(false);
-  };
+  // Retry re-issues the real catalogue request rather than faking progress,
+  // so a recovered backend actually replaces the error state.
+  const handleRetryFetch = () => startCatalogFetch();
 
-  const allTags = useMemo(() => getAllUniqueTags(), []);
+  // Tag facets are derived from the loaded catalogue so a newly published API's
+  // tags are selectable the moment it appears.
+  const allTags = useMemo(() => getAllUniqueTags(catalog), [catalog]);
 
   // ── Aria-live announcements for screen readers ───────────────────────
   const [announcement, setAnnouncement] = useState("");
@@ -171,7 +223,7 @@ export default function MarketplacePage(): JSX.Element {
   // clear every filter + cursor from the URL. This guarantees the new account
   // starts from authoritative, non-stale state instead of inheriting a previous
   // account's selections (stale-state guard for #989).
-  const { account } = useAccountContext();
+  // account (and therefore `cacheOwnerId`) is read above, next to the fetch.
   const accountIdRef = useRef(account?.id);
   useEffect(() => {
     if (accountIdRef.current === account?.id) return;
@@ -182,7 +234,7 @@ export default function MarketplacePage(): JSX.Element {
 
   // Filter and sort items
   const filtered = useMemo(() => {
-    let items = MOCK_APIS.slice();
+    let items = catalog.slice();
 
     if (debouncedQuery.trim()) {
       const q = debouncedQuery.toLowerCase();
@@ -253,6 +305,7 @@ export default function MarketplacePage(): JSX.Element {
 
     return items;
   }, [
+    catalog,
     debouncedQuery,
     categories,
     tag,
@@ -408,10 +461,13 @@ export default function MarketplacePage(): JSX.Element {
   };
 
   const handlePageChange = () => {
-    const seq = ++requestSeqRef.current;
+    // Separate counter from the catalogue fetch: a page change must not
+    // invalidate an in-flight catalogue request and strand the page in its
+    // loading state.
+    const seq = ++pageChangeSeqRef.current;
     setIsPageLoading(true);
     requestAnimationFrame(() => {
-      if (seq === requestSeqRef.current) setIsPageLoading(false);
+      if (seq === pageChangeSeqRef.current) setIsPageLoading(false);
     });
   };
 
@@ -486,7 +542,7 @@ export default function MarketplacePage(): JSX.Element {
       </div>
 
       {/* Rail of APIs with the most recent usage */}
-      <RecentlyActiveRail apis={MOCK_APIS} onSelect={handleViewDetails} />
+      <RecentlyActiveRail apis={catalog} onSelect={handleViewDetails} />
 
       {/* Bottom: filters left, content right */}
       <div className="marketplace-layout">
@@ -587,7 +643,15 @@ export default function MarketplacePage(): JSX.Element {
             tags={allTags}
             selectedTag={tag}
             onTagChange={setTag}
+            apis={catalog}
           />
+
+          {isShowingStaleData && (
+            <p className="marketplace-stale-notice" role="status">
+              Showing saved results — we could not reach the marketplace to
+              refresh. <strong>These listings may be out of date.</strong>
+            </p>
+          )}
 
           {fetchError ? (
             <EmptyState variant="error" onRetry={handleRetryFetch} />

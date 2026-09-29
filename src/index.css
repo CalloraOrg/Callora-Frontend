@@ -2051,6 +2051,19 @@ code,
   font-weight: 600;
 }
 
+/* Shown when the catalogue request failed but a cached copy is being rendered.
+   The warning wording carries the meaning; the colour is subordinate to it
+   (WCAG 1.4.1). */
+.marketplace-stale-notice {
+  margin: 0 0 var(--mkt-space-lg);
+  padding: var(--mkt-space-sm) var(--mkt-space-md);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--text);
+  font-size: var(--mkt-font-size-sm);
+}
+
 .marketplace-actions {
   display: flex;
   gap: var(--mkt-space-md);
