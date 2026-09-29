@@ -17,10 +17,15 @@ import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
 import { useAccountContext } from "./hooks/useAccountContext";
+import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
+import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
 
 // Route splitting: dynamic imports for all heavy page routes
 const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
 const PublishApi = lazy(() => import("./pages/PublishApi"));
+const ApiDetailPage = lazy(() => import("./pages/ApiDetailPage"));
+const LatencyChart = lazy(() => import("./pages/LatencyChart"));
+const SlaCard = lazy(() => import("./pages/SlaCard"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const ApiUsage = lazy(() => import("./pages/ApiUsage"));
 const MyApis = lazy(() => import("./pages/MyApis"));
@@ -159,6 +164,10 @@ const APP_ROUTES = {
   slaCard: "/marketplace/grantfox-wave-compute/sla",
   webhookDeliveries: "/webhooks/deliveries",
   onboarding: "/onboarding",
+  details: "/details/:id",
+  detailsBase: "/details/",
+  latencyChart: "/latency-chart",
+  endpointSummary: "/endpoint-summary",
 } as const;
 
 function createMockHash() {
@@ -332,8 +341,11 @@ function App() {
     [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
     [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
   };
-  const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
-  const currentDescription = routeDescriptionMap[location.pathname];
+  // Dynamic detail routes set their own meta description, so the shell must not
+  // overwrite it while the page is mounted.
+  const isApiDetailRoute = location.pathname.startsWith(APP_ROUTES.detailsBase);
+  const currentTitle = isApiDetailRoute ? "API Detail – Callora" : (routeTitleMap[location.pathname] ?? "Callora");
+  const currentDescription = isApiDetailRoute ? undefined : routeDescriptionMap[location.pathname];
   useDocumentTitle(currentTitle, currentDescription);
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
@@ -655,7 +667,27 @@ function App() {
             <Route path={APP_ROUTES.onboarding} element={<OnboardingTour onComplete={() => navigate(APP_ROUTES.dashboard)} />} />
 
             <Route path={APP_ROUTES.dashboard} element={<DashboardPage vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
-            <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
+            <Route
+              path={APP_ROUTES.marketplace}
+              element={
+                <Suspense fallback={<MarketplacePageSkeleton />}>
+                  <MarketplacePage />
+                </Suspense>
+              }
+            />
+
+            <Route path={APP_ROUTES.slaCard} element={<SlaCard />} />
+
+            <Route
+              path={APP_ROUTES.details}
+              element={
+                <Suspense fallback={<ApiDetailPageSkeleton />}>
+                  <ApiDetailPage onBack={() => navigate(APP_ROUTES.marketplace)} />
+                </Suspense>
+              }
+            />
+
+            <Route path={APP_ROUTES.latencyChart} element={<LatencyChart />} />
 
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
 

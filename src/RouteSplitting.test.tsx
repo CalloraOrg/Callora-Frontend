@@ -2,11 +2,15 @@
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import App, { prefetchRoute } from './App';
 import { AccountProvider } from './hooks/useAccountContext';
 import { ThemeProvider } from './ThemeContext';
 import { CollectionsProvider } from './state/collectionsStore';
+
+const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 
 function renderApp(initialPath = '/') {
   return render(
@@ -20,6 +24,30 @@ function renderApp(initialPath = '/') {
       </CollectionsProvider>
     </ThemeProvider>
   );
+}
+
+function renderAppWithRouter(initialEntries: string[], initialIndex: number) {
+  const router = createMemoryRouter(
+    [
+      {
+        path: '*',
+        element: (
+          <ThemeProvider>
+            <CollectionsProvider>
+              <AccountProvider>
+                <App />
+              </AccountProvider>
+            </CollectionsProvider>
+          </ThemeProvider>
+        ),
+      },
+    ],
+    { initialEntries, initialIndex },
+  );
+
+  render(<RouterProvider router={router} />);
+
+  return router;
 }
 
 describe('Route Splitting and Responsiveness Suite (Quality-2)', () => {
@@ -111,5 +139,78 @@ describe('Route Splitting and Responsiveness Suite (Quality-2)', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Design System/i })).toBeTruthy();
     });
+  });
+
+  it('renders /marketplace inside the App shell on a direct deep link', async () => {
+    renderApp('/marketplace');
+
+    expect(screen.getByLabelText('Marketplace loading shell')).toBeTruthy();
+    expect(screen.getByRole('banner')).toBeTruthy();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: /API Marketplace/i })).toBeTruthy();
+    }, { timeout: 4000 });
+
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' });
+    expect(within(primaryNav).getByRole('link', { name: 'Marketplace' })).toBeTruthy();
+  });
+
+  it('renders /details/:id inside the App shell using the detail skeleton while loading', async () => {
+    window.history.pushState({}, '', '/details/weather-001');
+    renderApp('/details/weather-001');
+
+    expect(screen.getByLabelText('API detail loading shell')).toBeTruthy();
+    expect(screen.getByRole('banner')).toBeTruthy();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'WeatherSim API' })).toBeTruthy();
+    }, { timeout: 4000 });
+
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' });
+    expect(within(primaryNav).getByRole('link', { name: 'Marketplace' })).toBeTruthy();
+
+    window.history.pushState({}, '', '/');
+  });
+
+  it('renders /latency-chart inside the App shell on a direct deep link', async () => {
+    renderApp('/latency-chart');
+
+    expect(screen.getByRole('banner')).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Latency' })).toBeTruthy();
+
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' });
+    expect(within(primaryNav).getByRole('link', { name: 'Dashboard' })).toBeTruthy();
+  });
+
+  it('returns from an API detail to the marketplace on history back without remounting the shell', async () => {
+    window.history.pushState({}, '', '/details/weather-001');
+    const router = renderAppWithRouter(['/marketplace', '/details/weather-001'], 1);
+
+    expect(screen.getByLabelText('API detail loading shell')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'WeatherSim API' })).toBeTruthy();
+    }, { timeout: 4000 });
+
+    const topbarBeforeBack = screen.getByRole('banner');
+
+    await router.navigate(-1);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: /API Marketplace/i })).toBeTruthy();
+    }, { timeout: 4000 });
+
+    expect(screen.getByRole('banner')).toBe(topbarBeforeBack);
+    expect(router.state.location.pathname).toBe('/marketplace');
+
+    window.history.pushState({}, '', '/');
+  });
+
+  it('boots the app from a single provider-wrapped tree instead of a manual pathname router', () => {
+    const main = read('src/main.tsx');
+
+    expect(main).not.toMatch(/renderRoute/);
+    expect(main).not.toMatch(/popstate/);
+    expect(main).toMatch(/<App \/>/);
+    expect(main).toMatch(/<ThemeProvider>[\s\S]*<CollectionsProvider>[\s\S]*<AccountProvider>/);
   });
 });
