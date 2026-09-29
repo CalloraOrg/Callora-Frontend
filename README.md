@@ -36,10 +36,70 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 
 ## Keyboard shortcuts
 
+### Command Palette
+
+`src/components/CommandPalette.tsx` isn't rendered anywhere in the app yet, so these keys currently do nothing. They describe the component as built:
+
 - **Open Command Palette**: `Cmd + K` (macOS) or `Ctrl + K` (Windows/Linux)
 - **Navigate options**: `Up / Down Arrow` keys
 - **Select option**: `Enter`
 - **Close Palette**: `Escape` or backdrop click
+
+### Shortcut reference
+
+The tables below list every entry in `SHORTCUTS` (`src/hooks/useGlobalShortcuts.ts`), which is what the Shortcuts dialog renders, grouped by the same categories in the same order. For two-key shortcuts such as `g h`, press `g` and then `h`.
+
+`?` (open the Shortcuts dialog) and the `g` sequences are handled in `App.tsx`, so they work on pages rendered inside the app shell. Pages that `src/main.tsx` renders on its own after a full page load (`/publish`, `/marketplace`, `/details/:id` and `/latency-chart`) don't respond to them.
+
+**Not wired up yet:** four entries in the dialog have no handler for the action they describe: `u` (Upgrade plan), `/` (Focus search bar), `1-5` (Switch tabs) and `Esc` on the API detail page (Go back to Marketplace). They are listed so this reference matches the dialog.
+
+#### Global
+
+| Key | Action |
+| --- | ------ |
+| `?` | Open shortcuts help |
+| `Esc` | Close modals |
+
+#### Navigation
+
+| Key | Action |
+| --- | ------ |
+| `g h` | Go to Dashboard |
+| `g m` | Go to Marketplace |
+| `g b` | Go to Billing |
+| `g a` | Go to My APIs |
+
+#### Plan
+
+| Key | Action |
+| --- | ------ |
+| `u` | Upgrade plan |
+
+#### Marketplace
+
+| Key | Action |
+| --- | ------ |
+| `/` | Focus search bar |
+| `c` | Add/remove focused API card to comparison |
+
+#### ApiDetailPage
+
+| Key | Action |
+| --- | ------ |
+| `Esc` | Go back to Marketplace |
+| `1-5` | Switch tabs (1=Overview, 2=Documentation, 3=Pricing, 4=Examples, 5=Reviews) |
+
+#### Pricing
+
+| Key | Action |
+| --- | ------ |
+| `s` | Select recommended pricing plan |
+
+### Typing in form fields
+
+`?` and the `g` that starts a navigation sequence go through `useGlobalShortcuts`, which ignores key presses while focus is in an `input`, `textarea` or `select` element or in editable (`contenteditable`) content. Typing in a form therefore never opens the Shortcuts dialog or starts a `g` sequence. `c` (on a focused API card) and `s` (on the pricing table) are handled by those components, which also ignore key presses from text inputs.
+
+When you add a shortcut, add it to `SHORTCUTS` and to the matching table above. `src/hooks/useGlobalShortcuts.test.tsx` fails when the README and the Shortcuts dialog disagree.
 
 ## UI Design System
 
