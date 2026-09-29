@@ -23,7 +23,7 @@ export default function WebhookDeliveries() {
       await retryDelivery(id);
       showToast('Retry triggered successfully');
     } catch (err: any) {
-      showToast(`Retry failed: ${err.message}`, 'error');
+      showToast({ message: `Retry failed: ${err.message}`, variant: 'error', persistent: true });
     }
   };
 
