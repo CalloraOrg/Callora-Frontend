@@ -16,7 +16,7 @@ import Tabs from '../components/Tabs';
 import { Icons } from '../utils/icons';
 import { LinkIcon } from '../components/icons';
 import KbdHint from '../components/KbdHint';
-import { SHORTCUTS } from '../hooks/useGlobalShortcuts';
+import { SHORTCUTS, useGlobalShortcuts } from '../hooks/useGlobalShortcuts';
 import StatusIndicator from './StatusIndicator';
 import { useAccountId } from '../hooks/useAccount';
 import { useExportHistory } from '../hooks/useExportHistory';
@@ -520,6 +520,37 @@ export default function ApiUsage() {
     announceStatus(`Starting ${format.toUpperCase()} export...`);
     startExport(format);
   };
+
+  useGlobalShortcuts(
+    useCallback(
+      (event) => {
+        switch (event.key) {
+          case 't':
+            if (!isLoading) {
+              handleMakeTestCall();
+            }
+            break;
+          case 'h':
+            toggleHistory();
+            break;
+          case 'c':
+            handleCopyApiKey();
+            break;
+          case 's':
+            if (!isLoading) {
+              handleShareSnapshot();
+            }
+            break;
+          case 'e':
+            if (!isExporting) {
+              handleExportHistory('csv');
+            }
+            break;
+        }
+      },
+      [isLoading, isExporting, handleMakeTestCall, toggleHistory, handleCopyApiKey, handleShareSnapshot, handleExportHistory]
+    )
+  );
 
   if (isPageLoading) {
     return <ApiUsageSkeleton />;
