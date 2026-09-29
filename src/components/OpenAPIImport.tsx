@@ -20,7 +20,12 @@ type ImportState =
   | { kind: 'idle' }
   | { kind: 'dragging' }
   | { kind: 'loading' }
-  | { kind: 'preview'; endpoints: ParsedEndpoint[]; filename: string }
+  | {
+      kind: 'preview';
+      endpoints: ParsedEndpoint[];
+      filename: string;
+      warnings?: ParseError[];
+  }
   | { kind: 'error'; errors: ParseError[]; filename: string };
 
 const ACCEPTED_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -149,7 +154,12 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
     const result = parseOpenApiSpec(text, file.name);
 
     if (result.errors.length > 0 && result.endpoints.length === 0) {
-      setState({ kind: 'error', filename: file.name, errors: result.errors });
+      setState({
+      kind: 'preview',
+      endpoints: result.endpoints,
+      filename: file.name,
+      ...(result.errors.length > 0 ? { warnings: result.errors } : {}),
+    });
       return;
     }
 
@@ -336,6 +346,27 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
                 </h3>
               </div>
             </div>
+            
+             {state.warnings && state.warnings.length > 0 && (
+              <div
+                className="oai-preview-warnings"
+                role="status"
+                aria-live="polite"
+                aria-label="Import warnings"
+              >
+                <p className="oai-preview-warnings-title">
+                  {state.warnings.length} warning
+                  {state.warnings.length !== 1 ? 's' : ''} during import
+                </p>
+                <ul className="oai-preview-warnings-list">
+                  {state.warnings.map((w, idx) => (
+                    <li key={idx} className="oai-preview-warning-item">
+                      {w.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {state.endpoints.length === 0 ? (
               <p className="oai-preview-empty">
@@ -669,6 +700,27 @@ const STYLES = `
     margin: 0;
     font-size: 0.9rem;
     color: var(--muted, #93a0bf);
+  }
+  .oai-preview-warnings {
+    margin: 0.75rem 0;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border, #e5e7eb);
+    background: var(--surface-muted, #f9fafb);
+  }
+  .oai-preview-warnings-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .oai-preview-warnings-list {
+    margin: 0;
+    padding-left: 1.25rem;
+    font-size: 0.8125rem;
+    color: var(--text-muted, #6b7280);
+  }
+  .oai-preview-warning-item {
+    margin: 0.25rem 0;
   }
 
   .oai-endpoint-list {
