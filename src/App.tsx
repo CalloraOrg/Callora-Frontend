@@ -8,9 +8,10 @@ import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut } from "./utils/format";
 import DepositPreview from "./components/DepositPreview";
-import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS } from "./config/constants";
+import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS } from "./config/constants";
 import CompareDrawer from "./components/CompareDrawer";
 import CompareTray from "./components/CompareTray";
+import ExternalLink from "./components/ExternalLink";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
@@ -287,21 +288,21 @@ function LandingPage({ onStartUsingApis, onPublishApi, onTakeTour }: { onStartUs
 
       <footer className="lp-section lp-footer">
         <nav aria-label="Footer links">
-          <a href="#" className="link-nav">
+          <ExternalLink href={EXTERNAL_LINKS.about} className="link-nav">
             About
-          </a>
-          <a href="#" className="link-nav">
+          </ExternalLink>
+          <NavLink to={APP_ROUTES.documentation} className="link-nav">
             Documentation
-          </a>
-          <a href="#" className="link-nav">
+          </NavLink>
+          <ExternalLink href={EXTERNAL_LINKS.support} className="link-nav">
             Support
-          </a>
-          <a href="#" className="link-nav">
+          </ExternalLink>
+          <ExternalLink href={EXTERNAL_LINKS.terms} className="link-nav">
             Terms
-          </a>
-          <a href="#" className="link-nav">
+          </ExternalLink>
+          <ExternalLink href={EXTERNAL_LINKS.privacy} className="link-nav">
             Privacy
-          </a>
+          </ExternalLink>
         </nav>
         <p>© {new Date().getFullYear()} Callora. All rights reserved.</p>
       </footer>

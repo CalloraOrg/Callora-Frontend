@@ -30,3 +30,11 @@ export const PRESET_AMOUNTS = [10, 50, 100, 500] as const;
  * and Dashboard to mimic an async data fetch.
  */
 export const LOADING_DELAY_MS = 1500;
+
+/** External links used in the footer and across the app. */
+export const EXTERNAL_LINKS = {
+  about: "https://callora.org/about",
+  support: "https://callora.org/support",
+  terms: "https://callora.org/terms",
+  privacy: "https://callora.org/privacy",
+} as const;
