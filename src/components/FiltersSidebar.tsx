@@ -1,8 +1,9 @@
 import { WarningIcon, ChevronIcon } from "./icons";
 import Dropdown from "./Dropdown";
 import EmptyState from "./EmptyState";
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { usePersistedState } from "../hooks/usePersistedState";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 
 import LiveRegion from "./LiveRegion";
 
@@ -145,13 +146,7 @@ export default function FiltersSidebar({
   toggleStatus?: (s: string) => void;
   resultCount?: number;
 }) {
-  const prefersReducedMotion = useMemo(() => {
-    return (
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    );
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Inverted price range — show a warning without silently discarding filters.
   const hasPriceRangeError = minPrice !== null && maxPrice !== null && minPrice > maxPrice;

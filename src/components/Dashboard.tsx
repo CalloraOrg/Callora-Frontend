@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import Skeleton from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import UsageGauge from '../components/UsageGauge';
+import LiveRegion from '../components/LiveRegion';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { formatUsdc, formatPrice } from '../utils/format';
 import { LOADING_DELAY_MS } from '../config/constants';
 import { usePinnedApis, pinnedApisStore } from '../state/pinnedApis';
@@ -27,6 +29,20 @@ interface ActivityItem {
   date: string; // ISO string
 }
 
+/**
+ * Screen-reader copy describing the recent-activity data transition.
+ * Announced via a polite live region so loading/success/empty changes are
+ * semantically announced without stealing focus.
+ */
+export function describeActivityAnnouncement(
+  isLoading: boolean,
+  activity: ActivityItem[] | null,
+): string | undefined {
+  if (isLoading) return 'Loading recent activity.';
+  if (!activity) return undefined;
+  return activity.length === 0 ? 'No recent activity yet.' : 'Recent activity loaded.';
+}
+
 export default function Dashboard({
   vaultBalance,
   walletBalance,
@@ -36,8 +52,10 @@ export default function Dashboard({
 }: DashboardProps) {
   const navigate = useNavigate();
   const [activity, setActivity] = useState<ActivityItem[] | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
-  // Simulate data fetch with a timeout
+  // Simulate data fetch with a timeout. Under reduced motion the delay is
+  // skipped entirely so the loading skeleton is not flashed on screen.
   useEffect(() => {
     const timer = setTimeout(() => {
       // Mock data – you can replace with real API call later
@@ -47,9 +65,9 @@ export default function Dashboard({
         { type: 'deposit', amount: 100, date: new Date(Date.now() - 2 * 86400000).toISOString() },
       ];
       setActivity(mock);
-    }, LOADING_DELAY_MS);
+    }, prefersReducedMotion ? 0 : LOADING_DELAY_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [prefersReducedMotion]);
 
   const isLoading = activity === null;
   const totalUsage = activity?.reduce((sum, item) => (item.type === 'usage' ? sum + item.amount : sum), 0) ?? 0;
@@ -132,8 +150,12 @@ export default function Dashboard({
       </div>
 
       {/* Recent Activity */}
-      <div className="dashboard-activity">
+      <div className="dashboard-activity" aria-busy={isLoading}>
         <h3 className="eyebrow">Recent activity</h3>
+        <LiveRegion
+          regionId="dashboard-activity"
+          message={describeActivityAnnouncement(isLoading, activity)}
+        />
         {isLoading && (
           <div className="activity-skeletons">
             {[...Array(3)].map((_, i) => (

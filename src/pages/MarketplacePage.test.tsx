@@ -289,12 +289,12 @@ describe("MarketplacePage URL filter state", () => {
     expect((favCheckbox as HTMLInputElement).checked).toBe(true);
   });
 
-  it("reads ?page param and clamps invalid page to valid range", () => {
-    renderPage(["/marketplace?page=99"]);
+  it("falls back to page 1 when an invalid cursor is provided", () => {
+    renderPage(["/marketplace?cursor=ZZOOWW__invalid"]);
     settleMarketplaceTimers();
 
-    const page1Btn = screen.getByRole("button", { name: "Page 1" });
-    expect(page1Btn.getAttribute("aria-current")).toBe("page");
+    const prevBtn = screen.getByRole("button", { name: "Previous page" });
+    expect(prevBtn).toBeDisabled();
   });
 
   it("reads multiple filter params simultaneously", () => {
@@ -531,6 +531,145 @@ describe("MarketplacePage tabular-nums (FWC26)", () => {
       const label = badge.getAttribute("aria-label") ?? "";
       expect(label).toMatch(/active filter/i);
     }
+  });
+});
+
+describe("MarketplacePage cursor pagination", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("renders Prev/Next buttons for cursor-based navigation", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const prevBtn = screen.getByRole("button", { name: "Previous page" });
+    const nextBtn = screen.getByRole("button", { name: "Next page" });
+    expect(prevBtn).toBeTruthy();
+    expect(nextBtn).toBeTruthy();
+  });
+
+  it("disables Previous button on first page", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const prevBtn = screen.getByRole("button", { name: "Previous page" });
+    expect(prevBtn).toBeDisabled();
+  });
+
+  it("enables Next button when more pages exist", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const nextBtn = screen.getByRole("button", { name: "Next page" });
+    expect(nextBtn).not.toBeDisabled();
+  });
+
+  it("navigates to next page and updates cursor in URL", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const nextBtn = screen.getByRole("button", { name: "Next page" });
+    fireEvent.click(nextBtn);
+
+    const prevBtn = screen.getByRole("button", { name: "Previous page" });
+    expect(prevBtn).not.toBeDisabled();
+  });
+
+  it("navigates back to previous page", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const nextBtn = screen.getByRole("button", { name: "Next page" });
+    fireEvent.click(nextBtn);
+
+    const prevBtn = screen.getByRole("button", { name: "Previous page" });
+    fireEvent.click(prevBtn);
+
+    expect(prevBtn).toBeDisabled();
+  });
+
+  it("disables Next button on last page", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const nextBtn = screen.getByRole("button", { name: "Next page" });
+    fireEvent.click(nextBtn);
+
+    const prevBtn = screen.getByRole("button", { name: "Previous page" });
+    fireEvent.click(prevBtn);
+
+    expect(nextBtn).not.toBeDisabled();
+  });
+
+  it("resets cursor when search filter changes", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const nextBtn = screen.getByRole("button", { name: "Next page" });
+    fireEvent.click(nextBtn);
+
+    const prevBtn = screen.getByRole("button", { name: "Previous page" });
+    expect(prevBtn).not.toBeDisabled();
+
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "weather" } });
+    act(() => { vi.advanceTimersByTime(500); });
+
+    const prevAfter = screen.getByRole("button", { name: "Previous page" });
+    expect(prevAfter).toBeDisabled();
+  });
+
+  it("shows cursor-page-indicator with current page info", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const indicator = document.querySelector(".cursor-page-indicator");
+    expect(indicator).toBeTruthy();
+    expect(indicator?.textContent).toContain("1");
+  });
+
+  it("renders page-size selector alongside cursor pagination", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const select = screen.getByLabelText("Items per page:");
+    expect(select).toBeTruthy();
+  });
+
+  it("changes page size and resets cursor", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const nextBtn = screen.getByRole("button", { name: "Next page" });
+    fireEvent.click(nextBtn);
+
+    const prevBtn = screen.getByRole("button", { name: "Previous page" });
+    expect(prevBtn).not.toBeDisabled();
+
+    const select = screen.getByLabelText("Items per page:");
+    fireEvent.change(select, { target: { value: "24" } });
+
+    const prevAfter = screen.getByRole("button", { name: "Previous page" });
+    expect(prevAfter).toBeDisabled();
   });
 });
 

@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import EmptyState from '../components/EmptyState';
-import Skeleton, { ApiUsageSkeleton, SkeletonRow } from '../components/Skeleton';
-import { formatPrice } from '../utils/format';
+import { useState, useEffect, useCallback } from 'react';
+import Skeleton, { ApiUsageSkeleton } from '../components/Skeleton';
+import { formatPrice, formatDuration } from '../utils/format';
 import type { JsonSchema } from '../components/RequestBodyEditor';
-import CallHistoryRow from '../components/CallHistoryRow';
+import VirtualizedCallHistory from '../components/VirtualizedCallHistory';
 import Breadcrumb from '../components/Breadcrumb';
 import RequestHistoryPanel from '../components/RequestHistoryPanel';
 import ParamsBuilder from '../components/ParamsBuilder';
 import UsageChart from '../components/UsageChart';
 import { useFetchTracker } from '../hooks/useFetchTracker';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useQuota } from '../hooks/useQuota';
 import PlanNudge from '../components/PlanNudge';
 import CallsHeatmap from '../components/CallsHeatmap';
@@ -18,6 +18,9 @@ import { LinkIcon } from '../components/icons';
 import KbdHint from '../components/KbdHint';
 import { SHORTCUTS } from '../hooks/useGlobalShortcuts';
 import StatusIndicator from './StatusIndicator';
+import { useAccountId } from '../hooks/useAccount';
+import { useExportHistory } from '../hooks/useExportHistory';
+import { ExportProgressBar } from '../components/ExportProgressBar';
 import {
   clearHistory,
   loadHistory,
@@ -204,19 +207,6 @@ const API_USAGE_SHORTCUTS = SHORTCUTS.filter(
 
 
 
-function formatTime(ms: number) {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatTimestamp(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 
 export default function ApiUsage() {
@@ -239,11 +229,29 @@ export default function ApiUsage() {
   const toggleHistory = useCallback(() => setIsHistoryOpen(prev => !prev), []);
   const [historyEntries, setHistoryEntries] = useState<any[]>([]);
 
-  const prefersReducedMotion = useMemo(() => {
-    return typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  }, []);
+  const currentAccountId = useAccountId() ?? 'default';
+  const {
+    status: exportStatus,
+    format: exportFormat,
+    progress: exportProgress,
+    totalRecords: exportTotalRecords,
+    processedRecords: exportProcessedRecords,
+    error: exportError,
+    downloadUrl: exportDownloadUrl,
+    fileName: exportFileName,
+    lastFailedFormat: exportLastFailedFormat,
+    isExporting,
+    isFailed: isExportFailed,
+    isCompleted: isExportCompleted,
+    isCancelled: isExportCancelled,
+    startExport,
+    cancelExport,
+    retryLastFailedExport,
+    recoverDownload,
+    resetExport,
+  } = useExportHistory(callHistory, { accountId: currentAccountId });
+
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
@@ -509,36 +517,8 @@ export default function ApiUsage() {
   };
 
   const handleExportHistory = (format: 'csv' | 'json') => {
-    const data = callHistory.map(call => ({
-      timestamp: call.timestamp.toISOString(),
-      endpoint: call.endpoint,
-      status: call.status,
-      responseTime: call.responseTime,
-      cost: call.cost
-    }));
-
-    if (format === 'json') {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'call-history.json';
-      a.click();
-    } else {
-      const csv = [
-        'Timestamp,Endpoint,Status,Response Time,Cost',
-        ...data.map(call =>
-          `${call.timestamp},${call.endpoint},${call.status},${call.responseTime},${call.cost}`
-        )
-      ].join('\n');
-
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'call-history.csv';
-      a.click();
-    }
+    announceStatus(`Starting ${format.toUpperCase()} export...`);
+    startExport(format);
   };
 
   if (isPageLoading) {
@@ -705,7 +685,7 @@ export default function ApiUsage() {
             ) : (
               <div className="response-content">
                 <div className="response-meta">
-                  <span className="response-time tabular-nums">Response time: {formatTime(responseTime || 0)}</span>
+                  <span className="response-time tabular-nums">Response time: {formatDuration(responseTime || 0)}</span>
                   <span className="response-cost tabular-nums">Cost: {formatPrice(callCost || 0)} USDC</span>
                 </div>
                 <pre className="response-json">
@@ -735,7 +715,7 @@ export default function ApiUsage() {
           </div>
           <div className="stat-card">
             <span className="stat-label">Avg Response Time</span>
-            <strong className="stat-value tabular-nums">{formatTime(usageStats.avgResponseTime)}</strong>
+            <strong className="stat-value tabular-nums">{formatDuration(usageStats.avgResponseTime)}</strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Success Rate</span>
@@ -783,45 +763,54 @@ export default function ApiUsage() {
             >
               Reset Filters
             </button>
-            <button className="secondary-button" onClick={() => handleExportHistory('csv')}>
-              Export CSV
+            <button
+              className="secondary-button"
+              onClick={() => handleExportHistory('csv')}
+              disabled={isExporting}
+              aria-busy={isExporting && exportFormat === 'csv'}
+            >
+              {isExporting && exportFormat === 'csv' ? 'Exporting CSV...' : 'Export CSV'}
             </button>
-            <button className="secondary-button" onClick={() => handleExportHistory('json')}>
-              Export JSON
+            <button
+              className="secondary-button"
+              onClick={() => handleExportHistory('json')}
+              disabled={isExporting}
+              aria-busy={isExporting && exportFormat === 'json'}
+            >
+              {isExporting && exportFormat === 'json' ? 'Exporting JSON...' : 'Export JSON'}
             </button>
           </div>
         </div>
+
+        <ExportProgressBar
+          exportState={{
+            status: exportStatus,
+            format: exportFormat,
+            progress: exportProgress,
+            totalRecords: exportTotalRecords,
+            processedRecords: exportProcessedRecords,
+            error: exportError,
+            downloadUrl: exportDownloadUrl,
+            fileName: exportFileName,
+            lastFailedFormat: exportLastFailedFormat,
+          }}
+          onCancel={cancelExport}
+          onRetry={retryLastFailedExport}
+          onRecoverDownload={recoverDownload}
+          onDismiss={resetExport}
+        />
 
         {/* Screen-reader announcement for ApiUsage state changes (WCAG 2.1 AA) */}
         <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
           {liveStatusMessage}
         </p>
 
-        <div className="call-history-table" aria-busy={isLoading}>
-           <div className="table-header">
-             <span>Timestamp</span>
-             <span>Endpoint</span>
-             <span>Status</span>
-             <span>Response Time</span>
-             <span>Cost</span>
-             <span>Actions</span>
-           </div>
-
-           {isTableLoading ? (
-             <SkeletonRow rows={5} />
-           ) : filteredCallHistory.length === 0 ? (
-             <EmptyState message="No call records match the selected filter." />
-           ) : (
-             filteredCallHistory.map(call => (
-               <CallHistoryRow
-                 key={call.id}
-                 call={call}
-                 expanded={expandedCall === call.id}
-                 onToggleExpand={id => setExpandedCall(expandedCall === id ? null : id)}
-               />
-             ))
-           )}
-         </div>
+        <VirtualizedCallHistory
+          calls={filteredCallHistory}
+          isLoading={isTableLoading}
+          expandedCallId={expandedCall}
+          onToggleExpand={(id) => setExpandedCall(expandedCall === id ? null : id)}
+        />
       </div>
 
       {/* Integration Guide */}

@@ -52,6 +52,12 @@ type Props = {
    * The current `call` is treated as "before" (A); `compareWith` is "after" (B).
    */
   compareWith?: CallRecord;
+  /**
+   * tabIndex for the row's expand/collapse button. Virtualized tables use
+   * roving tabindex (0 on the active row, -1 elsewhere) so only one row is
+   * in the tab order at a time; defaults to 0 (normal button behavior).
+   */
+  viewButtonTabIndex?: number;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -196,6 +202,7 @@ export default function CallHistoryRow({
   expanded,
   onToggleExpand,
   compareWith,
+  viewButtonTabIndex = 0,
 }: Props) {
   /**
    * Track whether the diff is showing "raw" or "diff" mode.
@@ -242,6 +249,7 @@ export default function CallHistoryRow({
             onClick={() => onToggleExpand(call.id)}
             aria-expanded={expanded}
             aria-controls={`call-details-${call.id}`}
+            tabIndex={viewButtonTabIndex}
           >
             {expanded ? 'Hide' : 'View'}
           </button>

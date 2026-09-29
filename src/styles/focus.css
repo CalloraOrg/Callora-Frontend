@@ -355,6 +355,45 @@
     outline-offset: 2px;
     background: var(--accent);
   }
+
+  /* ── OnboardingTour focus-visible overrides ────────────────────────────
+     Every interactive element inside OnboardingTour needs a visible
+     focus ring for keyboard users. These rules live inside @layer focus
+     so they match the cascade level of the other component rules above. */
+  .onboarding-tour__skip:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .tour-step-tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .onboarding-tour__panel:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .tour-nav-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .tour-done-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .tour-restart-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  .onboarding-tour *:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 }
 
 /* ── reduced-motion: suppress transition on focus for ApiUsage controls ── */

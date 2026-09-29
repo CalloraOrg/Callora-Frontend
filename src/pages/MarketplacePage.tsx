@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import ApiCard from "../components/ApiCard";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { useFavorites } from "../hooks/useFavorites";
+import { useMarketplaceUrlState } from "../hooks/useMarketplaceUrlState";
+import { useAccountContext } from "../hooks/useAccountContext";
 import SearchBar from "../components/SearchBar";
 import SortDropdown, { type SortValue } from "../components/SortDropdown";
 
@@ -15,6 +17,7 @@ import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import { useDebounce } from "../hooks/useDebounce";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import { LOADING_DELAY_MS } from "../config/constants";
 import {
@@ -28,6 +31,7 @@ import LiveRegion from "../components/LiveRegion";
 import RecentlyActiveRail from "../components/RecentlyActiveRail";
 import { useCompareStore } from "../state/compareStore";
 import MarketplacePageSkeleton from "./MarketplacePage.skeleton";
+import { useCursorPagination } from "../hooks/useCursorPagination";
 
 export default function MarketplacePage(): JSX.Element {
   const { apis } = useCompareStore();
@@ -42,253 +46,69 @@ export default function MarketplacePage(): JSX.Element {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [search, setSearchRaw] = useState(
-    () => searchParams.get("q") ?? "",
-  );
+  // Single source of truth for every marketplace filter: the URL. The hook
+  // derives each value from `searchParams` on render and only ever writes back
+  // to the URL, so back/forward, refreshes, and deep links can never leave the
+  // UI showing a stale, locally-cached filter (#989).
+  const {
+    query,
+    queryDraft,
+    commitQuery,
+    setQueryDraft,
+    categories,
+    setCategories,
+    statuses,
+    setStatuses,
+    tag,
+    setTag,
+    minPrice,
+    setMinPrice,
+    maxPrice,
+    setMaxPrice,
+    popularity,
+    setPopularity,
+    favoritesOnly,
+    setFavoritesOnly,
+    sort,
+    setSort,
+    clearAll,
+  } = useMarketplaceUrlState();
 
-  import React, { useState, useEffect } from 'react';
-
-export interface MarketplacePageProps {
-  // Existing props...
-}
-
-export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
-  const [items, setItems] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [filter, setFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  
-  // State dedicated to screen reader announcements
-  const [srAnnouncement, setSrAnnouncement] = useState<string>('');
-
-  // Example handler for filter or search change
-  const handleFilterChange = (newFilter: string) => {
-    setFilter(newFilter);
-    // Announce filter update trigger
-    setSrAnnouncement(`Filtering marketplace by ${newFilter}`);
-  };
-
-  // Announce results update after fetch/filter completion
-  useEffect(() => {
-    if (isLoading) {
-      setSrAnnouncement('Loading marketplace grants...');
-    } else {
-      const count = items.length;
-      const message = count === 1 
-        ? 'Marketplace updated: 1 grant found.' 
-        : `Marketplace updated: ${count} grants found.`;
-      
-      setSrAnnouncement(message);
-    }
-  }, [isLoading, items]);
-
-  return (
-    <div className="marketplace-page">
-      <h1>Grant Marketplace</h1>
-
-      {/* Screen Reader Live Region */}
-      <div 
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="sr-only"
-        data-testid="marketplace-sr-announcer"
-      >
-        {srAnnouncement}
-      </div>
-
-      {/* Visually Visible UI */}
-      <div className="marketplace-controls">
-        <label htmlFor="marketplace-search">Search Grants</label>
-        <input
-          id="marketplace-search"
-          type="search"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by keyword..."
-        />
-
-        <select 
-          value={filter} 
-          onChange={(e) => handleFilterChange(e.target.value)}
-          aria-label="Filter grants by category"
-        >
-          <option value="all">All Categories</option>
-          <option value="infrastructure">Infrastructure</option>
-          <option value="community">Community</option>
-        </select>
-      </div>
-
-      {isLoading ? (
-        <div>Loading...</div>
-      ) : (
-        <div className="marketplace-grid">
-          {items.map((item) => (
-            <article key={item.id} className="grant-card">
-              <h2>{item.title}</h2>
-              <p>{item.description}</p>
-            </article>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-  const setSearch = (v: string) => {
-    setSearchRaw(v);
-    setSearchParams((prev) => {
-      if (v) prev.set("q", v); else prev.delete("q");
-      return prev;
-    }, { replace: true });
-  };
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
 
   const [density, setDensity] = useState<DensityPreference>(() =>
     readDensityPreference(),
   );
-  // Debounce search input to prevent excessive re-renders on large lists
-  const debouncedSearch = useDebounce(search, 300);
-  // ── Filter persistence in URL ──────────────────────────────────────────────
-  // Categories are serialised as comma-separated ?categories= param.
-  // Tag, minPrice, maxPrice, popularity are individual params.
-  const [selectedCategories, setSelectedCategoriesRaw] = useState<Set<string>>(
-    () => {
-      const raw = searchParams.get("categories");
-      return raw ? new Set(raw.split(",").filter(Boolean)) : new Set();
-    },
-  );
-  const setSelectedCategories = (next: Set<string>) => {
-    setSelectedCategoriesRaw(next);
-    setSearchParams(
-      (prev) => {
-        if (next.size > 0) prev.set("categories", [...next].join(","));
-        else prev.delete("categories");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
+  const debouncedQuery = useDebounce(query, 300);
 
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(
-    () => {
-      const raw = searchParams.get("statuses");
-      return raw ? new Set(raw.split(",").filter(Boolean)) : new Set();
-    },
-  );
-
-  const [selectedTag, setSelectedTagRaw] = useState<string | null>(() =>
-    searchParams.get("tag"),
-  );
-  const setSelectedTag = (tag: string | null) => {
-    setSelectedTagRaw(tag);
-    setSearchParams(
-      (prev) => {
-        if (tag) prev.set("tag", tag);
-        else prev.delete("tag");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const [minPrice, setMinPriceRaw] = useState<number | null>(() => {
-    const v = searchParams.get("minPrice");
-    return v ? Number(v) : null;
-  });
-  const setMinPrice = (v: number | null) => {
-    setMinPriceRaw(v);
-    setSearchParams(
-      (prev) => {
-        if (v !== null) prev.set("minPrice", String(v));
-        else prev.delete("minPrice");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const [maxPrice, setMaxPriceRaw] = useState<number | null>(() => {
-    const v = searchParams.get("maxPrice");
-    return v ? Number(v) : null;
-  });
-  const setMaxPrice = (v: number | null) => {
-    setMaxPriceRaw(v);
-    setSearchParams(
-      (prev) => {
-        if (v !== null) prev.set("maxPrice", String(v));
-        else prev.delete("maxPrice");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const [popularity, setPopularityRaw] = useState<string>(
-    () => searchParams.get("popularity") ?? "any",
-  );
-  const setPopularity = (v: string) => {
-    setPopularityRaw(v);
-    setSearchParams(
-      (prev) => {
-        if (v !== "any") prev.set("popularity", v);
-        else prev.delete("popularity");
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-  const { favorites, toggleFavorite, isFavorite } = useFavorites();
-
-  const [favoritesOnly, setFavoritesOnlyRaw] = useState(
-    () => searchParams.get("favorites") === "1",
-  );
-  const setFavoritesOnly = (v: boolean) => {
-    setFavoritesOnlyRaw(v);
-    setSearchParams((prev) => {
-      if (v) prev.set("favorites", "1"); else prev.delete("favorites");
-      return prev;
-    }, { replace: true });
-  };
-
-  /**
-   * Sort state persisted via URL query parameter ?sort=
-   * Default is "popularity" to match existing behaviour.
-   */
-  const sortParam = (searchParams.get("sort") ?? "popularity") as SortValue;
-  const setSortParam = (value: SortValue) => {
-    setSearchParams(
-      (prev) => {
-        prev.set("sort", value);
-        return prev;
-      },
-      { replace: true },
-    );
-  };
-
-  const currentPage = Math.max(1, Number(searchParams.get("page")) || 1);
-  const [shown, setShown] = useState<number>(12);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Ref used to restore focus to the Filters trigger after the sheet closes
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
   const isInitialMount = useRef(true);
+  // Monotonic sequence that guards the loading transition: only the latest
+  // in-flight load may flip `isLoading` off, so a stale timer from an earlier
+  // navigation can never overwrite the loading state of a newer one (#989).
+  const requestSeqRef = useRef(0);
+
+  // Reactive OS-level reduced-motion preference (single source of truth).
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
+    const seq = ++requestSeqRef.current;
     const abortController = new AbortController();
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     trackFetch(
       new Promise<void>((resolve) => {
         if (prefersReducedMotion) {
-          setIsLoading(false);
+          if (seq === requestSeqRef.current) setIsLoading(false);
           resolve();
         } else {
           const timer = setTimeout(() => {
             if (!abortController.signal.aborted) {
-              setIsLoading(false);
+              if (seq === requestSeqRef.current) setIsLoading(false);
               resolve();
             }
           }, LOADING_DELAY_MS);
@@ -300,45 +120,33 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
       }),
     );
     return () => abortController.abort();
-  }, [trackFetch]);
+  }, [trackFetch, prefersReducedMotion]);
 
   useEffect(() => {
     persistDensityPreference(density);
   }, [density]);
 
-  /**
-   * Determine if any filters are currently active.
-   * Used to distinguish between "no APIs exist" vs "filters too narrow" empty states.
-   */
   const hasActiveFilters = () => {
     return (
-      search.trim() !== "" ||
-      selectedCategories.size > 0 ||
-      selectedTag !== null ||
+      query.trim() !== "" ||
+      categories.size > 0 ||
+      tag !== null ||
       minPrice !== null ||
       maxPrice !== null ||
       popularity !== "any" ||
       favoritesOnly ||
-      selectedStatuses.size > 0
+      statuses.size > 0
     );
   };
 
-  /**
-   * Count of actively-applied filter dimensions — shown as a badge on the
-   * mobile Filters trigger button.
-   */
   const activeFilterCount =
-    selectedCategories.size +
+    categories.size +
     (minPrice !== null ? 1 : 0) +
     (maxPrice !== null ? 1 : 0) +
     (popularity !== "any" ? 1 : 0) +
     (favoritesOnly ? 1 : 0) +
-    (selectedStatuses.size > 0 ? 1 : 0);
+    (statuses.size > 0 ? 1 : 0);
 
-  /**
-   * Handle retry for fetch errors.
-   * Clears error state and simulates refetch.
-   */
   const handleRetryFetch = async () => {
     setFetchError(null);
     setIsLoading(true);
@@ -346,7 +154,6 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
     setIsLoading(false);
   };
 
-  /** Tag list memoised from the mock dataset — stable across re-renders. */
   const allTags = useMemo(() => getAllUniqueTags(), []);
 
   // ── Aria-live announcements for screen readers ───────────────────────
@@ -359,12 +166,26 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
     announceTimerRef.current = setTimeout(() => setAnnouncement(""), 3000);
   }, []);
 
+  // Account-switch reset. Marketplace filters are scoped to the active account
+  // (favorites, category availability, etc.), so when the account changes we
+  // clear every filter + cursor from the URL. This guarantees the new account
+  // starts from authoritative, non-stale state instead of inheriting a previous
+  // account's selections (stale-state guard for #989).
+  const { account } = useAccountContext();
+  const accountIdRef = useRef(account?.id);
+  useEffect(() => {
+    if (accountIdRef.current === account?.id) return;
+    accountIdRef.current = account?.id;
+    clearAll();
+    announce("Switched account. Marketplace filters were reset.");
+  }, [account?.id, clearAll, announce]);
+
   // Filter and sort items
   const filtered = useMemo(() => {
     let items = MOCK_APIS.slice();
 
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.toLowerCase();
       items = items.filter((a) => {
         return (
           a.name.toLowerCase().includes(q) ||
@@ -375,24 +196,22 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
       });
     }
 
-    if (selectedCategories.size > 0) {
-      items = items.filter((a) => selectedCategories.has(a.category ?? ""));
+    if (categories.size > 0) {
+      items = items.filter((a) => categories.has(a.category ?? ""));
     }
 
-    if (selectedStatuses.size > 0) {
-      items = items.filter((a) => a.status && selectedStatuses.has(a.status));
+    if (statuses.size > 0) {
+      items = items.filter((a) => a.status && statuses.has(a.status));
     }
 
     if (favoritesOnly) {
       items = items.filter((a) => favorites.includes(a.id));
     }
 
-    if (selectedTag) {
-      const normalizedSelectedTag = selectedTag.toLowerCase();
+    if (tag) {
+      const normalizedTag = tag.toLowerCase();
       items = items.filter((a) =>
-        (a.tags || []).some(
-          (tag) => tag.toLowerCase() === normalizedSelectedTag,
-        ),
+        (a.tags || []).some((t) => t.toLowerCase() === normalizedTag),
       );
     }
 
@@ -415,18 +234,17 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
       );
     }
 
-    // explicit sort options driven by the URL ?sort= param
-    if (sortParam === "price-asc")
+    if (sort === "price-asc")
       items = items.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
-    if (sortParam === "latency-asc")
+    if (sort === "latency-asc")
       items = items.sort(
         (a, b) =>
           (a.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER) -
           (b.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER),
       );
-    if (sortParam === "popularity")
+    if (sort === "popularity")
       items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
-    if (sortParam === "newest")
+    if (sort === "newest")
       items = items.sort(
         (a, b) =>
           Date.parse(b.createdAt ?? "1970-01-01") -
@@ -435,19 +253,100 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
 
     return items;
   }, [
-    debouncedSearch,
-    selectedCategories,
-    selectedTag,
+    debouncedQuery,
+    categories,
+    tag,
     minPrice,
     maxPrice,
     popularity,
     favoritesOnly,
-    sortParam,
-    selectedStatuses,
+    sort,
+    statuses,
   ]);
 
+  // ── Cursor pagination ──────────────────────────────────────────────────
+  const initialCursor = searchParams.get("cursor");
+  const {
+    pageItems,
+    hasNextPage,
+    hasPreviousPage,
+    currentPageIndex,
+    totalItemCount,
+    goToNextPage,
+    goToPreviousPage,
+    resetCursor,
+    currentCursor,
+  } = useCursorPagination(filtered, pageSize, initialCursor);
+
+  // Sync cursor to URL
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        if (currentCursor) {
+          prev.set("cursor", currentCursor);
+        } else {
+          prev.delete("cursor");
+        }
+        return prev;
+      },
+      { replace: true },
+    );
+  }, [currentCursor, setSearchParams]);
+
+  // Reset cursor when filters change (skip initial mount)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    resetCursor();
+  }, [
+    debouncedQuery,
+    categories,
+    tag,
+    minPrice,
+    maxPrice,
+    popularity,
+    sort,
+    statuses,
+    favoritesOnly,
+    resetCursor,
+  ]);
 
   // ── Aria-live announcements (relies on filtered being defined above) ──
+  const prevIsLoading = useRef(isLoading);
+  const prevFetchError = useRef(fetchError);
+  const prevPageIndex = useRef(currentPageIndex);
+
+  useEffect(() => {
+    if (prevIsLoading.current && !isLoading) {
+      if (fetchError) {
+        announce(`Error loading marketplace: ${fetchError}`);
+      } else {
+        announce("Marketplace loaded.");
+      }
+    } else if (!prevIsLoading.current && isLoading) {
+      announce("Loading marketplace...");
+    }
+    prevIsLoading.current = isLoading;
+  }, [isLoading, fetchError, announce]);
+
+  useEffect(() => {
+    if (fetchError && fetchError !== prevFetchError.current && !isLoading) {
+      announce(`Error loading marketplace: ${fetchError}`);
+    }
+    prevFetchError.current = fetchError;
+  }, [fetchError, isLoading, announce]);
+
+  useEffect(() => {
+    if (prevPageIndex.current !== currentPageIndex) {
+      const newStart = totalItemCount > 0 ? currentPageIndex * pageSize + 1 : 0;
+      const newEnd = Math.min((currentPageIndex + 1) * pageSize, totalItemCount);
+      announce(`Page changed. Showing APIs ${newStart} through ${newEnd}.`);
+      prevPageIndex.current = currentPageIndex;
+    }
+  }, [currentPageIndex, pageSize, totalItemCount, announce]);
+
   const prevFilteredCount = useRef(0);
   const isFirstFilterRender = useRef(true);
   useEffect(() => {
@@ -466,98 +365,69 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
     }
   }, [filtered.length, announce]);
 
-  // Announce when tag filter changes
   const prevTag = useRef<string | null>(null);
   useEffect(() => {
     const prev = prevTag.current;
-    if (selectedTag !== prev) {
-      if (selectedTag) {
-        announce(`Filtering by tag: ${selectedTag}`);
+    if (tag !== prev) {
+      if (tag) {
+        announce(`Filtering by tag: ${tag}`);
       } else {
         announce("Tag filter removed.");
       }
-      prevTag.current = selectedTag;
+      prevTag.current = tag;
     }
-  }, [selectedTag, announce]);
+  }, [tag, announce]);
 
-
-  const handleTagClick = (tag: string) => {
-    setSelectedTag(
-      selectedTag?.toLowerCase() === tag.toLowerCase() ? null : tag,
-    );
+  const handleTagClick = (clickedTag: string) => {
+    setTag(tag?.toLowerCase() === clickedTag.toLowerCase() ? null : clickedTag);
   };
-
-  // Calculate total pages
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-
-  // Clamp current page to valid range
-  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
-
-  // Slice items for current page
-  const displayedItems = useMemo(() => {
-    const start = (validCurrentPage - 1) * pageSize;
-    const end = start + pageSize;
-    return filtered.slice(start, end);
-  }, [filtered, validCurrentPage, pageSize]);
 
   // Handlers
   const toggleCategory = (c: string) => {
-    const copy = new Set(selectedCategories);
+    const copy = new Set(categories);
     if (copy.has(c)) copy.delete(c);
     else copy.add(c);
-    setSelectedCategories(copy);
-    setSearchParams((prev) => { prev.set("page", "1"); return prev; }, { replace: true });
+    setCategories(copy);
   };
 
   const toggleStatus = (s: string) => {
-    const copy = new Set(selectedStatuses);
+    const copy = new Set(statuses);
     if (copy.has(s)) copy.delete(s);
     else copy.add(s);
-    setSelectedStatuses(copy);
-    setSearchParams({ page: "1" });
+    setStatuses(copy);
   };
 
   const clearCategories = () => {
-    setSelectedCategories(new Set());
-    setSearchParams({ page: "1" });
+    setCategories(new Set());
   };
 
   const clearFilters = () => {
-    setSelectedCategories(new Set());
-    setSelectedTag(null);
-    setMinPrice(null);
-    setMaxPrice(null);
-    setPopularity("any");
-    setFavoritesOnly(false);
-    setSelectedStatuses(new Set());
-    setSortParam("popularity");
-    setSearch("");
+    clearAll();
     announce("All filters cleared. Showing all APIs.");
-    setShown(12);
-    setSearchParams((prev) => {
-      prev.delete("categories");
-      prev.delete("tag");
-      prev.delete("minPrice");
-      prev.delete("maxPrice");
-      prev.delete("popularity");
-      prev.delete("favorites");
-      prev.delete("sort");
-      prev.delete("q");
-      prev.delete("statuses");
-      prev.set("page", "1");
-      return prev;
-    }, { replace: true });
+    setPageSize(12);
   };
 
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setSearchParams((prev) => { prev.set("page", page.toString()); return prev; }, { replace: true });
-    }
+  const handlePageChange = () => {
+    const seq = ++requestSeqRef.current;
+    setIsPageLoading(true);
+    requestAnimationFrame(() => {
+      if (seq === requestSeqRef.current) setIsPageLoading(false);
+    });
+  };
+
+  const handleGoNext = () => {
+    handlePageChange();
+    goToNextPage();
+  };
+
+  const handleGoPrevious = () => {
+    handlePageChange();
+    goToPreviousPage();
   };
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
-    setSearchParams((prev) => { prev.set("page", "1"); return prev; }, { replace: true });
+    resetCursor();
   };
 
   const handleViewDetails = (api: APIItem) => {
@@ -565,30 +435,19 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
-
-
-  // If page is invalid, update URL
-  useEffect(() => {
-    if (validCurrentPage !== currentPage) {
-      setSearchParams((prev) => { prev.set("page", validCurrentPage.toString()); return prev; }, { replace: true });
-    }
-  }, [validCurrentPage, currentPage, setSearchParams]);
-
-  // Reset page when filters change (skip initial mount so URL ?page= is preserved)
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    setSearchParams((prev) => { prev.set("page", "1"); return prev; }, { replace: true });
-  }, [debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sortParam, setSearchParams]);
-
-
-  const startItem = (validCurrentPage - 1) * pageSize + 1;
-  const endItem = Math.min(validCurrentPage * pageSize, filtered.length);
+  const startItem = totalItemCount > 0 ? currentPageIndex * pageSize + 1 : 0;
+  const endItem = Math.min(
+    (currentPageIndex + 1) * pageSize,
+    totalItemCount,
+  );
 
   if (isLoading) {
-    return <MarketplacePageSkeleton density={density} />;
+    return (
+      <>
+        <MarketplacePageSkeleton density={density} />
+        <LiveRegion message={announcement} />
+      </>
+    );
   }
 
   return (
@@ -598,7 +457,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
         <h1>API Marketplace</h1>
         <div className="marketplace-search-row">
           <div className="marketplace-search">
-            <SearchBar value={search} onChange={setSearch} />
+            <SearchBar value={queryDraft} onChange={commitQuery} />
           </div>
           <div
             className="marketplace-density-toggle"
@@ -623,7 +482,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
             </button>
           </div>
         </div>
-        <SortDropdown value={sortParam} onChange={setSortParam} />
+        <SortDropdown value={sort} onChange={setSort} />
       </div>
 
       {/* Rail of APIs with the most recent usage */}
@@ -633,7 +492,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
       <div className="marketplace-layout">
         <aside className="marketplace-sidebar">
           <FiltersSidebar
-            selectedCategories={selectedCategories}
+            selectedCategories={categories}
             toggleCategory={toggleCategory}
             minPrice={minPrice}
             maxPrice={maxPrice}
@@ -644,7 +503,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
             clearFilters={clearFilters}
             favoritesOnly={favoritesOnly}
             toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
-            selectedStatuses={selectedStatuses}
+            selectedStatuses={statuses}
             toggleStatus={toggleStatus}
             resultCount={filtered.length}
           />
@@ -658,8 +517,6 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
           }
         >
           <div className="marketplace-toolbar">
-            {/* numeric-tabular keeps page/count digits fixed-width so the
-                label doesn't shift as the user pages through results. */}
             <div className="marketplace-count">
               {filtered.length === 0 ? (
                 <>
@@ -680,17 +537,17 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
                   {" "}APIs
                 </>
               )}
-              {selectedTag && (
+              {tag && (
                 <span className="marketplace-active-tag" aria-live="polite">
-                  Filtered by tag: #{selectedTag}
+                  Filtered by tag: #{tag}
                 </span>
               )}
             </div>
 
             <div className="marketplace-actions">
               <select
-                value={sortParam}
-                onChange={(e) => setSortParam(e.target.value as SortValue)}
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortValue)}
               >
                 <option value="relevance">Relevance</option>
                 <option value="priceAsc">Price: low → high</option>
@@ -699,7 +556,6 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
                 <option value="newest">Newest</option>
               </select>
 
-              {/* Mobile Filters trigger — hidden on desktop via CSS */}
               <button
                 ref={filtersTriggerRef}
                 className="ghost-button marketplace-filter-button"
@@ -722,15 +578,15 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
 
           <CategoryPills
             categories={ALL_CATEGORIES}
-            selectedCategories={selectedCategories}
+            selectedCategories={categories}
             toggleCategory={toggleCategory}
             clearCategories={clearCategories}
           />
 
           <ApiTagFilter
             tags={allTags}
-            selectedTag={selectedTag}
-            onTagChange={setSelectedTag}
+            selectedTag={tag}
+            onTagChange={setTag}
           />
 
           {fetchError ? (
@@ -777,26 +633,30 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
             />
           ) : (
             <div className="marketplace-grid">
-              {displayedItems.map((a) => (
+              {pageItems.map((a) => (
                 <ApiCard
                   key={a.id}
                   api={a}
                   density={density}
                   onViewDetails={handleViewDetails}
                   onTagClick={handleTagClick}
-                  activeTag={selectedTag}
+                  activeTag={tag}
                 />
               ))}
             </div>
           )}
 
-          {/* Bottom pagination */}
+          {/* Cursor-based pagination */}
           {filtered.length > 0 && (
             <Pagination
-              currentPage={validCurrentPage}
-              totalPages={totalPages}
+              mode="cursor"
+              currentPageIndex={currentPageIndex}
+              hasNextPage={hasNextPage}
+              hasPreviousPage={hasPreviousPage}
+              totalItemCount={totalItemCount}
               pageSize={pageSize}
-              onPageChange={handlePageChange}
+              onGoNext={handleGoNext}
+              onGoPrevious={handleGoPrevious}
               onPageSizeChange={handlePageSizeChange}
             />
           )}
@@ -811,7 +671,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
         open={showFiltersMobile}
         onClose={() => setShowFiltersMobile(false)}
         resultCount={filtered.length}
-        selectedCategories={selectedCategories}
+        selectedCategories={categories}
         toggleCategory={toggleCategory}
         minPrice={minPrice}
         maxPrice={maxPrice}
@@ -822,7 +682,7 @@ export const MarketplacePage: React.FC<MarketplacePageProps> = () => {
         clearFilters={clearFilters}
         favoritesOnly={favoritesOnly}
         toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
-        selectedStatuses={selectedStatuses}
+        selectedStatuses={statuses}
         toggleStatus={toggleStatus}
         triggerRef={filtersTriggerRef}
       />

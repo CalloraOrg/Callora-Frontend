@@ -164,4 +164,17 @@ describe("EndpointGroupHover", () => {
     
     expect(screen.queryByLabelText("Forecast group preview")).toBeNull();
   });
+
+  it("closes the preview on Escape without moving focus off the trigger", () => {
+    render(<EndpointGroupHover groups={groups} />);
+
+    const trigger = screen.getByRole("button", { name: /forecast 2 endpoints/i });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "Escape" });
+
+    // Preview is dismissed.
+    expect(screen.queryByLabelText("Forecast group preview")).toBeNull();
+    // Keyboard focus stays on the trigger (not stranded on <body>).
+    expect(document.activeElement).toBe(trigger);
+  });
 });

@@ -16,6 +16,18 @@ const defaultProps = {
   ],
 };
 
+/** Props that include a sensitive-looking param alongside a safe one. */
+const sensitiveProps = {
+  endpointUrl: "https://api.callora.com/v1/secure",
+  method: "GET",
+  params: [
+    { name: "apiKey", type: "string", required: true },
+    { name: "token", type: "string", required: false },
+    { name: "Authorization", type: "string", required: false },
+    { name: "limit", type: "number", required: false },
+  ],
+};
+
 describe("TestInBrowser", () => {
   it("renders the trigger button in a collapsed state by default", () => {
     render(<TestInBrowser {...defaultProps} />);
@@ -83,4 +95,75 @@ describe("TestInBrowser", () => {
 
     vi.unstubAllGlobals();
   });
+
+  // ── Security: sensitive param inputs must be masked ───────────────────────
+
+  describe("sensitive parameter masking", () => {
+    it("renders apiKey param input as type=password", () => {
+      render(<TestInBrowser {...sensitiveProps} />);
+      fireEvent.click(screen.getByRole("button", { name: /test in browser/i }));
+
+      const input = screen.getByLabelText(/apikey parameter value/i) as HTMLInputElement;
+      expect(input.type).toBe("password");
+    });
+
+    it("renders token param input as type=password", () => {
+      render(<TestInBrowser {...sensitiveProps} />);
+      fireEvent.click(screen.getByRole("button", { name: /test in browser/i }));
+
+      const input = screen.getByLabelText(/token parameter value/i) as HTMLInputElement;
+      expect(input.type).toBe("password");
+    });
+
+    it("renders Authorization param input as type=password", () => {
+      render(<TestInBrowser {...sensitiveProps} />);
+      fireEvent.click(screen.getByRole("button", { name: /test in browser/i }));
+
+      const input = screen.getByLabelText(/authorization parameter value/i) as HTMLInputElement;
+      expect(input.type).toBe("password");
+    });
+
+    it("renders non-sensitive param inputs as type=text", () => {
+      render(<TestInBrowser {...sensitiveProps} />);
+      fireEvent.click(screen.getByRole("button", { name: /test in browser/i }));
+
+      const input = screen.getByLabelText(/limit parameter value/i) as HTMLInputElement;
+      expect(input.type).not.toBe("password");
+    });
+
+    it("sets autocomplete=new-password on sensitive inputs to prevent browser saves", () => {
+      render(<TestInBrowser {...sensitiveProps} />);
+      fireEvent.click(screen.getByRole("button", { name: /test in browser/i }));
+
+      const input = screen.getByLabelText(/apikey parameter value/i) as HTMLInputElement;
+      expect(input.getAttribute("autocomplete")).toBe("new-password");
+    });
+
+    it("shows the 🔒 indicator next to sensitive param names", () => {
+      render(<TestInBrowser {...sensitiveProps} />);
+      fireEvent.click(screen.getByRole("button", { name: /test in browser/i }));
+
+      // The lock emoji should be present at least once for the sensitive params
+      const lockIcons = document.querySelectorAll('[aria-label="sensitive — value will be masked"]');
+      expect(lockIcons.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("includes '(sensitive — masked)' in the aria-label of masked inputs", () => {
+      render(<TestInBrowser {...sensitiveProps} />);
+      fireEvent.click(screen.getByRole("button", { name: /test in browser/i }));
+
+      const input = screen.getByLabelText(/apikey parameter value \(sensitive — masked\)/i);
+      expect(input).toBeTruthy();
+    });
+
+    it("non-sensitive param inputs do NOT carry the sensitive aria-label suffix", () => {
+      render(<TestInBrowser {...sensitiveProps} />);
+      fireEvent.click(screen.getByRole("button", { name: /test in browser/i }));
+
+      // limit is safe; its label should not contain the masked note
+      const input = screen.getByLabelText(/^limit parameter value$/i);
+      expect(input).toBeTruthy();
+    });
+  });
 });
+

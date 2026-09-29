@@ -60,6 +60,17 @@
   --modal-bg: linear-gradient(180deg, rgba(20, 27, 50, 0.98), rgba(12, 18, 34, 0.98));
   --visited: #a78bfa;
 
+  /* ── Theme-agnostic display / glyph tokens ─────────────────────────────
+     These carry foreground colours that must remain legible in BOTH themes.
+     They are defined per-theme (light + dark) so dynamic theme switching
+     never leaves a hardcoded light-on-dark colour behind on a light surface.
+     Each value is tuned to clear WCAG 2.1 AA (>= 4.5:1) against its
+     intended background token.                                            */
+  --display-404: #dbe5ff;       /* .not-found-code — on --page-bg */
+  --glyph-error: #ffd0d6;       /* .error-illustration span — on --page-bg */
+  --status-pending-fg: #ffe08a; /* .status-chip.pending — on --surface */
+  --status-approving-fg: #cbd9ff; /* .status-chip.approving — on --surface */
+
   /* HTTP Method Badge Tokens - Dark Theme (High Contrast / Accessible) */
   --method-get-bg: rgba(59, 130, 246, 0.16);
   --method-get-color: #60a5fa;
@@ -103,6 +114,13 @@
   --backdrop: rgba(255, 255, 255, 0.8);
   --modal-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 255, 0.98));
   --visited: #7c3aed;
+
+  /* ── Theme-agnostic display / glyph tokens (Light Theme) ───────────────
+     Dark foregrounds so they clear WCAG 2.1 AA against light surfaces. */
+  --display-404: #1e3a8a;
+  --glyph-error: #b91c1c;
+  --status-pending-fg: #854d0e;
+  --status-approving-fg: #1e40af;
 
   /* HTTP Method Badge Tokens - Light Theme (High Contrast / Accessible) */
   --method-get-bg: rgba(37, 99, 235, 0.1);
@@ -960,8 +978,8 @@ code,
 }
 
 .primary-button {
-  background: linear-gradient(135deg, #4e85ff, #6da6ff);
-  color: white;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 84%, #000000), var(--accent));
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -1091,7 +1109,7 @@ code,
 .error-illustration span {
   font-size: 2rem;
   font-weight: 700;
-  color: #ffd0d6;
+  color: var(--glyph-error);
 }
 
 .not-found-code {
@@ -1099,7 +1117,7 @@ code,
   font-size: clamp(4rem, 16vw, 8rem);
   line-height: 0.9;
   font-weight: 700;
-  color: #dbe5ff;
+  color: var(--display-404);
   letter-spacing: 0.04em;
 }
 
@@ -1367,7 +1385,7 @@ code,
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1.2' fill='currentColor' fill-opacity='0.25'/%3E%3C/svg%3E") repeat,
     rgba(250, 204, 21, 0.12);
-  color: #ffe08a;
+  color: var(--status-pending-fg);
 }
 
 .status-chip.confirmed {
@@ -1390,7 +1408,7 @@ code,
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cline x1='0' y1='8' x2='8' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='4' y1='8' x2='8' y2='4' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='0' y1='4' x2='4' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3C/svg%3E") repeat,
     rgba(78, 133, 255, 0.14);
-  color: #cbd9ff;
+  color: var(--status-approving-fg);
 }
 
 .status-chip.input {
@@ -3655,17 +3673,27 @@ code,
 }
 
 .call-history-table {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 8px;
-  overflow: hidden;
+  /* Internal scroll container: bounds the table height so the virtualized
+     window stays small and stable no matter how many calls exist. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  max-height: min(60vh, 640px);
 }
 
 .table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr;
   gap: 16px;
   padding: 16px;
   background: var(--surface);
+  backdrop-filter: blur(22px);
   font-weight: 500;
   font-size: 0.875rem;
   border-bottom: 1px solid var(--line);
@@ -3680,7 +3708,31 @@ code,
   align-items: center;
 }
 
-.table-row:last-child {
+.call-history-table__viewport {
+  position: relative;
+}
+
+/* Windowed rows are absolutely positioned at their measured offsets; the
+   viewport's explicit height acts as the full-list spacer. */
+.call-history-table__item {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+/* The pinned row stays mounted (and focusable) when the keyboard-focused
+   row is scrolled outside the window. */
+.call-history-table__item--pinned {
+  z-index: 0;
+}
+
+/* Virtualized rows: drop the divider on the final rendered row. */
+.call-history-table__item:last-child .table-row {
+  border-bottom: none;
+}
+
+/* Loading skeletons are still direct children of the table shell. */
+.call-history-table > .table-row:last-child {
   border-bottom: none;
 }
 
@@ -4714,6 +4766,13 @@ code,
   }
 }
 
+/* With reduced motion the bar appears/disappears instantly instead of fading. */
+@media (prefers-reduced-motion: reduce) {
+  .route-progress-bar {
+    transition: none;
+  }
+}
+
 /* Skeleton Loading */
 @keyframes shimmer {
   0% {
@@ -4753,6 +4812,27 @@ code,
     linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 16%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
   background-size: 200% 100%;
 }
+
+/* Global reduced-motion fallback (Issue #1005):
+   Skeleton shimmer and spinner rotation are purely decorative. When the
+   user prefers reduced motion, freeze them to static, non-animated
+   surfaces so loading state is still conveyed without animating. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .skeleton--stellar,
+  .api-card-skeleton,
+  [data-theme="light"] .skeleton,
+  [data-theme="light"] .skeleton--stellar {
+    animation: none;
+    background: var(--surface-soft);
+  }
+
+  .button-spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.3);
+  }
+}
+
 /* Filters Sidebar accessibility styles */
 .filter-group {
   margin-bottom: 1rem;
@@ -4808,6 +4888,37 @@ code,
 
 .primary-button.button-loading {
   cursor: not-allowed;
+}
+
+/* ── Webhook Deliveries ──────────────────────────────────────────────
+   Status, error, and stale-data states use the semantic --danger /
+   --warning design tokens (theme-aware contrast) instead of hardcoded
+   colors. The stale fade respects prefers-reduced-motion. */
+.webhook-deliveries-error {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  padding: 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.webhook-deliveries-data {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.webhook-deliveries-data--stale {
+  opacity: 0.6;
+}
+
+.webhook-deliveries-stale-note {
+  color: var(--warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webhook-deliveries-data {
+    transition: none;
+  }
 }
 
 /* Response JSON Skeleton Container */
@@ -6944,6 +7055,10 @@ code,
     --line-strong: rgba(0, 0, 0, 0.12) !important;
     --text: #1a2332 !important;
     --muted: #64748b !important;
+    --display-404: #1e3a8a !important;
+    --glyph-error: #b91c1c !important;
+    --status-pending-fg: #854d0e !important;
+    --status-approving-fg: #1e40af !important;
     --accent: #2563eb !important;
     --accent-strong: #059669 !important;
     --danger: #dc2626 !important;
@@ -7450,4 +7565,37 @@ code,
   }
 }
 
+/* ── Skeleton layout-stability on narrow screens (#1010) ───────────────
+   Mirror the real .api-marketplace-card responsive rules so that the
+   skeleton's height, grid columns, header layout, and visible sections
+   match the loaded card at every breakpoint.  This eliminates CLS when
+   the skeleton swaps to real content. */
+@media (max-width: 768px) {
+  .api-card-skeleton {
+    min-height: 0 !important;
+  }
 
+  /* Skeleton header matches real card grid: icon 48px + fluid body */
+  .api-card-skeleton .api-marketplace-card-header {
+    display: grid !important;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: flex-start !important;
+  }
+
+  /* Skeleton icon shrinks to match real 48×48 icon */
+  .api-card-skeleton .api-marketplace-card-header > .skeleton:first-child {
+    width: 48px !important;
+    height: 48px !important;
+    flex: 0 0 48px;
+  }
+
+  /* Hide skeleton price section (matches real card display:none) */
+  .api-card-skeleton .api-marketplace-card-price {
+    display: none !important;
+  }
+
+  /* Stats row adapts to full width */
+  .api-card-skeleton .api-card__stats {
+    gap: var(--mkt-space-xl);
+  }
+}
