@@ -1,1 +1,396 @@
-ZXhwb3J0IHR5cGUgUmV2aWV3ID0gewogIGlkOiBzdHJpbmc7CiAgYXV0aG9yOiBzdHJpbmc7CiAgcmF0aW5nOiBudW1iZXI7IC8vIDHigJM1CiAgZGF0ZTogc3RyaW5nOyAgIC8vIElTTyBkYXRlIHN0cmluZwogIGJvZHk6IHN0cmluZzsKICB2ZXJpZmllZDogYm9vbGVhbjsKfTsKCi8qKgogKiBBIHNpbmdsZSBxdWVyeSBwYXJhbWV0ZXIgZm9yIGFuIEVuZHBvaW50LgogKi8KZXhwb3J0IHR5cGUgRW5kcG9pbnRQYXJhbSA9IHsKICAvKiogUGFyYW1ldGVyIG5hbWUgYXMgaXQgYXBwZWFycyBpbiB0aGUgcmVxdWVzdCAoZS5nLiAibGF0IikuICovCiAgbmFtZTogc3RyaW5nOwogIC8qKiBQcmltaXRpdmUgdHlwZSBvZiB0aGUgcGFyYW1ldGVyLiAqLwogIHR5cGU6ICJzdHJpbmciIHwgIm51bWJlciIgfCAiYm9vbGVhbiIgfCAiYXJyYXkiIHwgIm9iamVjdCI7CiAgLyoqIFdoZXRoZXIgdGhlIHBhcmFtZXRlciBtdXN0IGJlIHN1cHBsaWVkLiAqLwogIHJlcXVpcmVkOiBib29sZWFuOwp9OwoKLyoqCiAqIEhUVFAgbWV0aG9kcyBzdXBwb3J0ZWQgYnkgYW4gRW5kcG9pbnQuCiAqLwpleHBvcnQgdHlwZSBFbmRwb2ludE1ldGhvZCA9ICJHRVQiIHwgIlBPU1QiIHwgIlBVVCIgfCAiUEFUQ0giIHwgIkRFTEVURSI7CgovKioKICogQSBzaW5nbGUgQVBJIGVuZHBvaW50IGV4cG9zZWQgYnkgYSBwcm92aWRlci4KICoKICogVGhpcyB0eXBlIHJlcGxhY2VzIHRoZSBwcmV2aW91cyBgQXJyYXk8YW55PmAgc2hhcGUgc28gdGhlIGJhY2tlbmQKICogY2F0YWxvZ3VlIGFuZCB0aGUgZnJvbnRlbmQgY2FuIGFncmVlIG9uIGEgY29udHJhY3QuCiAqLwpleHBvcnQgdHlwZSBFbmRwb2ludCA9IHsKICAvKiogU3RhYmxlIGlkZW50aWZpZXIgdW5pcXVlIHdpdGhpbiBhbiBBUElJdGVtLiAqLwogIGlkOiBzdHJpbmc7CiAgLyoqIEh1bWFuLXJlYWRhYmxlIHRpdGxlIChlLmcuICJHZXQgRm9yZWNhc3QiKS4gKi8KICB0aXRsZTogc3RyaW5nOwogIC8qKiBSZWxhdGl2ZSBwYXRoIG9yIGFic29sdXRlIFVSTCBvZiB0aGUgZW5kcG9pbnQuICovCiAgdXJsOiBzdHJpbmc7CiAgLyoqIEhUVFAgbWV0aG9kLiAqLwogIG1ldGhvZDogRW5kcG9pbnRNZXRob2Q7CiAgLyoqIE9wdGlvbmFsIGdyb3VwaW5nIGxhYmVsIGZvciBVSSBzZWN0aW9uaW5nLiAqLwogIGdyb3VwPzogc3RyaW5nOwogIC8qKiBRdWVyeS9ib2R5IHBhcmFtZXRlcnMgYWNjZXB0ZWQgYnkgdGhlIGVuZHBvaW50LiAqLwogIHBhcmFtcz86IEVuZHBvaW50UGFyYW1bXTsKICAvKiogRXhhbXBsZSByZXNwb25zZSBwYXlsb2FkIGFzIGEgSlNPTiBzdHJpbmcuICovCiAgcmVzcG9uc2U/OiBzdHJpbmc7Cn07CgovKioKICogQ29tYmluZWQgc3RhdGlzdGljcyBibG9jayBmb3IgYW4gQVBJSXRlbS4KICoKICogQ2Fub25pY2FsIGZpZWxkczogYHRvdGFsQ2FsbHNgLCBgYXZnUmVzcG9uc2VNc2AsIGB1cHRpbWVQY3RgLgogKiBUaGUgZGVwcmVjYXRlZCBgYXZnTGF0ZW5jeU1zYCBhbmQgYHVwdGltZVBlcmNlbnRgIHRvcC1sZXZlbCBkdXBsaWNhdGVzCiAqIGFyZSBrZXB0IGZvciBiYWNrd2FyZCBjb21wYXRpYmlsaXR5IG9ubHkuCiAqLwpleHBvcnQgdHlwZSBBUElTdGF0cyA9IHsKICAvKiogQ2Fub25pY2FsIHRvdGFsIG51bWJlciBvZiBjYWxscy4gKi8KICB0b3RhbENhbGxzPzogbnVtYmVyOwogIC8qKiBDYW5vbmljYWwgYXZlcmFnZSByZXNwb25zZSB0aW1lIGluIG1pbGxpc2Vjb25kcy4gKi8KICBhdmdSZXNwb25zZU1zPzogbnVtYmVyOwogIC8qKiBDYW5vbmljYWwgdXB0aW1lIGFzIGEgcGVyY2VudGFnZSAoMC0xMDApLiAqLwogIHVwdGltZVBjdD86IG51bWJlcjsKfTsKCi eightKICogVGhlIGNhbm9uaWNhbCBBUElJdGVtIGNvbnRyYWN0LgogKgogKiBEdXBsaWNhdGUgZmllbGRzIGFuZCB0aGVpciBjYW5vbmljYWwgY2hvaWNlOgogKiAgIC0gYHByaWNlUGVyUmVxdWVzdGAgKGNhbm9uaWNhbCkgdnMgYHByaWNlUGVyQ2FsbGAgKGRlcHJlY2F0ZWQpCiAqICAgLSBgc3RhdHMuYXZnUmVzcG9uc2VNc2AgKGNhbm9uaWNhbCkgdnMgYGF2Z0xhdGVuY3lNc2AgKGRlcHJlY2F0ZWQpCiAqICAgLSBgc3RhdHMudXB0aW1lUGN0YCAoY2Fub25pY2FsKSB2cyBgdXB0aW1lUGVyY2VudGAgKGRlcHJlY2F0ZWQpCiAqCiAqIFNlZSBgZG9jcy9BUElJdGVtLWNvbnRyYWN0Lm1kYCBmb3IgdGhlIGZ1bGwgZG9jdW1lbnRhdGlvbiBhbmQgdGhlCiAqIGxpc3Qgb2YgY29tcG9uZW50cyB0aGF0IHN0aWxsIHJlYWQgZWFjaCBkZXByZWNhdGVkIGZpZWxkLgogKi8KZXhwb3J0IHR5cGUgQVBJSXRlbSA9IHsKICAvKiogU3RhYmxlIHVuaXF1ZSBpZGVudGlmaWVyIGZvciB0aGUgQVBJLiAqLwogIGlkOiBzdHJpbmc7CiAgLyoqIERpc3BsYXkgbmFtZSBvZiB0aGUgQVBJLiAqLwogIG5hbWU6IHN0cmluZzsKICAvKiogUHJvdmlkZXIgbWV0YWRhdGEuICovCiAgcHJvdmlkZXI6IHsgbmFtZTogc3RyaW5nOyB1cmw/OiBzdHJpbmc7IGF2YXRhcj86IHN0cmluZyB9OwogIC8qKiBTZW1hbnRpYyB2ZXJzaW9uIG9mIHRoZSBBUEkgKGUuZy4gIjIuMy4xIikuICovCiAgdmVyc2lvbj86IHN0cmluZzsKICAvKiogQ3VycmVudCBvcGVyYXRpb25hbCBzdGF0dXMuICovCiAgc3RhdHVzPzogIm9wZXJhdGlvbmFsIiB8ICJkZWdyYWRlZCIgfCAibWFpbnRlbmFuY2UiOwogIC8qKiBTaG9ydCBodW1hbi1yZWFkYWJsZSBkZXNjcmlwdGlvbi4gKi8KICBkZXNjcmlwdGlvbjogc3RyaW5nOwogIC8qKgogICAqIENBTk9OSUNBTDogUHJpY2UgcGVyIHJlcXVlc3QgaW4gVVNELgogICAqIFVzZSB0aGlzIGluc3RlYWQgb2YgdGhlIGRlcHJlY2F0ZWQgYHByaWNlUGVyQ2FsbGAuCiAgICovCiAgcHJpY2VQZXJSZXF1ZXN0OiBudW1iZXI7CiAgLyoqCiAgICogQERlcHJlY2F0ZWQgVXNlIGBwcmljZVBlclJlcXVlc3RgIGluc3RlYWQuCiAgICogUmVhZCBieTogc3JjL2NvbXBvbmVudHMvQ29tcGFyZURyYXdlci50c3gsIHNyYy9jb21wb25lbnRzL0FwaUNhcmQudHMuCiAgICovCiAgcHJpY2VQZXJDYWxsPzogbnVtYmVyOwogIC8qKgogICAqIEBEZXByZWNhdGVkIFVzZSBgc3RhdHMuYXZnUmVzcG9uc2VNc2Agb3IgYHN0YXRzLmF2Z1Jlc3BvbnNlTXNgIGluc3RlYWQuCiAgICogUmVhZCBieTogc3JjL2NvbXBvbmVudHMvQ29tcGFyZURyYXdlci50c3gsIHNyYy9jb21wb25lbnRzL0FwaUNhcmQudHMuCiAgICovCiAgYXZnTGF0ZW5jeU1zPzogbnVtYmVyOwogIC8qKgogICAqIEBEZXByZWNhdGVkIFVzZSBgc3RhdHMudXB0aW1lUGN0YCBpbnN0ZWFkLgogICAqIFJlYWQgYnk6IHNyYy9jb21wb25lbnRzL0NvbXBhcmVEcmF3ZXIudHN4LCBzcmMvY29tcG9uZW50cy9BcGlDYXJkLnRzLgogICAqLwogIHVwdGltZVBlcmNlbnQ/OiBudW1iZXI7CiAgLyoqIEFnZ3JlZ2F0ZSByYXRpbmcgKDEtNSkuICovCiAgcmF0aW5nPzogbnVtYmVyOwogIC8qKiBTZWFyY2gvdGF4b25vbXkgdGFncy4gKi8KICB0YWdzPzogc3RyaW5nW107CiAgLyoqIFByaW1hcnkgY2F0ZWdvcnkgbGFiZWwuICovCiAgY2F0ZWdvcnk/OiBzdHJpbmc7CiAgLyoqIElTTyBkYXRlIHRoZSBBUEkgd2FzIGFkZGVkIHRvIHRoZSBjYXRhbG9ndWUuICovCiAgY3JlYXRlZEF0Pzogc3RyaW5nOwogIC8qKiBUb3RhbCBudW1iZXIgb2YgY2FsbHMgYWNyb3NzIGFsbCBjb25zdW1lcnMuICovCiAgdXNhZ2VDb3VudD86IG51bWJlcjsKICAvKiogTm90YWJsZSBmZWF0dXJlcyBvZiB0aGUgQVBJLiAqLwogIGZlYXR1cmVzPzogc3RyaW5nW107CiAgLyoqIFR5cGljYWwgdXNlIGNhc2VzIGZvciB0aGUgQVBJLiAqLwogIHVzZUNhc2VzPzogc3RyaW5nW107CiAgLyoqIFR5cGVkIGxpc3Qgb2YgZW5kcG9pbnRzIChyZXBsYWNlcyBgQXJyYXk8YW55PmApLiAqLwogIGVuZHBvaW50cz86IEVuZHBvaW50W107CiAgLyoqIENhbm9uaWNhbCBzdGF0aXN0aWNzIGJsb2NrLiAqLwogIHN0YXRzPzogQVBJU3RhdHM7CiAgLyoqIE1hcHBpbmcgb2Ygc3RhciByYXRpbmcgLT4gY291bnQgb2YgcmV2aWV3cy4gKi8KICByYXRpbmdEaXN0cmlidXRpb24/OiBSZWNvcmQ8bnVtYmVyLCBudW1iZXI+OwogIC8qKiAyNC1ob3VyIGhlYWx0aCB0aW1lbGluZS4gKi8KICBob3VybHlIZWFsdGg/OiAoIm9wZXJhdGlvbmFsIiB8ICJkZWdyYWRlZCIgfCAiZG93biIpW107CiAgLyoqIEN1c3RvbWVyIHJldmlld3MuICovCiAgcmV2aWV3cz86IFJldmlld1tdOwogIC8qKiBTcGFya2xpbmUgdmFsdWVzIGZvciB0cmVuZCBjaGFydHMuICovCiAgc3BhcmtsaW5lVmFsdWVzPzogbnVtYmVyW107Cn07CgpleHBvcnQgY29uc3QgTU9DS19BUElTOiBBUElJdGVtW10gPSBbCiAgewogICAgaWQ6ICJ3ZWF0aGVyLTAwMSIsCiAgICBuYW1lOiAiV2VhdGhlclNpbSBBUEkiLAogICAgcHJvdmlkZXI6IHsgbmFtZTogIkFjbWUgTGFicyIsIHVybDogIiMiIH0sCiAgICB2ZXJzaW9uOiAiMi4zLjEiLAogICAgc3RhdHVzOiAib3BlcmF0aW9uYWwiLAogICAgZGVzY3JpcHRpb246CiAgICAgICJXZWF0aGVyU2ltIHByb3ZpZGVzIGh5cGVyLWxvY2FsIHdlYXRoZXIgZm9yZWNhc3RzLCBoaXN0b3JpY2FsIGNsaW1hdGUgZGF0YSwgYW5kIHNpbXVsYXRlZCBjb25kaXRpb25zIGZvciB0ZXN0aW5nIHlvdXIgc2VydmljZXMuIiwKICAgIHByaWNlUGVyUmVxdWVzdDogMC4wMSwKICAgIHByaWNlUGVyQ2FsbDogMC4wMSwKICAgIGF2Z0xhdGVuY3lNczogMTgwLAogICAgdXB0aW1lUGVyY2VudDogOTkuOTcsCiAgICByYXRpbmc6IDQuNiwKICAgIHRhZ3M6IFsid2VhdGhlciIsICJnZW8iLCAiZm9yZWNhc3QiXSwKICAgIGNhdGVnb3J5OiAiRGF0YSAmIEFuYWx5dGljcyIsCiAgICBjcmVhdGVkQXQ6ICIyMDI2LTAzLTAxIiwKICAgIHVzYWdlQ291bnQ6IDM4MjQxMiwKICAgIGZlYXR1cmVzOiBbCiAgICAgICJTdWItc2Vjb25kIHJlc3BvbnNlIHRpbWVzIiwKICAgICAgIkpTT04gc2NoZW1hIHJlc3BvbnNlcyIsCiAgICAgICJHZW8tYXdhcmUgcXVlcnlpbmciLAogICAgICAiSVNPIHRpbWVzdGFtcHMgYW5kIHRpbWV6b25lIGhhbmRsaW5nIiwKICAgIF0sCiAgICB1c2VDYXNlczogWwogICAgICAiUGVyc29uYWxpemVkIGZvcmVjYXN0cyIsCiAgICAgICJHYW1pbmcvd2VhdGhlciBzaW11bGF0aW9ucyIsCiAgICAgICJJb1QgZGV2aWNlIGNhbGlicmF0aW9uIiwKICAgIF0sCiAgICBlbmRwb2ludHM6IFsKICAgICAgewogICAgICAgIGlkOiAiZm9yZWNhc3QiLAogICAgICAgIHRpdGxlOiAiR2V0IEZvcmVjYXN0IiwKICAgICAgICB1cmw6ICIvdjEvZm9yZWNhc3QiLAogICAgICAgIG1ldGhvZDogIkdFVCIsCiAgICAgICAgZ3JvdXA6ICJGb3JlY2FzdCIsCiAgICAgICAgcGFyYW1zOiBbCiAgICAgICAgICB7IG5hbWU6ICJsYXQiLCB0eXBlOiAibnVtYmVyIiwgcmVxdWlyZWQ6IHRydWUgfSwKICAgICAgICAgIHsgbmFtZTogImxvbiIsIHR5cGU6ICJudW1iZXIiLCByZXF1aXJlZDogdHJ1ZSB9LAogICAgICAgIF0sCiAgICAgICAgcmVzcG9uc2U6ICd7ICJ0ZW1wX2MiOiAxMi4zLCAiY29uZGl0aW9ucyI6ICJyYWluIiB9JywKICAgICAgfSwKICAgICAgewogICAgICAgIGlkOiAiaGlzdG9yeSIsCiAgICAgICAgdGl0bGU6ICJIaXN0b3JpY2FsIFdlYXRoZXIiLAogICAgICAgIHVybDogIi92MS9oaXN0b3J5IiwKICAgICAgICBtZXRob2Q6ICJHRVQiLAogICAgICAgIGdyb3VwOiAiRm9yZWNhc3QiLAogICAgICAgIHBhcmFtczogW3sgbmFtZTogImRhdGUiLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IHRydWUgfV0sCiAgICAgICAgcmVzcG9uc2U6ICd7ICJkYXRlIjogIjIwMjYtMDMtMDEiLCAic3VtbWFyeSI6IHsgLi4uIH0gfScsCiAgICAgIH0sCiAgICAgIHsKICAgICAgICBpZDogImFsZXJ0cy1jcmVhdGUiLAogICAgICAgIHRpdGxlOiAiQ3JlYXRlIFdlYXRoZXIgQWxlcnQiLAogICAgICAgIHVybDogIi92MS9hbGVydHMiLAogICAgICAgIG1ldGhvZDogIlBPU1QiLAogICAgICAgIGdyb3VwOiAiQWxlcnRzIiwKICAgICAgICBwYXJhbXM6IFsKICAgICAgICAgIHsgbmFtZTogImxvY2F0aW9uIiwgdHlwZTogInN0cmluZyIsIHJlcXVpcmVkOiB0cnVlIH0sCiAgICAgICAgICB7IG5hbWU6ICJjb25kaXRpb25zIiwgdHlwZTogImFycmF5IiwgcmVxdWlyZWQ6IGZhbHNlIH0sCiAgICAgICAgXSwKICAgICAgICByZXNwb25zZTogJ3sgImFsZXJ0X2lkIjogIjEyMzQ1IiwgInN0YXR1cyI6ICJhY3RpdmUiIH0nLAogICAgICB9LAogICAgICB7CiAgICAgICAgaWQ6ICJhbGVydHMtZGVsZXRlIiwKICAgICAgICB0aXRsZTogIkRlbGV0ZSBXZWF0aGVyIEFsZXJ0IiwKICAgICAgICB1cmw6ICIvdjEvYWxlcnRzL3tpZH0iLAogICAgICAgIG1ldGhvZDogIkRFTEVURSIsCiAgICAgICAgZ3JvdXA6ICJBbGVydHMiLAogICAgICAgIHBhcmFtczogWwogICAgICAgICAgeyBuYW1lOiAiaWQiLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IHRydWUgfSwKICAgICAgICBdLAogICAgICAgIHJlc3BvbnNlOiAneyAic3RhdHVzIjogImRlbGV0ZWQiIH0nLAogICAgICB9LAogICAgXSwKICAgIHN0YXRzOiB7IHRvdGFsQ2FsbHM6IDM4MjQxMiwgYXZnUmVzcG9uc2VNczogMTgwLCB1cHRpbWVQY3Q6IDk5Ljk3IH0sCiAgICByYXRpbmdEaXN0cmlidXRpb246IHsgNTogODUsIDQ6IDI1LCAzOiAxMCwgMjogMiwgMTogMiB9LAogICAgaG91cmx5SGVhbHRoOiBBcnJheSgyNCkuZmlsbCgib3BlcmF0aW9uYWwiKS5tYXAoKF8sIGkpID0+IGkgPT09IDEyIHx8IGkgPT09IDEzID8gImRlZ3JhZGVkIiA6ICJvcGVyYXRpb25hbCIpLAogICAgc3BhcmtsaW5lVmFsdWVzOiBbMTUsIDE3LCAxNiwgMTksIDIxLCAyMCwgMjQsIDI1LCAyMywgMjYsIDI4LCAyN10sCiAgfSwKICB7CiAgICBpZDogInBheS1xciIsCiAgICBuYW1lOiAiUXVpY2tQYXkiLAogICAgcHJvdmlkZXI6IHsgbmFtZTogIlBheUZhc3QiLCB1cmw6ICIjIiB9LAogICAgc3RhdHVzOiAiZGVncmFkZWQiLAogICAgdmVyc2lvbjogIjEuOC4wIiwKICAgIGRlc2NyaXB0aW9uOiAiU2ltcGxlIHBheW1lbnQgcHJvY2Vzc2luZyB3aXRoIGNhcmQgYW5kIEFDSCBzdXBwb3J0IiwKICAgIHByaWNlUGVyUmVxdWVzdDogMC4wMDEsCiAgICBwcmljZVBlckNhbGw6IDAuMDAxLAogICAgYXZnTGF0ZW5jeU1zOiAyNjAsCiAgICB1cHRpbWVQZXJjZW50OiA5OS45LAogICAgcmF0aW5nOiA0LjMsCiAgICB0YWdzOiBbInBheW1lbnRzIiwgImNhcmRzIl0sCiAgICBjYXRlZ29yeTogIlBheW1lbnQgUHJvY2Vzc2luZyIsCiAgICBjcmVhdGVkQXQ6ICIyMDI2LTAyLTE1IiwKICAgIHVzYWdlQ291bnQ6IDg4MDAwMCwKICAgIGZlYXR1cmVzOiBbIlBDSS1jb21wbGlhbnQiLCAiTG93LWxhdGVuY3kgY2FwdHVyZXMiXSwKICAgIHVzZUNhc2VzOiBbIkNoZWNrb3V0IiwgIlN1YnNjcmlwdGlvbnMiXSwKICAgIGVuZHBvaW50czogWwogICAgICB7CiAgICAgICAgaWQ6ICJwYXltZW50LWNyZWF0ZSIsCiAgICAgICAgdGl0bGU6ICJDcmVhdGUgUGF5bWVudCIsCiAgICAgICAgdXJsOiAiL3YxL3BheW1lbnRzIiwKICAgICAgICBtZXRob2Q6ICJQT1NUIiwKICAgICAgICBncm91cDogIlBheW1lbnRzIiwKICAgICAgICBwYXJhbXM6IFsKICAgICAgICAgIHsgbmFtZTogImFtb3VudCIsIHR5cGU6ICJudW1iZXIiLCByZXF1aXJlZDogdHJ1ZSB9LAogICAgICAgICAgeyBuYW1lOiAiY3VycmVuY3kiLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IHRydWUgfSwKICAgICAgICAgIHsgbmFtZTogImNhcmRfdG9rZW4iLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IHRydWUgfSwKICAgICAgICBdLAogICAgICAgIHJlc3BvbnNlOiAneyAicGF5bWVudF9pZCI6ICJwYXlfMTIzIiwgInN0YXR1cyI6ICJwcm9jZXNzZWQiIH0nLAogICAgICB9LAogICAgICB7CiAgICAgICAgaWQ6ICJwYXltZW50LXJlZnVuZCIsCiAgICAgICAgdGl0bGU6ICJSZWZ1bmQgUGF5bWVudCIsCiAgICAgICAgdXJsOiAiL3YxL3BheW1lbnRzL3tpZH0vcmVmdW5kIiwKICAgICAgICBtZXRob2Q6ICJQT1NUIiwKICAgICAgICBncm91cDogIlBheW1lbnRzIiwKICAgICAgICBwYXJhbXM6IFsKICAgICAgICAgIHsgbmFtZTogImlkIiwgdHlwZTogInN0cmluZyIsIHJlcXVpcmVkOiB0cnVlIH0sCiAgICAgICAgICB7IG5hbWU6ICJhbW91bnQiLCB0eXBlOiAibnVtYmVyIiwgcmVxdWlyZWQ6IGZhbHNlIH0sCiAgICAgICAgXSwKICAgICAgICByZXNwb25zZTogJ3sgInJlZnVuZF9pZCI6ICJyZWZfNDU2IiwgInN0YXR1cyI6ICJwcm9jZXNzZWQiIH0nLAogICAgICB9LAogICAgICB7CiAgICAgICAgaWQ6ICJ3ZWJob29rLXJlZ2lzdGVyIiwKICAgICAgICB0aXRsZTogIlJlZ2lzdGVyIFdlYmhvb2siLAogICAgICAgIHVybDogIi92MS93ZWJob29rcyIsCiAgICAgICAgbWV0aG9kOiAiUE9TVCIsCiAgICAgICAgZ3JvdXA6ICJXZWJob29rcyIsCiAgICAgICAgcGFyYW1zOiBbCiAgICAgICAgICB7IG5hbWU6ICJ1cmwiLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IHRydWUgfSwKICAgICAgICAgIHsgbmFtZTogImV2ZW50cyIsIHR5cGU6ICJhcnJheSIsIHJlcXVpcmVkOiB0cnVlIH0sCiAgICAgICAgXSwKICAgICAgICByZXNwb25zZTogJ3sgIndlYmhvb2tfaWQiOiAid2hfNzg5IiwgInN0YXR1cyI6ICJhY3RpdmUiIH0nLAogICAgICB9LAogICAgXSwKICAgIHN0YXRzOiB7IHRvdGFsQ2FsbHM6IDg4MDAwMCwgYXZnUmVzcG9uc2VNczogMjYwLCB1cHRpbWVQY3Q6IDk5LjkgfSwKICAgIHJldmlld3M6IFsKICAgICAgewogICAgICAgIGlkOiAicjEiLAogICAgICAgIGF1dGhvcjogIk5hb21pIEwuIiwKICAgICAgICByYXRpbmc6IDQsCiAgICAgICAgZGF0ZTogIjIwMjYtMDYtMDEiLAogICAgICAgIGJvZHk6ICJQQ0kgY29tcGxpYW5jZSBvdXQgb2YgdGhlIGJveCBpcyBhIGh1Z2UgdGltZS1zYXZlci4iLAogICAgICAgIHZlcmlmaWVkOiB0cnVlLAogICAgICB9LAogICAgICB7CiAgICAgICAgaWQ6ICJyMiIsCiAgICAgICAgYXV0aG9yOiAiQmVuIEYuIiwKICAgICAgICByYXRpbmc6IDUsCiAgICAgICAgZGF0ZTogIjIwMjYtMDQtMjAiLAogICAgICAgIGJvZHk6ICJIYW5kbGVzIGhpZ2gtdm9sdW1lIGNoZWNrb3V0cyB3aXRoIG5vIGlzc3Vlcy4iLAogICAgICAgIHZlcmlmaWVkOiBmYWxzZSwKICAgICAgfSwKICAgIF0sCiAgICBob3VybHlIZWFsdGg6IEFycmF5KDI0KS5maWxsKCJvcGVyYXRpb25hbCIpLAogICAgc3BhcmtsaW5lVmFsdWVzOiBbMzAsIDI4LCAzNSwgMzIsIDQwLCAzOCwgNDUsIDQyLCA1MCwgNDgsIDU1LCA1Ml0sCiAgfSwKICB7CiAgICBpZDogIm1zZy0wMSIsCiAgICBuYW1lOiAiQ2hhdFN0cmVhbSIsCiAgICBwcm92aWRlcjogeyBuYW1lOiAiQ29tbXMgSW5jLiIsIHVybDogIiMiIH0sCiAgICB2ZXJzaW9uOiAiMy4wLjIiLAogICAgc3RhdHVzOiAibWFpbnRlbmFuY2UiLAogICAgZGVzY3JpcHRpb246ICJTY2FsYWJsZSBtZXNzYWdpbmcgYW5kIG5vdGlmaWNhdGlvbnMgZm9yIGFwcHMuIiwKICAgIHByaWNlUGVyUmVxdWVzdDogMC4wMDA1LAogICAgcHJpY2VQZXJDYWxsOiAwLjAwMDUsCiAgICBhdmdMYXRlbmN5TXM6IDEyMCwKICAgIHVwdGltZVBlcmNlbnQ6IDk5Ljk5LAogICAgcmF0aW5nOiA0LjEsCiAgICB0YWdzOiBbInNtcyIsICJlbWFpbCJdLAogICAgY2F0ZWdvcnk6ICJDb21tdW5pY2F0aW9uIiwKICAgIGNyZWF0ZWRBdDogIjIwMjUtMTItMDEiLAogICAgdXNhZ2VDb3VudDogMTIwMDAwMCwKICAgIGZlYXR1cmVzOiBbIkJ1bGsgc2VuZGluZyIsICJEZWxpdmVyeSB3ZWJob29rcyJdLAogICAgdXNlQ2FzZXM6IFsiTm90aWZpY2F0aW9ucyIsICJUd28tZmFjdG9yIGF1dGgiXSwKICAgIGVuZHBvaW50czogWwogICAgICB7CiAgICAgICAgaWQ6ICJzbXMtc2VuZCIsCiAgICAgICAgdGl0bGU6ICJTZW5kIFNNUyIsCiAgICAgICAgdXJsOiAiL3YxL3NtcyIsCiAgICAgICAgbWV0aG9kOiAiUE9TVCIsCiAgICAgICAgZ3JvdXA6ICJNZXNzYWdpbmciLAogICAgICAgIHBhcmFtczogWwogICAgICAgICAgeyBuYW1lOiAidG8iLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IHRydWUgfSwKICAgICAgICAgIHsgbmFtZTogIm1lc3NhZ2UiLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IHRydWUgfSwKICAgICAgICAgIHsgbmFtZTogImZyb20iLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IGZhbHNlIH0sCiAgICAgICAgXSwKICAgICAgICByZXNwb25zZTogJ3sgIm1lc3NhZ2VfaWQiOiAibXNnXzAwMSIsICJzdGF0dXMiOiAic2VudCIgfScsCiAgICAgIH0sCiAgICAgIHsKICAgICAgICBpZDogImVtYWlsLXNlbmQiLAogICAgICAgIHRpdGxlOiAiU2VuZCBFbWFpbCIsCiAgICAgICAgdXJsOiAiL3YxL2VtYWlsIiwKICAgICAgICBtZXRob2Q6ICJQT1NUIiwKICAgICAgICBncm91cDogIk1lc3NhZ2luZyIsCiAgICAgICAgcGFyYW1zOiBbCiAgICAgICAgICB7IG5hbWU6ICJ0byIsIHR5cGU6ICJzdHJpbmciLCByZXF1aXJlZDogdHJ1ZSB9LAogICAgICAgICAgeyBuYW1lOiAic3ViamVjdCIsIHR5cGU6ICJzdHJpbmciLCByZXF1aXJlZDogdHJ1ZSB9LAogICAgICAgICAgeyBuYW1lOiAiYm9keSIsIHR5cGU6ICJzdHJpbmciLCByZXF1aXJlZDogdHJ1ZSB9LAogICAgICAgIF0sCiAgICAgICAgcmVzcG9uc2U6ICd7ICJlbWFpbF9pZCI6ICJlbWFpbF8wMDIiLCAic3RhdHVzIjogInF1ZXVlZCIgfScsCiAgICAgIH0sCiAgICAgIHsKICAgICAgICBpZDogInRlbXBsYXRlLWNyZWF0ZSIsCiAgICAgICAgdGl0bGU6ICJDcmVhdGUgVGVtcGxhdGUiLAogICAgICAgIHVybDogIi92MS90ZW1wbGF0ZXMiLAogICAgICAgIG1ldGhvZDogIlBPU1QiLAogICAgICAgIGdyb3VwOiAiVGVtcGxhdGVzIiwKICAgICAgICBwYXJhbXM6IFsKICAgICAgICAgIHsgbmFtZTogIm5hbWUiLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IHRydWUgfSwKICAgICAgICAgIHsgbmFtZTogImNvbnRlbnQiLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IHRydWUgfSwKICAgICAgICAgIHsgbmFtZTogInR5cGUiLCB0eXBlOiAic3RyaW5nIiwgcmVxdWlyZWQ6IHRydWUgfSwKICAgICAgICBdLAogICAgICAgIHJlc3BvbnNlOiAneyAidGVtcGxhdGVfaWQiOiAidHBsXzAwMyIsICJzdGF0dXMiOiAiYWN0aXZlIiB9JywKICAgICAgfSwKICAgIF0sCiAgICBzdGF0czogeyB0b3RhbENhbGxzOiAxMjAwMDAwLCBhdmdSZXNwb25zZU1zOiAxMjAsIHVwdGltZVBjdDogOTkuOTkgfSwKICAgIHJldmlld3M6IFsKICAgICAgewogICAgICAgIGlkOiAicjEiLAogICAgICAgIGF1dGhvcjogIkV2YSBDLiIsCiAgICAgICAgcmF0aW5nOiA1LAogICAgICAgIGRhdGU6ICIyMDI2LTA2LTE1IiwKICAgICAgICBib2R5OiAiRGVsaXZlcnkgd2ViaG9va3MgYXJlIHJvY2stc29saWQuIEJyaWxsaWFudCBwcm9kdWN0LiIsCiAgICAgICAgdmVyaWZpZWQ6IHRydWUsCiAgICAgIH0sCiAgICBdLAogICAgaG91cmx5SGVhbHRoOiBBcnJheSgyNCkuZmlsbCgib3BlcmF0aW9uYWwiKS5tYXAoKF8sIGkpID0+IGkgPiAxOCAmJiBpIDwgMjIgPyAiZG93biIgOiAib3BlcmF0aW9uYWwiKSwKICAgIHNwYXJrbGluZVZhbHVlczogWzgsIDEwLCA5LCAxMiwgMTQsIDEzLCAxNiwgMTcsIDE1LCAxOCwgMjAsIDE5XSwKICB9LAogIC8vIG1pbmltYWwgZGVtbyBpdGVtcwogIC4uLkFycmF5LmZyb20oeyBsZW5ndGg6IDEwIH0pLm1hcCgoXywgaSkgPT4gewogICAgY29uc3QgcHJpY2VQZXJSZXF1ZXN0ID0gTnVtYmVyKChNYXRoLnJhbmRvbSgpICogMC4wMikudG9GaXhlZCg0KSk7CiAgICBjb25zdCBhdmdMYXRlbmN5TXMgPSBpICUgNSA9PT0gMCA/IHVuZGVmaW5lZCA6IDE0MCArIGkgKiAxODsKICAgIGNvbnN0IHVwdGltZVBlcmNlbnQgPQogICAgICBpICUgMyA9PT0gMCA/IHVuZGVmaW5lZCA6IE51bWJlcigoOTkuMiArIGkgKiAwLjA3KS50b0ZpeGVkKDIpKTsKICAgIGNvbnN0IHN0YXR1czogQVBJSXRlbVsic3RhdHVzIl0gPQogICAgICBpICUgMyA9PT0gMAogICAgICAgID8gIm9wZXJhdGlvbmFsIgogICAgICAgIDogaSAlIDMgPT09IDEKICAgICAgICA/ICJkZWdyYWRlZCIKICAgICAgICA6ICJtYWludGVuYW5jZSI7CiAgICByZXR1cm4gewogICAgICBpZDogYGRlbW8tJHtpfWAsCiAgICAgIG5hbWU6IGBEZW1vIEFQSSAke2kgKyAxfWAsCiAgICAgIHByb3ZpZGVyOiB7IG5hbWU6IGkgJSAyID09PSAwID8gIk9wZW5Ub29scyIgOiAiVGhpcmRQYXJ0eSIsIHVybDogIiMiIH0sCiAgICAgIHZlcnNpb246IGAxLiR7aX0uMGAsCiAgICAgIHN0YXR1cywKICAgICAgZGVzY3JpcHRpb246IGBEZW1vIEFQSSBudW1iZXIgJHtpICsgMX0gc2hvd2Nhc2luZyBmZWF0dXJlcyBhbmQgZW5kcG9pbnRzLmAsCiAgICAgIHByaWNlUGVyUmVxdWVzdCwKICAgICAgcHJpY2VQZXJDYWxsOiBpICUgNCA9PT0gMCA/IHVuZGVmaW5lZCA6IHByaWNlUGVyUmVxdWVzdCwKICAgICAgYXZnTGF0ZW5jeU1zLAogICAgICB1cHRpbWVQZXJjZW50LAogICAgICByYXRpbmc6IE51bWJlcigoMy41ICsgTWF0aC5yYW5kb20oKSAqIDEuNSkudG9GaXhlZCgxKSksCiAgICAgIHRhZ3M6IFtpICUgMiA9PT0gMCA/ICJhbmFseXRpY3MiIDogInV0aWxpdHkiXSwKICAgICAgY2F0ZWdvcnk6IGkgJSAyID09PSAwID8gIkRhdGEgJiBBbmFseXRpY3MiIDogIk90aGVyIiwKICAgICAgY3JlYXRlZEF0OiBuZXcgRGF0ZShEYXRlLm5vdygpIC0gaSAqIDg2NDAwMDAwKS50b0lTT1N0cmluZygpLAogICAgICB1c2FnZUNvdW50OiBNYXRoLmZsb29yKE1hdGgucmFuZG9tKCkgKiA1MDAwMDApLAogICAgICBmZWF0dXJlczogW10sCiAgICAgIHVzZUNhc2VzOiBbXSwKICAgICAgZW5kcG9pbnRzOiBbXSwKICAgICAgc3RhdHM6IHsKICAgICAgICB0b3RhbENhbGxzOiBNYXRoLmZsb29yKE1hdGgucmFuZG9tKCkgKiA1MDAwMDApLAogICAgICAgIGF2Z1Jlc3BvbnNlTXM6IGF2Z0xhdGVuY3lNcywKICAgICAgICB1cHRpbWVQY3Q6IHVwdGltZVBlcmNlbnQsCiAgICAgIH0sCiAgICAgIGhvdXJseUhlYWx0aDogQXJyYXkoMjQpLmZpbGwoIm9wZXJhdGlvbmFsIikubWFwKCgpID0+IE1hdGgucmFuZG9tKCkgPiAwLjkgPyAoTWF0aC5yYW5kb20oKSA+IDAuNSA/ICJkZWdyYWRlZCIgOiAiZG93biIpIDogIm9wZXJhdGlvbmFsIiksCiAgICB9OwogIH0pLApdOwoKZXhwb3J0IGZ1bmN0aW9uIGZpbmRBcGlCeUlkKGlkOiBzdHJpbmcgfCB1bmRlZmluZWQpIHsKICBpZiAoIWlkKSByZXR1cm4gdW5kZWZpbmVkOwogIHJldHVybiBNT0NLX0FQSVMuZmluZCgoYSkgPT4gYS5pZCA9PT0gaWQgfHwgYS5pZCA9PT0gZGVjb2RlVVJJQ29tcG9uZW50KGlkKSk7Cn0KCmV4cG9ydCBkZWZhdWx0IE1PQ0tfQVBJUzsK
+export type Review = {
+  id: string;
+  author: string;
+  rating: number; // 1–5
+  date: string;   // ISO date string
+  body: string;
+  verified: boolean;
+};
+
+/**
+ * A named query parameter for an endpoint.
+ */
+export type EndpointParam = {
+  /** Parameter name as it appears in the query string or body. */
+  name: string;
+  /** Primitive type of the parameter value. */
+  type: "string" | "number" | "boolean" | "array" | "object";
+  /** Whether the parameter must be supplied by the caller. */
+  required: boolean;
+};
+
+/**
+ * A single callable endpoint exposed by an API.
+ * Replaces the previous `Array<any>` endpoints shape.
+ */
+export type Endpoint = {
+  /** Stable identifier unique within an API's endpoint list. */
+  id: string;
+  /** Human-readable label for the endpoint. */
+  title: string;
+  /** Relative or absolute URL path for the endpoint. */
+  url: string;
+  /** HTTP method used to invoke the endpoint. */
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /** Optional grouping label for UI display (e.g. "Forecast"). */
+  group?: string;
+  /** Query/body parameters accepted by the endpoint. */
+  params?: EndpointParam[];
+  /** Representative response payload (JSON string) for documentation. */
+  response?: string;
+};
+
+/**
+ * Aggregated runtime statistics for an API.
+ * Canonical fields are `totalCalls`, `avgResponseMs`, and `uptimePct`.
+ */
+export type APIStats = {
+  /** Total number of calls made against the API. */
+  totalCalls?: number;
+  /** Average response latency in milliseconds. Canonical over top-level `avgLatencyMs`. */
+  avgResponseMs?: number;
+  /** Uptime percentage (0–100). Canonical over top-level `uptimePercent`. */
+  uptimePct?: number;
+};
+
+/**
+ * Contract for an API catalogue entry shared with Callora-Backend.
+ *
+ * Canonical fields:
+ *   - `pricePerRequest`: authoritative price per call.
+ *   - `stats.avgResponseMs`: authoritative average latency.
+ *   - `stats.uptimePct`: authoritative uptime percentage.
+ *
+ * Deprecated duplicates (retained for backward compatibility):
+ *   - `pricePerCall`: use `pricePerRequest`. Consumed by CompareDrawer and ApiCard.
+ *   - `avgLatencyMs`: use `stats.avgResponseMs`. Consumed by CompareDrawer and ApiCard.
+ *   - `uptimePercent`: use `stats.uptimePct`. Consumed by CompareDrawer and ApiCard.
+ */
+export type APIItem = {
+  /** Stable unique identifier for the API catalogue entry. */
+  id: string;
+  /** Display name of the API. */
+  name: string;
+  /** Provider metadata (name, optional url and avatar). */
+  provider: { name: string; url?: string; avatar?: string };
+  /** Semantic version of the API. */
+  version?: string;
+  /** Current operational status. */
+  status?: "operational" | "degraded" | "maintenance";
+  /** Human-readable description of the API. */
+  description: string;
+  /** Canonical price per request (in display currency). */
+  pricePerRequest: number;
+  /** @deprecated Use `pricePerRequest`. Consumed by CompareDrawer and ApiCard. */
+  pricePerCall?: number;
+  /** @deprecated Use `stats.avgResponseMs`. Consumed by CompareDrawer and ApiCard. */
+  avgLatencyMs?: number;
+  /** @deprecated Use `stats.uptimePct`. Consumed by CompareDrawer and ApiCard. */
+  uptimePercent?: number;
+  /** Average user rating (1–5). */
+  rating?: number;
+  /** Search/filter tags. */
+  tags?: string[];
+  /** Category label for grouping. */
+  category?: string;
+  /** ISO date the entry was added to the catalogue. */
+  createdAt?: string;
+  /** Cumulative usage count across all consumers. */
+  usageCount?: number;
+  /** Notable features highlighted in the UI. */
+  features?: string[];
+  /** Recommended use cases. */
+  useCases?: string[];
+  /** Callable endpoints exposed by the API. */
+  endpoints?: Endpoint[];
+  /** Aggregated runtime statistics. Canonical source for latency and uptime. */
+  stats?: APIStats;
+  /** Mapping of rating value (1 to 5) to review count. */
+  ratingDistribution?: Record<number, number>;
+  /** Hourly health status for the last 24 hours. */
+  hourlyHealth?: ("operational" | "degraded" | "down")[];
+  /** User reviews. */
+  reviews?: Review[];
+  /** Sparkline values for the trend chart. */
+  sparklineValues?: number[];
+};
+
+export const MOCK_APIS: APIItem[] = [
+  {
+    id: "weather-001",
+    name: "WeatherSim API",
+    provider: { name: "Acme Labs", url: "#" },
+    version: "2.3.1",
+    status: "operational",
+    description:
+      "WeatherSim provides hyper-local weather forecasts, historical climate data, and simulated conditions for testing your services.",
+    pricePerRequest: 0.01,
+    pricePerCall: 0.01,
+    avgLatencyMs: 180,
+    uptimePercent: 99.97,
+    rating: 4.6,
+    tags: ["weather", "geo", "forecast"],
+    category: "Data & Analytics",
+    createdAt: "2026-03-01",
+    usageCount: 382412,
+    features: [
+      "Sub-second response times",
+      "JSON schema responses",
+      "Geo-aware querying",
+      "ISO timestamps and timezone handling",
+    ],
+    useCases: [
+      "Personalized forecasts",
+      "Gaming/weather simulations",
+      "IoT device calibration",
+    ],
+    endpoints: [
+      {
+        id: "forecast",
+        title: "Get Forecast",
+        url: "/v1/forecast",
+        method: "GET",
+        group: "Forecast",
+        params: [
+          { name: "lat", type: "number", required: true },
+          { name: "lon", type: "number", required: true },
+        ],
+        response: '{ "temp_c": 12.3, "conditions": "rain" }',
+      },
+      {
+        id: "history",
+        title: "Historical Weather",
+        url: "/v1/history",
+        method: "GET",
+        group: "Forecast",
+        params: [{ name: "date", type: "string", required: true }],
+        response: '{ "date": "2026-03-01", "summary": { ... } }',
+      },
+      {
+        id: "alerts-create",
+        title: "Create Weather Alert",
+        url: "/v1/alerts",
+        method: "POST",
+        group: "Alerts",
+        params: [
+          { name: "location", type: "string", required: true },
+          { name: "conditions", type: "array", required: false },
+        ],
+        response: '{ "alert_id": "12345", "status": "active" }',
+      },
+      {
+        id: "alerts-delete",
+        title: "Delete Weather Alert",
+        url: "/v1/alerts/{id}",
+        method: "DELETE",
+        group: "Alerts",
+        params: [
+          { name: "id", type: "string", required: true },
+        ],
+        response: '{ "status": "deleted" }',
+      },
+    ],
+    stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
+    ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
+    hourlyHealth: Array(24).fill("operational").map(( i) => i === 12 || i === 13 ? "degraded" : "operational"),
+    sparklineValues: [15, 17, 16, 19, 21, 20, 24, 25, 23, 26, 28, 27],
+  },
+  {
+    id: "pay-qr",
+    name: "QuickPay",
+    provider: { name: "PayFast", url: "#" },
+    status: "degraded",
+    version: "1.8.0",
+    description: "Simple payment processing with card and ACH support",
+    pricePerRequest: 0.001,
+    pricePerCall: 0.001,
+    avgLatencyMs: 260,
+    uptimePercent: 99.9,
+    rating: 4.3,
+    tags: ["payments", "cards"],
+    category: "Payment Processing",
+    createdAt: "2026-02-15",
+    usageCount: 880000,
+    features: ["PCI-compliant", "Low-latency captures"],
+    useCases: ["Checkout", "Subscriptions"],
+    endpoints: [
+      {
+        id: "payment-create",
+        title: "Create Payment",
+        url: "/v1/payments",
+        method: "POST",
+        group: "Payments",
+        params: [
+          { name: "amount", type: "number", required: true },
+          { name: "currency", type: "string", required: true },
+          { name: "card_token", type: "string", required: true },
+        ],
+        response: '{ "payment_id": "pay_123", "status": "processed" }',
+      },
+      {
+        id: "payment-refund",
+        title: "Refund Payment",
+        url: "/v1/payments/{id}/refund",
+        method: "POST",
+        group: "Payments",
+        params: [
+          { name: "id", type: "string", required: true },
+          { name: "amount", type: "number", required: false },
+        ],
+        response: '{ "refund_id": "ref_456", "status": "processed" }',
+      },
+      {
+        id: "webhook-register",
+        title: "Register Webhook",
+        url: "/v1/webhooks",
+        method: "POST",
+        group: "Webhooks",
+        params: [
+          { name: "url", type: "string", required: true },
+          { name: "events", type: "array", required: true },
+        ],
+        response: '{ "webhook_id": "wh_789", "status": "active" }',
+      },
+    ],
+    stats: { totalCalls: 880000, avgResponseMs: 260, uptimePct: 99.9 },
+    reviews: [
+      {
+        id: "r1",
+        author: "Naomi L.",
+        rating: 4,
+        date: "2026-06-01",
+        body: "PCI compliance out of the box is a huge time-saver.",
+        verified: true,
+      },
+      {
+        id: "r2",
+        author: "Ben F.",
+        rating: 5,
+        date: "2026-04-20",
+        body: "Handles high-volume checkouts with no issues.",
+        verified: false,
+      },
+    ],
+    hourlyHealth: Array(24).fill("operational"),
+    sparklineValues: [30, 28, 35, 32, 40, 38, 45, 42, 50, 48, 55, 52],
+  },
+  {
+    id: "msg-01",
+    name: "ChatStream",
+    provider: { name: "Comms Inc.", url: "#" },
+    version: "3.0.2",
+    status: "maintenance",
+    description: "Scalable messaging and notifications for apps.",
+    pricePerRequest: 0.0005,
+    pricePerCall: 0.0005,
+    avgLatencyMs: 120,
+    uptimePercent: 99.99,
+    rating: 4.1,
+    tags: ["sms", "email"],
+    category: "Communication",
+    createdAt: "2025-12-01",
+    usageCount: 1200000,
+    features: ["Bulk sending", "Delivery webhooks"],
+    useCases: ["Notifications", "Two-factor auth"],
+    endpoints: [
+      {
+        id: "sms-send",
+        title: "Send SMS",
+        url: "/v1/sms",
+        method: "POST",
+        group: "Messaging",
+        params: [
+          { name: "to", type: "string", required: true },
+          { name: "message", type: "string", required: true },
+          { name: "from", type: "string", required: false },
+        ],
+        response: '{ "message_id": "msg_001", "status": "sent" }',
+      },
+      {
+        id: "email-send",
+        title: "Send Email",
+        url: "/v1/email",
+        method: "POST",
+        group: "Messaging",
+        params: [
+          { name: "to", type: "string", required: true },
+          { name: "subject", type: "string", required: true },
+          { name: "body", type: "string", required: true },
+        ],
+        response: '{ "email_id": "email_002", "status": "queued" }',
+      },
+      {
+        id: "template-create",
+        title: "Create Template",
+        url: "/v1/templates",
+        method: "POST",
+        group: "Templates",
+        params: [
+          { name: "name", type: "string", required: true },
+          { name: "content", type: "string", required: true },
+          { name: "type", type: "string", required: true },
+        ],
+        response: '{ "template_id": "tpl_003", "status": "active" }',
+      },
+    ],
+    stats: { totalCalls: 1200000, avgResponseMs: 120, uptimePct: 99.99 },
+    reviews: [
+      {
+        id: "r1",
+        author: "Eva C.",
+        rating: 5,
+        date: "2026-06-15",
+        body: "Delivery webhooks are rock-solid. Brilliant product.",
+        verified: true,
+      },
+    ],
+    hourlyHealth: Array(24).fill("operational").map((_, i) => i > 18 && i < 22 ? "down" : "operational"),
+    sparklineValues: [8, 10, 9, 12, 14, 13, 16, 17, 15, 18, 20, 19],
+  },
+  // minimal demo items
+  ...Array.from({ length: 10 }).map((_, i) => {
+    const pricePerRequest = Number((Math.random() * 0.02).toFixed(4));
+    const avgLatencyMs = i % 5 === 0 ? undefined : 140 + i * 18;
+    const uptimePercent =
+      i % 3 === 0 ? undefined : Number((99.2 + i * 0.07).toFixed(2));
+    const status: APIItem["status"] =
+      i % 3 === 0
+        ? "operational"
+        : i % 3 === 1
+        ? "degraded"
+        : "maintenance";
+    return {
+      id: `demo-${i}`,
+      name: `Demo API ${i + 1}`,
+      provider: { name: i % 2 === 0 ? "OpenTools" : "ThirdParty", url: "#" },
+      version: `1.${i}.0`,
+      status,
+      description: `Demo API number ${i + 1} showcasing features and endpoints.`,
+      pricePerRequest,
+      pricePerCall: i % 4 === 0 ? undefined : pricePerRequest,
+      avgLatencyMs,
+      uptimePercent,
+      rating: Number((3.5 + Math.random() * 1.5).toFixed(1)),
+      tags: [i % 2 === 0 ? "analytics" : "utility"],
+      category: i % 2 === 0 ? "Data & Analytics" : "Other",
+      createdAt: new Date(Date.now() - i * 86400000).toISOString(),
+      usageCount: Math.floor(Math.random() * 500000),
+      features: [],
+      useCases: [],
+      endpoints: [],
+      stats: {
+        totalCalls: Math.floor(Math.random() * 500000),
+        avgResponseMs: avgLatencyMs,
+        uptimePct: uptimePercent,
+      },
+      hourlyHealth: Array(24).fill("operational").map(() => Math.random() > 0.9 ? (Math.random() > 0.5 ? "degraded" : "down") : "operational"),
+    };
+  }),
+];
+
+export function findApiById(id: string | undefined) {
+  if (!id) return undefined;
+  return MOCK_APIS.find((a) => a.id === id || a.id === decodeURIComponent(id));
+}
+
+export default MOCK_APIS;

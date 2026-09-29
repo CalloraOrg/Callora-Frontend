@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import { formatPrice } from "../utils/format";
-import type { APIItem } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
+import { getPricePerCall, getAvgLatencyMs, getUptimePercent } from "../data/mockApis";
 import "./CompareDrawer.css";
 
 export default function CompareDrawer() {
@@ -22,7 +22,7 @@ export default function CompareDrawer() {
     return () => document.removeEventListener("keydown", handleKey);
   }, [isOpen]);
 
-  const handleRemove = (id: APIItem["id"], name: APIItem["name"]) => {
+  const handleRemove = (id: string, name: string) => {
     compareStore.removeApi(id);
     setAnnouncement(`Removed ${name} from comparison.`);
     setTimeout(() => setAnnouncement(""), 3000);
@@ -59,7 +59,7 @@ export default function CompareDrawer() {
                 Clear
               </button>
               <button className="close-button" onClick={() => compareStore.setOpen(false)} aria-label="Close drawer">
-                ✕
+                ✍
               </button>
             </div>
           </div>
@@ -71,14 +71,18 @@ export default function CompareDrawer() {
               </div>
             ) : (
               <div className="compare-grid">
-                {apis.map((api) => (
+                {apis.map((api) => {
+                  const pricePerCall = getPricePerCall(api);
+                  const avgLatencyMs = getAvgLatencyMs(api);
+                  const uptimePercent = getUptimePercent(api);
+                  return (
                   <div key={api.id} className="compare-column">
                     <button
                       className="compare-column-remove"
                       onClick={() => handleRemove(api.id, api.name)}
                       aria-label={`Remove ${api.name} from comparison`}
                     >
-                      <span aria-hidden="true">✕</span>
+                      <span aria-hidden="true">✍</span>
                     </button>
                     
                     <div className="compare-column-header">{api.name}</div>
@@ -86,21 +90,21 @@ export default function CompareDrawer() {
                     <div className="compare-stat">
                       <span className="compare-stat-label">Price / call</span>
                       <span className="compare-stat-value">
-                        {api.pricePerRequest !== undefined ? `$${formatPrice(api.pricePerRequest)}` : "—"}
+                        {pricePerCall !== undefined ? `$${formatPrice(pricePerCall)}` : "—"}
                       </span>
                     </div>
 
                     <div className="compare-stat">
                       <span className="compare-stat-label">Latency</span>
                       <span className="compare-stat-value">
-                        {api.stats.avgResponseMs !== undefined ? `${api.stats.avgResponseMs} ms` : "—"}
+                        {avgLatencyMs !== undefined ? `${avgLatencyMs} ms` : "—"}
                       </span>
                     </div>
 
                     <div className="compare-stat">
                       <span className="compare-stat-label">Uptime</span>
                       <span className="compare-stat-value">
-                        {api.stats.uptimePct !== undefined ? `${api.stats.uptimePct.toFixed(2)}%` : "—"}
+                        {uptimePercent !== undefined ? `${uptimePercent.toFixed(2)}%` : "—"}
                       </span>
                     </div>
 
@@ -115,7 +119,8 @@ export default function CompareDrawer() {
                       </span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
