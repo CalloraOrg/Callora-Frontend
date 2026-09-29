@@ -155,4 +155,17 @@ callora-frontend/
 
 This repo is part of [Callora](https://github.com/your-org/callora). Backend and contracts live in separate repos: `callora-backend`, `callora-contracts`.
 
+### Stellar wallet deposits
+
+Deposits use the Freighter browser extension and the Callora Soroban vault. Configure the deployed vault contract ID before starting the frontend:
+
+```env
+VITE_STELLAR_NETWORK=testnet
+VITE_STELLAR_VAULT_CONTRACT_ID=<deployed-vault-contract-id>
+```
+
+`VITE_STELLAR_RPC_URL` can override the testnet RPC endpoint. Mainnet deployments must set `VITE_STELLAR_NETWORK=mainnet`, `VITE_STELLAR_RPC_URL`, and the matching mainnet vault contract ID together. Do not mix addresses or RPC endpoints across networks.
+
+The demo outcome radio group is hidden by default. In a Vite development server, set `VITE_ENABLE_DEMO_OUTCOME=true` to show it.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.

@@ -1299,6 +1299,19 @@ code,
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), var(--modal-bg) 80%);
 }
 
+.wallet-install-prompt {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.wallet-install-prompt p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .modal-header,
 .preview-header {
   display: flex;
