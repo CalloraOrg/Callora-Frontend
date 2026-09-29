@@ -64,6 +64,11 @@ export enum RotationErrorCode {
  * Generates a confirmation token tied to a specific rotation context.
  * This token should be generated server-side after authorization checks.
  *
+ * TODO(Security): This function is a client-side placeholder using base64
+ * and Math.random(). It is NON-SECURE and must not be trusted in production.
+ * Production environments must require server-issued cryptographic tokens.
+ * See docs/Key-Rotation.md for the full trust model specification.
+ *
  * In a real implementation, this would:
  * 1. Generate a cryptographically secure random token
  * 2. Bind it to the user/tenant/session context
@@ -74,9 +79,9 @@ export enum RotationErrorCode {
  * parent component should use when calling the backend.
  */
 export function generateConfirmationToken(context: RotationContext): string {
+  // NON-SECURE PLACEHOLDER: See docs/Key-Rotation.md for details.
   // In production, this token is generated server-side and returned to the client.
   // The frontend stores it temporarily and includes it in the rotation request.
-  // This is a placeholder that demonstrates the token structure.
   const payload = {
     userId: context.userId,
     tenantId: context.tenantId,
