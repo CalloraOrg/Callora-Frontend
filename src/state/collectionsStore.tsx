@@ -80,7 +80,8 @@ function loadFromStorage(): CollectionsState {
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
 
-function reducer(state: CollectionsState, action: Action): CollectionsState {
+/** Exported for unit testing. Prefer the context helpers in application code. */
+export function reducer(state: CollectionsState, action: Action): CollectionsState {
   switch (action.type) {
     case "CREATE_COLLECTION": {
       const newCol: Collection = {
