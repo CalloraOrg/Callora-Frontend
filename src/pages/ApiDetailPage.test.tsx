@@ -328,6 +328,18 @@ describe("ApiDetailPage", () => {
     expect(screen.getByText("Integration Gallery")).toBeTruthy();
   });
 
+  it("generates payment samples from endpoint parameters without geographic coordinates", () => {
+    window.history.pushState({}, "", "/details/pay-qr");
+    renderWithProviders(<ApiDetailPage />);
+    settleLoadingState();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+    expect(document.body.textContent).toContain('"amount":1');
+    expect(document.body.textContent).toContain('"currency":"example"');
+    expect(document.body.textContent).not.toContain("lat=");
+  });
+
   it("shows the available page shortcuts next to the tab navigation", () => {
     renderWithProviders(<ApiDetailPage />);
     settleLoadingState();

@@ -29,6 +29,7 @@ import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import PlanBadge from "../components/PlanBadge";
 import LiveRegion from "../components/LiveRegion";
+import { toCurl, type CurlRequest } from "../utils/toCurl";
 
 /**
  * ApiDetailPage
@@ -64,6 +65,96 @@ type ApiEndpoint = {
   response?: string;
   group?: string;
 };
+
+const BODILESS_METHODS = new Set(["GET", "HEAD"]);
+
+function exampleValueForType(type: string): unknown {
+  switch ((type || "string").trim().toLowerCase()) {
+    case "number":
+    case "integer":
+      return 1;
+    case "boolean":
+      return true;
+    case "array":
+      return ["example"];
+    case "object":
+      return { example: "value" };
+    default:
+      return "example";
+  }
+}
+
+function buildExampleRequest(endpoint: ApiEndpoint): CurlRequest {
+  const method = (endpoint.method || "GET").toUpperCase();
+  const params = Object.fromEntries(
+    (endpoint.params ?? [])
+      .filter((param) => param.name.trim())
+      .map((param) => [param.name.trim(), exampleValueForType(param.type)]),
+  );
+  const hasParams = Object.keys(params).length > 0;
+  const query = new URLSearchParams();
+
+  if (BODILESS_METHODS.has(method)) {
+    for (const [name, value] of Object.entries(params)) {
+      query.set(name, typeof value === "string" ? value : JSON.stringify(value));
+    }
+  }
+
+  const baseUrl = `${API_BASE_URL}${endpoint.url}`;
+  const url = query.toString() ? `${baseUrl}?${query.toString()}` : baseUrl;
+
+  return {
+    method,
+    url,
+    headers: {
+      Authorization: "Bearer YOUR_API_KEY",
+      "Content-Type": "application/json",
+    },
+    ...(hasParams && !BODILESS_METHODS.has(method) ? { body: params } : {}),
+  };
+}
+
+function toJavaScriptExample(request: CurlRequest): string {
+  const body = request.body === undefined ? undefined : JSON.stringify(request.body);
+  const bodyLine = body ? `\n    body: '${body.replace(/'/g, "\\'")}',` : "";
+
+  return `import fetch from 'node-fetch';
+
+const getApiData = async () => {
+  const response = await fetch('${request.url}', {
+    method: '${request.method}',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },${bodyLine}
+  });
+
+  if (!response.ok) throw new Error('API request failed');
+
+  const data = await response.json();
+  return data;
+};
+
+getApiData().then(console.log).catch(console.error);`;
+}
+
+function toPythonExample(request: CurlRequest): string {
+  const body = request.body === undefined ? undefined : JSON.stringify(request.body);
+  const requestCall = body
+    ? `requests.${(request.method ?? "GET").toLowerCase()}(url, headers=headers, json=${body})`
+    : `requests.${(request.method ?? "GET").toLowerCase()}(url, headers=headers)`;
+
+  return `import requests
+
+url = "${request.url}"
+headers = {
+    "Authorization": "Bearer YOUR_API_KEY",
+    "Content-Type": "application/json"
+}
+
+response = ${requestCall}
+print(response.json())`;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -550,40 +641,11 @@ export default function ApiDetailPage({ onBack }: Props) {
 
   const firstEndpoint = api.endpoints?.[0] ?? { url: "/v1/data", method: "GET" };
 
-  const curlExample = `curl -X ${firstEndpoint.method} "${API_BASE_URL}${firstEndpoint.url}?lat=37.78&lon=-122.41" \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
-  -H "Content-Type: application/json"`;
+  const exampleRequest = buildExampleRequest(firstEndpoint as ApiEndpoint);
+  const curlExample = toCurl(exampleRequest);
 
-  const jsExample = `import fetch from 'node-fetch';
-
-const getApiData = async () => {
-  const response = await fetch(\`${API_BASE_URL}${firstEndpoint.url}\`, {
-    method: \`${firstEndpoint.method}\`,
-    headers: {
-      'Authorization': 'Bearer YOUR_API_KEY',
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (!response.ok) throw new Error('API request failed');
-
-  const data = await response.json();
-  return data;
-};
-
-getApiData().then(console.log).catch(console.error);`;
-
-  const pyExample = `import requests
-
-url = "${API_BASE_URL}${firstEndpoint.url}"
-headers = {
-    "Authorization": "Bearer YOUR_API_KEY",
-    "Content-Type": "application/json"
-}
-params = { "lat": 37.78, "lon": -122.41 }
-
-response = requests.get(url, headers=headers, params=params)
-print(response.json())`;
+  const jsExample = toJavaScriptExample(exampleRequest);
+  const pyExample = toPythonExample(exampleRequest);
 
   const allSnippets = { bash: curlExample, javascript: jsExample, python: pyExample };
 
