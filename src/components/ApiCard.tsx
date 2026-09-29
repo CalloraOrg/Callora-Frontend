@@ -15,7 +15,7 @@ import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import { useFavorites } from "../hooks/useFavorites";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
-import type { APIItem } from "../data/mockApis";
+import type { APIItem, Endpoint } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import { usePinnedApis, pinnedApisStore } from "../state/pinnedApis";
@@ -644,7 +644,7 @@ export default function ApiCard({
   const isMobile = useMediaQuery("(max-width: 768px)");
 
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
-  const avgLatencyMs = api.avgLatencyMs;
+  const avgLatencyMs = api.avgLatencyMs ?? api.stats?.avgResponseMs;
   const uptimePercent = api.uptimePercent;
   const isCompact = density === "compact" || isMobile;
 
@@ -749,7 +749,7 @@ export default function ApiCard({
     {
       label: "Copy Endpoint URL",
       action: () => {
-        const url = api.endpoints?.[0]?.url ?? `/${api.id}`;
+        const url = (api.endpoints as Endpoint[] | undefined)?.[0]?.url ?? `/${api.id}`;
         navigator.clipboard.writeText(url).catch(() => {
           /* clipboard unavailable in tests */
         });
@@ -912,7 +912,7 @@ export default function ApiCard({
       </div>
 
       <div className="api-marketplace-card-tags" style={{ display: "flex", gap: "var(--mkt-space-md)", flexWrap: "wrap" }}>
-        {((api.tags as string[]) || []).slice(0, 4).map((t: string) => (
+        {(api.tags || []).slice(0, 4).map((t: string) => (
           <TagChip key={t} tag={t} active={activeTag?.toLowerCase() === t.toLowerCase()} onClick={onTagClick} />
         ))}
       </div>
@@ -970,7 +970,13 @@ export default function ApiCard({
             <span className="api-card__stat-label" style={{ display: "inline-flex", alignItems: "center", gap: "var(--mkt-space-sm)" }}>
               <BoltIcon size={16} /> Uptime
             </span>
-            {renderStatValue(uptimePercent !== undefined ? `${uptimePercent.toFixed(2)}%` : undefined)}
+            {renderStatValue(
+              uptimePercent !== undefined
+                ? `${uptimePercent.toFixed(2)}%`
+                : api.stats?.uptimePct !== undefined
+                  ? `${api.stats.uptimePct.toFixed(2)}%`
+                  : undefined
+            )}
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import { formatPrice } from "../utils/format";
+import type { APIItem } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
 import "./CompareDrawer.css";
 
@@ -21,7 +22,7 @@ export default function CompareDrawer() {
     return () => document.removeEventListener("keydown", handleKey);
   }, [isOpen]);
 
-  const handleRemove = (id: string, name: string) => {
+  const handleRemove = (id: APIItem["id"], name: APIItem["name"]) => {
     compareStore.removeApi(id);
     setAnnouncement(`Removed ${name} from comparison.`);
     setTimeout(() => setAnnouncement(""), 3000);
@@ -85,21 +86,21 @@ export default function CompareDrawer() {
                     <div className="compare-stat">
                       <span className="compare-stat-label">Price / call</span>
                       <span className="compare-stat-value">
-                        {api.pricePerCall !== undefined ? `$${formatPrice(api.pricePerCall)}` : "—"}
+                        {api.pricePerRequest !== undefined ? `$${formatPrice(api.pricePerRequest)}` : "—"}
                       </span>
                     </div>
 
                     <div className="compare-stat">
                       <span className="compare-stat-label">Latency</span>
                       <span className="compare-stat-value">
-                        {api.avgLatencyMs !== undefined ? `${api.avgLatencyMs} ms` : "—"}
+                        {api.stats.avgResponseMs !== undefined ? `${api.stats.avgResponseMs} ms` : "—"}
                       </span>
                     </div>
 
                     <div className="compare-stat">
                       <span className="compare-stat-label">Uptime</span>
                       <span className="compare-stat-value">
-                        {api.uptimePercent !== undefined ? `${api.uptimePercent.toFixed(2)}%` : "—"}
+                        {api.stats.uptimePct !== undefined ? `${api.stats.uptimePct.toFixed(2)}%` : "—"}
                       </span>
                     </div>
 
