@@ -1,117 +1,231 @@
-import { render, screen, act, fireEvent } from '@testing-library/react';
-import { ToastProvider, useToast } from './Toast';
-import { useEffect } from 'react';
+// @vitest-environment jsdom
 
-const TestComponent = ({ testCase }: { testCase: number }) => {
-  const { showToast } = useToast();
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider, useToast } from "./Toast";
 
-  useEffect(() => {
-    if (testCase === 1) {
-      showToast({ message: 'Persistent Toast', persistent: true });
-    } else if (testCase === 2) {
-      showToast({ message: 'Custom Duration', duration: 1000 });
-    } else if (testCase === 3) {
-      showToast('Error Toast', 'error');
-    } else if (testCase === 4) {
-      showToast({ message: '1', persistent: true });
-      showToast({ message: '2', persistent: false });
-      showToast({ message: '3', persistent: true });
-      showToast({ message: '4', persistent: false });
-      showToast({ message: '5', persistent: true });
-    }
-  }, [testCase, showToast]);
+const MAX_TOASTS = 4;
+const DEFAULT_DURATION = 5000;
+const ERROR_DURATION = 10000;
+const EXIT_ANIMATION = 200;
+const DISMISS_LABEL = "Dismiss notification";
 
+type ShowToast = ReturnType<typeof useToast>["showToast"];
+
+let showToast: ShowToast = () => {};
+
+function ToastHarness() {
+  const { showToast: show } = useToast();
+  showToast = show;
   return null;
-};
+}
 
-describe('Toast Component', () => {
+function renderWithProvider() {
+  return render(
+    <ToastProvider>
+      <ToastHarness />
+    </ToastProvider>,
+  );
+}
+
+const advance = (ms: number) =>
+  act(() => {
+    vi.advanceTimersByTime(ms);
+  });
+
+function push(...messages: string[]) {
+  act(() => {
+    messages.forEach((message) => showToast(message));
+  });
+}
+
+const queue = () => screen.getByRole("status", { name: "Notifications" });
+
+const toastCount = () => queue().querySelectorAll(".toast-queue__toast").length;
+
+const isPresent = (message: string) => screen.queryByText(message) !== null;
+
+const getToast = (message: string) =>
+  screen.getByText(message).closest(".toast-queue__toast") as HTMLElement;
+
+describe("Toast", () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
-    jest.useRealTimers();
+    cleanup();
+    vi.useRealTimers();
   });
 
-  it('keeps persistent toast until dismissed', () => {
-    render(
-      <ToastProvider>
-        <TestComponent testCase={1} />
-      </ToastProvider>
-    );
-    expect(screen.getByText('Persistent Toast')).toBeInTheDocument();
-    
-    act(() => {
-      jest.advanceTimersByTime(10000);
-    });
-    
-    expect(screen.getByText('Persistent Toast')).toBeInTheDocument();
+  describe("queue eviction", () => {
+    it("keeps at most four toasts and evicts the oldest when a fifth is pushed", () => {
+      renderWithProvider();
 
-    const closeBtn = screen.getByRole('button', { name: /Dismiss notification/i });
-    fireEvent.click(closeBtn);
-    
-    act(() => {
-      jest.advanceTimersByTime(500);
+      push("T1", "T2", "T3", "T4");
+      expect(toastCount()).toBe(MAX_TOASTS);
+
+      push("T5");
+
+      expect(toastCount()).toBe(MAX_TOASTS);
+      expect(screen.queryByText("T1")).not.toBeInTheDocument();
+      ["T2", "T3", "T4", "T5"].forEach((message) => {
+        expect(screen.getByText(message)).toBeInTheDocument();
+      });
     });
-    
-    expect(screen.queryByText('Persistent Toast')).not.toBeInTheDocument();
+
+    it("evicts a non-persistent toast before a persistent one", () => {
+      renderWithProvider();
+
+      act(() => {
+        showToast({ message: "P1", persistent: true });
+        showToast({ message: "NP1" });
+        showToast({ message: "P2", persistent: true });
+        showToast({ message: "NP2" });
+        showToast({ message: "P3", persistent: true });
+      });
+
+      expect(toastCount()).toBe(MAX_TOASTS);
+      expect(screen.getByText("P1")).toBeInTheDocument();
+      expect(screen.queryByText("NP1")).not.toBeInTheDocument();
+      expect(screen.getByText("P2")).toBeInTheDocument();
+      expect(screen.getByText("NP2")).toBeInTheDocument();
+      expect(screen.getByText("P3")).toBeInTheDocument();
+    });
   });
 
-  it('custom duration dismisses the toast after that many milliseconds', () => {
-    render(
-      <ToastProvider>
-        <TestComponent testCase={2} />
-      </ToastProvider>
-    );
-    expect(screen.getByText('Custom Duration')).toBeInTheDocument();
+  describe("auto-dismiss", () => {
+    it("removes a toast 200ms after its 5s duration, at 5200ms", () => {
+      renderWithProvider();
+      push("Solo");
 
-    act(() => {
-      jest.advanceTimersByTime(900);
-    });
-    expect(screen.getByText('Custom Duration')).toBeInTheDocument();
+      advance(DEFAULT_DURATION - 1);
+      expect(isPresent("Solo")).toBe(true);
 
-    act(() => {
-      jest.advanceTimersByTime(300); // 900 + 300 = 1200 > 1000 + 200 (animation)
+      // At 5000ms the timer only flags the toast as exiting so the CSS
+      // transition can play, so it is still mounted.
+      advance(1);
+      expect(isPresent("Solo")).toBe(true);
+      expect(getToast("Solo").className).toContain("toast-queue__toast--exiting");
+
+      advance(EXIT_ANIMATION);
+      expect(screen.queryByText("Solo")).not.toBeInTheDocument();
     });
-    expect(screen.queryByText('Custom Duration')).not.toBeInTheDocument();
+
+    it("respects a custom duration before the same exit animation", () => {
+      renderWithProvider();
+      act(() => {
+        showToast({ message: "Custom", duration: 1000 });
+      });
+
+      advance(1000 + EXIT_ANIMATION - 1);
+      expect(isPresent("Custom")).toBe(true);
+
+      advance(1);
+      expect(screen.queryByText("Custom")).not.toBeInTheDocument();
+    });
+
+    it("defaults error toasts to 10s rather than 5s", () => {
+      renderWithProvider();
+      act(() => {
+        showToast("Error Toast", "error");
+      });
+
+      advance(DEFAULT_DURATION);
+      expect(isPresent("Error Toast")).toBe(true);
+
+      advance(ERROR_DURATION + EXIT_ANIMATION - DEFAULT_DURATION);
+      expect(screen.queryByText("Error Toast")).not.toBeInTheDocument();
+    });
+
+    it("never auto-dismisses a persistent toast", () => {
+      renderWithProvider();
+      act(() => {
+        showToast({ message: "Sticky", persistent: true });
+      });
+
+      advance(ERROR_DURATION * 10);
+      expect(isPresent("Sticky")).toBe(true);
+    });
   });
 
-  it('existing showToast(message, "error") calls continue to compile and work, defaulting to 10s', () => {
-    render(
-      <ToastProvider>
-        <TestComponent testCase={3} />
-      </ToastProvider>
-    );
-    expect(screen.getByText('Error Toast')).toBeInTheDocument();
-    
-    act(() => {
-      jest.advanceTimersByTime(5000);
-    });
-    // Should still be there because error default is 10s
-    expect(screen.getByText('Error Toast')).toBeInTheDocument();
+  describe("pause on hover and focus", () => {
+    it("pauses the countdown on mouse enter and resumes the remainder on mouse leave", () => {
+      renderWithProvider();
+      push("Hover");
+      const toast = getToast("Hover");
 
-    act(() => {
-      jest.advanceTimersByTime(5500); // 10500 total
+      advance(3000);
+      fireEvent.mouseEnter(toast);
+
+      // Well past the original deadline, but the countdown is frozen.
+      advance(DEFAULT_DURATION + EXIT_ANIMATION);
+      expect(isPresent("Hover")).toBe(true);
+      expect(getToast("Hover").className).not.toContain("toast-queue__toast--exiting");
+
+      fireEvent.mouseLeave(toast);
+
+      // 2000ms of the original 5000ms were left, so removal lands at 5200ms
+      // from the original start.
+      advance(2000 - 1);
+      expect(isPresent("Hover")).toBe(true);
+
+      advance(1);
+      expect(isPresent("Hover")).toBe(true);
+      expect(getToast("Hover").className).toContain("toast-queue__toast--exiting");
+
+      advance(EXIT_ANIMATION);
+      expect(screen.queryByText("Hover")).not.toBeInTheDocument();
     });
-    expect(screen.queryByText('Error Toast')).not.toBeInTheDocument();
+
+    it("pauses on focus and resumes on blur", () => {
+      renderWithProvider();
+      push("Focus");
+      const toast = getToast("Focus");
+
+      fireEvent.focus(toast);
+      advance(DEFAULT_DURATION + EXIT_ANIMATION);
+      expect(isPresent("Focus")).toBe(true);
+
+      fireEvent.blur(toast);
+      advance(DEFAULT_DURATION + EXIT_ANIMATION);
+      expect(screen.queryByText("Focus")).not.toBeInTheDocument();
+    });
   });
 
-  it('when the queue exceeds four, a non-persistent toast is evicted before a persistent one', () => {
-    render(
-      <ToastProvider>
-        <TestComponent testCase={4} />
-      </ToastProvider>
-    );
-    // added: 1(P), 2(NP), 3(P), 4(NP), 5(P)
-    // max toasts = 4
-    // when 5(P) is added, we have 4 items: 1(P), 2(NP), 3(P), 4(NP)
-    // 2(NP) should be evicted because it's the first non-persistent
-    // remaining: 1(P), 3(P), 4(NP), 5(P)
-    expect(screen.getByText('1')).toBeInTheDocument();
-    expect(screen.queryByText('2')).not.toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getByText('4')).toBeInTheDocument();
-    expect(screen.getByText('5')).toBeInTheDocument();
+  describe("manual dismissal", () => {
+    it("removes a toast when its dismiss button is clicked", () => {
+      renderWithProvider();
+      act(() => {
+        showToast({ message: "Bye", persistent: true });
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: `${DISMISS_LABEL}: Bye` }));
+
+      advance(EXIT_ANIMATION - 1);
+      expect(isPresent("Bye")).toBe(true);
+
+      advance(1);
+      expect(screen.queryByText("Bye")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("useToast", () => {
+    it("throws when called outside a ToastProvider", () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      function Orphan() {
+        useToast();
+        return null;
+      }
+
+      try {
+        expect(() => render(<Orphan />)).toThrow(
+          "useToast must be used within a ToastProvider",
+        );
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
   });
 });
