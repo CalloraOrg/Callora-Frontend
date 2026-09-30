@@ -38,6 +38,12 @@ Example: `git checkout -b feature/api-search-filters`
 3. Run `npm run build` to confirm no TypeScript errors.
 4. Open a pull request against `main` with a clear description of what changed and why.
 
+## Pull request checklist
+
+- [ ] The change is described in the PR body, including why it is needed.
+- [ ] `npm run build` passes with no TypeScript errors.
+- [ ] Any component added, removed, or re-audited has a matching update in [`src/data/a11y-manifest.json`](src/data/a11y-manifest.json). New user-facing components start at `needs-work` until their audit is complete. See the [Accessibility Manifest Guide](docs/A11y-Manifest.md).
+
 ## Design system
 
 All UI changes must follow the [UI Design System](docs/UI-Design-System.md).
@@ -53,6 +59,21 @@ Key rules:
 - Use semantic HTML elements (`<button>`, `<nav>`, `<main>`, `<article>`, etc.).
 - Provide `aria-label` or visible text for icon-only controls.
 - Verify your changes in both light and dark modes (use the theme toggle in the top bar).
+
+### Accessibility audit manifest
+
+The [Accessibility Audit board](/a11y-audit) is generated from
+[`src/data/a11y-manifest.json`](src/data/a11y-manifest.json). Every user-facing
+component must have an entry there, and that entry must reflect the component's
+current audit state:
+
+- Add an entry for new user-facing components, starting at `needs-work` until
+  their audit is complete.
+- Flip `status` to `audited` once a component's audit is finished, and back if a
+  regression re-opens a finding.
+- Remove the entry when a component is deleted.
+- The field schema and the precise meaning of `audited`, `needs-work`, and
+  `n/a` are documented in the [Accessibility Manifest Guide](docs/A11y-Manifest.md).
 
 ## Testing
 

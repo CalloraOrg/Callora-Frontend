@@ -26,6 +26,11 @@ export default function A11yAudit() {
       <div className="page-header">
         <h1>Accessibility Audit Board</h1>
         <p className="page-subtitle">Track the WCAG 2.1 AA compliance status of all design system components.</p>
+        <p className="page-subtitle">
+          This board is generated from <code>src/data/a11y-manifest.json</code>. See the{' '}
+          <a href="docs/A11y-Manifest.md" className="component-link">Accessibility Manifest Guide</a>{' '}
+          for the manifest fields, status definitions, and upkeep rules.
+        </p>
       </div>
 
       <div className="surface summary-section" style={{ marginBottom: '24px', padding: '16px', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
