@@ -215,6 +215,10 @@ export default function MarketplacePage(): JSX.Element {
       );
     }
 
+    // An inverted range (min > max) would match nothing, so both bounds are
+    // skipped and results stay unfiltered by price. FiltersSidebar renders an
+    // inline error plus a "Swap values" action whenever this is true, so the
+    // no-op is always visible rather than silent.
     const hasInvertedPrice =
       minPrice !== null && maxPrice !== null && minPrice > maxPrice;
     if (!hasInvertedPrice) {

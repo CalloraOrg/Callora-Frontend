@@ -5698,6 +5698,37 @@ code,
   box-shadow: 0 0 0 3px rgba(255, 125, 141, 0.4) !important;
 }
 
+/* Inline hint shown when the price range is inverted (min > max). */
+.filters-price-error {
+  display: grid;
+  gap: var(--mkt-space-sm, 4px);
+  justify-items: start;
+}
+
+.filters-price-swap {
+  font-size: 0.8125rem;
+  padding: 4px 10px;
+  min-height: 32px;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.filters-price-swap:hover {
+  background: rgba(255, 125, 141, 0.12);
+}
+
+/* Active-filter chip for a value that is set but not narrowing results
+   (inverted price range). Kept visible, visibly de-emphasised. */
+.filter-chip--inactive {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+.filter-chip__inactive-note {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* ─── Calls Heatmap ───────────────────────────────────────────────────────── */
 .calls-heatmap-container {
   overflow-x: auto;

@@ -903,3 +903,81 @@ describe("MarketplacePage empty state", () => {
     expect(screen.queryByTestId("empty-state-filtered")).toBeNull();
   });
 });
+
+describe("MarketplacePage inverted price range", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    localStorage.clear();
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  /** Last numeric-tabular span in the toolbar count is the filtered total. */
+  function filteredResultCount(): number {
+    const spans = document.querySelectorAll(
+      ".marketplace-count .numeric-tabular",
+    );
+    return Number(spans[spans.length - 1]?.textContent);
+  }
+
+  function setPriceRange(min: string, max: string) {
+    fireEvent.change(screen.getByLabelText("Minimum price"), {
+      target: { value: min },
+    });
+    fireEvent.change(screen.getByLabelText("Maximum price"), {
+      target: { value: max },
+    });
+  }
+
+  it("keeps results unfiltered by price while the range is inverted", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const unfilteredCount = filteredResultCount();
+    expect(unfilteredCount).toBeGreaterThan(0);
+
+    setPriceRange("0.5", "0.019");
+
+    expect(screen.getByText(/Min price cannot exceed max price/i)).toBeTruthy();
+    // An inverted range matches nothing if applied, so both bounds are
+    // skipped and the result set is left untouched.
+    expect(filteredResultCount()).toBe(unfilteredCount);
+  });
+
+  it("applies the corrected range after swapping an inverted range", () => {
+    renderPage();
+    settleMarketplaceTimers();
+
+    const unfilteredCount = filteredResultCount();
+    setPriceRange("0.5", "0.019");
+    expect(filteredResultCount()).toBe(unfilteredCount);
+
+    fireEvent.click(screen.getByTestId("filters-price-swap"));
+
+    expect(
+      (screen.getByLabelText("Minimum price") as HTMLInputElement).value,
+    ).toBe("0.019");
+    expect(
+      (screen.getByLabelText("Maximum price") as HTMLInputElement).value,
+    ).toBe("0.5");
+    expect(screen.queryByText(/Min price cannot exceed max price/i)).toBeNull();
+    // The corrected range is now really applied, so results narrow.
+    expect(filteredResultCount()).toBeLessThan(unfilteredCount);
+  });
+});
