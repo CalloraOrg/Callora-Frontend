@@ -33,7 +33,7 @@ type PublishFormState = {
   endpoints: EndpointEntry[];
 };
 
-type ValidatedFields = Exclude<keyof PublishFormState, 'description' | 'endpoints'>;
+type ValidatedFields = Exclude<keyof PublishFormState, 'endpoints'>;
 
 type TouchedState = Record<ValidatedFields, boolean>;
 
@@ -54,8 +54,18 @@ const INITIAL_TOUCHED: TouchedState = {
   apiName: false,
   baseUrl: false,
   category: false,
+  description: false,
   pricePerCall: false,
 };
+
+/** Maximum number of characters allowed in the API description. */
+const DESCRIPTION_MAX_LENGTH = 500;
+
+/**
+ * Announce the remaining count only once the provider is close to the limit,
+ * so screen readers are not flooded on every keystroke.
+ */
+const DESCRIPTION_ANNOUNCE_THRESHOLD = 50;
 
 const CATEGORIES = [
   'AI & Machine Learning',
@@ -113,6 +123,10 @@ function validateForm(form: PublishFormState): ValidationErrors {
 
   if (!form.category) {
     errors.category = 'Please select a category.';
+  }
+
+  if (form.description.length > DESCRIPTION_MAX_LENGTH) {
+    errors.description = `Description must be ${DESCRIPTION_MAX_LENGTH} characters or fewer.`;
   }
 
   if (form.pricePerCall.trim() !== '') {

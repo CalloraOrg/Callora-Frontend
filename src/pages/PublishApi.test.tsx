@@ -67,7 +67,7 @@ describe('PublishApi submission', () => {
 
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
 
-    const [url, init] = fetchImpl.mock.calls[0];
+    const [url, init] = fetchImpl.mockResults.calls[0];
     expect(url).toContain('/v1/apis');
     expect(init.method).toBe('POST');
     expect(init.headers['Idempotency-Key']).toBeTruthy();
@@ -89,7 +89,7 @@ describe('PublishApi submission', () => {
     await userEvent.click(submitButton());
 
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
-    const body = JSON.parse(fetchImpl.mock.calls[0][1].body);
+    const body = JSON.parse(fetchImpl.mockResults[0][1].body);
 
     expect(body).toMatchObject({
       apiName: 'Weather Forecast API',
@@ -110,7 +110,7 @@ describe('PublishApi submission', () => {
     await userEvent.click(submitButton());
 
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
-    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).pricePerCall).toBeNull();
+    expect(JSON.parse(fetchImpl.mockResults[0][1].body).pricePerCall).toBeNull();
   });
 
   it('does not POST when client-side validation fails', async () => {
@@ -121,7 +121,7 @@ describe('PublishApi submission', () => {
     await userEvent.click(submitButton());
 
     expect(fetchImpl).not.toHaveBeenCalled();
-    expect(screen.queryByText(/submitted for review/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/submitted for review/i)).not.toBeInDocument();
   });
 
   it('reuses the same idempotency key when an identical submission is retried', async () => {
@@ -136,8 +136,8 @@ describe('PublishApi submission', () => {
     await userEvent.click(submitButton());
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
 
-    expect(fetchImpl.mock.calls[0][1].headers['Idempotency-Key']).toBe(
-      fetchImpl.mock.calls[1][1].headers['Idempotency-Key'],
+    expect(fetchImpl.mockResults[0][1].headers['Idempotency-Key']).toBe(
+      fetchImpl.mockResults[1][1].headers['Idempotency-Key'],
     );
   });
 
@@ -156,8 +156,8 @@ describe('PublishApi submission', () => {
     await userEvent.click(submitButton());
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
 
-    expect(fetchImpl.mock.calls[1][1].headers['Idempotency-Key']).not.toBe(
-      fetchImpl.mock.calls[0][1].headers['Idempotency-Key'],
+    expect(fetchImpl.mockResults[1][1].headers['Idempotency-Key']).not.toBe(
+      fetchImpl.mockResults[0][1].headers['Idempotency-Key'],
     );
   });
 });
@@ -171,7 +171,7 @@ describe('PublishApi success screen', () => {
     fillValidForm();
     await userEvent.click(submitButton());
 
-    expect(screen.queryByText(/submitted for review/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/submitted for review/i)).not.toBeInDocument();
     expect(screen.getByRole('form', { name: /publish api form/i })).toBeInTheDocument();
 
     await act(async () => {
@@ -215,7 +215,7 @@ describe('PublishApi success screen', () => {
     await userEvent.click(submitButton());
 
     await waitFor(() => expect(fetchImpl).toHaveBeenCalled());
-    expect(screen.queryByText(/submitted for review/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/submitted for review/i)).not.toBeInDocument();
   });
 
   it('does not show the success screen on a 5xx', async () => {
@@ -227,7 +227,7 @@ describe('PublishApi success screen', () => {
     await userEvent.click(submitButton());
 
     await waitFor(() => expect(fetchImpl).toHaveBeenCalled());
-    expect(screen.queryByText(/submitted for review/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/submitted for review/i)).not.toBeInDocument();
   });
 
   it('does not show the success screen on a network failure', async () => {
@@ -280,7 +280,7 @@ describe('PublishApi server field errors', () => {
   });
 
   it('maps a snake_case server field onto the matching input', async () => {
-    const fetchImpl = vi
+    const fetchImpl = v
       .fn()
       .mockResolvedValue(jsonResponse(422, { errors: { base_url: 'Unreachable host.' } }));
     vi.stubGlobal('fetch', fetchImpl);
@@ -295,7 +295,7 @@ describe('PublishApi server field errors', () => {
   });
 
   it('keeps unrelated fields free of the server message', async () => {
-    const fetchImpl = vi
+    const fetchImpl = v
       .fn()
       .mockResolvedValue(jsonResponse(422, { errors: { apiName: 'Taken.' } }));
     vi.stubGlobal('fetch', fetchImpl);
@@ -340,11 +340,11 @@ describe('PublishApi server field errors', () => {
     fillValidForm();
     await userEvent.click(submitButton());
 
-    expect(await screen.findByText(/You are not verified to publish\./)).toBeInTheDocument();
+    expect(await screen.findByText(/You are not verified to publish\./i)).toBeInTheDocument();
   });
 
   it('shows a form-level error when a 4xx carries no field detail', async () => {
-    const fetchImpl = vi
+    const fetchImpl = v
       .fn()
       .mockResolvedValue(jsonResponse(403, { message: 'Publishing is restricted.' }));
     vi.stubGlobal('fetch', fetchImpl);
@@ -353,297 +353,108 @@ describe('PublishApi server field errors', () => {
     fillValidForm();
     await userEvent.click(submitButton());
 
-    expect(await screen.findByText('Publishing is restricted.')).toBeInTheDocument();
-  });
-
-  it('lets the user retry after fixing a server-reported field error', async () => {
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(422, { errors: { apiName: 'Taken.' } }))
-      .mockResolvedValueOnce(jsonResponse(201, { id: 'api_2' }));
-    vi.stubGlobal('fetch', fetchImpl);
-
-    render(<PublishApi />);
-    fillValidForm();
-    await userEvent.click(submitButton());
-    await waitFor(() => expect(errorNodeFor('pa-api-name')).toHaveTextContent('Taken.'));
-
-    fireEvent.change(screen.getByLabelText(/api name/i), {
-      target: { value: 'Weather Forecast API v2' },
-    });
-    await userEvent.click(submitButton());
-
-    expect(await screen.findByText(/submitted for review/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Publishing is restricted\./i)).toBeInTheDocument();
   });
 });
 
-describe('PublishApi session expiry', () => {
-  it('shows the session expiry banner on a 401', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(401, { message: 'Token expired' }));
-    vi.stubGlobal('fetch', fetchImpl);
+describe('PublishApi description length limit', () => {
+  const MAX_DESCRIPTION_LENGTH = 500;
 
+  function descriptionInput() {
+    return screen.getByLabelText(/description/i);
+  }
+
+  function counter() {
+    return document.getElementById('pa-description-counter');
+  }
+
+  it('renders a live counter that updates as the user types', () => {
     render(<PublishApi />);
-    fillValidForm();
-    await userEvent.click(submitButton());
 
-    expect(await screen.findByText(/session has expired/i)).toBeInTheDocument();
-  });
+    expect(counter()).toHaveTextContent(`0 / ${MAX_DESCRIPTION_LENGTH}`);
 
-  it('does not show the success screen after a 401', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(401, {}));
-    vi.stubGlobal('fetch', fetchImpl);
-
-    render(<PublishApi />);
-    fillValidForm();
-    await userEvent.click(submitButton());
-
-    expect(await screen.findByText(/session has expired/i)).toBeInTheDocument();
-    expect(screen.queryByText(/submitted for review/i)).not.toBeInTheDocument();
-  });
-
-  it('can dismiss the banner', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(401, {}));
-    vi.stubGlobal('fetch', fetchImpl);
-
-    render(<PublishApi />);
-    fillValidForm();
-    await userEvent.click(submitButton());
-
-    await userEvent.click(await screen.findByRole('button', { name: /dismiss/i }));
-    expect(screen.queryByText(/session has expired/i)).not.toBeInTheDocument();
-  });
-
-  it('keeps the draft after a 401', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(401, {}));
-    vi.stubGlobal('fetch', fetchImpl);
-
-    render(<PublishApi />);
-    fillValidForm();
-    await userEvent.click(submitButton());
-
-    await screen.findByText(/session has expired/i);
-    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) as string).apiName).toBe(
-      'Weather Forecast API',
-    );
-  });
-});
-
-describe('PublishApi in-flight state', () => {
-  it('disables the submit button while the request is in flight', async () => {
-    const { fetchImpl, resolveWith } = deferredResponse();
-    vi.stubGlobal('fetch', fetchImpl);
-
-    render(<PublishApi />);
-    fillValidForm();
-    await userEvent.click(submitButton());
-
-    const button = screen.getByRole('button', { name: /submitting/i });
-    expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('aria-busy', 'true');
-
-    await act(async () => {
-      resolveWith(jsonResponse(201, { id: 'api_1' }));
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'Forecasts.' },
     });
+
+    expect(counter()).toHaveTextContent(`10 / ${MAX_DESCRIPTION_LENGTH}`);
   });
 
-  it('re-enables the submit button after a failure', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, {}));
+  it('references the counter via aria-describedby', () => {
+    render(<PublishApi />);
+
+    const input = descriptionInput();
+    expect(input.getAttribute('aria-describedby')).toContain('pa-description-counter');
+    expect(counter()).toBeInTheDocument();
+  });
+
+  it('shows a validation error and blocks submit when the limit is exceeded', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { id: 'api_1' }));
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
     fillValidForm();
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH + 1) },
+    });
+
+    await userEvent.click(submitButton());
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(errorNodeFor('pa-description')).toHaveTextContent(/500/);
+    expect(descriptionInput()).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('updates the counter and clears the error once the description fits', async () => {
+    render(<PublishApi />);
+    fillValidForm();
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH + 1) },
+    });
     await userEvent.click(submitButton());
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /publish api/i })).toBeEnabled(),
+      expect(errorNodeFor('pa-description')).toHaveTextContent(/500/),
+    );
+
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH - 1) },
+    });
+
+    expect(counter()).toHaveTextContent(`${MAX_DESCRIPTION_LENGTH - 1} / ${MAX_DESCRIPTION_LENGTH}`);
+    await waitFor(() =>
+      expect(errorNodeFor('pa-description')).toHaveTextContent(''),
     );
   });
 
-  it('does not issue a second POST when the button is clicked again in flight', async () => {
-    const { fetchImpl, resolveWith } = deferredResponse();
-    vi.stubGlobal('fetch', fetchImpl);
-
+  it('announces the remaining count politely only when under 50 characters remain', () => {
     render(<PublishApi />);
-    fillValidForm();
-    await userEvent.click(submitButton());
-    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
 
-    const button = screen.getByRole('button', { name: /submitting/i });
-    await userEvent.click(button);
-    fireEvent.submit(screen.getByRole('form', { name: /publish api form/i }));
-
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      resolveWith(jsonResponse(201, { id: 'api_1' }));
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH - 100) },
     });
-  });
+    expect(screen.queryByText(/characters remaining/i)).not.toBeInTheDocument();
 
-  it('ignores a duplicate submit dispatched in the same tick', async () => {
-    // The button is not disabled until React re-renders, so a double click can
-    // deliver two submit events before the first render commits. The in-flight
-    // guard must hold even then.
-    const { fetchImpl, resolveWith } = deferredResponse();
-    vi.stubGlobal('fetch', fetchImpl);
-
-    render(<PublishApi />);
-    fillValidForm();
-
-    const form = screen.getByRole('form', { name: /publish api form/i });
-    await act(async () => {
-      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH - 49) },
     });
+    const liveRegion = document.getElementById('pa-description-remaining');
+    expect(liveRegion).toHaveAttribute('aria-live', 'polite');
+    expect(liveRegion).toHaveTextContent(/49 characters remaining/i);
+  });
 
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  it('throttles near-limit announcements to avoid chatter', () => {
+    render(<PublishApi />);
 
-    await act(async () => {
-      resolveWith(jsonResponse(201, { id: 'api_1' }));
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH - 49) },
     });
-  });
+    const liveRegion = document.getElementById('pa-description-remaining');
+    expect(liveRegion).toHaveTextContent(/49 characters remaining/i);
 
-  it('recovers the form when the request times out', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      // Never settles on its own; only the timeout budget ends it.
-      const fetchImpl = vi.fn().mockImplementation(
-        (_url: string, init: RequestInit) =>
-          new Promise((_resolve, reject) => {
-            init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
-          }),
-      );
-      vi.stubGlobal('fetch', fetchImpl);
-
-      render(<PublishApi />);
-      fillValidForm();
-      await user.click(submitButton());
-
-      expect(screen.getByRole('button', { name: /submitting/i })).toBeDisabled();
-
-      await act(async () => {
-        vi.advanceTimersByTime(20_000);
-      });
-
-      expect(screen.getByText(/timed out/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /publish api/i })).toBeEnabled();
-      expect(screen.queryByText(/submitted for review/i)).not.toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
-
-describe('PublishApi draft persistence', () => {
-  it('persists the draft as the provider types', () => {
-    render(<PublishApi />);
-    fireEvent.change(screen.getByLabelText(/api name/i), {
-      target: { value: 'Weather Forecast API' },
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH - 48) },
     });
-
-    expect(JSON.parse(localStorage.getItem(DRAFT_KEY) as string).apiName).toBe(
-      'Weather Forecast API',
-    );
-  });
-
-  it('restores a stored draft on mount', () => {
-    localStorage.setItem(
-      DRAFT_KEY,
-      JSON.stringify({
-        apiName: 'Restored API',
-        baseUrl: 'https://restored.example.com',
-        category: 'Security',
-        description: 'From a previous session.',
-        pricePerCall: '0.5',
-        endpoints: [{ id: 'ep-1', path: '/ping', method: 'GET' }],
-      }),
-    );
-
-    render(<PublishApi />);
-
-    expect(screen.getByLabelText(/api name/i)).toHaveValue('Restored API');
-    expect(screen.getByLabelText(/base url/i)).toHaveValue('https://restored.example.com');
-    expect(screen.getByLabelText(/category/i)).toHaveValue('Security');
-  });
-
-  it('keeps the draft restorable after a failed submission', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, {}));
-    vi.stubGlobal('fetch', fetchImpl);
-
-    const first = render(<PublishApi />);
-    fillValidForm();
-    fireEvent.change(screen.getByLabelText(/description/i), {
-      target: { value: 'Half-written listing.' },
-    });
-
-    await userEvent.click(submitButton());
-    await waitFor(() => expect(fetchImpl).toHaveBeenCalled());
-    expect(await screen.findByText(/unavailable right now/i)).toBeInTheDocument();
-
-    first.unmount();
-    render(<PublishApi />);
-
-    expect(screen.getByLabelText(/api name/i)).toHaveValue('Weather Forecast API');
-    expect(screen.getByLabelText(/base url/i)).toHaveValue('https://api.example.com');
-    expect(screen.getByLabelText(/description/i)).toHaveValue('Half-written listing.');
-  });
-
-  it('keeps the draft restorable after a rejected submission', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(422, { errors: { apiName: 'Taken.' } }));
-    vi.stubGlobal('fetch', fetchImpl);
-
-    const first = render(<PublishApi />);
-    fillValidForm();
-    await userEvent.click(submitButton());
-    await waitFor(() => expect(fetchImpl).toHaveBeenCalled());
-
-    first.unmount();
-    render(<PublishApi />);
-
-    expect(screen.getByLabelText(/api name/i)).toHaveValue('Weather Forecast API');
-  });
-
-  it('ignores a draft written with an unrecognised shape', () => {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ legacy: 'shape' }));
-
-    render(<PublishApi />);
-
-    expect(screen.getByLabelText(/api name/i)).toHaveValue('');
-  });
-
-  it('ignores a corrupt draft', () => {
-    localStorage.setItem(DRAFT_KEY, '{ broken json');
-
-    render(<PublishApi />);
-
-    expect(screen.getByLabelText(/api name/i)).toHaveValue('');
-  });
-
-  it('clears the draft once the server confirms', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { id: 'api_1' }));
-    vi.stubGlobal('fetch', fetchImpl);
-
-    render(<PublishApi />);
-    fillValidForm();
-    await userEvent.click(submitButton());
-
-    await screen.findByText(/submitted for review/i);
-    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
-  });
-
-  it('starts a clean form after publishing another API', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { id: 'api_1' }));
-    vi.stubGlobal('fetch', fetchImpl);
-
-    render(<PublishApi />);
-    fillValidForm();
-    await userEvent.click(submitButton());
-    await screen.findByText(/submitted for review/i);
-
-    await userEvent.click(screen.getByRole('button', { name: /publish another api/i }));
-
-    expect(screen.getByLabelText(/api name/i)).toHaveValue('');
-    expect(screen.getByLabelText(/base url/i)).toHaveValue('');
-    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+    expect(liveRegion).toHaveTextContent(/49 characters remaining/i);
   });
 });

@@ -44,7 +44,7 @@ describe('FormField', () => {
         <input id="price-field" type="text" />
       </FormField>,
     );
-    const input = screen.getByRole('textbox');
+    const input = screen.getBuRole('textbox');
     const describedBy = input.getAttribute('aria-describedby') ?? '';
     expect(describedBy).toContain('price-field-hint');
     expect(describedBy).toContain('price-field-error');
@@ -56,7 +56,7 @@ describe('FormField', () => {
         <input id="name-field" type="text" />
       </FormField>,
     );
-    const input = screen.getByRole('textbox');
+    const input = screen.getBuRole('textbox');
     expect(input.getAttribute('aria-invalid')).toBeNull();
   });
 
@@ -194,6 +194,26 @@ describe('PublishApi validation (integration)', () => {
     const isInvalid = !Number.isFinite(price) || price < 0;
     expect(isInvalid).toBe(true);
   });
+
+  it('rejects a description longer than the max length', () => {
+    const MAX_DESCRIPTION_LENGTH = 500;
+    const description = 'a'.repeat(MAX_DESCRIPTION_LENGTH + 1);
+    const error =
+      description.length > MAX_DESCRIPTION_LENGTH
+        ? `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`
+        : undefined;
+    expect(error).toBe(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`);
+  });
+
+  it('accepts a description at the max length', () => {
+    const MAX_DESCRIPTION_LENGTH = 500;
+    const description = 'a'.repeat(MAX_DESCRIPTION_LENGTH);
+    const error =
+      description.length > MAX_DESCRIPTION_LENGTH
+        ? `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`
+        : undefined;
+    expect(error).toBeUndefined();
+  });
 });
 
 describe('FormField blur-before-error behaviour', () => {
@@ -203,7 +223,7 @@ describe('FormField blur-before-error behaviour', () => {
         <input id="name-field" type="text" />
       </FormField>,
     );
-    const input = screen.getByRole('textbox');
+    const input = screen.getBuRole('textbox');
     expect(input.getAttribute('aria-invalid')).toBeNull();
     const errorEl = document.getElementById('name-field-error');
     expect(errorEl?.textContent).toBe('');
@@ -224,7 +244,7 @@ describe('FormField blur-before-error behaviour', () => {
       </FormField>,
     );
 
-    expect(screen.getByRole('textbox').getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getBuRole('textbox').getAttribute('aria-invalid')).toBe('true');
     expect(screen.getByText('Name is required.')).toBeTruthy();
   });
 });

@@ -10,6 +10,8 @@ export type FormFieldProps = {
   error?: string;
   status: FieldStatus;
   children: React.ReactElement;
+  /** Optional live character counter configuration. */
+  counter?: { current: number; max: number };
 };
 
 const CheckIcon = () => (
@@ -36,10 +38,15 @@ const CheckIcon = () => (
  * FormField — accessible wrapper for form inputs.
  *
  * Renders a label (with optional required marker and success tick), the field
- * itself, an optional hint, and an error region that is always present in the
+ * itself, an optional hint, an error region that is always present in the
  * DOM so screen readers can reference it via aria-describedby even before an
  * error occurs. The child input element receives aria-invalid and
  * aria-describedby via React.cloneElement.
+ *
+ * When a `counter` is provided, a live "n / max" counter is rendered and
+ * referenced from the input via aria-describedby. The counter is announced
+ * politely only when the remaining count drops under 50 characters, so the
+ * screen reader is not chattered on every keystroke.
  *
  * Errors are surfaced only after the field has been touched (blurred) or the
  * form has been submitted — the parent controls this via the `status` prop.
@@ -52,17 +59,25 @@ export default function FormField({
   error,
   status,
   children,
+  counter,
 }: FormFieldProps) {
   const errorId = `${id}-error`;
   const hintId = hint ? `${id}-hint` : undefined;
+  const counterId = counter ? `${id}-counter` : undefined;
 
   const existingDescribedBy = children.props['aria-describedby'];
-  const describedBy = [existingDescribedBy, hintId, errorId].filter(Boolean).join(' ');
+  const describedBy = [existingDescribedBy, hintId, counterId, errorId]
+    .filter(Boolean)
+    .join(' ');
 
   const enhancedChild = React.cloneElement(children, {
-    'aria-invalid': status === 'error' ? true : undefined,
+    'aria-invalid': status === 'error' ? 'true' : undefined,
     'aria-describedby': describedBy,
   });
+
+  const remaining = counter ? counter.max - counter.current : Number.POSITIVE_INFINITY;
+  // Only announce politely when the remaining count is under 50 characters.
+  const announceRemaining = counter !== undefined && remaining < 50;
 
   return (
     <>
@@ -72,7 +87,7 @@ export default function FormField({
           {label}
           {required && (
             <span className="ff-required" aria-hidden="true">
-              {' '}*
+              {' *'}
             </span>
           )}
           {status === 'success' && (
@@ -85,6 +100,16 @@ export default function FormField({
         {hint && (
           <p id={hintId} className="ff-hint">
             {hint}
+          </p>
+        )}
+        {counter && (
+          <p
+            id={counterId}
+            className={`lf-counter${counter.current > counter.max ? ' ff-counter--over' : ''}`}
+            aria-live={announceRemaining ? 'polite' : 'off'}
+            aria-atomic="true"
+          >
+            {`${counter.current} / ${counter.max`}`}
           </p>
         )}
         <p
@@ -132,6 +157,17 @@ const FF_STYLES = `
     margin: 0;
     font-size: 0.82rem;
     color: var(--muted, #93a0bf);
+  }
+
+  .ff-counter {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--muted, #93a0bf);
+    text-align: right;
+  }
+
+  .ff-counter--over {
+    color: var(--danger, #ff7d8d);
   }
 
   .ff-error {
