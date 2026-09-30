@@ -155,7 +155,7 @@ export function useWebhookDeliveries(accountId: string) {
     if (retryingId === deliveryId) return;
 
     setRetryingId(deliveryId);
-    const idempotencyKey = generateIdempotencyKey("delivery-retry");
+    const idempotencyKey = generateIdempotencyKey();
 
     try {
       let attempt = 0;
