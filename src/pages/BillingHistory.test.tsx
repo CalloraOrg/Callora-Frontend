@@ -345,3 +345,116 @@ describe('BillingHistory — table row content', () => {
     });
   });
 });
+
+// ── Date range filtering ──────────────────────────────────────────────────────
+
+describe('BillingHistory — date range filter', () => {
+  afterEach(cleanup);
+
+  /** Get the date range start/end inputs rendered by DateRangePicker. */
+  function getDateInputs() {
+    const start = document.querySelector(
+      'input[type="date"][data-testid="drp-start"], input[type="date"][name="start"]',
+    ) as HTMLInputElement | null;
+    const end = document.querySelector(
+      'input[type="date"][data-testid="drp-end"], input[type="date"][name="end"]',
+    ) as HTMLInputElement | null;
+    return { start, end };
+  }
+
+  it('mounts the DateRangePicker inside the bh-filters region', () => {
+    render(<BillingHistory />);
+    const filters = document.querySelector('.bh-filters, [data-testid="bh-filters"]');
+    expect(filters).toBeTruthy();
+    const { start, end } = getDateInputs();
+    expect(start).toBeTruthy();
+    expect(end).toBeTruthy();
+  });
+
+  it('selecting a range removes transactions outside it', () => {
+    render(<BillingHistory />);
+    const { start, end } = getDateInputs();
+    expect(start).toBeTruthy();
+    expect(end).toBeTruthy();
+
+    // Pick a narrow window around the first transaction's date.
+    const first = MOCK_TRANSACTIONS[0];
+    const day = new Date(first.date);
+    const iso = day.toISOString().slice(0, 10);
+
+    fireEvent.change(start!, { target: { value: iso } });
+    fireEvent.change(end!, { target: { value: iso } });
+
+    const inRange = MOCK_TRANSACTIONS.filter((tx) => {
+      const d = new Date(tx.date).toISOString().slice(0, 10);
+      return d === iso;
+    });
+    expect(
+      screen.getByText(`${inRange.length} transaction${inRange.length !== 1 ? 's' : ''}`),
+    ).toBeTruthy();
+
+    MOCK_TRANSACTIONS.filter((tx) => {
+      const d = new Date(tx.date).toISOString().slice(0, 10);
+      return d !== iso;
+    }).forEach((tx) => {
+      expect(screen.queryByTestId(`bh-row-${tx.id}`)).toBeNull();
+    });
+  });
+
+  it('treats the end date as inclusive of the whole local day', () => {
+    render(<BillingHistory />);
+    const { start, end } = getDateInputs();
+    const first = MOCK_TRANSACTIONS[0];
+    const day = new Date(first.date);
+    const iso = day.toISOString().slice(0, 10);
+
+    fireEvent.change(start!, { target: { value: iso } });
+    fireEvent.change(end!, { target: { value: iso } });
+
+    // The transaction on that day must remain visible.
+    expect(screen.getByTestId(`bh-row-${first.id}`)).toBeTruthy();
+  });
+
+  it('live region announces the active date range', () => {
+    render(<BillingHistory />);
+    const { start, end } = getDateInputs();
+    fireEvent.change(start!, { target: { value: '2024-01-01' } });
+    fireEvent.change(end!, { target: { value: '2024-01-31' } });
+
+    const liveRegion = document.querySelector(
+      '[role="status"][aria-live="polite"]',
+    ) as HTMLElement;
+    expect(liveRegion.textContent).toMatch(/2024-01-01/);
+    expect(liveRegion.textContent).toMatch(/2024-01-31/);
+  });
+
+  it('clearing the range restores all transactions', () => {
+    render(<BillingHistory />);
+    const { start, end } = getDateInputs();
+    fireEvent.change(start!, { target: { value: '2024-01-01' } });
+    fireEvent.change(end!, { target: { value: '2024-01-02' } });
+
+    const clearBtn = screen.getByRole('button', { name: /clear dates/i });
+    fireEvent.click(clearBtn);
+
+    expect(
+      screen.getByText(`${MOCK_TRANSACTIONS.length} transactions`),
+    ).toBeTruthy();
+  });
+
+  it('net balance recomputes for the chosen period', () => {
+    render(<BillingHistory />);
+    const { start, end } = getDateInputs();
+    const first = MOCK_TRANSACTIONS[0];
+    const day = new Date(first.date);
+    const iso = day.toISOString().slice(0, 10);
+
+    fireEvent.change(start!, { target: { value: iso } });
+    fireEvent.change(end!, { target: { value: iso } });
+
+    const netLine = screen.getByText('Net:').parentElement as HTMLElement;
+    expect(netLine).toBeTruthy();
+    // Net line must still render a numeric value after filtering.
+    expect(netLine.textContent).toMatch(/[0-9]/);
+  });
+});
