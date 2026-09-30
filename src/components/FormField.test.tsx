@@ -44,7 +44,7 @@ describe('FormField', () => {
         <input id="price-field" type="text" />
       </FormField>,
     );
-    const input = screen.getBuRole('textbox');
+    const input = screen.getByRole('textbox');
     const describedBy = input.getAttribute('aria-describedby') ?? '';
     expect(describedBy).toContain('price-field-hint');
     expect(describedBy).toContain('price-field-error');
@@ -195,55 +195,28 @@ describe('PublishApi validation (integration)', () => {
     expect(isInvalid).toBe(true);
   });
 
-  it('rejects a description longer than 500 characters', () => {
+  it('rejects a description exceeding the max length', () => {
     const MAX_DESCRIPTION_LENGTH = 500;
     const description = 'a'.repeat(MAX_DESCRIPTION_LENGTH + 1);
-    const error =
-      description.length > MAX_DESCRIPTION_LENGTH
-        ? `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`
-        : undefined;
-    expect(error).toBe(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`);
+    const errors: Record<string, string> = {};
+
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      errors.description = `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`;
+    }
+
+    expect(errors.description).toBe('Description must be 500 characters or fewer.');
   });
 
-  it('accepts a description at the 500 character limit', () => {
+  it('accepts a description at the max length', () => {
     const MAX_DESCRIPTION_LENGTH = 500;
     const description = 'a'.repeat(MAX_DESCRIPTION_LENGTH);
-    const error =
-      description.length > MAX_DESCRIPTION_LENGTH
-        ? `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`
-        : undefined;
-    expect(error).toBeUndefined();
-  });
+    const errors: Record<string, string> = {};
 
-  it('throttles near-limit announcements to one per threshold band', () => {
-    const MAX_DESCRIPTION_LENGTH = 500;
-    const REMAINING_THRESHOLD = 50;
-    const announcements = new Set<number>();
-    const announce = (remaining: number) => {
-      if (remaining > REMAINING_THRESHOLD || remaining < 0) return;
-      if (announcements.has(remaining)) return;
-      announcements.add(remaining);
-    };
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      errors.description = `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`;
+    }
 
-    // Typing within the same remaining count should not repeat the announcement.
-    announce(49);
-    announce(49);
-    expect(announcements.size).toBe(1);
-
-    // Crossing a new threshold band announces once.
-    announce(48);
-    announce(48);
-    expect(announcements.size).toBe(2);
-
-    // Above the threshold there is no announcement.
-    announce(51);
-    expect(announcements.size).toBe(2);
-
-    // Negative remaining (exceeded) is not announced.
-    announce(-1);
-    expect(announcements.size).toBe(2);
-
-    expect(MAX_DESCRIPTION_LENGTH).toBe(500);
+    expect(errors.description).toBeUndefined();
   });
 });
 
@@ -277,5 +250,84 @@ describe('FormField blur-before-error behaviour', () => {
 
     expect(screen.getByRole('textbox').getAttribute('aria-invalid')).toBe('true');
     expect(screen.getByText('Name is required.')).toBeTruthy();
+  });
+});
+
+describe('FormField character counter', () => {
+  it('renders a live character counter with the current length and max', () => {
+    render(
+      <FormField
+        id="description-field"
+        label="Description"
+        status="idle"
+        counter={{ current: 12, max: 500 }}
+      >
+        <textarea id="description-field" />
+      </FormField>,
+    );
+    expect(screen.getByText('12 / 500')).toBeTruthy();
+  });
+
+  it('references the counter id from aria-describedby', () => {
+    render(
+      <FormField
+        id="description-field"
+        label="Description"
+        status="idle"
+        counter={{ current: 12, max: 500 }}
+      >
+        <textarea id="description-field" />
+      </FormField>,
+    );
+    const input = screen.getByRole('textbox');
+    const describedBy = input.getAttribute('aria-describedby') ?? '';
+    expect(describedBy).toContain('description-field-counter');
+  });
+
+  it('announces remaining count politely when under 50 characters remain', () => {
+    render(
+      <FormField
+        id="description-field"
+        label="Description"
+        status="idle"
+        counter={{ current: 460, max: 500 }}
+      >
+        <textarea id="description-field" />
+      </FormField>,
+    );
+    const announcement = document.getElementById('description-field-counter-announcement');
+    expect(announcement?.getAttribute('aria-live')).toBe('polite');
+    expect(announcement?.textContent).toBeTruthy();
+  });
+
+  it('does not announce when 50 or more characters remain', () => {
+    render(
+      <FormField
+        id="description-field"
+        label="Description"
+        status="idle"
+        counter={{ current: 450, max: 500 }}
+      >
+        <textarea id="description-field" />
+      </FormField>,
+    );
+    const announcement = document.getElementById('description-field-counter-announcement');
+    expect(announcement?.textContent).toBe('');
+  });
+
+  it('shows a validation error when the counter exceeds the max', () => {
+    render(
+      <FormField
+        id="description-field"
+        label="Description"
+        status="error"
+        error="Description must be 500 characters or fewer."
+        counter={{ current: 501, max: 500 }}
+      >
+        <textarea id="description-field" />
+      </FormField>,
+    );
+    expect(screen.getByText('Description must be 500 characters or fewer.')).toBeTruthy();
+    expect(screen.getByText('501 / 500')).toBeTruthy();
   });
 });

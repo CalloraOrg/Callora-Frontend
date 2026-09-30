@@ -2,6 +2,13 @@ import React from 'react';
 
 export type FieldStatus = 'idle' | 'error' | 'success';
 
+export type FormFieldCounter = {
+  /** Current number of characters entered. */
+  current: number;
+  /** Maximum number of characters allowed. */
+  max: number;
+};
+
 export type FormFieldProps = {
   id: string;
   label: string;
@@ -10,18 +17,10 @@ export type FormFieldProps = {
   error?: string;
   status: FieldStatus;
   /**
-   * Optional live character counter rendered below the field. The counter
-   * element is referenced from the input via aria-described.
+   * Optional live character counter. When provided, a 'n / max' counter is
+   * rendered below the field and referenced from the input via aria-describedby.
    */
-  counter?: {
-    current: number;
-    max: number;
-    /**
-     * Optional polite announcement text (living region). When provided,
-     * the text is rendered in a visually-hidden aria-live="polite" region.
-     */
-    announcement?: string;
-  };
+  counter?: FormFieldCounter;
   children: React.ReactElement;
 };
 
@@ -50,17 +49,17 @@ const CheckIcon = () => (
  *
  * Renders a label (with optional required marker and success tick), the field
  * itself, an optional hint, an error region that is always present in the
- * DOM so screen readers can reference it via aria-described even before an
+ * DOM so screen readers can reference it via aria-describedby even before an
  * error occurs. The child input element receives aria-invalid and
  * aria-describedby via React.cloneElement.
  *
  * Errors are surfaced only after the field has been touched (blurred) or the
  * form has been submitted — the parent controls this via the `status` prop.
  *
- * When a `counter` is provided, a live "n / max" counter is rendered below
- * the field and linked to the input via aria-described. An optional
- * `announcement` is rendered in a polite live region so the parent can
- * throttle near-limit messages.
+ * When a `counter` is provided, a live 'n / max' counter is rendered and
+ * referenced from the input via aria-describedby. The counter is only
+ * announced politely (aria-live="polite") when the remaining count is under
+ * 50 characters, so screen readers are not chattered on every keystroke.
  */
 export default function FormField({
   id,
@@ -75,7 +74,6 @@ export default function FormField({
   const errorId = `${id}-error`;
   const hintId = hint ? `${id}-hint` : undefined;
   const counterId = counter ? `${id}-counter` : undefined;
-  const announcementId = counter ? `${id}-counter-announcement` : undefined;
 
   const existingDescribedBy = children.props['aria-describedby'];
   const describedBy = [existingDescribedBy, hintId, counterId, errorId]
@@ -87,7 +85,9 @@ export default function FormField({
     'aria-describedby': describedBy,
   });
 
-  const counterOver = counter ? counter.current > counter.max : false;
+  const remaining = counter ? counter.max - counter.current : 0;
+  const nearLimit = counter !== undefined && remaining < 50;
+  const overLimit = counter !== undefined && counter.current > counter.max;
 
   return (
     <>
@@ -97,7 +97,7 @@ export default function FormField({
           {label}
           {required && (
             <span className="ff-required" aria-hidden="true">
-              {' *'}
+              {' '}*
             </span>
           )}
           {status === 'success' && (
@@ -115,25 +115,15 @@ export default function FormField({
         {counter && (
           <p
             id={counterId}
-            className={`lf-counter${counterOver ? ' ff-counter--over' : ''}`}
-            aria-hidden="true"
+            className={`lf-counter${overLimit ? ' ff-counter--over' : ''}${nearLimit && !overLimit ? ' ff-counter--near' : ''}`}
+            aria-live={nearLimit ? 'polite' : 'off' }
+            aria-atomic="true"
           >
             {counter.current} / {counter.max}
           </p>
         )}
-        {counter && announcementId && (
-          <span
-            id={announcementId}
-            className="ff-sr-only"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {counter.announcement ?? ''}
-          </span>
-        )}
         <p
-          id={errorId}
+          id={ErrorId}
           className={`ff-error${status === 'error' && error ? ' ff-error--visible' : ''}`}
           role="alert"
           aria-live="assertive"
@@ -181,26 +171,19 @@ const FF_STYLES = `
 
   .ff-counter {
     margin: 0;
-    font-size: 0.78rem;
+    font-size: 0.82rem;
     color: var(--muted, #93a0bf);
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
 
-  .ff-counter--over {
-    color: var(--danger, #ff7d8d);
+  .ff-counter--near {
+    color: var(--warning, #ffcb66);
   }
 
-  .ff-sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
+  .ff-counter--over {
+    color: var(--danger, #ff7d8d);
+    font-weight: 600;
   }
 
   .ff-error {
@@ -229,4 +212,4 @@ const FF_STYLES = `
   .ff-field:has(.ff-check) .pa-select {
     border-color: var(--success, #73f2bb);
   }
-`
+`;
