@@ -18,19 +18,22 @@ export interface WebhookFilter {
   page: number;
 }
 
-// Mock API function
-export const fetchDeliveries = async (
+export type WebhookDeliveriesFetcher = (
   accountId: string,
   filter: WebhookFilter,
   signal: AbortSignal,
-): Promise<WebhookDelivery[]> => {
+) => Promise<WebhookDelivery[]>;
+
+// Mock API function
+export const fetchDeliveries: WebhookDeliveriesFetcher = async (
+  accountId,
+  filter,
+  signal,
+) => {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       if (signal.aborted) {
         return reject(new DOMException("Aborted", "AbortError"));
-      }
-      if (accountId === "error-account") {
-        return reject(new Error("Failed to fetch from authoritative source"));
       }
 
       const data: WebhookDelivery[] = [
@@ -93,8 +96,12 @@ function isRetryableDeliveryError(error: unknown): boolean {
   return false;
 }
 
-export function useWebhookDeliveries(accountId: string) {
+export function useWebhookDeliveries(
+  accountId: string | null,
+  fetcher: WebhookDeliveriesFetcher = fetchDeliveries,
+) {
   const [deliveries, setDeliveries] = useState<WebhookDelivery[]>([]);
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null);
   const [filter, setFilter] = useState<WebhookFilter>({
     page: 1,
     status: "all",
@@ -107,24 +114,36 @@ export function useWebhookDeliveries(accountId: string) {
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const requestCounter = useRef(0);
+  const previousAccountId = useRef<string | null>(null);
 
   const loadData = useCallback(
-    async (currentAccountId: string, currentFilter: WebhookFilter) => {
+    async (
+      currentAccountId: string,
+      currentFilter: WebhookFilter,
+      preserveCurrentData = true,
+    ) => {
       const reqId = ++requestCounter.current;
 
-      setStatus((prev) => {
-        if (prev === "success" || prev === "error") {
-          setIsStale(true);
-          return prev;
-        }
-        return "loading";
-      });
+      if (preserveCurrentData) {
+        setStatus((prev) => {
+          if (prev === "success" || prev === "error") {
+            setIsStale(true);
+            return prev;
+          }
+          return "loading";
+        });
+      } else {
+        setDeliveries([]);
+        setLoadedAccountId(null);
+        setStatus("loading");
+        setIsStale(false);
+      }
       setError(null);
 
       const abortController = new AbortController();
 
       try {
-        const data = await fetchDeliveries(
+        const data = await fetcher(
           currentAccountId,
           currentFilter,
           abortController.signal,
@@ -133,6 +152,7 @@ export function useWebhookDeliveries(accountId: string) {
         if (reqId !== requestCounter.current) return;
 
         setDeliveries(data);
+        setLoadedAccountId(currentAccountId);
         setStatus("success");
         setIsStale(false);
       } catch (err: any) {
@@ -144,15 +164,28 @@ export function useWebhookDeliveries(accountId: string) {
         setIsStale(false);
       }
     },
-    [],
+    [fetcher],
   );
 
   useEffect(() => {
-    loadData(accountId, filter);
+    if (!accountId) {
+      requestCounter.current += 1;
+      previousAccountId.current = null;
+      setDeliveries([]);
+      setLoadedAccountId(null);
+      setStatus("idle");
+      setError(null);
+      setIsStale(false);
+      return;
+    }
+
+    const accountChanged = previousAccountId.current !== accountId;
+    previousAccountId.current = accountId;
+    loadData(accountId, filter, !accountChanged);
   }, [accountId, filter, loadData]);
 
   const retryDelivery = async (deliveryId: string) => {
-    if (retryingId === deliveryId) return;
+    if (!accountId || retryingId === deliveryId) return;
 
     setRetryingId(deliveryId);
     const idempotencyKey = generateIdempotencyKey("delivery-retry");
@@ -177,15 +210,13 @@ export function useWebhookDeliveries(accountId: string) {
         }
       }
       await loadData(accountId, filter);
-    } catch (err) {
-      throw err;
     } finally {
       setRetryingId(null);
     }
   };
 
   return {
-    deliveries,
+    deliveries: loadedAccountId === accountId ? deliveries : [],
     status,
     error,
     isStale,
@@ -193,6 +224,9 @@ export function useWebhookDeliveries(accountId: string) {
     setFilter,
     retryDelivery,
     retryingId,
-    refresh: () => loadData(accountId, filter),
+    refresh: () => {
+      if (!accountId) return;
+      void loadData(accountId, filter);
+    },
   };
 }
