@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { useCallback, useId, useMemo, useState } from 'react';
 import OpenAPIImport from '../components/OpenAPIImport';
 import type { ParsedEndpoint } from '../components/OpenAPIImport';
 import FormField from '../components/FormField';
 import type { FieldStatus } from '../components/FormField';
-import SessionExpiryBanner from '../components/SessionExpiryBanner';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import useFormPersistence from '../hooks/useFormPersistence';
 import useSessionExpiry from '../hooks/useSessionExpiry';
 import { generateIdempotencyKey } from '../services/idempotency';
 import { submitPublishApi } from '../services/publishApi';
 import type { PublishApiFieldErrors, PublishApiInput } from '../services/publishApi';
-import { useFormPersistence } from '../hooks/useFormPersistence';
-import { useSessionExpiry } from '../hooks/useSessionExpiry';
-import { useBeforeUnload } from '../hooks/useBeforeUnload';
 import SessionExpiryBanner from '../components/SessionExpiryBanner';
 
 // ---------------------------------------------------------------------------
@@ -41,6 +36,8 @@ type ValidationErrors = Partial<Record<ValidatedFields, string>>;
 
 const PUBLISH_FORM_DRAFT_KEY = 'callora:publish-form:draft';
 
+const DESCRIPTION_MAX_LENGTH = 500;
+
 const INITIAL_FORM: PublishFormState = {
   apiName: '',
   baseUrl: '',
@@ -57,15 +54,6 @@ const INITIAL_TOUCHED: TouchedState = {
   description: false,
   pricePerCall: false,
 };
-
-/** Maximum number of characters allowed in the API description. */
-const DESCRIPTION_MAX_LENGTH = 500;
-
-/**
- * Announce the remaining count only once the provider is close to the limit,
- * so screen readers are not flooded on every keystroke.
- */
-const DESCRIPTION_ANNOUNCE_THRESHOLD = 50;
 
 const CATEGORIES = [
   'AI & Machine Learning',
@@ -306,6 +294,8 @@ export default function PublishApi() {
   const [formError, setFormError] = useState<string | null>(null);
   const [listingId, setListingId] = useState<string | null>(null);
   const importSectionId = useId();
+  const descriptionCounterId = useId();
+  const descriptionErrorId = useId();
 
   const { isExpired, dismiss: dismissExpiry } = useSessionExpiry();
 
@@ -340,25 +330,6 @@ export default function PublishApi() {
   // showing why until the provider edits it.
   const errors: ValidationErrors = { ...clientErrors, ...serverErrors };
   const isFormValid = Object.keys(clientErrors).length === 0;
-  // ── Session expiry & form persistence ────────────────────────────────
-  const { clearDraft, wasRestored } = useFormPersistence(
-    PUBLISH_FORM_DRAFT_KEY,
-    form as unknown as Record<string, unknown>,
-    setForm as unknown as React.Dispatch<React.SetStateAction<Record<string, unknown>>>,
-    { restoreOnMount: true },
-  );
-  const { isExpired, dismiss: dismissExpiry, countdown, signalExpiry } = useSessionExpiry();
-
-  const hasUnsavedChanges = useMemo(() => {
-    return form.apiName !== '' || form.baseUrl !== '' || form.category !== '' ||
-           form.description !== '' || form.pricePerCall !== '' ||
-           form.endpoints.length > 0;
-  }, [form]);
-
-  useBeforeUnload(hasUnsavedChanges);
-
-  const errors = validateForm(form);
-  const isFormValid = Object.keys(errors).length === 0;
 
   // ── Field change handlers ──────────────────────────────────────────────
 
@@ -428,7 +399,7 @@ export default function PublishApi() {
 
       setSubmitAttempted(true);
       // Touch all validated fields so errors become visible
-      setTouched({ apiName: true, baseUrl: true, category: true, pricePerCall: true });
+      setTouched({ apiName: true, baseUrl: true, category: true, description: true, pricePerCall: true });
       setFormError(null);
       setServerErrors({});
       if (!isFormValid) return;
@@ -483,8 +454,6 @@ export default function PublishApi() {
         submittingRef.current = false;
         if (mountedRef.current) setSubmitting(false);
       }
-      setSubmitted(true);
-      clearDraft();
     },
     [discardDraft, form, isFormValid],
   );
@@ -522,7 +491,6 @@ export default function PublishApi() {
                 setFormError(null);
                 setListingId(null);
                 setImportOpen(false);
-                clearDraft();
               }}
             >
               Publish another API
@@ -535,26 +503,14 @@ export default function PublishApi() {
 
   // ── Main form ──────────────────────────────────────────────────────────
 
-  // ── Simulate a 401 for demo purposes ─────────────────────────────────
-  const handleSimulateExpiry = useCallback(() => {
-    signalExpiry();
-  }, [signalExpiry]);
-
   return (
     <>
       <style>{STYLES}</style>
       <SessionExpiryBanner
         isVisible={isExpired}
-        countdown={countdown}
         onDismiss={dismissExpiry}
       />
-      {wasRestored && !isExpired && (
-        <div className="pa-draft-restored" role="status" aria-live="polite">
-          Draft restored from a previous session.
-        </div>
-      )}
       <div className="pa-shell">
-        {isExpired && <SessionExpiryBanner onDismiss={dismissExpiry} />}
 
         <header className="pa-page-header">
           <p className="pa-eyebrow">Developer tools</p>
@@ -598,38 +554,6 @@ export default function PublishApi() {
             </div>
           )}
         </section>
-
-        {/* ── Draft restored notice (with dismiss) ─────────────── */}
-        {wasRestored && !isExpired && (
-          <div className="pa-draft-banner surface">
-            <span aria-hidden="true">💾</span>
-            <span>Your previous draft has been restored. Your form data is being saved automatically.</span>
-            <button
-              type="button"
-              className="pa-btn-secondary pa-draft-dismiss"
-              onClick={() => {
-                clearDraft();
-                setForm(INITIAL_FORM);
-                setTouched(INITIAL_TOUCHED);
-                setSubmitAttempted(false);
-              }}
-            >
-              Clear draft
-            </button>
-          </div>
-        )}
-
-        {/* ── Session expiry simulation (demo) ──────────────────── */}
-        <div className="pa-demo-controls surface">
-          <p className="pa-demo-label">Session controls (demo)</p>
-          <button
-            type="button"
-            className="pa-btn-secondary"
-            onClick={handleSimulateExpiry}
-          >
-            Simulate session expiry
-          </button>
-        </div>
 
         {/* ── Publish form ───────────────────────────────────────── */}
         <form
@@ -732,9 +656,29 @@ export default function PublishApi() {
                 className="pa-textarea"
                 value={form.description}
                 onChange={handleField('description')}
+                onBlur={handleBlur('description')}
                 placeholder="Describe what your API does, its use cases, and any notable constraints."
                 rows={4}
+                maxLength={DESCRIPTION_MAX_LENGTH}
+                aria-describedby={`${descriptionCounterId}${errors.description ? ` ${descriptionErrorId}` : ''}`}
+                aria-invalid={errors.description ? true : undefined}
               />
+              <p
+                id={descriptionCounterId}
+                className="pa-field-hint"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {form.description.length} / {DESCRIPTION_MAX_LENGTH}
+                {DESCRIPTION_MAX_LENGTH - form.description.length <= 50 &&
+                  DESCRIPTION_MAX_LENGTH - form.description.length >= 0 &&
+                  ` — ${DESCRIPTION_MAX_LENGTH - form.description.length} characters remaining`}
+              </p>
+              {errors.description && (
+                <p id={descriptionErrorId} className="pa-field-error" role="alert">
+                  {errors.description}
+                </p>
+              )}
             </div>
           </fieldset>
 

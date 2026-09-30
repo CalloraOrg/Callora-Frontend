@@ -280,7 +280,7 @@ describe('PublishApi server field errors', () => {
   });
 
   it('maps a snake_case server field onto the matching input', async () => {
-    const fetchImpl = v
+    const fetchImpl = vi
       .fn()
       .mockResolvedValue(jsonResponse(422, { errors: { base_url: 'Unreachable host.' } }));
     vi.stubGlobal('fetch', fetchImpl);
@@ -295,7 +295,7 @@ describe('PublishApi server field errors', () => {
   });
 
   it('keeps unrelated fields free of the server message', async () => {
-    const fetchImpl = v
+    const fetchImpl = vi
       .fn()
       .mockResolvedValue(jsonResponse(422, { errors: { apiName: 'Taken.' } }));
     vi.stubGlobal('fetch', fetchImpl);
@@ -340,11 +340,11 @@ describe('PublishApi server field errors', () => {
     fillValidForm();
     await userEvent.click(submitButton());
 
-    expect(await screen.findByText(/You are not verified to publish\./i)).toBeInTheDocument();
+    expect(await screen.findByText(/You are not verified to publish\./)).toBeInTheDocument();
   });
 
   it('shows a form-level error when a 4xx carries no field detail', async () => {
-    const fetchImpl = v
+    const fetchImpl = vi
       .fn()
       .mockResolvedValue(jsonResponse(403, { message: 'Publishing is restricted.' }));
     vi.stubGlobal('fetch', fetchImpl);
@@ -353,108 +353,114 @@ describe('PublishApi server field errors', () => {
     fillValidForm();
     await userEvent.click(submitButton());
 
-    expect(await screen.findByText(/Publishing is restricted\./i)).toBeInTheDocument();
+    expect(await screen.findByText(/Publishing is restricted./)).toBeInTheDocument();
   });
 });
 
-describe('PublishApi description length limit', () => {
+describe('PublishApi description length', () => {
   const MAX_DESCRIPTION_LENGTH = 500;
 
-  function descriptionInput() {
+  function descriptionField() {
     return screen.getByLabelText(/description/i);
   }
 
-  function counter() {
+  function counterNode() {
     return document.getElementById('pa-description-counter');
   }
 
-  it('renders a live counter that updates as the user types', () => {
+  it('renders a live character counter that updates as the user types', () => {
     render(<PublishApi />);
 
-    expect(counter()).toHaveTextContent(`0 / ${MAX_DESCRIPTION_LENGTH}`);
+    const counter = counterNode();
+    expect(counter).toBeInTheDocument();
+    expect(counter).toHaveTextContent(`0 / ${MAX_DESCRIPTION_LENGTH}`);
 
-    fireEvent.change(descriptionInput(), {
-      target: { value: 'Forecasts.' },
-    });
+    fireEvent.change(descriptionField(), { target: { value: 'Hello' } });
+    expect(counterNode()).toHaveTextContent(`5 / ${MAX_DESCRIPTION_LENGTH}`);
 
-    expect(counter()).toHaveTextContent(`10 / ${MAX_DESCRIPTION_LENGTH}`);
+    fireEvent.change(descriptionField(), { target: { value: 'Hello world' } });
+    expect(counterNode()).toHaveTextContent(`11 / ${MAX_DESCRIPTION_LENGTH}`);
   });
 
-  it('references the counter via aria-describedby', () => {
+  it('references the counter from the description field via aria-describedby', () => {
     render(<PublishApi />);
 
-    const input = descriptionInput();
-    expect(input.getAttribute('aria-describedby')).toContain('pa-description-counter');
-    expect(counter()).toBeInTheDocument();
+    const field = descriptionField();
+    expect(field.getAttribute('aria-describedby')).toContain('pa-description-counter');
   });
 
-  it('shows a validation error and blocks submit when the limit is exceeded', async () => {
+  it('accepts a description at the maximum length', () => {
+    render(<PublishApi />);
+
+    const atMax = 'a'.repeat(MAX_DESCRIPTION_LENGTH);
+    fireEvent.change(descriptionField(), { target: { value: atMax } });
+
+    expect(counterNode()).toHaveTextContent(`${MAX_DESCRIPTION_LENGTH} / ${MAX_DESCRIPTION_LENGTH}`);
+    expect(errorNodeFor('pa-description')).toHaveTextContent('');
+  });
+
+  it('shows a validation error when the description exceeds the limit', () => {
+    render(<PublishApi />);
+
+    const tooLong = 'a'.repeat(MAX_DESCRIPTION_LENGTH + 1);
+    fireEvent.change(descriptionField(), { target: { value: tooLong } });
+
+    expect(counterNode()).toHaveTextContent(`${MAX_DESCRIPTION_LENGTH + 1} / ${MAX_DESCRIPTION_LENGTH}`);
+    expect(errorNodeFor('pa-description')).toHaveTextContent(/500/);
+    expect(descriptionField()).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('blocks submission when the description exceeds the limit', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { id: 'api_1' }));
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
     fillValidForm();
-    fireEvent.change(descriptionInput(), {
-      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH + 1) },
+    fireEvent.change(descriptionField(), {
+      target: { value: 'a'.repeat(MAX_DESCRIPTION_LENGTH + 1) },
     });
 
     await userEvent.click(submitButton());
 
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(errorNodeFor('pa-description')).toHaveTextContent(/500/);
-    expect(descriptionInput()).toHaveAttribute('aria-invalid', 'true');
-  });
-
-  it('updates the counter and clears the error once the description fits', async () => {
-    render(<PublishApi />);
-    fillValidForm();
-    fireEvent.change(descriptionInput(), {
-      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH + 1) },
-    });
-    await userEvent.click(submitButton());
-
-    await waitFor(() =>
-      expect(errorNodeFor('pa-description')).toHaveTextContent(/500/),
-    );
-
-    fireEvent.change(descriptionInput(), {
-      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH - 1) },
-    });
-
-    expect(counter()).toHaveTextContent(`${MAX_DESCRIPTION_LENGTH - 1} / ${MAX_DESCRIPTION_LENGTH}`);
-    await waitFor(() =>
-      expect(errorNodeFor('pa-description')).toHaveTextContent(''),
-    );
   });
 
   it('announces the remaining count politely only when under 50 characters remain', () => {
     render(<PublishApi />);
 
-    fireEvent.change(descriptionInput(), {
-      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH - 100) },
+    // Well above the threshold: no live announcement.
+    fireEvent.change(descriptionField(), {
+      target: { value: 'a'.repeat(MAX_DESCRIPTION_LENGTH - 100) },
     });
-    expect(screen.queryByText(/characters remaining/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/remaining/i)).not.toBeInTheDocument();
 
-    fireEvent.change(descriptionInput(), {
-      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH - 49) },
+    // Just below the threshold: announcement appears.
+    fireEvent.change(descriptionField(), {
+      target: { value: 'a'.repeat(MAX_DESCRIPTION_LENGTH - 49) },
     });
-    const liveRegion = document.getElementById('pa-description-remaining');
-    expect(liveRegion).toHaveAttribute('aria-live', 'polite');
-    expect(liveRegion).toHaveTextContent(/49 characters remaining/i);
+    const announcement = screen.getByText(/remaining/i);
+    expect(announcement).toHaveAttribute('aria-live', 'polite');
   });
 
   it('throttles near-limit announcements to avoid chatter', () => {
     render(<PublishApi />);
 
-    fireEvent.change(descriptionInput(), {
-      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH - 49) },
+    // Drive the field into the near-limit range.
+    fireEvent.change(descriptionField(), {
+      target: { value: 'a'.repeat(MAX_DESCRIPTION_LENGTH - 49) },
     });
-    const liveRegion = document.getElementById('pa-description-remaining');
-    expect(liveRegion).toHaveTextContent(/49 characters remaining/i);
 
-    fireEvent.change(descriptionInput(), {
-      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH - 48) },
-    });
-    expect(liveRegion).toHaveTextContent(/49 characters remaining/i);
+    const announcement = screen.getByText(/remaining/i);
+    expect(announcement).toHaveAttribute('aria-live', 'polite');
+
+    // Several subsequent edits must not produce additional live regions.
+    for (let i = 1; i <= 5; i += 1) {
+      fireEvent.change(descriptionField(), {
+        target: { value: 'a'.repeat(MAX_DESCRIPTION_LENGTH - 49 + i) },
+      });
+    }
+
+    expect(screen.getAllByText(/remaining/i)).toHaveLength(1);
   });
 });

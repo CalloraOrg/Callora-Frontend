@@ -9,9 +9,20 @@ export type FormFieldProps = {
   hint?: string;
   error?: string;
   status: FieldStatus;
+  /**
+   * Optional live character counter rendered below the field. The counter
+   * element is referenced from the input via aria-described.
+   */
+  counter?: {
+    current: number;
+    max: number;
+    /**
+     * Optional polite announcement text (living region). When provided,
+     * the text is rendered in a visually-hidden aria-live="polite" region.
+     */
+    announcement?: string;
+  };
   children: React.ReactElement;
-  /** Optional live character counter configuration. */
-  counter?: { current: number; max: number };
 };
 
 const CheckIcon = () => (
@@ -32,24 +43,24 @@ const CheckIcon = () => (
       strokeLinejoin="round"
     />
   </svg>
-);
+	);
 
 /**
  * FormField — accessible wrapper for form inputs.
  *
  * Renders a label (with optional required marker and success tick), the field
  * itself, an optional hint, an error region that is always present in the
- * DOM so screen readers can reference it via aria-describedby even before an
+ * DOM so screen readers can reference it via aria-described even before an
  * error occurs. The child input element receives aria-invalid and
  * aria-describedby via React.cloneElement.
  *
- * When a `counter` is provided, a live "n / max" counter is rendered and
- * referenced from the input via aria-describedby. The counter is announced
- * politely only when the remaining count drops under 50 characters, so the
- * screen reader is not chattered on every keystroke.
- *
  * Errors are surfaced only after the field has been touched (blurred) or the
  * form has been submitted — the parent controls this via the `status` prop.
+ *
+ * When a `counter` is provided, a live "n / max" counter is rendered below
+ * the field and linked to the input via aria-described. An optional
+ * `announcement` is rendered in a polite live region so the parent can
+ * throttle near-limit messages.
  */
 export default function FormField({
   id,
@@ -58,12 +69,13 @@ export default function FormField({
   hint,
   error,
   status,
-  children,
   counter,
+  children,
 }: FormFieldProps) {
   const errorId = `${id}-error`;
   const hintId = hint ? `${id}-hint` : undefined;
   const counterId = counter ? `${id}-counter` : undefined;
+  const announcementId = counter ? `${id}-counter-announcement` : undefined;
 
   const existingDescribedBy = children.props['aria-describedby'];
   const describedBy = [existingDescribedBy, hintId, counterId, errorId]
@@ -71,13 +83,11 @@ export default function FormField({
     .join(' ');
 
   const enhancedChild = React.cloneElement(children, {
-    'aria-invalid': status === 'error' ? 'true' : undefined,
+    'aria-invalid': status === 'error' ? true : undefined,
     'aria-describedby': describedBy,
   });
 
-  const remaining = counter ? counter.max - counter.current : Number.POSITIVE_INFINITY;
-  // Only announce politely when the remaining count is under 50 characters.
-  const announceRemaining = counter !== undefined && remaining < 50;
+  const counterOver = counter ? counter.current > counter.max : false;
 
   return (
     <>
@@ -105,12 +115,22 @@ export default function FormField({
         {counter && (
           <p
             id={counterId}
-            className={`lf-counter${counter.current > counter.max ? ' ff-counter--over' : ''}`}
-            aria-live={announceRemaining ? 'polite' : 'off'}
+            className={`lf-counter${counterOver ? ' ff-counter--over' : ''}`}
+            aria-hidden="true"
+          >
+            {counter.current} / {counter.max}
+          </p>
+        )}
+        {counter && announcementId && (
+          <span
+            id={announcementId}
+            className="ff-sr-only"
+            role="status"
+            aria-live="polite"
             aria-atomic="true"
           >
-            {`${counter.current} / ${counter.max`}`}
-          </p>
+            {counter.announcement ?? ''}
+          </span>
         )}
         <p
           id={errorId}
@@ -161,13 +181,26 @@ const FF_STYLES = `
 
   .ff-counter {
     margin: 0;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     color: var(--muted, #93a0bf);
     text-align: right;
+    font-variant-numeric: tabular-nums;
   }
 
   .ff-counter--over {
     color: var(--danger, #ff7d8d);
+  }
+
+  .ff-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .ff-error {
@@ -196,4 +229,4 @@ const FF_STYLES = `
   .ff-field:has(.ff-check) .pa-select {
     border-color: var(--success, #73f2bb);
   }
-`;
+`

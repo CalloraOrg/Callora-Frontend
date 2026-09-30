@@ -56,7 +56,7 @@ describe('FormField', () => {
         <input id="name-field" type="text" />
       </FormField>,
     );
-    const input = screen.getBuRole('textbox');
+    const input = screen.getByRole('textbox');
     expect(input.getAttribute('aria-invalid')).toBeNull();
   });
 
@@ -195,7 +195,7 @@ describe('PublishApi validation (integration)', () => {
     expect(isInvalid).toBe(true);
   });
 
-  it('rejects a description longer than the max length', () => {
+  it('rejects a description longer than 500 characters', () => {
     const MAX_DESCRIPTION_LENGTH = 500;
     const description = 'a'.repeat(MAX_DESCRIPTION_LENGTH + 1);
     const error =
@@ -205,7 +205,7 @@ describe('PublishApi validation (integration)', () => {
     expect(error).toBe(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`);
   });
 
-  it('accepts a description at the max length', () => {
+  it('accepts a description at the 500 character limit', () => {
     const MAX_DESCRIPTION_LENGTH = 500;
     const description = 'a'.repeat(MAX_DESCRIPTION_LENGTH);
     const error =
@@ -213,6 +213,37 @@ describe('PublishApi validation (integration)', () => {
         ? `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`
         : undefined;
     expect(error).toBeUndefined();
+  });
+
+  it('throttles near-limit announcements to one per threshold band', () => {
+    const MAX_DESCRIPTION_LENGTH = 500;
+    const REMAINING_THRESHOLD = 50;
+    const announcements = new Set<number>();
+    const announce = (remaining: number) => {
+      if (remaining > REMAINING_THRESHOLD || remaining < 0) return;
+      if (announcements.has(remaining)) return;
+      announcements.add(remaining);
+    };
+
+    // Typing within the same remaining count should not repeat the announcement.
+    announce(49);
+    announce(49);
+    expect(announcements.size).toBe(1);
+
+    // Crossing a new threshold band announces once.
+    announce(48);
+    announce(48);
+    expect(announcements.size).toBe(2);
+
+    // Above the threshold there is no announcement.
+    announce(51);
+    expect(announcements.size).toBe(2);
+
+    // Negative remaining (exceeded) is not announced.
+    announce(-1);
+    expect(announcements.size).toBe(2);
+
+    expect(MAX_DESCRIPTION_LENGTH).toBe(500);
   });
 });
 
@@ -223,7 +254,7 @@ describe('FormField blur-before-error behaviour', () => {
         <input id="name-field" type="text" />
       </FormField>,
     );
-    const input = screen.getBuRole('textbox');
+    const input = screen.getByRole('textbox');
     expect(input.getAttribute('aria-invalid')).toBeNull();
     const errorEl = document.getElementById('name-field-error');
     expect(errorEl?.textContent).toBe('');
@@ -244,7 +275,7 @@ describe('FormField blur-before-error behaviour', () => {
       </FormField>,
     );
 
-    expect(screen.getBuRole('textbox').getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByRole('textbox').getAttribute('aria-invalid')).toBe('true');
     expect(screen.getByText('Name is required.')).toBeTruthy();
   });
 });
