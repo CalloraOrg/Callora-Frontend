@@ -1,9 +1,13 @@
-import { useState } from 'react';
-import { useWebhookDeliveries } from '../hooks/useWebhookDeliveries';
+import { useWebhookDeliveries, type WebhookDeliveriesFetcher } from '../hooks/useWebhookDeliveries';
+import { useAccountId } from '../hooks/useAccount';
 import { useToast } from '../components/Toast';
 
-export default function WebhookDeliveries() {
-  const [accountId, setAccountId] = useState('acc_123'); // Simulate account switch
+interface WebhookDeliveriesProps {
+  fetcher?: WebhookDeliveriesFetcher;
+}
+
+export default function WebhookDeliveries({ fetcher }: WebhookDeliveriesProps = {}) {
+  const accountId = useAccountId();
   const {
     deliveries,
     status,
@@ -14,7 +18,7 @@ export default function WebhookDeliveries() {
     retryDelivery,
     retryingId,
     refresh
-  } = useWebhookDeliveries(accountId);
+  } = useWebhookDeliveries(accountId, fetcher);
 
   const { showToast } = useToast();
 
@@ -32,12 +36,6 @@ export default function WebhookDeliveries() {
       <h1>Webhook Deliveries</h1>
       
       <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
-        <button onClick={() => setAccountId(accountId === 'acc_123' ? 'acc_456' : 'acc_123')}>
-          Switch Account (Current: {accountId})
-        </button>
-        <button onClick={() => setAccountId('error-account')}>
-          Simulate Error Account
-        </button>
         <button onClick={refresh}>Refresh</button>
       </div>
 
