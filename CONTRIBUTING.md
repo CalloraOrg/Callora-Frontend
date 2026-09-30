@@ -38,6 +38,18 @@ Example: `git checkout -b feature/api-search-filters`
 3. Run `npm run build` to confirm no TypeScript errors.
 4. Open a pull request against `main` with a clear description of what changed and why.
 
+## Pull request checklist
+
+Before opening a pull request, confirm:
+
+- [ ] `npm run build` passes with no TypeScript errors.
+- [ ] Tests pass (`npm test -- --run`).
+- [ ] Any new component added to `src/components/` has a matching entry in
+      [`src/data/a11y-manifest.json`](src/data/a11y-manifest.json)
+      (`{ "id", "name", "status" }`), and changed components have their `status`
+      re-checked. See
+      [Accessibility Audit Manifest — Upkeep Rules](docs/a11y-manifest.md).
+
 ## Design system
 
 All UI changes must follow the [UI Design System](docs/UI-Design-System.md).
