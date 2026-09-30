@@ -17,7 +17,8 @@ import EndpointPreview from "../components/EndpointPreview";
 import RatingHistogram from "../components/RatingHistogram";
 import { ApiDetailStickyTOC, type TocSection } from "../components/ApiDetailStickyTOC";
 import { StickyTocErrorBoundary } from "../components/StickyTocErrorBoundary";
-import { CheckIcon } from "../components/icons";
+import PricingTierTable, { type PricingTier } from "../components/PricingTierTable";
+import { PRICING_PLANS, cheapestPlan, type PricingPlanId } from "../utils/pricingTiers";
 import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
 import SubscribeButton from "../components/SubscribeButton";
 import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
@@ -27,7 +28,6 @@ import RelatedApisRail from "../components/RelatedApisRail";
 import MOCK_APIS from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
-import PlanBadge from "../components/PlanBadge";
 import LiveRegion from "../components/LiveRegion";
 
 /**
@@ -91,6 +91,61 @@ function deriveEndpointGroupLabel(endpoint: ApiEndpoint): string {
 
   if (!firstMeaningfulSegment) return "General";
   return toTitleCase(firstMeaningfulSegment.replace(/[-_]+/g, " "));
+}
+
+// ── Pricing plans (issue #1091) ──────────────────────────────────────────────
+
+/**
+ * Presentation metadata for each plan in {@link PRICING_PLANS}.
+ *
+ * `tier` ids line up with `PlanBadge`'s supported tiers so every card shows
+ * its badge (and the rate-limit tooltip that comes with it).
+ */
+const PRICING_TIER_META: Record<
+  PricingPlanId,
+  { name: string; ctaLabel: string; description: string; features: string[] }
+> = {
+  free: {
+    name: "Free",
+    ctaLabel: "Get Started",
+    description: "Prototype and evaluate without a commitment.",
+    features: ["Up to 10,000 requests / month", "Community support"],
+  },
+  pro: {
+    name: "Pro",
+    ctaLabel: "Upgrade Now",
+    description: "For production workloads that need headroom.",
+    features: [
+      "500,000 requests included / month",
+      "Overage billed at the API's list per-call price",
+      "99.9% uptime SLA",
+    ],
+  },
+  enterprise: {
+    name: "Enterprise",
+    ctaLabel: "Contact Sales",
+    description: "Dedicated capacity and volume discounts.",
+    features: [
+      "5,000,000 requests included / month",
+      "50% off the list price beyond that",
+      "24/7 support and custom rate limits",
+    ],
+  },
+};
+
+/** Build the rendered pricing tiers for an API from the shared plan catalogue. */
+function buildPricingTiers(): PricingTier[] {
+  return PRICING_PLANS.map((plan) => {
+    const meta = PRICING_TIER_META[plan.id];
+    return {
+      name: meta.name,
+      tier: plan.id,
+      price: plan.monthlyBaseUsd === 0 ? "$0" : `$${plan.monthlyBaseUsd} / mo`,
+      description: meta.description,
+      features: meta.features.map((label) => ({ label, included: true })),
+      ctaLabel: meta.ctaLabel,
+    };
+  });
 }
 
 // ── TOC sections (ids must match heading elements in the doc tab) ─────────────
@@ -500,6 +555,30 @@ export default function ApiDetailPage({ onBack }: Props) {
     return dist;
   }, [rawReviews]);
 
+  // ── Pricing recommendation (issue #1091) ───────────────────────────────────
+  //
+  // Computed before any early return so the hook order stays stable across the
+  // loading / not-found / ready renders. The cheapest tier for the projected
+  // request volume drives the "Recommended" badge and the "s" shortcut inside
+  // PricingTierTable.
+
+  const pricingTiers = useMemo(() => buildPricingTiers(), []);
+
+  const recommendedTier = useMemo(() => {
+    const plan = cheapestPlan(requests, api?.pricePerRequest ?? 0);
+    if (!plan) return null;
+    return pricingTiers.find((tier) => tier.tier === plan.id) ?? null;
+  }, [pricingTiers, requests, api?.pricePerRequest]);
+
+  const handleSelectTier = useCallback(
+    (tier: PricingTier) => {
+      setAnnouncement(
+        `${tier.name} plan selected${tier === recommendedTier ? " (recommended)" : ""}.`,
+      );
+    },
+    [recommendedTier],
+  );
+
   // Simulate 1.5 s initial data load (consistent with MarketplacePage)
   useEffect(() => {
     const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
@@ -857,41 +936,15 @@ print(response.json())`;
                 {tab === "pricing" && (
                   <section id="panel-pricing" role="tabpanel" aria-labelledby="tab-pricing" tabIndex={0}>
                     <h2>Pricing Plans</h2>
-                    <div className="api-detail-pricing-grid">
-                      {/* Standard plan */}
-                      <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", border: "2px solid var(--accent)" }}>
-                        <PlanBadge tier="pro" />
-                        {/* tabular-nums prevents digit-width jitter on formatted prices (#466) */}
-                        <div className="api-detail-plan-price tabular-nums">
-                          {`$${formatPrice(api.pricePerRequest ?? 0)}`} <span style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>/ call</span>
-                        </div>
-                        <p style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>Perfect for startups and scaling applications. Pay only for what you use.</p>
-                        <ul style={{ padding: 0, listStyle: "none", fontSize: "var(--mkt-font-size-tag)", marginTop: "var(--mkt-space-2xl)" }}>
-                          {["Unlimited Throughput", "99.9% Uptime SLA", "Community Support"].map((feat) => (
-                            <li key={feat} style={{ marginBottom: "var(--mkt-space-lg)", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                              <CheckIcon size={16} aria-hidden="true" /> {feat}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {/* Enterprise plan */}
-                      <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)" }}>
-                        <PlanBadge tier="enterprise" />
-                        <div className="api-detail-plan-price">Custom</div>
-                        <p style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>For high-volume needs requiring dedicated infrastructure and support.</p>
-                        <ul style={{ padding: 0, listStyle: "none", fontSize: "var(--mkt-font-size-tag)", marginTop: "var(--mkt-space-2xl)" }}>
-                          {["Dedicated Node", "24/7 Phone Support", "Custom Rate Limits"].map((feat) => (
-                            <li key={feat} style={{ marginBottom: "var(--mkt-space-lg)", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                              <CheckIcon size={16} aria-hidden="true" /> {feat}
-                            </li>
-                          ))}
-                        </ul>
-                        <button className="secondary-button" style={{ width: "100%", marginTop: "var(--mkt-space-lg)" }}>
-                          Contact Sales
-                        </button>
-                      </div>
-                    </div>
+                    <p style={{ color: "var(--muted)", marginTop: 0 }}>
+                      The plan with the Recommended badge is the cheapest option for the{' '}
+                      {formatCount(requests)} requests projected in the calculator below.
+                    </p>
+                    <PricingTierTable
+                      tiers={pricingTiers}
+                      recommended={recommendedTier}
+                      onSelectTier={handleSelectTier}
+                    />
 
                     {/* Cost calculator */}
                     <div className="preview-card" style={{ padding: "var(--mkt-space-5xl)" }}>
