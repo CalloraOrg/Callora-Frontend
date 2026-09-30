@@ -12,7 +12,7 @@ Thanks for contributing! Follow these guidelines to keep the codebase consistent
 ## Setup
 
 ```bash
-git clone https://github.com/your-org/Callora-Frontend.git
+git clone https://github.com/CalloraOrg/Callora-Frontend.git
 cd Callora-Frontend
 npm install
 npm run dev      # dev server at http://localhost:5173
@@ -43,7 +43,7 @@ Example: `git checkout -b feature/api-search-filters`
 All UI changes must follow the [UI Design System](docs/UI-Design-System.md).
 
 Key rules:
-- **Use design tokens, not raw values.** Colors, spacing, and shadows are defined as CSS custom properties in `src/index.css`. Reference them via `var(--token-name)` — never use inline hex values or hardcoded pixel sizes.
+- **Use design tokens, not raw values.** `src/index.css` is the canonical source for app-wide design tokens; `src/styles/tokens.css` defines additional marketplace, API, and status tokens. Reference them via `var(--token-name)` — never use inline hex values or hardcoded pixel sizes.
 - **Reuse existing components.** Check `src/components/` before building something new. Components like `ApiCard`, `EmptyState`, `SearchBar`, `Skeleton`, and `Breadcrumb` are shared across views.
 - **Do not introduce a component library.** The project is intentionally dependency-light.
 

@@ -153,6 +153,6 @@ callora-frontend/
 └── vite.config.ts
 ```
 
-This repo is part of [Callora](https://github.com/your-org/callora). Backend and contracts live in separate repos: `callora-backend`, `callora-contracts`.
+This repo is part of [Callora](https://github.com/CalloraOrg/callora). Backend and contracts live in separate repos: `callora-backend`, `callora-contracts`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
