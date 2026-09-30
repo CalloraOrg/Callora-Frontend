@@ -76,10 +76,17 @@ const SENSITIVE_PATTERNS = [
   { pattern: /\b(ck_live_|sk_|pk_)[a-zA-Z0-9_]{20,}\b/g, replacement: '[REDACTED_KEY]' },
   // Bearer tokens
   { pattern: /Bearer\s+[a-zA-Z0-9\-_.~+/]+=*/gi, replacement: 'Bearer [REDACTED_TOKEN]' },
-  // Session/JWT tokens
-  { pattern: /[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*/g, replacement: '[REDACTED_TOKEN]' },
+  // JWT tokens: three base64url segments, the first of which is a realistic
+  // base64url-encoded JSON header starting with 'eyJ' (e.g. eyJhbGci...).
+  // This avoids matching semver strings (1.2.3), hostnames (api.callora.com),
+  // and dotted method names (v1.users.list).
+  {
+    pattern:
+      /\beyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_\-+]+\.[a-zA-Z0-9_\-+]+\b/g,
+    replacement: '[REDACTED_TOKEN]',
+  },
   // Email addresses
-  { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: '[REDACTED_EMAIL]' },
+  { pattern: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: '[REDACTED_EMAIL]' },
   // URLs with credentials
   { pattern: /https?:\/\/[^:]+:[^@]+@[^\s]/gi, replacement: 'https://[REDACTED_CREDENTIALS]' },
   // Passwords
