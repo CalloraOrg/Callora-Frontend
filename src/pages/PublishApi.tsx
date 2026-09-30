@@ -1,20 +1,17 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import OpenAPIImport from '../components/OpenAPIImport';
 import type { ParsedEndpoint } from '../components/OpenAPIImport';
 import FormField from '../components/FormField';
 import type { FieldStatus } from '../components/FormField';
 import SessionExpiryBanner from '../components/SessionExpiryBanner';
+import { useBeforeUnload } from '../hooks/useBeforeUnload';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import useFormPersistence from '../hooks/useFormPersistence';
 import useSessionExpiry from '../hooks/useSessionExpiry';
 import { generateIdempotencyKey } from '../services/idempotency';
 import { submitPublishApi } from '../services/publishApi';
 import type { PublishApiFieldErrors, PublishApiInput } from '../services/publishApi';
-import { useFormPersistence } from '../hooks/useFormPersistence';
-import { useSessionExpiry } from '../hooks/useSessionExpiry';
-import { useBeforeUnload } from '../hooks/useBeforeUnload';
-import SessionExpiryBanner from '../components/SessionExpiryBanner';
+import { signalExpiry } from '../services/sessionExpiry';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,9 +34,15 @@ type ValidatedFields = Exclude<keyof PublishFormState, 'description' | 'endpoint
 
 type TouchedState = Record<ValidatedFields, boolean>;
 
-type ValidationErrors = Partial<Record<ValidatedFields, string>>;
+/**
+ * `endpoints` is list-level: it covers both "no endpoints" and "duplicate
+ * METHOD + path". Which rows are duplicates is derived from the list itself
+ * (see `findDuplicateEndpointIds`), never stored, so it cannot go stale.
+ */
+type ValidationErrors = Partial<Record<ValidatedFields | 'endpoints', string>>;
 
-const PUBLISH_FORM_DRAFT_KEY = 'callora:publish-form:draft';
+/** id of the endpoint list's error node, referenced by aria-describedby. */
+const ENDPOINTS_ERROR_ID = 'pa-endpoints-error';
 
 const INITIAL_FORM: PublishFormState = {
   apiName: '',
@@ -91,6 +94,57 @@ function methodBadgeClass(method: string): string {
   return 'pa-badge pa-badge-default';
 }
 
+/**
+ * Identity of an endpoint for uniqueness purposes.
+ *
+ * The method is upper-cased (the OpenAPI parser already does this; a draft
+ * from an older build may not have). The path is compared exactly:
+ * `/users` and `/users/:id` are different endpoints, and rewriting paths here
+ * could merge definitions the provider meant to keep apart.
+ */
+function endpointKey(ep: Pick<EndpointEntry, 'method' | 'path'>): string {
+  return `${ep.method.toUpperCase()} ${ep.path}`;
+}
+
+/**
+ * Ids of every endpoint whose METHOD + path appears more than once.
+ *
+ * Every member of a duplicate group is returned, not just the later ones, so
+ * the provider sees all the rows involved and can choose which to remove.
+ */
+function findDuplicateEndpointIds(endpoints: EndpointEntry[]): Set<string> {
+  const groups = new Map<string, string[]>();
+  for (const ep of endpoints) {
+    const key = endpointKey(ep);
+    const ids = groups.get(key);
+    if (ids) ids.push(ep.id);
+    else groups.set(key, [ep.id]);
+  }
+
+  const duplicates = new Set<string>();
+  for (const ids of groups.values()) {
+    if (ids.length > 1) ids.forEach((id) => duplicates.add(id));
+  }
+  return duplicates;
+}
+
+function validateEndpoints(endpoints: EndpointEntry[]): string | undefined {
+  if (endpoints.length === 0) {
+    return 'Add at least one endpoint before publishing. Use "Import spec" above to add them.';
+  }
+
+  const counts = new Map<string, number>();
+  for (const ep of endpoints) {
+    const key = endpointKey(ep);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const repeated = [...counts].filter(([, count]) => count > 1);
+  if (repeated.length === 0) return undefined;
+
+  const list = repeated.map(([key, count]) => `${key} (${count}×)`).join(', ');
+  return `Each endpoint must have a unique method and path. Remove the duplicates: ${list}.`;
+}
+
 function validateForm(form: PublishFormState): ValidationErrors {
   const errors: ValidationErrors = {};
 
@@ -120,6 +174,11 @@ function validateForm(form: PublishFormState): ValidationErrors {
     if (!Number.isFinite(price) || price < 0) {
       errors.pricePerCall = 'Price per call must be 0 or greater.';
     }
+  }
+
+  const endpointsError = validateEndpoints(form.endpoints);
+  if (endpointsError) {
+    errors.endpoints = endpointsError;
   }
 
   return errors;
@@ -276,7 +335,12 @@ function toPublishPayload(form: PublishFormState): PublishApiInput {
  */
 export default function PublishApi() {
   useDocumentTitle('Publish API');
-  const { value: form, setValue: setForm, discard: discardDraft } = useFormPersistence(
+  const {
+    value: form,
+    setValue: setForm,
+    discard: discardDraft,
+    isRestored: draftRestored,
+  } = useFormPersistence(
     DRAFT_STORAGE_KEY,
     INITIAL_FORM,
     { isValid: isPublishFormDraft },
@@ -321,19 +385,22 @@ export default function PublishApi() {
     };
   }, []);
 
-  const clientErrors = validateForm(form);
+  const clientErrors = useMemo(() => validateForm(form), [form]);
   // Server messages take precedence so a field the backend rejected keeps
   // showing why until the provider edits it.
   const errors: ValidationErrors = { ...clientErrors, ...serverErrors };
   const isFormValid = Object.keys(clientErrors).length === 0;
-  // ── Session expiry & form persistence ────────────────────────────────
-  const { clearDraft, wasRestored } = useFormPersistence(
-    PUBLISH_FORM_DRAFT_KEY,
-    form as unknown as Record<string, unknown>,
-    setForm as unknown as React.Dispatch<React.SetStateAction<Record<string, unknown>>>,
-    { restoreOnMount: true },
+  const duplicateEndpointIds = useMemo(
+    () => findDuplicateEndpointIds(form.endpoints),
+    [form.endpoints],
   );
-  const { isExpired, dismiss: dismissExpiry, countdown, signalExpiry } = useSessionExpiry();
+  // Rendered errors follow the rest of the form: nothing until a submit.
+  const endpointsError = submitAttempted ? errors.endpoints : undefined;
+
+  /** Focus target when a submit fails on the endpoint list alone. */
+  const endpointsRef = useRef<HTMLFieldSetElement>(null);
+  /** Bumped by a failed submit that should move focus to the endpoint list. */
+  const [endpointFocusRequest, setEndpointFocusRequest] = useState(0);
 
   const hasUnsavedChanges = useMemo(() => {
     return form.apiName !== '' || form.baseUrl !== '' || form.category !== '' ||
@@ -342,9 +409,6 @@ export default function PublishApi() {
   }, [form]);
 
   useBeforeUnload(hasUnsavedChanges);
-
-  const errors = validateForm(form);
-  const isFormValid = Object.keys(errors).length === 0;
 
   // ── Field change handlers ──────────────────────────────────────────────
 
@@ -417,7 +481,15 @@ export default function PublishApi() {
       setTouched({ apiName: true, baseUrl: true, category: true, pricePerCall: true });
       setFormError(null);
       setServerErrors({});
-      if (!isFormValid) return;
+      if (!isFormValid) {
+        // The detail fields come first on the page. Only take focus to the
+        // endpoint list when it is the sole problem, so a provider is never
+        // pulled past an earlier error they have not seen yet.
+        const onlyEndpointsInvalid =
+          clientErrors.endpoints !== undefined && Object.keys(clientErrors).length === 1;
+        if (onlyEndpointsInvalid) setEndpointFocusRequest((n) => n + 1);
+        return;
+      }
 
       const payload = toPublishPayload(form);
       const serialized = JSON.stringify(payload);
@@ -469,11 +541,28 @@ export default function PublishApi() {
         submittingRef.current = false;
         if (mountedRef.current) setSubmitting(false);
       }
-      setSubmitted(true);
-      clearDraft();
     },
-    [discardDraft, form, isFormValid],
+    [clientErrors, discardDraft, form, isFormValid],
   );
+
+  // Runs after the render that fills in the endpoint error, so a screen reader
+  // announces the description along with the focus move.
+  useEffect(() => {
+    if (endpointFocusRequest > 0) endpointsRef.current?.focus();
+  }, [endpointFocusRequest]);
+
+  const handleSimulateExpiry = useCallback(() => {
+    signalExpiry('expired');
+  }, []);
+
+  const handleClearDraft = useCallback(() => {
+    discardDraft(INITIAL_FORM);
+    idempotencyRef.current = null;
+    setTouched(INITIAL_TOUCHED);
+    setSubmitAttempted(false);
+    setServerErrors({});
+    setFormError(null);
+  }, [discardDraft]);
 
   // ── Success screen ─────────────────────────────────────────────────────
 
@@ -508,7 +597,6 @@ export default function PublishApi() {
                 setFormError(null);
                 setListingId(null);
                 setImportOpen(false);
-                clearDraft();
               }}
             >
               Publish another API
@@ -521,20 +609,10 @@ export default function PublishApi() {
 
   // ── Main form ──────────────────────────────────────────────────────────
 
-  // ── Simulate a 401 for demo purposes ─────────────────────────────────
-  const handleSimulateExpiry = useCallback(() => {
-    signalExpiry();
-  }, [signalExpiry]);
-
   return (
     <>
       <style>{STYLES}</style>
-      <SessionExpiryBanner
-        isVisible={isExpired}
-        countdown={countdown}
-        onDismiss={dismissExpiry}
-      />
-      {wasRestored && !isExpired && (
+      {draftRestored && !isExpired && (
         <div className="pa-draft-restored" role="status" aria-live="polite">
           Draft restored from a previous session.
         </div>
@@ -586,19 +664,14 @@ export default function PublishApi() {
         </section>
 
         {/* ── Draft restored notice (with dismiss) ─────────────── */}
-        {wasRestored && !isExpired && (
+        {draftRestored && !isExpired && (
           <div className="pa-draft-banner surface">
             <span aria-hidden="true">💾</span>
             <span>Your previous draft has been restored. Your form data is being saved automatically.</span>
             <button
               type="button"
               className="pa-btn-secondary pa-draft-dismiss"
-              onClick={() => {
-                clearDraft();
-                setForm(INITIAL_FORM);
-                setTouched(INITIAL_TOUCHED);
-                setSubmitAttempted(false);
-              }}
+              onClick={handleClearDraft}
             >
               Clear draft
             </button>
@@ -725,7 +798,12 @@ export default function PublishApi() {
           </fieldset>
 
           {/* ── Endpoint list ────────────────────────────────────── */}
-          <fieldset className="pa-fieldset">
+          <fieldset
+            ref={endpointsRef}
+            className="pa-fieldset pa-endpoints-fieldset"
+            aria-describedby={ENDPOINTS_ERROR_ID}
+            tabIndex={-1}
+          >
             <legend className="pa-legend">
               Endpoints
               {form.endpoints.length > 0 && (
@@ -745,30 +823,52 @@ export default function PublishApi() {
                 className="pa-endpoint-list"
                 aria-label={`${form.endpoints.length} imported endpoints`}
               >
-                {form.endpoints.map((ep) => (
-                  <li key={ep.id} className="pa-endpoint-item">
-                    <span
-                      className={methodBadgeClass(ep.method)}
-                      aria-label={`HTTP ${ep.method}`}
+                {form.endpoints.map((ep) => {
+                  const isDuplicate = submitAttempted && duplicateEndpointIds.has(ep.id);
+                  return (
+                    <li
+                      key={ep.id}
+                      className={
+                        isDuplicate ? 'pa-endpoint-item pa-endpoint-item-duplicate' : 'pa-endpoint-item'
+                      }
                     >
-                      {ep.method}
-                    </span>
-                    <code className="pa-endpoint-path">{ep.path}</code>
-                    {ep.summary && (
-                      <span className="pa-endpoint-summary">{ep.summary}</span>
-                    )}
-                    <button
-                      type="button"
-                      className="pa-remove-btn"
-                      onClick={() => handleRemoveEndpoint(ep.id)}
-                      aria-label={`Remove endpoint ${ep.method} ${ep.path}`}
-                    >
-                      ✕
-                    </button>
-                  </li>
-                ))}
+                      <span
+                        className={methodBadgeClass(ep.method)}
+                        aria-label={`HTTP ${ep.method}`}
+                      >
+                        {ep.method}
+                      </span>
+                      <code className="pa-endpoint-path">{ep.path}</code>
+                      {ep.summary && (
+                        <span className="pa-endpoint-summary">{ep.summary}</span>
+                      )}
+                      {isDuplicate && (
+                        <span className="pa-endpoint-duplicate">Duplicate</span>
+                      )}
+                      <button
+                        type="button"
+                        className="pa-remove-btn"
+                        onClick={() => handleRemoveEndpoint(ep.id)}
+                        aria-label={`Remove endpoint ${ep.method} ${ep.path}`}
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
+
+            {/* Always in the DOM so aria-describedby never points at nothing,
+                matching how FormField renders its error region. */}
+            <p
+              id={ENDPOINTS_ERROR_ID}
+              className="pa-endpoints-error"
+              role="alert"
+              aria-atomic="true"
+            >
+              {endpointsError}
+            </p>
           </fieldset>
 
           <div className="pa-form-footer">
@@ -786,8 +886,8 @@ export default function PublishApi() {
               {submitting ? 'Submitting…' : 'Publish API'}
             </button>
             <p className="pa-form-note">
-              Submission is reviewed before going live. API name, base URL, and
-              category are required.
+              Submission is reviewed before going live. API name, base URL,
+              category, and at least one endpoint are required.
             </p>
           </div>
         </form>
@@ -1029,6 +1129,31 @@ const STYLES = `
 
   .pa-endpoint-item:hover {
     background: rgba(78,133,255,0.05);
+  }
+
+  .pa-endpoints-fieldset:focus-visible {
+    outline: 2px solid var(--accent, #4e85ff);
+    outline-offset: 6px;
+    border-radius: 10px;
+  }
+
+  .pa-endpoint-item-duplicate {
+    border-color: var(--danger, #ff7d8d);
+    background: rgba(255, 125, 141, 0.06);
+  }
+
+  .pa-endpoint-duplicate {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--danger, #ff7d8d);
+  }
+
+  .pa-endpoints-error {
+    margin: 0;
+    min-height: 1.2em;
+    font-size: 0.82rem;
+    color: var(--danger, #ff7d8d);
   }
 
   .pa-badge {

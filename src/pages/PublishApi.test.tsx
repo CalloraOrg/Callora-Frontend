@@ -24,7 +24,8 @@ function deferredResponse() {
   return { fetchImpl, resolveWith };
 }
 
-function fillValidForm() {
+/** Fill every required detail field, leaving the endpoint list untouched. */
+function fillValidDetails() {
   fireEvent.change(screen.getByLabelText(/api name/i), {
     target: { value: 'Weather Forecast API' },
   });
@@ -34,6 +35,43 @@ function fillValidForm() {
   fireEvent.change(screen.getByLabelText(/category/i), {
     target: { value: 'Weather & Environment' },
   });
+}
+
+/** Operations to put in an imported spec, keyed by path: `{ '/users': ['get'] }`. */
+type SpecPaths = Record<string, string[]>;
+
+/**
+ * Add endpoints the way a provider does: open the importer, pick an OpenAPI
+ * file, and confirm the preview. fireEvent keeps it usable under fake timers.
+ */
+async function importEndpoints(paths: SpecPaths) {
+  const spec = {
+    openapi: '3.0.0',
+    info: { title: 'Test', version: '1.0.0' },
+    paths: Object.fromEntries(
+      Object.entries(paths).map(([path, methods]) => [
+        path,
+        Object.fromEntries(methods.map((m) => [m, { summary: `${m.toUpperCase()} ${path}` }])),
+      ]),
+    ),
+  };
+  const file = new File([JSON.stringify(spec)], 'api.json', { type: 'application/json' });
+
+  fireEvent.click(screen.getByRole('button', { name: /import spec/i }));
+  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  fireEvent.change(input);
+  // FileReader resolves on a later task; under a loaded full-suite run that
+  // can outlast findBy's 1s default.
+  fireEvent.click(
+    await screen.findByRole('button', { name: /confirm import/i }, { timeout: 5000 }),
+  );
+}
+
+/** A form that passes client validation: details plus one endpoint. */
+async function fillValidForm() {
+  fillValidDetails();
+  await importEndpoints({ '/forecast': ['get'] });
 }
 
 /** The always-present error paragraph rendered by FormField for a field. */
@@ -61,7 +99,7 @@ describe('PublishApi submission', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
 
     await userEvent.click(submitButton());
 
@@ -78,7 +116,7 @@ describe('PublishApi submission', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     fireEvent.change(screen.getByLabelText(/price per call/i), {
       target: { value: '0.0025' },
     });
@@ -97,7 +135,7 @@ describe('PublishApi submission', () => {
       category: 'Weather & Environment',
       description: 'Forecasts for the next 7 days.',
       pricePerCall: 0.0025,
-      endpoints: [],
+      endpoints: [{ path: '/forecast', method: 'GET', summary: 'GET /forecast' }],
     });
   });
 
@@ -106,7 +144,7 @@ describe('PublishApi submission', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
@@ -129,7 +167,7 @@ describe('PublishApi submission', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
 
     await userEvent.click(submitButton());
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
@@ -146,7 +184,7 @@ describe('PublishApi submission', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
 
@@ -168,7 +206,7 @@ describe('PublishApi success screen', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     expect(screen.queryByText(/submitted for review/i)).not.toBeInTheDocument();
@@ -184,7 +222,7 @@ describe('PublishApi success screen', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await act(async () => {
@@ -200,7 +238,7 @@ describe('PublishApi success screen', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     expect(await screen.findByText('api_xyz')).toBeInTheDocument();
@@ -211,7 +249,7 @@ describe('PublishApi success screen', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await waitFor(() => expect(fetchImpl).toHaveBeenCalled());
@@ -223,7 +261,7 @@ describe('PublishApi success screen', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await waitFor(() => expect(fetchImpl).toHaveBeenCalled());
@@ -235,7 +273,7 @@ describe('PublishApi success screen', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     expect(await screen.findByText(/network error/i)).toBeInTheDocument();
@@ -251,7 +289,7 @@ describe('PublishApi server field errors', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     const errorNode = await waitFor(() => {
@@ -270,7 +308,7 @@ describe('PublishApi server field errors', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     const input = screen.getByLabelText(/base url/i);
@@ -286,7 +324,7 @@ describe('PublishApi server field errors', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await waitFor(() =>
@@ -301,7 +339,7 @@ describe('PublishApi server field errors', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await waitFor(() => expect(errorNodeFor('pa-api-name')).toHaveTextContent('Taken.'));
@@ -316,7 +354,7 @@ describe('PublishApi server field errors', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await waitFor(() =>
@@ -337,7 +375,7 @@ describe('PublishApi server field errors', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     expect(await screen.findByText(/You are not verified to publish\./)).toBeInTheDocument();
@@ -350,7 +388,7 @@ describe('PublishApi server field errors', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     expect(await screen.findByText('Publishing is restricted.')).toBeInTheDocument();
@@ -364,7 +402,7 @@ describe('PublishApi server field errors', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
     await waitFor(() => expect(errorNodeFor('pa-api-name')).toHaveTextContent('Taken.'));
 
@@ -383,7 +421,7 @@ describe('PublishApi session expiry', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     expect(await screen.findByText(/session has expired/i)).toBeInTheDocument();
@@ -394,7 +432,7 @@ describe('PublishApi session expiry', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     expect(await screen.findByText(/session has expired/i)).toBeInTheDocument();
@@ -406,7 +444,7 @@ describe('PublishApi session expiry', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await userEvent.click(await screen.findByRole('button', { name: /dismiss/i }));
@@ -418,7 +456,7 @@ describe('PublishApi session expiry', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await screen.findByText(/session has expired/i);
@@ -434,7 +472,7 @@ describe('PublishApi in-flight state', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     const button = screen.getByRole('button', { name: /submitting/i });
@@ -451,7 +489,7 @@ describe('PublishApi in-flight state', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await waitFor(() =>
@@ -464,7 +502,7 @@ describe('PublishApi in-flight state', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
 
@@ -487,7 +525,7 @@ describe('PublishApi in-flight state', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
 
     const form = screen.getByRole('form', { name: /publish api form/i });
     await act(async () => {
@@ -516,7 +554,7 @@ describe('PublishApi in-flight state', () => {
       vi.stubGlobal('fetch', fetchImpl);
 
       render(<PublishApi />);
-      fillValidForm();
+      await fillValidForm();
       await user.click(submitButton());
 
       expect(screen.getByRole('button', { name: /submitting/i })).toBeDisabled();
@@ -571,7 +609,7 @@ describe('PublishApi draft persistence', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     const first = render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     fireEvent.change(screen.getByLabelText(/description/i), {
       target: { value: 'Half-written listing.' },
     });
@@ -593,7 +631,7 @@ describe('PublishApi draft persistence', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     const first = render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
     await waitFor(() => expect(fetchImpl).toHaveBeenCalled());
 
@@ -624,7 +662,7 @@ describe('PublishApi draft persistence', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
 
     await screen.findByText(/submitted for review/i);
@@ -636,7 +674,7 @@ describe('PublishApi draft persistence', () => {
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<PublishApi />);
-    fillValidForm();
+    await fillValidForm();
     await userEvent.click(submitButton());
     await screen.findByText(/submitted for review/i);
 
@@ -645,5 +683,189 @@ describe('PublishApi draft persistence', () => {
     expect(screen.getByLabelText(/api name/i)).toHaveValue('');
     expect(screen.getByLabelText(/base url/i)).toHaveValue('');
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+});
+
+describe('PublishApi endpoint validation (#1076)', () => {
+  const ENDPOINTS_ERROR_ID = 'pa-endpoints-error';
+
+  function endpointsGroup() {
+    return screen.getByRole('group', { name: /endpoints/i });
+  }
+
+  function endpointsErrorNode() {
+    return document.getElementById(ENDPOINTS_ERROR_ID);
+  }
+
+  /** Rows of the endpoint list, as the text each one reads out. */
+  function endpointRows() {
+    return screen.queryAllByRole('listitem').filter((li) => li.closest('.pa-endpoint-list'));
+  }
+
+  function flaggedRows() {
+    return endpointRows().filter((li) => li.textContent?.includes('Duplicate'));
+  }
+
+  function seedDraftWithEndpoints(endpoints: { id: string; method: string; path: string }[]) {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        apiName: 'Weather Forecast API',
+        baseUrl: 'https://api.example.com',
+        category: 'Weather & Environment',
+        description: '',
+        pricePerCall: '',
+        endpoints,
+      }),
+    );
+  }
+
+  it('rejects a submission with zero endpoints and never POSTs', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { id: 'api_1' }));
+    vi.stubGlobal('fetch', fetchImpl);
+
+    render(<PublishApi />);
+    fillValidDetails();
+    await userEvent.click(submitButton());
+
+    expect(endpointsErrorNode()).toHaveTextContent(/add at least one endpoint/i);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(screen.queryByText(/submitted for review/i)).not.toBeInTheDocument();
+  });
+
+  it('does not show the endpoint error before a submit', () => {
+    render(<PublishApi />);
+    fillValidDetails();
+
+    expect(endpointsErrorNode()).toHaveTextContent('');
+  });
+
+  it('associates the endpoint error with the endpoint list', async () => {
+    render(<PublishApi />);
+    fillValidDetails();
+    await userEvent.click(submitButton());
+
+    const group = endpointsGroup();
+    expect(group).toHaveAttribute('aria-describedby', ENDPOINTS_ERROR_ID);
+    expect(group).toHaveAccessibleDescription(/add at least one endpoint/i);
+  });
+
+  it('moves focus to the endpoint list when it is the only problem', async () => {
+    render(<PublishApi />);
+    fillValidDetails();
+    await userEvent.click(submitButton());
+
+    await waitFor(() => expect(endpointsGroup()).toHaveFocus());
+  });
+
+  it('leaves focus alone when an earlier field is also invalid', async () => {
+    render(<PublishApi />);
+    // API name left blank: that error comes first on the page.
+    fireEvent.change(screen.getByLabelText(/base url/i), {
+      target: { value: 'https://api.example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/category/i), {
+      target: { value: 'Weather & Environment' },
+    });
+    await userEvent.click(submitButton());
+
+    expect(endpointsErrorNode()).toHaveTextContent(/add at least one endpoint/i);
+    expect(endpointsGroup()).not.toHaveFocus();
+  });
+
+  it('clears the empty-list error once an endpoint is added', async () => {
+    render(<PublishApi />);
+    fillValidDetails();
+    await userEvent.click(submitButton());
+    expect(endpointsErrorNode()).toHaveTextContent(/add at least one endpoint/i);
+
+    await importEndpoints({ '/forecast': ['get'] });
+
+    await waitFor(() => expect(endpointsErrorNode()).toHaveTextContent(''));
+  });
+
+  it('flags every row of a duplicated METHOD + path and blocks the POST', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { id: 'api_1' }));
+    vi.stubGlobal('fetch', fetchImpl);
+
+    render(<PublishApi />);
+    fillValidDetails();
+    // Importing twice is how a provider ends up with a repeated operation.
+    await importEndpoints({ '/users': ['get', 'post'] });
+    await importEndpoints({ '/users': ['get'] });
+    await userEvent.click(submitButton());
+
+    const flagged = flaggedRows();
+    expect(flagged).toHaveLength(2);
+    flagged.forEach((row) => {
+      expect(row).toHaveTextContent('GET');
+      expect(row).toHaveTextContent('/users');
+    });
+    const postRow = endpointRows().find((row) => row.textContent?.includes('POST'));
+    expect(postRow).not.toHaveTextContent('Duplicate');
+
+    expect(endpointsErrorNode()).toHaveTextContent('GET /users (2×)');
+    expect(fetchImpl).not.toHaveBeenCalled();
+    await waitFor(() => expect(endpointsGroup()).toHaveFocus());
+  });
+
+  it('allows the same path under different methods, and distinct paths', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { id: 'api_1' }));
+    vi.stubGlobal('fetch', fetchImpl);
+
+    render(<PublishApi />);
+    fillValidDetails();
+    await importEndpoints({ '/users': ['get', 'post'], '/users/{id}': ['get'] });
+    await userEvent.click(submitButton());
+
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    const body = JSON.parse(fetchImpl.mock.calls[0][1].body);
+    expect(body.endpoints.map((ep: { method: string; path: string }) => `${ep.method} ${ep.path}`)).toEqual([
+      'GET /users',
+      'POST /users',
+      'GET /users/{id}',
+    ]);
+  });
+
+  it('treats a lowercase method from an older draft as the same endpoint', async () => {
+    seedDraftWithEndpoints([
+      { id: 'ep-a', method: 'get', path: '/users' },
+      { id: 'ep-b', method: 'GET', path: '/users' },
+    ]);
+
+    render(<PublishApi />);
+    await userEvent.click(submitButton());
+
+    expect(flaggedRows()).toHaveLength(2);
+  });
+
+  it('clears the duplicate flags as the duplicates are removed', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { id: 'api_1' }));
+    vi.stubGlobal('fetch', fetchImpl);
+    seedDraftWithEndpoints([
+      { id: 'ep-a', method: 'GET', path: '/users' },
+      { id: 'ep-b', method: 'GET', path: '/users' },
+      { id: 'ep-c', method: 'GET', path: '/users' },
+      { id: 'ep-d', method: 'POST', path: '/users' },
+    ]);
+
+    render(<PublishApi />);
+    await userEvent.click(submitButton());
+    // All three copies are flagged, not just the later ones.
+    expect(flaggedRows()).toHaveLength(3);
+    expect(endpointsErrorNode()).toHaveTextContent('GET /users (3×)');
+
+    const removeGet = () =>
+      screen.getAllByRole('button', { name: 'Remove endpoint GET /users' })[0];
+
+    await userEvent.click(removeGet());
+    expect(flaggedRows()).toHaveLength(2);
+
+    await userEvent.click(removeGet());
+    expect(flaggedRows()).toHaveLength(0);
+    expect(endpointsErrorNode()).toHaveTextContent('');
+
+    await userEvent.click(submitButton());
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
   });
 });
