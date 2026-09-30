@@ -31,6 +31,7 @@ const A11yAudit = lazy(() => import("./pages/A11yAudit"));
 const RateLimitCard = lazy(() => import("./pages/RateLimitCard"));
 const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
+const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
 const InvoiceCard = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.InvoiceCard })));
 
 // Prefetch cache map to ensure modules are loaded on hover / focus without delaying critical interaction
@@ -47,6 +48,7 @@ const routePrefetchers: Record<string, () => Promise<any>> = {
   "/a11y-audit": () => import("./pages/A11yAudit"),
   "/rate-limit": () => import("./pages/RateLimitCard"),
   "/webhooks/deliveries": () => import("./pages/WebhookDeliveries"),
+  "/endpoints": () => import("./pages/EndpointSummary"),
 };
 
 export function prefetchRoute(path: string) {
@@ -159,6 +161,7 @@ const APP_ROUTES = {
   slaCard: "/marketplace/grantfox-wave-compute/sla",
   webhookDeliveries: "/webhooks/deliveries",
   onboarding: "/onboarding",
+  endpointSummary: "/endpoints",
 } as const;
 
 function createMockHash() {
@@ -766,6 +769,8 @@ function App() {
             <Route path="/a11y-audit" element={<A11yAudit />} />
 
             <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
+
+            <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
 
             {/* ── Billing History (FWC26) ──────────────────────────────── */}
             <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />

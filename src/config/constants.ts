@@ -38,3 +38,12 @@ export const EXTERNAL_LINKS = {
   terms: "https://callora.org/terms",
   privacy: "https://callora.org/privacy",
 } as const;
+
+/** Application route paths. */
+export const APP_ROUTES = {
+  home: "/",
+  marketplace: "/marketplace",
+  apiDetail: "/api/:id",
+  dashboard: "/dashboard",
+  endpointSummary: "/endpoints",
+} as const;
