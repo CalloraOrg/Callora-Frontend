@@ -1,24 +1,52 @@
 // src/state/uiPrefs.ts
+//
+// Canonical owner of the `callora.density` localStorage key (#1186).
+// Previously `src/utils/density.ts` duplicated this logic (and the
+// DensityPreference type) with its own read/persist helpers; that module was
+// removed so there is a single source of truth for density persistence.
 
 export type DensityPreference = "comfortable" | "compact";
 
-const DENSITY_STORAGE_KEY = "callora.density";
+export const DENSITY_STORAGE_KEY = "callora.density";
+
+const VALID_DENSITY_PREFERENCES: readonly DensityPreference[] = [
+  "comfortable",
+  "compact",
+];
+
+function isValidDensityPreference(
+  value: string,
+): value is DensityPreference {
+  return (VALID_DENSITY_PREFERENCES as readonly string[]).includes(value);
+}
 
 export function getDensityPreference(): DensityPreference {
   if (typeof window === "undefined") {
     return "comfortable";
   }
 
-  const value = window.localStorage.getItem(DENSITY_STORAGE_KEY);
+  try {
+    const value = window.localStorage.getItem(DENSITY_STORAGE_KEY);
 
-  return value === "compact" ? "compact" : "comfortable";
+    return value !== null && isValidDensityPreference(value)
+      ? value
+      : "comfortable";
+  } catch {
+    // localStorage unavailable (SSR / private browsing / disabled storage)
+    return "comfortable";
+  }
 }
 
 export function setDensityPreference(
   density: DensityPreference,
 ): DensityPreference {
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(DENSITY_STORAGE_KEY, density);
+    try {
+      window.localStorage.setItem(DENSITY_STORAGE_KEY, density);
+    } catch {
+      // localStorage unavailable or quota exceeded; the in-memory caller
+      // state still holds the selection for the current session.
+    }
   }
 
   return density;

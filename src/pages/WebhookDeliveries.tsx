@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useWebhookDeliveries } from '../hooks/useWebhookDeliveries';
 import { useToast } from '../components/Toast';
+import { Pagination } from '../components/Pagination';
 
 export default function WebhookDeliveries() {
   const [accountId, setAccountId] = useState('acc_123'); // Simulate account switch
   const {
     deliveries,
+    totalCount,
     status,
     error,
     isStale,
@@ -23,7 +25,7 @@ export default function WebhookDeliveries() {
       await retryDelivery(id);
       showToast('Retry triggered successfully');
     } catch (err: any) {
-      showToast(`Retry failed: ${err.message}`, 'error');
+      showToast({ message: `Retry failed: ${err.message}`, variant: 'error', persistent: true });
     }
   };
 
@@ -32,10 +34,16 @@ export default function WebhookDeliveries() {
       <h1>Webhook Deliveries</h1>
       
       <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
-        <button onClick={() => setAccountId(accountId === 'acc_123' ? 'acc_456' : 'acc_123')}>
+        <button onClick={() => {
+          setAccountId(accountId === 'acc_123' ? 'acc_456' : 'acc_123');
+          setFilter(f => ({ ...f, page: 1 }));
+        }}>
           Switch Account (Current: {accountId})
         </button>
-        <button onClick={() => setAccountId('error-account')}>
+        <button onClick={() => {
+          setAccountId('error-account');
+          setFilter(f => ({ ...f, page: 1 }));
+        }}>
           Simulate Error Account
         </button>
         <button onClick={refresh}>Refresh</button>
@@ -54,14 +62,19 @@ export default function WebhookDeliveries() {
             <option value="pending">Pending</option>
           </select>
         </label>
-        
-        <label>
-          Page:
-          <button onClick={() => setFilter(f => ({ ...f, page: Math.max(1, f.page - 1) }))}>Prev</button>
-          <span style={{ margin: '0 8px' }}>{filter.page}</span>
-          <button onClick={() => setFilter(f => ({ ...f, page: f.page + 1 }))}>Next</button>
-        </label>
       </div>
+
+      <Pagination
+        mode="cursor"
+        currentPageIndex={filter.page - 1}
+        hasNextPage={filter.page * 2 < totalCount}
+        hasPreviousPage={filter.page > 1}
+        totalItemCount={totalCount}
+        pageSize={2}
+        onGoNext={() => setFilter(f => ({ ...f, page: f.page + 1 }))}
+        onGoPrevious={() => setFilter(f => ({ ...f, page: Math.max(1, f.page - 1) }))}
+        onPageSizeChange={() => {}}
+      />
 
       {status === 'loading' && <p role="status">Loading deliveries...</p>}
       {status === 'error' && (

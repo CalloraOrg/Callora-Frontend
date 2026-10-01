@@ -48,6 +48,30 @@ describe("SecureErrorHandler", () => {
       expect(result).toContain("[REDACTED_TOKEN]");
     });
 
+    it("does not redact semver version strings", () => {
+      const text = "Version 1.2.3 failed";
+      const result = redactSensitiveData(text);
+
+      expect(result).toBe("Version 1.2.3 failed");
+      expect(result).not.toContain("[REDACTED_TOKEN]");
+    });
+
+    it("does not redact hostnames", () => {
+      const text = "Timeout calling api.callora.com";
+      const result = redactSensitiveData(text);
+
+      expect(result).toContain("api.callora.com");
+      expect(result).not.toContain("[REDACTED_TOKEN]");
+    });
+
+    it("does not redact dotted method names", () => {
+      const text = "Method v1.users.list threw an error";
+      const result = redactSensitiveData(text);
+
+      expect(result).toContain("v1.users.list");
+      expect(result).not.toContain("[REDACTED_TOKEN]");
+    });
+
     it("redacts email addresses", () => {
       const text = "User user@example.com failed authentication";
       const result = redactSensitiveData(text);

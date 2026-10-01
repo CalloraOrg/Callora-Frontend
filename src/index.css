@@ -285,6 +285,37 @@ input {
   line-height: 1.6;
 }
 
+/* Clipboard-export failure status (Issue #1066). Token-based so the message
+   is legible in both light and dark themes. */
+.theme-playground__export-error {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.theme-playground__download-btn {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.theme-playground__download-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .theme-playground__actions,
 .theme-playground__actions-inline {
   display: flex;

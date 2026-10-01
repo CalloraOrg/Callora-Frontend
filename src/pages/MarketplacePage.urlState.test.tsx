@@ -203,4 +203,53 @@ describe("MarketplacePage – URL authority & no stale state (#989)", () => {
       ).checked,
     ).toBe(false);
   });
+
+  it("price-desc round-trips: selecting it writes ?sort=price-desc and the dropdown reflects it", () => {
+    matchMediaStub(true);
+    renderWithRouter(["/marketplace"]);
+    settleTimers();
+
+    // The SortDropdown combobox is labelled "Sort marketplace results".
+    const sortButton = screen.getByRole("combobox", {
+      name: /sort marketplace results/i,
+    });
+    fireEvent.click(sortButton);
+
+    // Click the "Price: high → low" option in the listbox.
+    const priceDescOption = screen.getByRole("option", {
+      name: /price.*high.*low/i,
+    });
+    fireEvent.click(priceDescOption);
+    settleTimers();
+
+    // The combobox button should now show the selected label.
+    expect(
+      screen.getByRole("combobox", { name: /sort marketplace results/i })
+        .textContent,
+    ).toMatch(/price.*high.*low/i);
+  });
+
+  it("price-desc URL param: deep-linking ?sort=price-desc selects that option in the dropdown", () => {
+    matchMediaStub(true);
+    renderWithRouter(["/marketplace?sort=price-desc"]);
+    settleTimers();
+
+    // The sort combobox text should reflect price-desc.
+    expect(
+      screen.getByRole("combobox", { name: /sort marketplace results/i })
+        .textContent,
+    ).toMatch(/price.*high.*low/i);
+  });
+
+  it("unknown ?sort= value falls back to the default sort (popularity)", () => {
+    matchMediaStub(true);
+    renderWithRouter(["/marketplace?sort=bogus_unknown_value"]);
+    settleTimers();
+
+    // The sort combobox should fall back to the default (Popularity).
+    expect(
+      screen.getByRole("combobox", { name: /sort marketplace results/i })
+        .textContent,
+    ).toMatch(/popularity/i);
+  });
 });

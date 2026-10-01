@@ -12,7 +12,7 @@
 import Skeleton, { FiltersSidebarSkeleton } from "../components/Skeleton";
 import { ApiCardSkeleton } from "../components/ApiCard";
 import { ApiTagFilterSkeleton } from "./ApiTagFilter";
-import type { DensityPreference } from "../utils/density";
+import type { DensityPreference } from "../state/uiPrefs";
 
 export default function MarketplacePageSkeleton({
   density = "comfortable",
