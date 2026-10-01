@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import "./RouteErrorBoundary.css";
+import { logError } from "../services/SecureErrorHandler";
 
 export interface RouteErrorBoundaryProps {
   children: ReactNode;
@@ -39,11 +40,7 @@ export class RouteErrorBoundary extends Component<
   componentDidCatch(error: Error, info: ErrorInfo): void {
     this.props.onError?.(error, info);
     if (!this.props.onError) {
-      console.error(
-        "[RouteErrorBoundary] Unhandled render error:",
-        error,
-        info.componentStack,
-      );
+      logError("[RouteErrorBoundary] Unhandled render error", error, { componentStack: info.componentStack });
     }
   }
 
