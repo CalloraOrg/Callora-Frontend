@@ -1,15 +1,17 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useAccount, useAccountId, useSwitchAccount, useInvalidateCache } from "./useAccount";
-import { addAccount, switchAccount, _reset } from "../state/accountStore";
+import { useAccount, useAccountId, useSwitchAccount, useInvalidateCache, useRemoveAccount, useRenameAccount } from "./useAccount";
+import { addAccount, switchAccount, _reset, getKnownAccounts } from "../state/accountStore";
 import { getCache, setCache, invalidateAccountCache } from "../utils/offlineApiCache";
 
-const ACCOUNT_1 = { id: "account-1", label: "Account 1", apiKey: "ck_live_aaa" };
-const ACCOUNT_2 = { id: "account-2", label: "Account 2", apiKey: "ck_live_bbb" };
+let ACCOUNT_1: { id: string; label: string; apiKey: string };
+let ACCOUNT_2: { id: string; label: string; apiKey: string };
 
 beforeEach(() => {
   localStorage.clear();
   _reset();
+  ACCOUNT_1 = { id: "account-1", label: "Account 1", apiKey: "ck_live_aaa" };
+  ACCOUNT_2 = { id: "account-2", label: "Account 2", apiKey: "ck_live_bbb" };
 });
 
 afterEach(() => {
@@ -74,5 +76,40 @@ describe("useInvalidateCache", () => {
     const { result } = renderHook(() => useInvalidateCache());
     act(() => result.current(ACCOUNT_1.id));
     expect(getCache(ACCOUNT_1.id, "key-1")).toBeNull();
+  });
+});
+
+describe("useRemoveAccount", () => {
+  it("removes an account and invalidates its cache", () => {
+    addAccount(ACCOUNT_1);
+    setCache(ACCOUNT_1.id, "key-1", { value: 1 });
+    const { result } = renderHook(() => useRemoveAccount());
+    act(() => result.current(ACCOUNT_1.id));
+    expect(getKnownAccounts().length).toBe(0);
+    expect(getCache(ACCOUNT_1.id, "key-1")).toBeNull();
+  });
+});
+
+describe("useRenameAccount", () => {
+  it("renames an account", () => {
+    addAccount(ACCOUNT_1);
+    const { result } = renderHook(() => useRenameAccount());
+    act(() => { result.current(ACCOUNT_1.id, "New Name"); });
+    expect(getKnownAccounts()[0].label).toBe("New Name");
+  });
+
+  it("returns false for empty label", () => {
+    addAccount(ACCOUNT_1);
+    const { result } = renderHook(() => useRenameAccount());
+    act(() => { result.current(ACCOUNT_1.id, ""); });
+    expect(getKnownAccounts()[0].label).toBe("Account 1");
+  });
+
+  it("returns false for duplicate label", () => {
+    addAccount(ACCOUNT_1);
+    addAccount(ACCOUNT_2);
+    const { result } = renderHook(() => useRenameAccount());
+    act(() => { result.current(ACCOUNT_1.id, "Account 2"); });
+    expect(getKnownAccounts()[0].label).toBe("Account 1");
   });
 });

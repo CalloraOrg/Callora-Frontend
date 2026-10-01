@@ -1,22 +1,34 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import WebhookDeliveries from './WebhookDeliveries';
 import { ToastProvider } from '../components/Toast';
+import type { WebhookDeliveriesFetcher } from '../hooks/useWebhookDeliveries';
+import { addAccount, switchAccount, _reset } from '../state/accountStore';
+
+const ACCOUNT_1 = { id: 'account-1', label: 'Account 1', apiKey: 'ck_live_aaa' };
+const ACCOUNT_2 = { id: 'account-2', label: 'Account 2', apiKey: 'ck_live_bbb' };
 
 describe('WebhookDeliveries Page', () => {
   beforeEach(() => {
+    localStorage.clear();
+    _reset();
+    addAccount(ACCOUNT_1);
+    addAccount(ACCOUNT_2);
+    switchAccount(ACCOUNT_1.id);
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    localStorage.clear();
+    _reset();
   });
 
   // The toast provider is mounted at the app root (main.tsx); retry
   // feedback uses the useToast context, so tests wrap the page in it.
-  const renderPage = () => render(
+  const renderPage = (fetcher?: WebhookDeliveriesFetcher) => render(
     <ToastProvider>
-      <WebhookDeliveries />
+      <WebhookDeliveries fetcher={fetcher} />
     </ToastProvider>,
   );
 
@@ -32,22 +44,70 @@ describe('WebhookDeliveries Page', () => {
     expect(screen.getByText(/dlv_1_1/i)).toBeInTheDocument();
   });
 
-  it('renders explicit error and empty states', async () => {
-    renderPage();
-    
-    const errorBtn = screen.getByText(/Simulate Error Account/i);
-    fireEvent.click(errorBtn);
+  it('renders explicit errors from a mocked fetcher', async () => {
+    const failingFetcher: WebhookDeliveriesFetcher = vi.fn(async () => {
+      throw new Error('Failed to fetch from authoritative source');
+    });
+
+    renderPage(failingFetcher);
 
     await waitFor(() => {
       expect(screen.getByText(/Failed to fetch from authoritative source/i)).toBeInTheDocument();
     });
+  });
 
-    const switchBtn = screen.getByText(/Switch Account/i);
-    fireEvent.click(switchBtn);
+  it('reloads deliveries from the active account and clears previous rows on switch', async () => {
+    const accountFetcher: WebhookDeliveriesFetcher = vi.fn(
+      (accountId, filter, signal) => new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          resolve({
+            data: [{
+              id: `${accountId}-delivery-${filter.page}`,
+              url: 'https://example.com/webhook',
+              status: 'delivered',
+              attempts: 1,
+              lastAttemptAt: new Date().toISOString(),
+            }],
+            totalCount: 1,
+          });
+        }, 50);
+
+        signal.addEventListener('abort', () => {
+          clearTimeout(timeout);
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+      }),
+    );
+
+    renderPage(accountFetcher);
 
     await waitFor(() => {
-      expect(screen.getByText(/dlv_1_1/i)).toBeInTheDocument();
+      expect(screen.getByText('account-1-delivery-1')).toBeInTheDocument();
     });
+
+    act(() => {
+      switchAccount(ACCOUNT_2.id);
+    });
+
+    expect(screen.queryByText('account-1-delivery-1')).not.toBeInTheDocument();
+    expect(screen.getByText(/Loading deliveries/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText('account-2-delivery-1')).toBeInTheDocument();
+    });
+
+    expect(accountFetcher).toHaveBeenCalledWith(
+      ACCOUNT_2.id,
+      expect.objectContaining({ page: 1, status: 'all' }),
+      expect.any(AbortSignal),
+    );
+  });
+
+  it('does not render production account simulation controls', () => {
+    renderPage();
+
+    expect(screen.queryByText(/Switch Account/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Simulate Error Account/i)).not.toBeInTheDocument();
   });
 
   it('never reports unconfirmed mutations as successful during retry', async () => {
@@ -74,10 +134,12 @@ describe('WebhookDeliveries Page', () => {
     expect(loading.getAttribute('role')).toBe('status');
   });
 
-  it('announces errors with role=alert and a semantic danger class', async () => {
-    renderPage();
+  it('announces mocked fetch errors with role=alert and a semantic danger class', async () => {
+    const failingFetcher: WebhookDeliveriesFetcher = vi.fn(async () => {
+      throw new Error('Failed to fetch from authoritative source');
+    });
 
-    fireEvent.click(screen.getByText(/Simulate Error Account/i));
+    renderPage(failingFetcher);
 
     await waitFor(() => {
       const alert = screen.getByRole('alert');
