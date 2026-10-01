@@ -8,7 +8,6 @@ import {
   Address,
   BASE_FEE,
   Contract,
-  Networks,
   Transaction,
   TransactionBuilder,
   nativeToScVal,
@@ -20,7 +19,14 @@ import {
   STELLAR_RPC_URL,
   STELLAR_USDC_DECIMALS,
   STELLAR_VAULT_CONTRACT_ID,
+  type StellarNetwork,
 } from "../config/constants";
+
+const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
+  mainnet: "Mainnet",
+  testnet: "Testnet",
+  futurenet: "Futurenet",
+};
 
 const RPC_TIMEOUT_MS = 8_000;
 const TRANSACTION_TIMEOUT_SECONDS = 120;
@@ -264,7 +270,7 @@ export async function submitVaultDeposit(
   if (walletNetwork.networkPassphrase !== STELLAR_NETWORK_PASSPHRASE) {
     throw new WalletServiceError(
       "NETWORK_MISMATCH",
-      `Switch Freighter to Stellar ${STELLAR_NETWORK === "PUBLIC" ? "Mainnet" : "Testnet"} and try again.`,
+      `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[STELLAR_NETWORK]} and try again.`,
     );
   }
 
@@ -300,8 +306,7 @@ export async function submitVaultDeposit(
   let signature;
   try {
     signature = await signTransaction(preparedTransaction.toXDR(), {
-      networkPassphrase:
-        STELLAR_NETWORK === "PUBLIC" ? Networks.PUBLIC : Networks.TESTNET,
+      networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
       address: access.address,
     });
   } catch (error) {

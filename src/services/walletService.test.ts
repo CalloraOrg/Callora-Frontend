@@ -90,7 +90,7 @@ vi.mock("@stellar/stellar-sdk", () => {
 });
 
 vi.mock("../config/constants", () => ({
-  STELLAR_NETWORK: "TESTNET",
+  STELLAR_NETWORK: "testnet",
   STELLAR_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015",
   STELLAR_RPC_URL: "https://soroban-testnet.stellar.org",
   STELLAR_USDC_DECIMALS: 7,

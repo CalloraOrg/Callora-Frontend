@@ -31,9 +31,9 @@ function emitChange() {
 }
 
 export const compareStore = {
-  addApi(api: APIItem) {
-    if (state.apis.length >= 3) return;
-    if (state.apis.some((item) => item.id === api.id)) return;
+  addApi(api: APIItem): 'added' | 'duplicate' | 'full' {
+    if (state.apis.length >= 3) return 'full';
+    if (state.apis.some((item) => item.id === api.id)) return 'duplicate';
 
     state = {
       ...state,
@@ -41,6 +41,7 @@ export const compareStore = {
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     emitChange();
+    return 'added';
   },
   removeApi(apiId: string) {
     state = {

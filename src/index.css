@@ -285,6 +285,37 @@ input {
   line-height: 1.6;
 }
 
+/* Clipboard-export failure status (Issue #1066). Token-based so the message
+   is legible in both light and dark themes. */
+.theme-playground__export-error {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.theme-playground__download-btn {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.theme-playground__download-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .theme-playground__actions,
 .theme-playground__actions-inline {
   display: flex;
@@ -1160,6 +1191,44 @@ code,
 
 .not-found-search input::placeholder {
   color: var(--muted);
+}
+
+.not-found-search-results {
+  display: grid;
+  gap: 8px;
+}
+
+.not-found-search-results p {
+  margin: 0;
+}
+
+.not-found-search-results ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.not-found-search-results a {
+  display: inline-block;
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.92rem;
+  transition:
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.not-found-search-results a:hover,
+.not-found-search-results a:focus-visible {
+  background: rgba(78, 133, 255, 0.12);
+  transform: translateY(-1px);
 }
 
 .not-found-links {
