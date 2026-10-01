@@ -383,6 +383,78 @@ describe('OpenAPIImport — endpoint preview', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Swagger 2.0 conversion (issue #1075)
+// ---------------------------------------------------------------------------
+
+const SWAGGER2_CONTENT = JSON.stringify({
+  swagger: '2.0',
+  info: { title: 'Legacy', version: '1.0.0' },
+  basePath: '/api/v1',
+  consumes: ['application/json'],
+  paths: {
+    '/items': { get: { summary: 'List items' } },
+  },
+});
+
+const CLEAN_SWAGGER2_CONTENT = JSON.stringify({
+  swagger: '2.0',
+  basePath: '/v2',
+  paths: {
+    '/ping': { get: { summary: 'Ping' } },
+  },
+});
+
+describe('OpenAPIImport — Swagger 2.0 conversion', () => {
+  async function renderSwaggerPreview(content: string) {
+    const { container } = render(<OpenAPIImport onImport={() => {}} />);
+    const file = new File([content], 'legacy.json', { type: 'application/json' });
+    changeFileInput(container, file);
+    await waitFor(() => {
+      expect(screen.getByText(/endpoints? found/i)).toBeTruthy();
+    });
+    return { container };
+  }
+
+  it('previews the endpoints of a Swagger 2.0 document', async () => {
+    await renderSwaggerPreview(SWAGGER2_CONTENT);
+    // basePath is prefixed in the preview.
+    expect(screen.getByText('/api/v1/items')).toBeTruthy();
+  });
+
+  it('shows a "converted from Swagger 2.0" notice', async () => {
+    await renderSwaggerPreview(SWAGGER2_CONTENT);
+    const notice = screen.getByTestId('openapi-conversion-notice');
+    expect(notice.textContent).toMatch(/converted from swagger 2\.0/i);
+    expect(notice.textContent).toContain('basePath');
+  });
+
+  it('does not show the conversion notice for OpenAPI 3.x files', async () => {
+    const { container } = render(<OpenAPIImport onImport={() => {}} />);
+    const file = new File([VALID_JSON_CONTENT], 'api.json', { type: 'application/json' });
+    changeFileInput(container, file);
+    await waitFor(() => {
+      expect(screen.getByText(/endpoints? found/i)).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId('openapi-conversion-notice')).toBeNull();
+  });
+
+  it('lists unsupported 2.0 features as warnings without blocking the import', async () => {
+    await renderSwaggerPreview(SWAGGER2_CONTENT);
+
+    const warnings = screen.getByTestId('openapi-warnings');
+    expect(warnings.textContent).toMatch(/consumes/i);
+    // The import can still be confirmed.
+    expect(screen.getByRole('button', { name: /confirm import/i })).toBeTruthy();
+  });
+
+  it('renders no warning panel for a clean 2.0 document', async () => {
+    await renderSwaggerPreview(CLEAN_SWAGGER2_CONTENT);
+    expect(screen.queryByTestId('openapi-warnings')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Parse error display
 // ---------------------------------------------------------------------------
 

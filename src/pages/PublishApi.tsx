@@ -29,7 +29,7 @@ type PublishFormState = {
   endpoints: EndpointEntry[];
 };
 
-type ValidatedFields = Exclude<keyof PublishFormState, 'description' | 'endpoints'>;
+type ValidatedFields = Exclude<keyof PublishFormState, 'endpoints'>;
 
 type TouchedState = Record<ValidatedFields, boolean>;
 
@@ -48,8 +48,15 @@ const INITIAL_TOUCHED: TouchedState = {
   apiName: false,
   baseUrl: false,
   category: false,
+  description: false,
   pricePerCall: false,
 };
+
+/** Maximum number of characters allowed in the API description. */
+const DESCRIPTION_MAX_LENGTH = 500;
+
+/** Announce the remaining count only when this many characters (or fewer) remain. */
+const DESCRIPTION_ANNOUNCE_THRESHOLD = 50;
 
 const CATEGORIES = [
   'AI & Machine Learning',
@@ -107,6 +114,10 @@ function validateForm(form: PublishFormState): ValidationErrors {
 
   if (!form.category) {
     errors.category = 'Please select a category.';
+  }
+
+  if (form.description.length > DESCRIPTION_MAX_LENGTH) {
+    errors.description = `Description is over the maximum of ${DESCRIPTION_MAX_LENGTH} characters.`;
   }
 
   if (form.pricePerCall.trim() !== '') {
@@ -283,6 +294,34 @@ export default function PublishApi() {
   const [formError, setFormError] = useState<string | null>(null);
   const [listingId, setListingId] = useState<string | null>(null);
   const importSectionId = useId();
+
+  const descriptionLength = form.description.length;
+  const descriptionRemaining = DESCRIPTION_MAX_LENGTH - descriptionLength;
+  const descriptionOverLimit = descriptionRemaining < 0;
+  const descriptionNearLimit =
+    !descriptionOverLimit && descriptionRemaining <= DESCRIPTION_ANNOUNCE_THRESHOLD;
+
+  /**
+   * Throttled polite announcement of the remaining character count.
+   *
+   * Only updates when the field is within the near-limit threshold, and only
+   * when the remaining count actually changes, so screen readers are not
+   * spammed on every keystroke.
+   */
+  const [descriptionAnnouncement, setDescriptionAnnouncement] = useState('');
+  const lastAnnouncedRemainingRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!descriptionNearLimit) {
+      lastAnnouncedRemainingRef.current = null;
+      setDescriptionAnnouncement('');
+      return;
+    }
+    if (lastAnnouncedRemainingRef.current === descriptionRemaining) return;
+    lastAnnouncedRemainingRef.current = descriptionRemaining;
+    setDescriptionAnnouncement(
+      `${descriptionRemaining} character${descriptionRemaining === 1 ? '' : 's'} remaining`,
+    );
+  }, [descriptionNearLimit, descriptionRemaining]);
 
   const { isExpired, dismiss: dismissExpiry } = useSessionExpiry();
 
@@ -663,19 +702,27 @@ export default function PublishApi() {
               />
             </FormField>
 
-            <div className="pa-field">
-              <label className="pa-label" htmlFor="pa-description">
-                Description
-              </label>
+            <FormField
+              id="pa-description"
+              label="Description"
+              error={errors.description}
+              status={fieldStatus('description', errors, touched, submitAttempted)}
+              counter={{ current: descriptionLength, max: DESCRIPTION_MAX_LENGTH }}
+            >
               <textarea
                 id="pa-description"
                 className="pa-textarea"
                 value={form.description}
                 onChange={handleField('description')}
+                onBlur={handleBlur('description')}
                 placeholder="Describe what your API does, its use cases, and any notable constraints."
                 rows={4}
               />
-            </div>
+            </FormField>
+            {/* Throttled announcement: only speaks once fewer than 50 characters remain. */}
+            <p id="pa-description-counter-live" className="sr-only" aria-live="polite" aria-atomic="true">
+              {descriptionAnnouncement}
+            </p>
           </fieldset>
 
           {/* ── Endpoint list ────────────────────────────────────── */}

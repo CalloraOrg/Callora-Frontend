@@ -2,15 +2,20 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   DEFAULT_REQUEST_TIMEOUT_MS,
   RequestTimeoutError,
+  backoffDelayMs,
+  createInFlightGuard,
   generateIdempotencyKey,
   isTimeoutError,
   runWithTimeout,
+  withRetry,
 } from './idempotency';
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('generateIdempotencyKey', () => {
@@ -170,5 +175,179 @@ describe('runWithTimeout', () => {
 
   it('defaults to a positive default budget', () => {
     expect(DEFAULT_REQUEST_TIMEOUT_MS).toBeGreaterThan(0);
+  });
+});
+
+// ─── Burst / retry guarantees (issue #1205) ──────────────────────────────────
+
+describe('generateIdempotencyKey — burst', () => {
+  it('produces 10,000 unique keys in a rapid burst', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+
+    const seen = new Set<string>();
+    for (let i = 0; i < 10_000; i += 1) {
+      const key = generateIdempotencyKey();
+      expect(key).toMatch(UUID_V4);
+      seen.add(key);
+    }
+    expect(seen.size).toBe(10_000);
+  });
+});
+
+describe("InFlightGuard", () => {
+  it("coalesces concurrent duplicate submissions into a single side effect", async () => {
+    const guard = createInFlightGuard<number>();
+    let calls = 0;
+    const task = () => {
+      calls += 1;
+      return new Promise<number>((resolve) =>
+        setTimeout(() => resolve(42), 20),
+      );
+    };
+
+    const p1 = guard.run("rotate-key", task);
+    const p2 = guard.run("rotate-key", task);
+    const p3 = guard.run("rotate-key", task);
+
+    expect(p2).toBe(p1);
+    expect(p3).toBe(p1);
+    expect(guard.size()).toBe(1);
+    expect(guard.isRunning("rotate-key")).toBe(true);
+
+    await Promise.resolve();
+    expect(calls).toBe(1);
+
+    await expect(Promise.all([p1, p2, p3])).resolves.toEqual([42, 42, 42]);
+    expect(calls).toBe(1);
+    expect(guard.size()).toBe(0);
+    expect(guard.isRunning("rotate-key")).toBe(false);
+  });
+
+  it("allows a fresh attempt after the previous one resolves", async () => {
+    const guard = createInFlightGuard<number>();
+    let calls = 0;
+    const task = () => {
+      calls += 1;
+      return Promise.resolve(calls);
+    };
+
+    const first = await guard.run("delivery", task);
+    const second = await guard.run("delivery", task);
+    expect(first).toBe(1);
+    expect(second).toBe(2);
+    expect(calls).toBe(2);
+  });
+
+  it("does not poison the key after a failure (recovery)", async () => {
+    const guard = createInFlightGuard<number>();
+    const task = vi
+      .fn<() => Promise<number>>()
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce(7);
+
+    const first = guard.run("delivery", task).catch((e: Error) => e.message);
+    await expect(Promise.resolve(first)).resolves.toBe("boom");
+
+    const second = await guard.run("delivery", task);
+    expect(second).toBe(7);
+    expect(task).toHaveBeenCalledTimes(2);
+  });
+
+  it("tracks distinct keys independently", async () => {
+    const guard = createInFlightGuard<number>();
+    const task = (value: number) => () => Promise.resolve(value);
+
+    const a = guard.run("a", task(1));
+    const b = guard.run("b", task(2));
+    expect(guard.size()).toBe(2);
+
+    const [av, bv] = await Promise.all([a, b]);
+    expect(av).toBe(1);
+    expect(bv).toBe(2);
+  });
+});
+
+describe("backoffDelayMs", () => {
+  it("grows exponentially", () => {
+    expect(backoffDelayMs(0, 1000)).toBe(1000);
+    expect(backoffDelayMs(1, 1000)).toBe(2000);
+    expect(backoffDelayMs(2, 1000)).toBe(4000);
+    expect(backoffDelayMs(3, 1000)).toBe(8000);
+  });
+
+  it("clamps at the maximum delay", () => {
+    expect(backoffDelayMs(10, 1000, 5000)).toBe(5000);
+  });
+});
+
+describe("withRetry", () => {
+  it("retries transient failures and eventually succeeds", async () => {
+    let calls = 0;
+    const result = await withRetry(
+      async () => {
+        calls += 1;
+        if (calls < 3) throw new Error("transient");
+        return "ok";
+      },
+      { maxRetries: 5, baseDelayMs: 1 },
+    );
+    expect(result).toBe("ok");
+    expect(calls).toBe(3);
+  });
+
+  it("rethrows the final error after maxRetries (retry exhaustion)", async () => {
+    const err = new Error("always fails");
+    let calls = 0;
+    const delay = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      withRetry(
+        async () => {
+          calls += 1;
+          throw err;
+        },
+        { maxRetries: 2, baseDelayMs: 1, delay },
+      ),
+    ).rejects.toBe(err);
+
+    expect(calls).toBe(3);
+    expect(delay).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry when maxRetries is zero", async () => {
+    const err = new Error("first attempt failed");
+    const task = vi.fn().mockRejectedValue(err);
+    const delay = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      withRetry(task, { maxRetries: 0, baseDelayMs: 1, delay }),
+    ).rejects.toBe(err);
+
+    expect(task).toHaveBeenCalledTimes(1);
+    expect(delay).not.toHaveBeenCalled();
+  });
+
+  it("honors the shouldRetry predicate to stop immediately", async () => {
+    const err = new Error("non-retryable");
+    let calls = 0;
+    const delay = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      withRetry(
+        async () => {
+          calls += 1;
+          throw err;
+        },
+        {
+          maxRetries: 5,
+          baseDelayMs: 0,
+          shouldRetry: (e) => e !== err,
+          delay,
+        },
+      ),
+    ).rejects.toThrow("non-retryable");
+
+    expect(calls).toBe(1);
+    expect(delay).not.toHaveBeenCalled();
   });
 });

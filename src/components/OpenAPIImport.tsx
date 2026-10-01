@@ -1,7 +1,7 @@
 import { useCallback, useId, useRef, useState } from 'react';
 import { Icons } from '../utils/icons';
 import { parseOpenApiSpec } from '../utils/openapi-parse';
-import type { ParsedEndpoint, ParseError } from '../utils/openapi-parse';
+import type { ParsedEndpoint, ParsedSpecSource, ParseError } from '../utils/openapi-parse';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,7 +20,15 @@ type ImportState =
   | { kind: 'idle' }
   | { kind: 'dragging' }
   | { kind: 'loading' }
-  | { kind: 'preview'; endpoints: ParsedEndpoint[]; filename: string }
+  | {
+      kind: 'preview';
+      endpoints: ParsedEndpoint[];
+      filename: string;
+      /** Non-fatal diagnostics (e.g. skipped Swagger 2.0 features). */
+      warnings: ParseError[];
+      /** Which specification flavour was parsed. */
+      source: ParsedSpecSource;
+    }
   | { kind: 'error'; errors: ParseError[]; filename: string };
 
 const ACCEPTED_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -94,11 +102,15 @@ function Spinner() {
 // ---------------------------------------------------------------------------
 
 /**
- * OpenAPIImport — self-contained widget for importing OpenAPI 3.x specifications.
+ * OpenAPIImport — self-contained widget for importing OpenAPI specifications.
  *
  * Accepts drag-and-drop or file-picker uploads of .json / .yaml / .yml files,
  * parses them using the openapi-parse utility, shows a preview of the extracted
  * endpoints, and calls `onImport` when the user confirms.
+ *
+ * Swagger 2.0 documents are accepted and converted on the fly (issue #1075):
+ * the preview flags the conversion and lists any features that could not be
+ * represented, without blocking the import.
  *
  * State machine: idle → (dragging) → loading → preview | error
  */
@@ -153,7 +165,16 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
       return;
     }
 
-    setState({ kind: 'preview', endpoints: result.endpoints, filename: file.name });
+    // Partial success (e.g. an unresolvable $ref on one operation) and
+    // Swagger 2.0 conversion notes: show the endpoints that did parse, with the
+    // problems listed as non-fatal warnings.
+    setState({
+      kind: 'preview',
+      endpoints: result.endpoints,
+      filename: file.name,
+      warnings: [...result.warnings, ...result.errors],
+      source: result.source,
+    });
   }, []);
 
   // ── Drag-and-drop handlers ─────────────────────────────────────────────
@@ -268,7 +289,10 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
             <p id={helpId} className="oai-drop-hint">
               Supports{' '}
               <code>.json</code>, <code>.yaml</code>, and <code>.yml</code>
-              {' '}— OpenAPI 3.x only
+              {' '}— OpenAPI 3.x or Swagger 2.0.{' '}
+              <a href="https://github.com/CalloraOrg/Callora-Frontend/blob/main/docs/OpenAPI-Import.md" target="_blank" rel="noopener noreferrer" className="oai-help-link">
+                View supported features
+              </a>
             </p>
             <button
               type="button"
@@ -337,6 +361,18 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
               </div>
             </div>
 
+            {/* Swagger 2.0 → OpenAPI 3.x conversion notice (issue #1075) */}
+            {state.source === 'swagger2' && (
+              <p
+                className="oai-conversion-notice"
+                role="note"
+                data-testid="openapi-conversion-notice"
+              >
+                Converted from Swagger 2.0 — every path includes the document's{' '}
+                <code>basePath</code>.
+              </p>
+            )}
+
             {state.endpoints.length === 0 ? (
               <p className="oai-preview-empty">
                 No endpoints were found in this specification. The file is valid but the{' '}
@@ -359,6 +395,28 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
                   </li>
                 ))}
               </ul>
+            )}
+
+            {/* Non-fatal diagnostics — the import still proceeds. */}
+            {state.warnings.length > 0 && (
+              <div
+                className="oai-warning-panel"
+                role="note"
+                aria-label="Import warnings"
+                data-testid="openapi-warnings"
+              >
+                <h4 className="oai-warning-title">
+                  {state.warnings.length} warning
+                  {state.warnings.length !== 1 ? 's' : ''}
+                </h4>
+                <ul className="oai-warning-list" aria-label="Import warnings list">
+                  {state.warnings.map((warning, idx) => (
+                    <li key={idx} className="oai-warning-item">
+                      {warning.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             <div className="oai-preview-actions">
@@ -483,6 +541,17 @@ const STYLES = `
     background: var(--surface-soft, rgba(255,255,255,0.06));
     border: 1px solid var(--line, rgba(169,184,255,0.16));
     color: var(--accent, #4e85ff);
+  }
+
+  .oai-help-link {
+    color: var(--accent, #4e85ff);
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    transition: text-decoration-color 180ms ease;
+  }
+  
+  .oai-help-link:hover {
+    text-decoration-color: var(--accent, #4e85ff);
   }
 
   .oai-browse-btn {
@@ -668,6 +737,56 @@ const STYLES = `
     padding: 20px;
     margin: 0;
     font-size: 0.9rem;
+    color: var(--muted, #93a0bf);
+  }
+
+  /* ── Swagger 2.0 conversion notice ──────────────────────────────────── */
+
+  .oai-conversion-notice {
+    margin: 0;
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text, #f3f5fb);
+    background: rgba(78, 133, 255, 0.08);
+    border-bottom: 1px solid var(--line, rgba(169,184,255,0.16));
+  }
+
+  .oai-conversion-notice code {
+    font-size: 0.8rem;
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: var(--surface-soft, rgba(255,255,255,0.06));
+    border: 1px solid var(--line, rgba(169,184,255,0.16));
+    color: var(--accent, #4e85ff);
+  }
+
+  /* ── Non-fatal warnings ─────────────────────────────────────────────── */
+
+  .oai-warning-panel {
+    padding: 14px 20px;
+    border-top: 1px solid var(--line, rgba(169,184,255,0.16));
+    background: rgba(245, 158, 11, 0.06);
+  }
+
+  .oai-warning-title {
+    margin: 0 0 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--warning, #fbbf24);
+  }
+
+  .oai-warning-list {
+    margin: 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 6px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text, #f3f5fb);
+  }
+
+  .oai-warning-item {
     color: var(--muted, #93a0bf);
   }
 

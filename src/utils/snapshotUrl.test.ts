@@ -7,6 +7,7 @@ import {
   isSensitiveKey,
   redactSensitiveParams,
   SENSITIVE_PARAM_PATTERNS,
+  tokenizeKey,
 } from './snapshotUrl';
 
 describe('snapshotUrl', () => {
@@ -105,6 +106,28 @@ describe('snapshotUrl', () => {
         params: { limit: 10, currency: 'USD' },
       });
       expect(url).toContain('params=');
+    });
+
+    // ── False-positive regression: benign keys must survive in the URL ─────
+
+    it('preserves "keyword" in the snapshot URL', () => {
+      const url = generateSnapshotUrl('/usage', {
+        endpointId: 'ep-fp-1',
+        params: { keyword: 'search term', limit: 10 },
+      });
+      const encoded = new URLSearchParams(url.split('?')[1]).get('params')!;
+      const decoded = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+      expect(decoded).toHaveProperty('keyword', 'search term');
+    });
+
+    it('preserves "passengers" in the snapshot URL', () => {
+      const url = generateSnapshotUrl('/usage', {
+        endpointId: 'ep-fp-2',
+        params: { passengers: 3, departure: 'JFK' },
+      });
+      const encoded = new URLSearchParams(url.split('?')[1]).get('params')!;
+      const decoded = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+      expect(decoded).toHaveProperty('passengers', 3);
     });
   });
 
@@ -242,12 +265,68 @@ describe('snapshotUrl', () => {
     it('does NOT flag "endpointId" as sensitive', () => expect(isSensitiveKey('endpointId')).toBe(false));
     it('does NOT flag "amount" as sensitive', () => expect(isSensitiveKey('amount')).toBe(false));
 
+    // ── False positives: benign keys that must NOT be flagged ──────────────
+    it('does NOT flag "keyword" as sensitive', () => expect(isSensitiveKey('keyword')).toBe(false));
+    it('does NOT flag "passengers" as sensitive', () => expect(isSensitiveKey('passengers')).toBe(false));
+    it('does NOT flag "monkey" as sensitive', () => expect(isSensitiveKey('monkey')).toBe(false));
+    it('does NOT flag "accessibility" as sensitive', () => expect(isSensitiveKey('accessibility')).toBe(false));
+    it('does NOT flag "expression" as sensitive', () => expect(isSensitiveKey('expression')).toBe(false));
+    it('does NOT flag "passport" as sensitive', () => expect(isSensitiveKey('passport')).toBe(false));
+    it('does NOT flag "passthrough" as sensitive', () => expect(isSensitiveKey('passthrough')).toBe(false));
+    it('does NOT flag "bypass" as sensitive', () => expect(isSensitiveKey('bypass')).toBe(false));
+    it('does NOT flag "keynote" as sensitive', () => expect(isSensitiveKey('keynote')).toBe(false));
+    it('does NOT flag "keyframe" as sensitive', () => expect(isSensitiveKey('keyframe')).toBe(false));
+    it('does NOT flag "authored" as sensitive', () => expect(isSensitiveKey('authored')).toBe(false));
+    it('does NOT flag "tokenize" as sensitive', () => expect(isSensitiveKey('tokenize')).toBe(false));
+
     it('covers every entry in SENSITIVE_PARAM_PATTERNS', () => {
       // Each pattern string must itself be detected as a sensitive key, so the
       // table is self-consistent and new additions are automatically checked.
       for (const pattern of SENSITIVE_PARAM_PATTERNS) {
         expect(isSensitiveKey(pattern)).toBe(true);
       }
+    });
+  });
+
+  // ── tokenizeKey unit tests ────────────────────────────────────────────────
+
+  describe('tokenizeKey', () => {
+    it('splits camelCase into tokens', () => {
+      expect(tokenizeKey('apiKey')).toEqual(['api', 'key']);
+    });
+
+    it('splits snake_case into tokens', () => {
+      expect(tokenizeKey('api_key')).toEqual(['api', 'key']);
+    });
+
+    it('splits kebab-case into tokens', () => {
+      expect(tokenizeKey('x-api-key')).toEqual(['x', 'api', 'key']);
+    });
+
+    it('splits PascalCase into tokens', () => {
+      expect(tokenizeKey('ClientSecret')).toEqual(['client', 'secret']);
+    });
+
+    it('handles uppercase acronyms followed by PascalCase', () => {
+      expect(tokenizeKey('XMLParser')).toEqual(['xml', 'parser']);
+    });
+
+    it('lowercases all tokens', () => {
+      expect(tokenizeKey('API_KEY')).toEqual(['api', 'key']);
+    });
+
+    it('returns single-word keys as a single token', () => {
+      expect(tokenizeKey('keyword')).toEqual(['keyword']);
+      expect(tokenizeKey('passengers')).toEqual(['passengers']);
+      expect(tokenizeKey('monkey')).toEqual(['monkey']);
+    });
+
+    it('handles mixed delimiters', () => {
+      expect(tokenizeKey('some_mixed-case.key')).toEqual(['some', 'mixed', 'case', 'key']);
+    });
+
+    it('returns an empty array for an empty string', () => {
+      expect(tokenizeKey('')).toEqual([]);
     });
   });
 
@@ -302,9 +381,11 @@ describe('snapshotUrl', () => {
       expect(redactSensitiveParams({ ApiKey: 'val' })).not.toHaveProperty('ApiKey');
     });
 
-    it('strips a key with Unicode look-alike characters that happen to match a pattern', () => {
-      // A key whose lowercased form contains "key"
-      expect(redactSensitiveParams({ monkey: 'value' })).not.toHaveProperty('monkey');
+    it('preserves a key like "monkey" that merely contains the substring "key"', () => {
+      // "monkey" is a single indivisible word — it does not contain the
+      // word "key" as a separate token, so it must not be flagged.
+      const result = redactSensitiveParams({ monkey: 'value' });
+      expect(result).toHaveProperty('monkey', 'value');
     });
 
     it('handles a params object with numeric and boolean values', () => {
