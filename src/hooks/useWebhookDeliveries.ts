@@ -22,12 +22,11 @@ export interface WebhookFilter {
   page: number;
 }
 
-// Mock API function
 export const fetchDeliveries = async (
   accountId: string,
   filter: WebhookFilter,
   signal: AbortSignal,
-): Promise<WebhookDelivery[]> => {
+): Promise<{ data: WebhookDelivery[]; totalCount: number }> => {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       if (signal.aborted) {
@@ -37,6 +36,8 @@ export const fetchDeliveries = async (
         return reject(new Error("Failed to fetch from authoritative source"));
       }
 
+      // Mock total of 50 items, but return 2 items per page for testing
+      const totalCount = 50;
       const data: WebhookDelivery[] = [
         {
           id: `dlv_1_${filter.page}`,
@@ -67,7 +68,7 @@ export const fetchDeliveries = async (
         filtered = data.filter((d) => d.status === filter.status);
       }
 
-      resolve(filtered);
+      resolve({ data: filtered, totalCount });
     }, 50);
 
     signal.addEventListener("abort", () => clearTimeout(timeout));
@@ -107,6 +108,7 @@ function isRetryableDeliveryError(error: unknown): boolean {
 
 export function useWebhookDeliveries(accountId: string) {
   const [deliveries, setDeliveries] = useState<WebhookDelivery[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [filter, setFilter] = useState<WebhookFilter>({
     page: 1,
     status: "all",
@@ -136,7 +138,7 @@ export function useWebhookDeliveries(accountId: string) {
       const abortController = new AbortController();
 
       try {
-        const data = await fetchDeliveries(
+        const response = await fetchDeliveries(
           currentAccountId,
           currentFilter,
           abortController.signal,
@@ -144,7 +146,8 @@ export function useWebhookDeliveries(accountId: string) {
 
         if (reqId !== requestCounter.current) return;
 
-        setDeliveries(data);
+        setDeliveries(response.data);
+        setTotalCount(response.totalCount);
         setStatus("success");
         setIsStale(false);
       } catch (err: any) {
@@ -198,6 +201,7 @@ export function useWebhookDeliveries(accountId: string) {
 
   return {
     deliveries,
+    totalCount,
     status,
     error,
     isStale,

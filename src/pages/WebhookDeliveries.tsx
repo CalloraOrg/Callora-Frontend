@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { useWebhookDeliveries, WebhookDelivery } from '../hooks/useWebhookDeliveries';
+import { Fragment, useState } from 'react';
+import { useWebhookDeliveries, type WebhookDelivery } from '../hooks/useWebhookDeliveries';
 import { useToast } from '../components/Toast';
+import { Pagination } from '../components/Pagination';
 import { JsonViewer } from '../components/JsonViewer';
 import { redactSensitiveData } from '../services/SecureErrorHandler';
 
@@ -44,7 +45,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: WebhookDelivery }) {
   return (
     <tr>
       <td
-        colSpan={6}
+        colSpan={7}
         style={{ padding: '12px 16px', background: '#f9f9f9', borderBottom: '1px solid #ddd' }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -85,6 +86,7 @@ export default function WebhookDeliveries() {
   const [accountId, setAccountId] = useState('acc_123');
   const {
     deliveries,
+    totalCount,
     status,
     error,
     isStale,
@@ -126,10 +128,16 @@ export default function WebhookDeliveries() {
       <h1>Webhook Deliveries</h1>
 
       <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
-        <button onClick={() => setAccountId(accountId === 'acc_123' ? 'acc_456' : 'acc_123')}>
+        <button onClick={() => {
+          setAccountId(accountId === 'acc_123' ? 'acc_456' : 'acc_123');
+          setFilter(f => ({ ...f, page: 1 }));
+        }}>
           Switch Account (Current: {accountId})
         </button>
-        <button onClick={() => setAccountId('error-account')}>
+        <button onClick={() => {
+          setAccountId('error-account');
+          setFilter(f => ({ ...f, page: 1 }));
+        }}>
           Simulate Error Account
         </button>
         <button onClick={refresh}>Refresh</button>
@@ -148,14 +156,19 @@ export default function WebhookDeliveries() {
             <option value="pending">Pending</option>
           </select>
         </label>
-
-        <label>
-          Page:
-          <button onClick={() => setFilter((f) => ({ ...f, page: Math.max(1, f.page - 1) }))}>Prev</button>
-          <span style={{ margin: '0 8px' }}>{filter.page}</span>
-          <button onClick={() => setFilter((f) => ({ ...f, page: f.page + 1 }))}>Next</button>
-        </label>
       </div>
+
+      <Pagination
+        mode="cursor"
+        currentPageIndex={filter.page - 1}
+        hasNextPage={filter.page * 2 < totalCount}
+        hasPreviousPage={filter.page > 1}
+        totalItemCount={totalCount}
+        pageSize={2}
+        onGoNext={() => setFilter(f => ({ ...f, page: f.page + 1 }))}
+        onGoPrevious={() => setFilter(f => ({ ...f, page: Math.max(1, f.page - 1) }))}
+        onPageSizeChange={() => {}}
+      />
 
       {status === 'loading' && <p role="status">Loading deliveries...</p>}
       {status === 'error' && (
@@ -196,8 +209,8 @@ export default function WebhookDeliveries() {
                 {deliveries.map((d) => {
                   const isExpanded = expandedIds.has(d.id);
                   return (
-                    <>
-                      <tr key={d.id}>
+                    <Fragment key={d.id}>
+                      <tr>
                         <td style={{ borderBottom: '1px solid #eee', padding: '8px' }}>
                           <button
                             aria-expanded={isExpanded}
@@ -233,8 +246,8 @@ export default function WebhookDeliveries() {
                           )}
                         </td>
                       </tr>
-                      {isExpanded && <DeliveryDetailPanel key={`${d.id}-detail`} delivery={d} />}
-                    </>
+                      {isExpanded && <DeliveryDetailPanel delivery={d} />}
+                    </Fragment>
                   );
                 })}
               </tbody>

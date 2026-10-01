@@ -1,8 +1,14 @@
 node_modules
 dist
+coverage
 *.local
 .DS_Store
 .env
 .env.*
+!.env.example
 *.log
 *.tsbuildinfo
+
+# Test output
+test-output*.txt
+coverage/

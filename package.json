@@ -7,10 +7,14 @@
     "dev": "vite",
     "test": "vitest",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --force",
     "preview": "vite preview",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit"
   },
   "dependencies": {
+    "@stellar/freighter-api": "^6.0.1",
+    "@stellar/stellar-sdk": "^17.2.0",
     "lucide-react": "^1.21.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
