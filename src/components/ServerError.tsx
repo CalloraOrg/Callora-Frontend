@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from "react";
 interface ServerErrorProps {
   /** Optional retry callback. When provided, renders the retry button. */
   onRetry?: () => void | Promise<void>;
+  /** Optional reload callback. When provided, renders a secondary "Reload page" button as a last-resort action. */
+  onReload?: () => void;
   /** Optional request ID for support traceability. Displayed as a masked reference only. */
   requestId?: string;
   /** Optional override for the error heading. Defaults to the standard copy. */
@@ -21,6 +23,7 @@ interface ServerErrorProps {
 
 export default function ServerError({
   onRetry,
+  onReload,
   requestId,
   title,
   description,
@@ -265,6 +268,22 @@ export default function ServerError({
           }}
         >
           {isRetrying ? "Retrying…" : "Try again"}
+        </button>
+      )}
+
+      {/* Secondary reload button — last-resort action that performs a full page reload */}
+      {onReload && (
+        <button
+          className="secondary-button"
+          onClick={onReload}
+          type="button"
+          style={{
+            minWidth: "140px",
+            minHeight: "48px",
+            marginTop: onRetry ? "12px" : "0",
+          }}
+        >
+          Reload page
         </button>
       )}
 

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
 import ServerError from "./components/ServerError";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
@@ -600,9 +601,18 @@ function App() {
     resetFlow("50", 50);
   };
 
-  const handleServerRetry = () => {
-    window.location.reload();
-  };
+  // Tracks a bump counter so RouteErrorBoundary resets its subtree on every retry.
+  const [serverErrorResetKey, setServerErrorResetKey] = useState('');
+
+  const handleServerRetry = useCallback(() => {
+    const from = (location.state as { from?: string } | null)?.from;
+    // Bump the key first so the RouteErrorBoundary wrapping the Routes resets before
+    // we navigate, giving the destination subtree a clean error-boundary state.
+    setServerErrorResetKey(prev => prev + '1');
+    if (from && from !== APP_ROUTES.serverError) {
+      navigate(from);
+    }
+  }, [location.state, navigate]);
 
   return (
       <div className="app-shell">
@@ -679,6 +689,7 @@ function App() {
 
         <main id="main-content" role="main" className="page">
           <Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
+            <RouteErrorBoundary resetKey={serverErrorResetKey} onGoHome={() => navigate(APP_ROUTES.dashboard)}>
             <Routes>
             <Route
               path={APP_ROUTES.landing}
@@ -800,7 +811,7 @@ function App() {
 
             <Route path={APP_ROUTES.designSystem} element={<DesignSystemDocs />} />
 
-            <Route path={APP_ROUTES.serverError} element={<ServerError onRetry={handleServerRetry} onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
+            <Route path={APP_ROUTES.serverError} element={<ServerError onRetry={handleServerRetry} onReload={() => window.location.reload()} onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
 
             <Route path="/a11y-audit" element={<A11yAudit />} />
 
@@ -813,6 +824,7 @@ function App() {
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
             </Routes>
+            </RouteErrorBoundary>
           </Suspense>
         </main>
 
