@@ -7,8 +7,8 @@ let ACCOUNT_2: { id: string; label: string; apiKey: string };
 beforeEach(() => {
   localStorage.clear();
   _reset();
-  ACCOUNT_1 = { id: "account-1", label: "Account 1", apiKey: "ck_live_aaa" };
-  ACCOUNT_2 = { id: "account-2", label: "Account 2", apiKey: "ck_live_bbb" };
+  ACCOUNT_1 = { id: "account-1", label: "Account 1", apiKey: "fake-test-key-a" };
+  ACCOUNT_2 = { id: "account-2", label: "Account 2", apiKey: "fake-test-key-b" };
 });
 
 afterEach(() => {
@@ -21,9 +21,13 @@ describe("accountStore", () => {
     expect(getCurrentAccount()).toBeNull();
   });
 
-  it("adds and retrieves accounts", () => {
+  it("adds accounts without retaining credential-shaped input", () => {
     addAccount(ACCOUNT_1);
-    expect(getKnownAccounts()).toContainEqual(ACCOUNT_1);
+    expect(getKnownAccounts()).toContainEqual({
+      id: ACCOUNT_1.id,
+      label: ACCOUNT_1.label,
+    });
+    expect(getKnownAccounts()[0]).not.toHaveProperty("apiKey");
   });
 
   it("switches account and returns the new account", () => {
@@ -67,6 +71,32 @@ describe("accountStore", () => {
     addAccount(ACCOUNT_1);
     addAccount(ACCOUNT_1);
     expect(getKnownAccounts().filter((a) => a.id === ACCOUNT_1.id).length).toBe(1);
+  });
+
+  it("sanitizes legacy persisted API-key fields without losing metadata", () => {
+    localStorage.setItem(
+      "callora_known_accounts",
+      JSON.stringify([
+        {
+          id: "legacy-account",
+          label: "Legacy",
+          apiKey: "fake-legacy-key",
+          timezone: "Europe/Athens",
+        },
+      ]),
+    );
+    localStorage.setItem("callora_current_account", "legacy-account");
+
+    _load();
+
+    expect(getCurrentAccount()).toEqual({
+      id: "legacy-account",
+      label: "Legacy",
+      timezone: "Europe/Athens",
+    });
+    const persisted = localStorage.getItem("callora_known_accounts") ?? "";
+    expect(persisted).not.toContain("apiKey");
+    expect(persisted).not.toContain("fake-legacy-key");
   });
 
   it("recovers from corrupt localStorage on load", () => {
@@ -127,11 +157,12 @@ describe("accountStore", () => {
     expect(renameAccount("nonexistent", "New Label")).toBe(false);
   });
 
-  it("creates an account with createAccount", () => {
+  it("creates a local account without generating an API key", () => {
     const account = createAccount("My Account");
     expect(account.label).toBe("My Account");
     expect(account.id).toBeTruthy();
-    expect(getKnownAccounts().length).toBe(1);
+    expect(account).not.toHaveProperty("apiKey");
+    expect(getKnownAccounts()).toHaveLength(1);
   });
 
   it("creates accounts with unique ids via createAccount", () => {

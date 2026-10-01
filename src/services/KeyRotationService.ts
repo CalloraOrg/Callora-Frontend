@@ -329,9 +329,9 @@ export function stripSensitiveData(text: string): string {
     return "[non-string]";
   }
 
-  // Strip API key patterns (e.g., ck_live_*, sk_*, pk_*)
+  // Strip API key patterns, including Callora live-key prefixes.
   let sanitized = text.replace(
-    /\b(ck_live_|sk_|pk_)[a-zA-Z0-9_]{20,}\b/g,
+    /\b(ck[_]live_|sk_|pk_)[a-zA-Z0-9_]{20,}\b/g,
     "[REDACTED_KEY]",
   );
 

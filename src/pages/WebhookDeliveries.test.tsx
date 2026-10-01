@@ -5,8 +5,8 @@ import { ToastProvider } from '../components/Toast';
 import type { WebhookDeliveriesFetcher } from '../hooks/useWebhookDeliveries';
 import { addAccount, switchAccount, _reset } from '../state/accountStore';
 
-const ACCOUNT_1 = { id: 'account-1', label: 'Account 1', apiKey: 'ck_live_aaa' };
-const ACCOUNT_2 = { id: 'account-2', label: 'Account 2', apiKey: 'ck_live_bbb' };
+const ACCOUNT_1 = { id: 'account-1', label: 'Account 1', apiKey: 'fake-test-key-a' };
+const ACCOUNT_2 = { id: 'account-2', label: 'Account 2', apiKey: 'fake-test-key-b' };
 
 describe('WebhookDeliveries Page', () => {
   beforeEach(() => {

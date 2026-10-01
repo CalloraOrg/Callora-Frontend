@@ -1,16 +1,12 @@
 import { createContext, useContext, useCallback, useEffect, useState, type ReactNode } from "react";
-import { getCurrentAccount, switchAccount as doSwitchAccount, addAccount, getKnownAccounts, subscribe, removeAccount, renameAccount, createAccount } from "../state/accountStore";
+import { fetchAuthenticatedAccount } from "../api/accountApi";
+import { getCurrentAccount, switchAccount as doSwitchAccount, addAccount, getKnownAccounts, subscribe, removeAccount, renameAccount, createAccount, type Account } from "../state/accountStore";
 import { invalidateAccountCache } from "../utils/offlineApiCache";
 
-const DEFAULT_ACCOUNTS = [
-  { id: "account-1", label: "Account 1", apiKey: "ck_live_4e85ff1ed6a4ff73893a0bf73f2bb", timezone: "America/New_York" },
-  { id: "account-2", label: "Account 2", apiKey: "ck_live_9a2bc33e7f5d991475c1cb84g3cc", timezone: "Europe/London" },
-];
-
 interface AccountContextValue {
-  account: { id: string; label: string; apiKey: string; timezone?: string } | null;
+  account: Account | null;
   timezone?: string;
-  accounts: { id: string; label: string; apiKey: string; timezone?: string }[];
+  accounts: Account[];
   switchAccount: (accountId: string) => void;
   addAccount: (label: string) => void;
   removeAccount: (accountId: string) => void;
@@ -29,20 +25,40 @@ const AccountContext = createContext<AccountContextValue>({
 export function AccountProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState(getCurrentAccount);
   const [accounts, setAccounts] = useState(getKnownAccounts);
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const known = getKnownAccounts();
-    if (known.length === 0) {
-      DEFAULT_ACCOUNTS.forEach((acc) => addAccount(acc));
-    }
-    setAccounts(getKnownAccounts());
-    setReady(true);
-    const unsub = subscribe(() => {
+    const controller = new AbortController();
+    const syncFromStore = () => {
       setAccount(getCurrentAccount());
       setAccounts(getKnownAccounts());
-    });
-    return unsub;
+    };
+    const unsubscribe = subscribe(syncFromStore);
+
+    // Discover the authenticated developer without blocking the app or
+    // replacing the local add/rename/remove account model.
+    void fetchAuthenticatedAccount(controller.signal)
+      .then((authenticatedAccount) => {
+        if (controller.signal.aborted || !authenticatedAccount) return;
+        const hadCurrentAccount = getCurrentAccount() !== null;
+        addAccount(authenticatedAccount);
+        if (!hadCurrentAccount) {
+          doSwitchAccount(authenticatedAccount.id);
+        }
+      })
+      .catch((error: unknown) => {
+        if (
+          controller.signal.aborted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          return;
+        }
+        // Keep existing non-secret local metadata on discovery failure.
+      });
+
+    return () => {
+      controller.abort();
+      unsubscribe();
+    };
   }, []);
 
   const switchAccountHandler = useCallback(
@@ -77,8 +93,6 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const renameAccountHandler = useCallback((accountId: string, newLabel: string) => {
     renameAccount(accountId, newLabel);
   }, []);
-
-  if (!ready) return null;
 
   return (
     <AccountContext.Provider

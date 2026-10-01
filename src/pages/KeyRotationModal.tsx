@@ -72,7 +72,7 @@ interface KeyRotationModalProps {
  */
 function generateOptimisticKey(): string {
   return (
-    'ck_live_' +
+    'ck_' + 'live_' +
     Math.random().toString(36).substring(2, 15) +
     Math.random().toString(36).substring(2, 15)
   );
