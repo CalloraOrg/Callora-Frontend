@@ -49,6 +49,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act } from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
@@ -62,6 +63,10 @@ const readFile = (p: string) =>
 
 function renderTour(onComplete = vi.fn(), persistKey = "callora_onboarding_checkpoint") {
   return render(<OnboardingTour onComplete={onComplete} persistKey={persistKey} />);
+}
+
+function getPrimaryButton() {
+  return document.querySelector(".tour-nav-button--primary") as HTMLElement;
 }
 
 function clearStorage(key: string) {
@@ -347,7 +352,107 @@ describe("OnboardingTour — completion screen", () => {
 
   it("restarts the tour when 'Restart tour' is clicked", async () => {
     const { user } = await reachCompletion();
-    await user.click(screen.getByRole("button", { name: /restart.*tour/i }));
+    await user.click(screen.getByRole("button", { name: /restart/i }));
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(/welcome to callora/i)).toBeInTheDocument();
+  });
+});
+
+/* ── 6. Checkpoint / resume behavior ─────────────────────────────────── */
+
+describe("OnboardingTour — checkpoint / resume behavior", () => {
+  it("persists the active step to localStorage", async () => {
+    const user = userEvent.setup();
+    renderTour(vi.fn(), "callora_test_onboarding_checkpoint");
+
+    await user.click(screen.getByRole("button", { name: /go to step 2/i }));
+
+    const raw = localStorage.getItem("callora_test_onboarding_checkpoint");
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string);
+    expect(parsed.lastStep).toBe(1);
+    expect(parsed.completed).toBe(false);
+  });
+
+  it("resumes from the persisted step on mount", () => {
+    localStorage.setItem(
+      "callora_test_onboarding_checkpoint",
+      JSON.stringify({ completed: false, lastStep: 2 }),
+    );
+
+    renderTour(vi.fn(), "callora_test_onboarding_checkpoint");
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs[2]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(/browse the marketplace/i)).toBeInTheDocument();
+  });
+
+  it("marks the tour completed when skipped", async () => {
+    const onComplete = vi.fn();
+    const user = userEvent.setup();
+    renderTour(onComplete, "callora_test_onboarding_checkpoint");
+
+    await user.click(screen.getByRole("link", { name: /skip.*tour/i }));
+
+    const raw = localStorage.getItem("callora_test_onboarding_checkpoint");
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string);
+    expect(parsed.completed).toBe(true);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks the tour completed when finished", async () => {
+    const user = userEvent.setup();
+    renderTour(vi.fn(), "callora_test_onboarding_checkpoint");
+
+    for (let i = 0; i < 4; i++) {
+      await user.click(getPrimaryButton());
+    }
+    await user.click(getPrimaryButton());
+
+    const raw = localStorage.getItem("callora_test_onboarding_checkpoint");
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string);
+    expect(parsed.completed).toBe(true);
+  });
+
+  it("resets progress to step one when Restart is clicked", async () => {
+    const user = userEvent.setup();
+    renderTour(vi.fn(), "callora_test_onboarding_checkpoint");
+
+    for (let i = 0; i < 4; i++) {
+      await user.click(getPrimaryButton());
+    }
+    await user.click(getPrimaryButton());
+
+    await user.click(screen.getByRole("button", { name: /restart/i }));
+
+    const raw = localStorage.getItem("callora_test_onboarding_checkpoint");
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string);
+    expect(parsed.completed).toBe(false);
+    expect(parsed.lastStep).toBe(0);
+  });
+
+  it("falls back to in-memory behavior when storage throws", async () => {
+    const setItemSpy = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("quota exceeded");
+      });
+
+    const user = userEvent.setup();
+    renderTour(vi.fn(), "callora_test_onboarding_checkpoint");
+
+    await user.click(screen.getByRole("button", { name: /go to step 2/i }));
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+
+    setItemSpy.mockRestore();
+  });
+});art.*tour/i }));
     expect(screen.queryByTestId("tour-complete")).not.toBeInTheDocument();
     const tabs = screen.getAllByRole("tab");
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");

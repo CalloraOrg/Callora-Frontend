@@ -23,6 +23,7 @@
  */
 
 import { useId, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
 import StatusBadge, { type StatusVariant } from '../components/StatusBadge';
 import { formatUsdcAmount, formatDateShort } from '../utils/format';
@@ -159,6 +160,26 @@ export const MOCK_TRANSACTIONS: BillingTransaction[] = [
 const ALL_TYPES: TxType[] = ['Deposit', 'API Call', 'Refund', 'Settlement', 'Fee'];
 const ALL_STATUSES: TxStatus[] = ['success', 'pending', 'error', 'warning'];
 
+// Valid URL parameter values for sort column and direction.
+export type SortColumn = 'date' | 'amount';
+export type SortDirection = 'asc' | 'desc';
+
+const VALID_SORT_COLUMNS: ReadonlySet<string> = new Set<SortColumn>(['date', 'amount']);
+const VALID_SORT_DIRS: ReadonlySet<string> = new Set<SortDirection>(['asc', 'desc']);
+
+/** Parse sort params from a URLSearchParams, returning null for invalid/missing values. */
+function parseSortParams(params: URLSearchParams): {
+  column: SortColumn | null;
+  direction: SortDirection;
+} {
+  const col = params.get('sort');
+  const dir = params.get('dir');
+  return {
+    column: col && VALID_SORT_COLUMNS.has(col) ? (col as SortColumn) : null,
+    direction: dir && VALID_SORT_DIRS.has(dir) ? (dir as SortDirection) : 'asc',
+  };
+}
+
 function truncateTxHash(hash: string): string {
   if (hash.length <= 14) return hash;
   return `${hash.slice(0, 6)}…${hash.slice(-4)}`;
@@ -189,6 +210,33 @@ export function BillingHistory() {
   const [directionFilter, setDirectionFilter] = useState<TxDirection | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // ── Sort state (URL-persisted) ────────────────────────────────────────────
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { column: sortColumn, direction: sortDirection } = parseSortParams(searchParams);
+
+  /** Toggle sort: same column flips direction; new column starts asc. */
+  function handleSort(col: SortColumn) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (sortColumn === col) {
+          next.set('dir', sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+          next.set('sort', col);
+          next.set('dir', 'asc');
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
+  /** aria-sort value for a given column header. */
+  function ariaSortFor(col: SortColumn): React.AriaAttributes['aria-sort'] {
+    if (sortColumn !== col) return 'none';
+    return sortDirection === 'asc' ? 'ascending' : 'descending';
+  }
+
   // Live-region ID for filter-change announcements.
   const liveRegionId = useId();
 
@@ -204,7 +252,7 @@ export function BillingHistory() {
 
   // ── Derived filtered/sorted list ──────────────────────────────────────────
   const filteredTxs = useMemo(() => {
-    return MOCK_TRANSACTIONS.filter((tx) => {
+    const filtered = MOCK_TRANSACTIONS.filter((tx) => {
       if (typeFilter !== 'All' && tx.type !== typeFilter) return false;
       if (statusFilter !== 'All' && tx.status !== statusFilter) return false;
       if (directionFilter !== 'All' && tx.direction !== directionFilter) return false;
@@ -218,7 +266,20 @@ export function BillingHistory() {
       }
       return true;
     });
-  }, [typeFilter, statusFilter, directionFilter, searchQuery]);
+
+    if (!sortColumn) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      if (sortColumn === 'date') {
+        cmp = a.timestamp.localeCompare(b.timestamp);
+      } else {
+        // amount
+        cmp = a.amount - b.amount;
+      }
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+  }, [typeFilter, statusFilter, directionFilter, searchQuery, sortColumn, sortDirection]);
 
   // ── Totals ─────────────────────────────────────────────────────────────────
   const netBalance = useMemo(() => {
@@ -478,31 +539,151 @@ export function BillingHistory() {
                   borderBottom: '1px solid var(--line, rgba(255,255,255,0.08))',
                 }}
               >
-                {(
-                  [
-                    { label: 'Date', width: '160px' },
-                    { label: 'Description', width: 'auto' },
-                    { label: 'Type', width: '110px' },
-                    { label: 'Status', width: '110px' },
-                    { label: 'Amount (USDC)', width: '130px' },
-                    { label: 'Tx Hash', width: '110px' },
-                  ] as const
-                ).map(({ label, width }) => (
-                  <th
-                    key={label}
-                    scope="col"
+                {/* Date — sortable */}
+                <th
+                  scope="col"
+                  aria-sort={ariaSortFor('date')}
+                  style={{
+                    padding: '10px 12px',
+                    textAlign: 'left',
+                    fontWeight: 600,
+                    color: 'var(--text-secondary, #9ca3af)',
+                    whiteSpace: 'nowrap',
+                    width: '160px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSort('date')}
+                    aria-label={
+                      sortColumn === 'date'
+                        ? `Date, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}. Activate to reverse.`
+                        : 'Date. Activate to sort ascending.'
+                    }
                     style={{
-                      padding: '10px 12px',
-                      textAlign: label === 'Amount (USDC)' ? 'right' : 'left',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      font: 'inherit',
                       fontWeight: 600,
-                      color: 'var(--text-secondary, #9ca3af)',
-                      whiteSpace: 'nowrap',
-                      width,
+                      color: sortColumn === 'date'
+                        ? 'var(--accent, #6366f1)'
+                        : 'var(--text-secondary, #9ca3af)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
                     }}
                   >
-                    {label}
-                  </th>
-                ))}
+                    Date
+                    <span aria-hidden="true" style={{ fontSize: '0.65rem', lineHeight: 1 }}>
+                      {sortColumn === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇅'}
+                    </span>
+                  </button>
+                </th>
+
+                {/* Description — not sortable */}
+                <th
+                  scope="col"
+                  style={{
+                    padding: '10px 12px',
+                    textAlign: 'left',
+                    fontWeight: 600,
+                    color: 'var(--text-secondary, #9ca3af)',
+                    whiteSpace: 'nowrap',
+                    width: 'auto',
+                  }}
+                >
+                  Description
+                </th>
+
+                {/* Type — not sortable */}
+                <th
+                  scope="col"
+                  style={{
+                    padding: '10px 12px',
+                    textAlign: 'left',
+                    fontWeight: 600,
+                    color: 'var(--text-secondary, #9ca3af)',
+                    whiteSpace: 'nowrap',
+                    width: '110px',
+                  }}
+                >
+                  Type
+                </th>
+
+                {/* Status — not sortable */}
+                <th
+                  scope="col"
+                  style={{
+                    padding: '10px 12px',
+                    textAlign: 'left',
+                    fontWeight: 600,
+                    color: 'var(--text-secondary, #9ca3af)',
+                    whiteSpace: 'nowrap',
+                    width: '110px',
+                  }}
+                >
+                  Status
+                </th>
+
+                {/* Amount — sortable */}
+                <th
+                  scope="col"
+                  aria-sort={ariaSortFor('amount')}
+                  style={{
+                    padding: '10px 12px',
+                    textAlign: 'right',
+                    fontWeight: 600,
+                    color: 'var(--text-secondary, #9ca3af)',
+                    whiteSpace: 'nowrap',
+                    width: '130px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSort('amount')}
+                    aria-label={
+                      sortColumn === 'amount'
+                        ? `Amount, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}. Activate to reverse.`
+                        : 'Amount. Activate to sort ascending.'
+                    }
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      font: 'inherit',
+                      fontWeight: 600,
+                      color: sortColumn === 'amount'
+                        ? 'var(--accent, #6366f1)'
+                        : 'var(--text-secondary, #9ca3af)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    Amount (USDC)
+                    <span aria-hidden="true" style={{ fontSize: '0.65rem', lineHeight: 1 }}>
+                      {sortColumn === 'amount' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇅'}
+                    </span>
+                  </button>
+                </th>
+
+                {/* Tx Hash — not sortable */}
+                <th
+                  scope="col"
+                  style={{
+                    padding: '10px 12px',
+                    textAlign: 'left',
+                    fontWeight: 600,
+                    color: 'var(--text-secondary, #9ca3af)',
+                    whiteSpace: 'nowrap',
+                    width: '110px',
+                  }}
+                >
+                  Tx Hash
+                </th>
               </tr>
             </thead>
 
