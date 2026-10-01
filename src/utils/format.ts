@@ -273,7 +273,7 @@ export function formatTimestamp(date: Date, locale?: string): string {
  *
  * @example formatDateShort('2026-07-25T14:32:00Z', 'en-US') // "Jul 25, 2:32 PM"
  */
-export function formatDateShort(iso: string, locale?: string): string {
+export function formatDateShort(iso: string, locale?: string, timeZone?: string): string {
   try {
     return new Intl.DateTimeFormat(resolveLocale(locale), {
       month: 'short',
@@ -281,6 +281,7 @@ export function formatDateShort(iso: string, locale?: string): string {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
+      timeZone,
     }).format(new Date(iso));
   } catch {
     return iso;
@@ -330,6 +331,18 @@ export function formatCountdown(ms: number): string {
   if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
 
   return parts.join(' ');
+}
+
+/** Resolve an account timezone, falling back to the runtime's local timezone. */
+export function resolveTimeZone(timeZone?: string): string {
+  const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!timeZone) return localTimeZone;
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone }).format();
+    return timeZone;
+  } catch {
+    return localTimeZone;
+  }
 }
 
 /**

@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import HealthTimeline from "./HealthTimeline.tsx";
 import { HealthStatus } from "./HealthTimeline.tsx";
+import { AccountProvider } from "../hooks/useAccountContext";
+import { addAccount, switchAccount, _reset } from "../state/accountStore";
 
 describe("HealthTimeline", () => {
   const FAKE_TIME = new Date("2026-09-30T12:00:00.000Z");
@@ -118,5 +120,41 @@ describe("HealthTimeline", () => {
     const expectedOneHourAgoLabel = oneHourAgo.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
     expect(buttons[22]).toHaveAttribute("aria-label", `${expectedOneHourAgoLabel}: Operational`);
+  });
+});
+
+/** Short zone name (e.g. "EDT" / "EST") as Intl renders it right now. */
+function zoneAbbreviation(timeZone: string): string {
+  return (
+    new Intl.DateTimeFormat(undefined, { timeZone, timeZoneName: "short" })
+      .formatToParts(new Date())
+      .find((part) => part.type === "timeZoneName")?.value ?? timeZone
+  );
+}
+
+describe("HealthTimeline timezone labels", () => {
+  beforeEach(() => {
+    _reset();
+    addAccount({ id: "timeline-ny", label: "New York", apiKey: "test-key", timezone: "America/New_York" });
+    switchAccount("timeline-ny");
+  });
+
+  afterEach(() => {
+    cleanup();
+    _reset();
+  });
+
+  it("formats timeline hours and shows the account timezone abbreviation", async () => {
+    render(<AccountProvider><HealthTimeline /></AccountProvider>);
+    // EDT or EST depending on when the suite runs.
+    expect(await screen.findByText(`Now (${zoneAbbreviation("America/New_York")})`)).toBeTruthy();
+    const expectedCurrentHour = new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit", minute: "2-digit", timeZone: "America/New_York",
+    }).format(new Date());
+    const expectedPreviousHour = new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit", minute: "2-digit", timeZone: "America/New_York",
+    }).format(new Date(Date.now() - 60 * 60 * 1000));
+    expect(screen.getByRole("button", { name: `${expectedCurrentHour}: Operational` })).toBeTruthy();
+    expect(screen.getByRole("button", { name: `${expectedPreviousHour}: Operational` })).toBeTruthy();
   });
 });

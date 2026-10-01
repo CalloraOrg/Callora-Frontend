@@ -26,7 +26,8 @@ import { useId, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
 import StatusBadge, { type StatusVariant } from '../components/StatusBadge';
-import { formatUsdcAmount, formatDateShort } from '../utils/format';
+import { formatUsdcAmount, formatDateShort, resolveTimeZone } from '../utils/format';
+import { useAccountContext } from '../hooks/useAccountContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -204,6 +205,14 @@ function txToPreviewData(tx: BillingTransaction): PreviewCardData {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function BillingHistory() {
+  const { timezone } = useAccountContext();
+  const dateZone = resolveTimeZone(timezone);
+  const zoneAbbreviation = new Intl.DateTimeFormat(undefined, {
+    timeZone: dateZone,
+    timeZoneName: 'short',
+  }).formatToParts(new Date()).find((part) => part.type === 'timeZoneName')?.value;
+  // Header suffix, e.g. "EDT"; falls back to the IANA zone name.
+  const dateZoneLabel = zoneAbbreviation ?? dateZone;
   // ── Filter state ──────────────────────────────────────────────────────────
   const [typeFilter, setTypeFilter] = useState<TxType | 'All'>('All');
   const [statusFilter, setStatusFilter] = useState<TxStatus | 'All'>('All');
@@ -557,8 +566,8 @@ export function BillingHistory() {
                     onClick={() => handleSort('date')}
                     aria-label={
                       sortColumn === 'date'
-                        ? `Date, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}. Activate to reverse.`
-                        : 'Date. Activate to sort ascending.'
+                        ? `Date (${dateZoneLabel}), sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}. Activate to reverse.`
+                        : `Date (${dateZoneLabel}). Activate to sort ascending.`
                     }
                     style={{
                       background: 'none',
@@ -575,7 +584,7 @@ export function BillingHistory() {
                       gap: '4px',
                     }}
                   >
-                    Date
+                    Date ({dateZoneLabel})
                     <span aria-hidden="true" style={{ fontSize: '0.65rem', lineHeight: 1 }}>
                       {sortColumn === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇅'}
                     </span>
@@ -708,7 +717,7 @@ export function BillingHistory() {
                       fontSize: '0.75rem',
                     }}
                   >
-                    <time dateTime={tx.timestamp}>{formatDateShort(tx.timestamp)}</time>
+                    <time dateTime={tx.timestamp}>{formatDateShort(tx.timestamp, undefined, dateZone)}</time>
                   </td>
 
                   {/* Description cell — wraps the PreviewCard trigger */}

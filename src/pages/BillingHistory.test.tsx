@@ -17,6 +17,8 @@
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { AccountProvider } from '../hooks/useAccountContext';
+import { addAccount, switchAccount, _reset } from '../state/accountStore';
 import { MemoryRouter } from 'react-router-dom';
 import { BillingHistory, MOCK_TRANSACTIONS } from './BillingHistory';
 
@@ -47,7 +49,7 @@ function getTriggerInRow(row: HTMLElement) {
 // ── Suite ─────────────────────────────────────────────────────────────────────
 
 describe('BillingHistory — page structure', () => {
-  afterEach(cleanup);
+  afterEach(() => { cleanup(); _reset(); });
 
   it('renders the page heading', () => {
     renderBH();
@@ -66,6 +68,24 @@ describe('BillingHistory — page structure', () => {
     expect(
       screen.getByRole('table', { name: /billing transaction history/i }),
     ).toBeTruthy();
+  });
+
+  it('formats dates and labels the header in the active account timezone', async () => {
+    addAccount({ id: 'billing-ny', label: 'New York', apiKey: 'test-key', timezone: 'America/New_York' });
+    switchAccount('billing-ny');
+    render(
+      <MemoryRouter>
+        <AccountProvider><BillingHistory /></AccountProvider>
+      </MemoryRouter>,
+    );
+    // EDT or EST depending on when the suite runs.
+    const zone =
+      new Intl.DateTimeFormat(undefined, { timeZone: 'America/New_York', timeZoneName: 'short' })
+        .formatToParts(new Date())
+        .find((part) => part.type === 'timeZoneName')?.value ?? 'America/New_York';
+    const dateHeader = await screen.findByRole('columnheader', { name: new RegExp(`date \\(${zone}\\)`, 'i') });
+    expect(dateHeader).toBeTruthy();
+    expect(screen.getByText('Jul 25, 10:32 AM')).toBeTruthy();
   });
 
   it('renders column headers with scope="col"', () => {
