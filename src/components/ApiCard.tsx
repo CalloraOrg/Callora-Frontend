@@ -25,6 +25,7 @@ import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
 import { colorFromId } from "../utils/colorFromId";
 import { ClockIcon, BoltIcon } from "./icons";
+import { useToast } from "./Toast";
 
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -659,6 +660,7 @@ export default function ApiCard({
   const { apis: comparedApis } = useCompareStore();
   const isCompared = comparedApis.some((item) => item.id === api.id);
   const canCompare = isCompared || comparedApis.length < 3;
+  const { showToast } = useToast();
 
   const sparklineValues = useMemo(() => {
     if (api.sparklineValues && api.sparklineValues.length > 0) {
@@ -681,9 +683,15 @@ export default function ApiCard({
     if (isCompared) {
       compareStore.removeApi(api.id);
       announce(`Removed ${api.name} from comparison`);
-    } else if (canCompare) {
-      compareStore.addApi(api);
-      announce(`Added ${api.name} to comparison`);
+    } else {
+      const result = compareStore.addApi(api);
+      if (result === 'full') {
+        const msg = 'Comparison is limited to 3 APIs';
+        showToast(msg, 'error');
+        announce(msg);
+      } else if (result === 'added') {
+        announce(`Added ${api.name} to comparison`);
+      }
     }
   };
 
@@ -824,6 +832,7 @@ export default function ApiCard({
          onFocus={() => setIsCompareHovered(true)}
          onBlur={() => setIsCompareHovered(false)}
          disabled={!canCompare}
+         title={!canCompare ? "Comparison is limited to 3 APIs" : undefined}
          className="api-card__compare-btn"
          style={{
            position: "absolute",

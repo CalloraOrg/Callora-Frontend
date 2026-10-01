@@ -328,6 +328,18 @@ describe("ApiDetailPage", () => {
     expect(screen.getByText("Integration Gallery")).toBeTruthy();
   });
 
+  it("generates payment samples from endpoint parameters without geographic coordinates", () => {
+    window.history.pushState({}, "", "/details/pay-qr");
+    renderWithProviders(<ApiDetailPage />);
+    settleLoadingState();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Documentation" }));
+
+    expect(document.body.textContent).toContain('"amount":1');
+    expect(document.body.textContent).toContain('"currency":"example"');
+    expect(document.body.textContent).not.toContain("lat=");
+  });
+
   it("shows the available page shortcuts next to the tab navigation", () => {
     renderWithProviders(<ApiDetailPage />);
     settleLoadingState();
@@ -972,6 +984,64 @@ describe("ApiDetailPage", () => {
 
       const liveRegion = document.querySelector("[aria-live='polite']");
       expect(liveRegion?.textContent).toBe("Reviews sorted by highest rated");
+    });
+  });
+
+  // ── Recommended pricing tier (issue #1091) ────────────────────────────────
+
+  describe("recommended pricing tier", () => {
+    /** Switch to the pricing tab and return its panel. */
+    function openPricingPanel() {
+      fireEvent.click(screen.getByRole("tab", { name: "Pricing" }));
+      return document.getElementById("panel-pricing") as HTMLElement;
+    }
+
+    const tierCardFor = (panel: HTMLElement, badge: string) =>
+      within(panel).getByText(badge).closest(".pricing-tier-card") as HTMLElement;
+
+    it("labels exactly one tier as Recommended for the projected volume", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      const panel = openPricingPanel();
+
+      // The badge must be real text, not colour alone.
+      expect(within(panel).getAllByText("Recommended")).toHaveLength(1);
+      // 1,000 requests is inside the free allowance → the free tier is cheapest.
+      expect(tierCardFor(panel, "Free").textContent).toContain("Recommended");
+    });
+
+    it("moves the recommendation when the requests slider changes", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      const panel = openPricingPanel();
+
+      fireEvent.change(screen.getByRole("slider"), { target: { value: "1000000" } });
+
+      expect(within(panel).getAllByText("Recommended")).toHaveLength(1);
+      expect(tierCardFor(panel, "Enterprise").textContent).toContain("Recommended");
+    });
+
+    it("selects the recommended tier when the 's' shortcut is pressed", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      openPricingPanel();
+
+      fireEvent.keyDown(window, { key: "s" });
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion?.textContent).toBe("Free plan selected (recommended).");
+    });
+
+    it("selects whichever tier is recommended for the current volume", () => {
+      renderWithProviders(<ApiDetailPage />);
+      settleLoadingState();
+      openPricingPanel();
+
+      fireEvent.change(screen.getByRole("slider"), { target: { value: "1000000" } });
+      fireEvent.keyDown(window, { key: "s" });
+
+      const liveRegion = document.querySelector("[aria-live='polite']");
+      expect(liveRegion?.textContent).toBe("Enterprise plan selected (recommended).");
     });
   });
 

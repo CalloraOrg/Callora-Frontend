@@ -7,6 +7,7 @@ import App, { prefetchRoute } from './App';
 import { AccountProvider } from './hooks/useAccountContext';
 import { ThemeProvider } from './ThemeContext';
 import { CollectionsProvider } from './state/collectionsStore';
+import { ToastProvider } from './components/Toast';
 
 function renderApp(initialPath = '/') {
   return render(
@@ -14,7 +15,10 @@ function renderApp(initialPath = '/') {
       <CollectionsProvider>
         <AccountProvider>
           <MemoryRouter initialEntries={[initialPath]}>
-            <App />
+            {/* Mirrors src/main.tsx: ToastProvider wraps every route render path. */}
+            <ToastProvider>
+              <App />
+            </ToastProvider>
           </MemoryRouter>
         </AccountProvider>
       </CollectionsProvider>
