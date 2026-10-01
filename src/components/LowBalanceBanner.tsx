@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { LOW_BALANCE_USD } from '../config/constants';
+import {
+  LOW_BALANCE_USD,
+  LOW_BALANCE_SNOOZE_KEY,
+  LOW_BALANCE_SNOOZE_TTL_MS,
+} from '../config/constants';
 import { WarningIcon } from './icons/WarningIcon';
 import { BoltIcon } from './icons/BoltIcon';
 import { formatUsdShortcut } from '../utils/format';
@@ -20,19 +24,65 @@ const QUICK_TOP_UP_AMOUNTS = [25, 50, 100, 250, 500] as const;
  *
  * Part of GrantFox FWC26 (Stellar Wave) buffer top-up polish.
  */
-export default function LowBalanceBanner({ balance, openDeposit }: LowBalanceBannerProps) {
-  const [dismissed, setDismissed] = useState(false);
+/** Persisted snooze record: the balance seen at dismissal time plus when. */
+interface BalanceSnooze {
+  balance: number;
+  dismissedAt: number;
+}
 
-  useEffect(() => {
-    const isDismissed = sessionStorage.getItem('lowBalanceBannerDismissed') === 'true';
-    if (isDismissed) {
-      setDismissed(true);
+/**
+ * Reads the snooze record from localStorage. Returns null when missing,
+ * malformed, or expired (expired records are removed). Never throws —
+ * storage exceptions degrade to "not snoozed" so the banner still renders.
+ */
+function readSnooze(): BalanceSnooze | null {
+  try {
+    const raw = localStorage.getItem(LOW_BALANCE_SNOOZE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      typeof (parsed as BalanceSnooze).balance !== 'number' ||
+      !Number.isFinite((parsed as BalanceSnooze).balance) ||
+      typeof (parsed as BalanceSnooze).dismissedAt !== 'number' ||
+      !Number.isFinite((parsed as BalanceSnooze).dismissedAt)
+    ) {
+      return null;
     }
-  }, []);
+    const snooze = parsed as BalanceSnooze;
+    if (Date.now() - snooze.dismissedAt >= LOW_BALANCE_SNOOZE_TTL_MS) {
+      try {
+        localStorage.removeItem(LOW_BALANCE_SNOOZE_KEY);
+      } catch {
+        // Ignore cleanup failures — expiry alone is enough to re-show.
+      }
+      return null;
+    }
+    return snooze;
+  } catch {
+    return null;
+  }
+}
+
+export default function LowBalanceBanner({ balance, openDeposit }: LowBalanceBannerProps) {
+  const [snoozed, setSnoozed] = useState<BalanceSnooze | null>(null);
+
+  // Re-read the snooze on mount and whenever the balance moves so the
+  // banner stays hidden across route changes but reappears as soon as
+  // the balance changes or the TTL expires.
+  useEffect(() => {
+    setSnoozed(readSnooze());
+  }, [balance]);
 
   const handleDismiss = () => {
-    sessionStorage.setItem('lowBalanceBannerDismissed', 'true');
-    setDismissed(true);
+    const entry: BalanceSnooze = { balance, dismissedAt: Date.now() };
+    try {
+      localStorage.setItem(LOW_BALANCE_SNOOZE_KEY, JSON.stringify(entry));
+    } catch {
+      // localStorage unavailable – snooze only in memory for this mount.
+    }
+    setSnoozed(entry);
   };
 
   const handleQuickTopUp = (amount: number) => {
@@ -46,7 +96,11 @@ export default function LowBalanceBanner({ balance, openDeposit }: LowBalanceBan
     return nextPreset;
   }, [balance]);
 
-  if (dismissed || balance >= LOW_BALANCE_USD) {
+  // Hidden while snoozed at the exact dismissed balance. Any balance
+  // movement (further drop or top-up) or TTL expiry re-shows the banner.
+  const isSnoozed = snoozed !== null && balance === snoozed.balance;
+
+  if (isSnoozed || balance >= LOW_BALANCE_USD) {
     return null;
   }
 

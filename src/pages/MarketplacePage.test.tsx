@@ -12,7 +12,7 @@ import { AccountProvider } from "../hooks/useAccountContext";
 import { _reset as resetAccounts, switchAccount } from "../state/accountStore";
 import { CATALOG_CACHE_KEY } from "../api/catalogApi";
 import { getCache } from "../utils/offlineApiCache";
-import { DENSITY_STORAGE_KEY } from "../utils/density";
+import { DENSITY_STORAGE_KEY } from "../state/uiPrefs";
 
 /** Reads a catalogue entry straight out of the offline cache. */
 function readCache(accountId: string, cacheKey: string) {
