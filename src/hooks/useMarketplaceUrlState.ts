@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { SortValue } from "../components/SortDropdown";
+import { VALID_SORT_VALUES } from "../components/SortDropdown";
 
 export const DEFAULT_SORT: SortValue = "popularity";
 
@@ -98,7 +99,13 @@ export function useMarketplaceUrlState(): MarketplaceUrlState {
   const maxPriceParam = searchParams.get("maxPrice");
   const popularity = searchParams.get("popularity") ?? "any";
   const favoritesOnly = searchParams.get("favorites") === "1";
-  const sort = (searchParams.get("sort") ?? DEFAULT_SORT) as SortValue;
+  const rawSort = searchParams.get("sort") ?? DEFAULT_SORT;
+  // Reject unknown ?sort= values (e.g. stale bookmarks, manual URL edits) and
+  // fall back to the default so the sort control is never left in an invalid
+  // state with no matching option.
+  const sort: SortValue = VALID_SORT_VALUES.has(rawSort as SortValue)
+    ? (rawSort as SortValue)
+    : DEFAULT_SORT;
 
   // Memoized so the returned Set/array identity only changes when the
   // underlying param actually changes — never on an unrelated re-render.

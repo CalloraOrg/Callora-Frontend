@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   getContrastRatio,
+  getContrastRatioOrNull,
+  evaluateContrastPair,
   parseColor,
   composite,
   WCAG_AA_NORMAL,
@@ -137,5 +139,65 @@ describe('contrast utility math', () => {
   it('alpha-composites translucent surfaces over an opaque backdrop', () => {
     // 50% black over white => mid grey (128) per channel.
     expect(composite([0, 0, 0, 0.5], [255, 255, 255])).toEqual([128, 128, 128]);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Invalid-colour handling for the playground badges (issue #1065)
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('contrast pair evaluation distinguishes invalid colours from failures', () => {
+  it('returns null when either colour cannot be parsed', () => {
+    expect(getContrastRatioOrNull('#zzzzzz', '#ffffff')).toBeNull();
+    expect(getContrastRatioOrNull('#ffffff', 'not-a-colour')).toBeNull();
+    expect(getContrastRatioOrNull('', '#ffffff')).toBeNull();
+    expect(getContrastRatioOrNull('rgb(1,2)', '#ffffff')).toBeNull();
+  });
+
+  it('matches getContrastRatio for parseable colours', () => {
+    const expected = getContrastRatio(
+      parseColor('#ffffff')!,
+      parseColor('#0f172a')!,
+    );
+    expect(getContrastRatioOrNull('#ffffff', '#0f172a')).toBeCloseTo(expected, 10);
+  });
+
+  it('evaluates a passing pair', () => {
+    const check = evaluateContrastPair(
+      'text-on-surface',
+      'Text on surface',
+      '#ffffff',
+      '#0f172a',
+    );
+
+    expect(check.ratio).toBeGreaterThanOrEqual(WCAG_AA_NORMAL);
+    expect(check.passes).toBe(true);
+  });
+
+  it('evaluates a failing pair', () => {
+    const check = evaluateContrastPair(
+      'accent-on-surface',
+      'Accent on surface',
+      '#0f172a',
+      '#0f172a',
+    );
+
+    expect(check.ratio).toBeCloseTo(1, 5);
+    expect(check.passes).toBe(false);
+  });
+
+  it('keeps the threshold at 4.5:1', () => {
+    // #767676 on white is the canonical "just passes AA" grey (~4.54:1).
+    expect(evaluateContrastPair('a', 'A', '#767676', '#ffffff').passes).toBe(true);
+    // One step lighter drops below the threshold.
+    expect(evaluateContrastPair('b', 'B', '#777777', '#ffffff').passes).toBe(false);
+  });
+
+  it('marks an unparseable pair as failing rather than throwing', () => {
+    const check = evaluateContrastPair('c', 'C', '#zzzzzz', '#ffffff');
+
+    expect(check.ratio).toBeNull();
+    expect(check.passes).toBe(false);
+    expect(check.passesLargeText).toBe(false);
   });
 });

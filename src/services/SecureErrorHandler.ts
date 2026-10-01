@@ -72,14 +72,29 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
  * These patterns are used to sanitize error messages before display or logging.
  */
 const SENSITIVE_PATTERNS = [
+  // JSON-shaped credentials, e.g. in serialized request/response bodies:
+  // "password": "value" / "api_key":"value". The key is preserved so the
+  // surrounding JSON stays valid after redaction. Runs before the generic
+  // patterns below so quoted secret values are claimed first.
+  {
+    pattern: /(\"(?:password|passwd|pwd|secret|token|api_?key|access_?token|refresh_?token|client_?secret|authorization|private_?key)\"\s*:\s*)\"[^\"]*\"/gi,
+    replacement: '$1"[REDACTED]"',
+  },
   // API keys
   { pattern: /\b(ck_live_|sk_|pk_)[a-zA-Z0-9_]{20,}\b/g, replacement: '[REDACTED_KEY]' },
   // Bearer tokens
   { pattern: /Bearer\s+[a-zA-Z0-9\-_.~+/]+=*/gi, replacement: 'Bearer [REDACTED_TOKEN]' },
-  // Session/JWT tokens
-  { pattern: /[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*/g, replacement: '[REDACTED_TOKEN]' },
+  // JWT tokens: three base64url segments, the first of which is a realistic
+  // base64url-encoded JSON header starting with 'eyJ' (e.g. eyJhbGci...).
+  // This avoids matching semver strings (1.2.3), hostnames (api.callora.com),
+  // and dotted method names (v1.users.list).
+  {
+    pattern:
+      /\beyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_\-+]+\.[a-zA-Z0-9_\-+]+\b/g,
+    replacement: '[REDACTED_TOKEN]',
+  },
   // Email addresses
-  { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: '[REDACTED_EMAIL]' },
+  { pattern: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: '[REDACTED_EMAIL]' },
   // URLs with credentials
   { pattern: /https?:\/\/[^:]+:[^@]+@[^\s]/gi, replacement: 'https://[REDACTED_CREDENTIALS]' },
   // Passwords
