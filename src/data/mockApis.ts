@@ -113,7 +113,7 @@ export const MOCK_APIS: APIItem[] = [
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
     ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
-    hourlyHealth: Array(24).fill("operational").map((_, i) => i === 12 || i === 13 ? "degraded" : "operational"),
+    hourlyHealth: Array(24).fill("operational").map((, i) => i === 12 || i === 13 ? "degraded" : "operational"),
     sparklineValues: [15, 17, 16, 19, 21, 20, 24, 25, 23, 26, 28, 27],
   },
   {
@@ -311,7 +311,12 @@ const status:  APIItem["status"] =
 
 export function findApiById(id: string | undefined) {
   if (!id) return undefined;
-  return MOCK_APIS.find((a) => a.id === id || a.id === decodeURIComponent(id));
+  const decoded = try {
+    decodeURIComponent(id);
+  } catch {
+    return undefined;
+  }
+  return MOCK_APIS.find((a) => a.id === id || a.id === decoded);
 }
 
 export default MOCK_APIS;
