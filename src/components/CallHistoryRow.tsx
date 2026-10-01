@@ -22,11 +22,11 @@
  * --diff-unchanged-bg / --diff-unchanged-fg / --diff-unchanged-gutter-bg
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { CheckCircle, XCircle } from 'lucide-react';
-import { formatPrice } from '../utils/format';
-import { diffJson, hasDifferences } from '../utils/diff';
-import type { DiffLine } from '../utils/diff';
+import { useEffect, useRef, useState } from "react";
+import { CheckCircle, XCircle } from "lucide-react";
+import { formatPrice } from "../utils/format";
+import { diffJson, hasDifferences } from "../utils/diff";
+import type { DiffLine } from "../utils/diff";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,8 +34,8 @@ export type CallRecord = {
   id: string;
   timestamp: Date;
   endpoint: string;
-  status: 'success' | 'error';
-  responseTime: number;
+  status: "success" | "error" | "unknown";
+  responseTime: number | null;
   cost: number;
   request?: unknown;
   response?: unknown;
@@ -68,19 +68,19 @@ function formatTime(ms: number) {
 }
 
 function formatTimestamp(date: Date) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(date);
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** Status icon using design tokens — no hardcoded hex values. */
-function StatusIcon({ status }: { status: 'success' | 'error' }) {
-  if (status === 'success') {
+function StatusIcon({ status }: { status: "success" | "error" }) {
+  if (status === "success") {
     return (
       <CheckCircle
         aria-hidden="true"
@@ -107,8 +107,9 @@ function StatusIcon({ status }: { status: 'success' | 'error' }) {
  * the gutter cell so colour is never the only indicator (WCAG 1.4.1).
  */
 function DiffLineRow({ line, index }: { line: DiffLine; index: number }) {
-  const sign = line.type === 'added' ? '+' : line.type === 'removed' ? '−' : ' ';
-  const ariaLabel = `${line.type === 'added' ? 'Added' : line.type === 'removed' ? 'Removed' : 'Unchanged'}: ${line.value}`;
+  const sign =
+    line.type === "added" ? "+" : line.type === "removed" ? "−" : " ";
+  const ariaLabel = `${line.type === "added" ? "Added" : line.type === "removed" ? "Removed" : "Unchanged"}: ${line.value}`;
 
   return (
     <tr
@@ -118,24 +119,15 @@ function DiffLineRow({ line, index }: { line: DiffLine; index: number }) {
       key={index}
     >
       {/* Line number — "before" column */}
-      <td
-        className="diff-line__gutter diff-line__gutter--a"
-        aria-hidden="true"
-      >
-        {line.lineA ?? ''}
+      <td className="diff-line__gutter diff-line__gutter--a" aria-hidden="true">
+        {line.lineA ?? ""}
       </td>
       {/* Line number — "after" column */}
-      <td
-        className="diff-line__gutter diff-line__gutter--b"
-        aria-hidden="true"
-      >
-        {line.lineB ?? ''}
+      <td className="diff-line__gutter diff-line__gutter--b" aria-hidden="true">
+        {line.lineB ?? ""}
       </td>
       {/* Sign (+/-/ ) */}
-      <td
-        className="diff-line__sign"
-        aria-hidden="true"
-      >
+      <td className="diff-line__sign" aria-hidden="true">
         {sign}
       </td>
       {/* Line content */}
@@ -152,13 +144,7 @@ function DiffLineRow({ line, index }: { line: DiffLine; index: number }) {
  * When the responses are identical a short "No differences" notice is shown
  * instead of repeating all lines unchanged.
  */
-function ResponseDiff({
-  before,
-  after,
-}: {
-  before: unknown;
-  after: unknown;
-}) {
+function ResponseDiff({ before, after }: { before: unknown; after: unknown }) {
   const lines: DiffLine[] = diffJson(before, after);
   const hasChanges = hasDifferences(lines);
 
@@ -209,15 +195,15 @@ export default function CallHistoryRow({
    * Diff mode is only relevant when `compareWith` is provided.
    * Defaults to 'diff' when a comparison target is set.
    */
-  const [viewMode, setViewMode] = useState<'raw' | 'diff'>(
-    compareWith ? 'diff' : 'raw',
+  const [viewMode, setViewMode] = useState<"raw" | "diff">(
+    compareWith ? "diff" : "raw",
   );
 
   // Keep viewMode in sync if compareWith is removed after mount
-  const effectiveMode = compareWith ? viewMode : 'raw';
+  const effectiveMode = compareWith ? viewMode : "raw";
 
   // ── Aria-live announcement for status changes (Issue #683) ───────────────
-  const [announcement, setAnnouncement] = useState('');
+  const [announcement, setAnnouncement] = useState("");
   const previousStatusRef = useRef(call.status);
 
   useEffect(() => {
@@ -235,13 +221,27 @@ export default function CallHistoryRow({
         {/* Status cell — icon + label; icon color driven by CSS custom properties */}
         <span
           className={`status-cell ${call.status}`}
-          data-pattern={call.status === 'success' ? 'baseline' : 'stripes'}
-          aria-label={call.status === 'success' ? 'Success' : 'Error'}
+          data-pattern={
+            call.status === "success"
+              ? "baseline"
+              : call.status === "error"
+                ? "stripes"
+                : "none"
+          }
+          aria-label={
+            call.status === "unknown" ? "Status unavailable" : call.status
+          }
         >
-          <StatusIcon status={call.status} />
+          {call.status === "unknown" ? (
+            "—"
+          ) : (
+            <StatusIcon status={call.status} />
+          )}
           {call.status}
         </span>
-        <span>{formatTime(call.responseTime)}</span>
+        <span>
+          {call.responseTime === null ? "—" : formatTime(call.responseTime)}
+        </span>
         <span>{formatPrice(call.cost)} USDC</span>
         <span>
           <button
@@ -251,13 +251,18 @@ export default function CallHistoryRow({
             aria-controls={`call-details-${call.id}`}
             tabIndex={viewButtonTabIndex}
           >
-            {expanded ? 'Hide' : 'View'}
+            {expanded ? "Hide" : "View"}
           </button>
         </span>
       </div>
 
       {/* Screen reader polite announcement for status changes (WCAG 4.1.3) */}
-      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      <span
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         {announcement}
       </span>
 
@@ -284,16 +289,16 @@ export default function CallHistoryRow({
                   aria-label="Response view mode"
                 >
                   <button
-                    className={`ghost-button diff-mode-toggle__btn${effectiveMode === 'diff' ? ' diff-mode-toggle__btn--active' : ''}`}
-                    aria-pressed={effectiveMode === 'diff'}
-                    onClick={() => setViewMode('diff')}
+                    className={`ghost-button diff-mode-toggle__btn${effectiveMode === "diff" ? " diff-mode-toggle__btn--active" : ""}`}
+                    aria-pressed={effectiveMode === "diff"}
+                    onClick={() => setViewMode("diff")}
                   >
                     Diff
                   </button>
                   <button
-                    className={`ghost-button diff-mode-toggle__btn${effectiveMode === 'raw' ? ' diff-mode-toggle__btn--active' : ''}`}
-                    aria-pressed={effectiveMode === 'raw'}
-                    onClick={() => setViewMode('raw')}
+                    className={`ghost-button diff-mode-toggle__btn${effectiveMode === "raw" ? " diff-mode-toggle__btn--active" : ""}`}
+                    aria-pressed={effectiveMode === "raw"}
+                    onClick={() => setViewMode("raw")}
                   >
                     Raw
                   </button>
@@ -301,7 +306,7 @@ export default function CallHistoryRow({
               )}
             </div>
 
-            {effectiveMode === 'diff' && compareWith ? (
+            {effectiveMode === "diff" && compareWith ? (
               // ── Diff view ─────────────────────────────────────────────────
               <>
                 <div className="diff-call-labels" aria-hidden="true">

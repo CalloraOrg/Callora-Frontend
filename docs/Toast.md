@@ -40,7 +40,18 @@ Returns the context value. Throws if called outside a `ToastProvider`
 
 | Member | Signature | Description |
 |--------|-----------|-------------|
-| `showToast` | `(message: string, variant?: ToastVariant) => void` | Enqueues a toast. `variant` defaults to `"success"` |
+| `showToast` | `(messageOrOptions: string \| ToastOptions, variant?: ToastVariant) => void` | Enqueues a toast. `variant` defaults to `"success"` |
+
+### `ToastOptions`
+
+```ts
+type ToastOptions = {
+  message: string;
+  variant?: ToastVariant;
+  persistent?: boolean; // stays until dismissed; never auto-dismissed
+  duration?: number;    // ms before auto-dismiss; overrides the default
+};
+```
 
 ### `ToastVariant`
 
@@ -77,7 +88,9 @@ screen readers and may remain visible while the user shares their screen.
 - **Cap:** the queue holds at most **4** toasts (`MAX_TOASTS`). When a fifth
   arrives, the oldest **non-persistent** toast is evicted; if every visible
   toast is persistent, the oldest toast is evicted instead.
-- **Timing:** each toast auto-dismisses after **5000 ms** (`DEFAULT_DURATION`).
+- **Timing:** each non-persistent toast auto-dismisses after **5000 ms**
+  (`DEFAULT_DURATION`), or **10000 ms** for `error` toasts, unless
+  `duration` is passed. `persistent: true` toasts stay until dismissed.
 - **Exit animation:** removal is staged — the toast is marked `exiting`, slides
   out over **200 ms**, and is then dropped from state.
 - **Manual dismissal:** every toast renders a close button
