@@ -11,13 +11,14 @@ export interface EndpointSnapshot {
 }
 
 /**
- * Case-insensitive set of parameter key patterns that may carry secret values.
- * Any param key matching one of these patterns is stripped before the snapshot
- * is encoded into the URL, so credentials never enter browser history,
- * server logs, or shared links.
+ * Set of sensitive parameter name tokens.  A parameter key is considered
+ * sensitive when any of its word-level tokens — obtained by splitting
+ * camelCase and delimiter-separated names — exactly matches one of these
+ * entries (case-insensitive).
  *
- * Matches are performed on the lowercased key; a key is redacted when it
- * *contains* any of these substrings.
+ * This word-level matching catches compound forms like "apiKey" and
+ * "api_key" while avoiding false positives on benign names like "keyword",
+ * "passengers", or "monkey".
  */
 export const SENSITIVE_PARAM_PATTERNS: readonly string[] = [
   'key',
@@ -37,21 +38,52 @@ export const SENSITIVE_PARAM_PATTERNS: readonly string[] = [
   'bearer',
   'session',
   'jwt',
-  'x-api',
 ];
+
+/**
+ * Decomposes a parameter key into individual word tokens by:
+ * 1. Splitting camelCase boundaries (e.g. "apiKey" → ["api", "Key"])
+ * 2. Splitting on common delimiters: underscores, hyphens, dots, colons,
+ *    and whitespace
+ * 3. Lowercasing all tokens
+ * 4. Filtering out empty strings
+ *
+ * This enables exact word-level matching so that "apiKey" is detected as
+ * sensitive (contains the word "key") while "keyword" is not (it is a
+ * single, indivisible word).
+ */
+export function tokenizeKey(key: string): string[] {
+  return key
+    // Insert a split point before an uppercase letter preceded by a lowercase
+    // letter, e.g. "apiKey" → "api_Key", "clientSecret" → "client_Secret"
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    // Insert a split point between a run of uppercase letters and an uppercase
+    // letter followed by lowercase, e.g. "XMLParser" → "XML_Parser"
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    // Split on underscores, hyphens, dots, colons, and whitespace
+    .split(/[_\-.:\s]+/)
+    .map((t) => t.toLowerCase())
+    .filter((t) => t.length > 0);
+}
+
+/** Pre-computed Set for O(1) token lookups. */
+const SENSITIVE_TOKEN_SET: ReadonlySet<string> = new Set(
+  SENSITIVE_PARAM_PATTERNS.map((p) => p.toLowerCase()),
+);
 
 /**
  * Returns true when a parameter key should be treated as sensitive and must
  * not be embedded in a shareable URL.
  *
- * The check is intentionally broad: a key is flagged when its lowercased form
- * *contains* any of the patterns above.  This catches both camelCase
- * ("apiKey") and snake_case ("api_key") variants without requiring an exact
- * match.
+ * The key is first decomposed into word-level tokens (splitting camelCase
+ * and delimiter-separated names), and each token is checked for an exact
+ * match against {@link SENSITIVE_PARAM_PATTERNS}.  This catches compound
+ * names like "apiKey" and "api_key" while avoiding false positives on
+ * benign words like "keyword" or "passengers".
  */
 export function isSensitiveKey(key: string): boolean {
-  const lower = key.toLowerCase();
-  return SENSITIVE_PARAM_PATTERNS.some((pattern) => lower.includes(pattern));
+  const tokens = tokenizeKey(key);
+  return tokens.some((token) => SENSITIVE_TOKEN_SET.has(token));
 }
 
 /**

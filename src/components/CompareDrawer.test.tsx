@@ -1,23 +1,13 @@
-/**
- * CompareDrawer.test.tsx
- *
- * Covers every acceptance criterion from issue #1062:
- *  AC1 – APIs lacking pricePerCall display their pricePerRequest
- *  AC2 – Status and category rows appear in each column
- *  AC3 – Best value per row is marked with a visible text label
- *  AC4 – Missing values still render an em dash
- *
- * Also verifies:
- *  - The bestIndex helper edge-cases (single defined value → no winner)
- *  - Multiple tied best-value columns (the first one wins)
- */
+// @vitest-environment jsdom
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import React from 'react';
+import CompareDrawer from './CompareDrawer';
+import { compareStore } from '../state/compareStore';
+import type { APIItem } from '../data/mockApis';
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import React from "react";
-
-// ── Mock RatingHistogram so we don't drag in canvas/d3 ───────────────────────
+// RatingHistogram is replaced with a lightweight stand-in so the best-value
+// assertions below can target the rating cell directly.
 vi.mock("./RatingHistogram", () => ({
   default: ({
     children,
@@ -28,11 +18,151 @@ vi.mock("./RatingHistogram", () => ({
   }) => <span data-testid={`rating-histogram-${rating}`}>{children}</span>,
 }));
 
-// ── Module under test ────────────────────────────────────────────────────────
-// We import *after* mocks are registered.
-import CompareDrawer from "./CompareDrawer";
-import { compareStore } from "../state/compareStore";
-import type { APIItem } from "../data/mockApis";
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => {
+      store[key] = value.toString();
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
+Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+
+describe('CompareDrawer Component', () => {
+  beforeEach(() => {
+    localStorageMock.clear();
+    compareStore.clear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const sampleApi = {
+    id: 'api-1',
+    name: 'Test API',
+    pricePerCall: 0.01,
+    avgLatencyMs: 45,
+    uptimePercent: 99.9,
+    rating: 4.8,
+    ratingDistribution: { 5: 80, 4: 20, 3: 0, 2: 0, 1: 0 },
+  };
+
+  it('renders nothing when isOpen is false', () => {
+    render(<CompareDrawer />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('renders correctly when isOpen is true with items and empty state', () => {
+    act(() => {
+      compareStore.addApi(sampleApi);
+      compareStore.setOpen(true);
+    });
+
+    const { rerender } = render(<CompareDrawer />);
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.getByText('Test API')).toBeTruthy();
+    expect(screen.getByText('Price / call')).toBeTruthy();
+
+    // Test empty state
+    act(() => {
+      compareStore.clear();
+      compareStore.setOpen(true);
+    });
+    rerender(<CompareDrawer />);
+    expect(screen.getByText('Select APIs to compare them.')).toBeTruthy();
+  });
+
+  it('announces removal and clears announcement after 3 seconds', () => {
+    act(() => {
+      compareStore.addApi(sampleApi);
+      compareStore.setOpen(true);
+    });
+
+    render(<CompareDrawer />);
+
+    const removeBtn = screen.getByLabelText('Remove Test API from comparison');
+    act(() => {
+      fireEvent.click(removeBtn);
+    });
+
+    const liveRegion = screen.getByText('Removed Test API from comparison.');
+    expect(liveRegion).toBeTruthy();
+
+    // Advance timers by 3 seconds
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.queryByText('Removed Test API from comparison.')).toBeNull();
+  });
+
+  it('clears all items and announces it', () => {
+    act(() => {
+      compareStore.addApi(sampleApi);
+      compareStore.setOpen(true);
+    });
+
+    render(<CompareDrawer />);
+
+    const clearBtn = screen.getByLabelText('Clear all comparisons');
+    act(() => {
+      fireEvent.click(clearBtn);
+    });
+
+    expect(screen.getByText('Cleared all comparison items.')).toBeTruthy();
+    expect(compareStore.getSnapshot().apis.length).toBe(0);
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(screen.queryByText('Cleared all comparison items.')).toBeNull();
+  });
+
+  it('closes on Escape key press', () => {
+    act(() => {
+      compareStore.addApi(sampleApi);
+      compareStore.setOpen(true);
+    });
+
+    render(<CompareDrawer />);
+    expect(screen.getByRole('dialog')).toBeTruthy();
+
+    act(() => {
+      fireEvent.keydown(document, { key: 'Escape' });
+    });
+
+    expect(compareStore.getSnapshot().isOpen).toBe(false);
+  });
+
+  it('closes on backdrop click', () => {
+    act(() => {
+      compareStore.addApi(sampleApi);
+      compareStore.setOpen(true);
+    });
+
+    render(<CompareDrawer />);
+    const overlay = document.querySelector('.compare-drawer-overlay');
+    expect(overlay).toBeTruthy();
+
+    act(() => {
+      fireEvent.click(overlay!);
+    });
+
+    expect(compareStore.getSnapshot().isOpen).toBe(false);
+  });
+});
+
+// ─── Issue #1062: price fallback, status/category rows, best-value labels ───
 
 // ── Shared fixture data ──────────────────────────────────────────────────────
 
@@ -92,12 +222,6 @@ function renderWithApis(apis: APIItem[]) {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Get all compare-columns currently rendered. */
-function getColumns() {
-  return screen.getAllByRole("heading", { level: 2 })
-    ? document.querySelectorAll(".compare-column")
-    : [];
-}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // AC1: Price fallback
@@ -303,49 +427,5 @@ describe("AC4 – em dash for missing values", () => {
     const catLabel = screen.getByText(/^category$/i);
     const statGroup = catLabel.closest(".compare-stat");
     expect(statGroup!.textContent).toContain("—");
-  });
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-// Additional: drawer behaviour
-// ═════════════════════════════════════════════════════════════════════════════
-
-describe("drawer general behaviour", () => {
-  beforeEach(() => {
-    compareStore.clear();
-  });
-
-  it("renders nothing when isOpen is false", () => {
-    compareStore.clear(); // also sets isOpen=false
-    const { container } = render(<CompareDrawer />);
-    expect(container.firstChild).toBeNull();
-  });
-
-  it("shows empty-state message when no APIs are loaded", () => {
-    compareStore.setOpen(true);
-    render(<CompareDrawer />);
-    expect(screen.getByText("Select APIs to compare them.")).toBeInTheDocument();
-  });
-
-  it("removes an API when its remove button is clicked", async () => {
-    const user = userEvent.setup();
-    renderWithApis([apiNoPricePerCall, apiWithBothPrices]);
-    const removeBtn = screen.getByRole("button", {
-      name: `Remove ${apiNoPricePerCall.name} from comparison`,
-    });
-    await user.click(removeBtn);
-    expect(screen.queryByText(apiNoPricePerCall.name)).not.toBeInTheDocument();
-    expect(screen.getByText(apiWithBothPrices.name)).toBeInTheDocument();
-  });
-
-  it("clears all APIs on Clear button click", async () => {
-    const user = userEvent.setup();
-    renderWithApis([apiNoPricePerCall, apiWithBothPrices]);
-    const clearBtn = screen.getByRole("button", { name: /clear all comparisons/i });
-    await user.click(clearBtn);
-    // compareStore.clear() also sets isOpen=false, causing the drawer to unmount.
-    // Verify both API names are gone from the document.
-    expect(screen.queryByText(apiNoPricePerCall.name)).not.toBeInTheDocument();
-    expect(screen.queryByText(apiWithBothPrices.name)).not.toBeInTheDocument();
   });
 });
