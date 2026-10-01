@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import ServerError from "../ServerError";
+import ServerError from "./ServerError";
 
 describe("ServerError", () => {
   it("renders with default error message", () => {
@@ -173,5 +173,57 @@ describe("ServerError", () => {
 
     const retryButton = screen.queryByRole("button", { name: /try again/i });
     expect(retryButton).not.toBeInTheDocument();
+  });
+
+  describe("onReload secondary action", () => {
+    it("does not render reload button when onReload is not provided", () => {
+      render(<ServerError />);
+
+      const reloadButton = screen.queryByRole("button", { name: /reload page/i });
+      expect(reloadButton).not.toBeInTheDocument();
+    });
+
+    it("renders reload button when onReload is provided", () => {
+      const onReload = vi.fn();
+      render(<ServerError onReload={onReload} />);
+
+      expect(
+        screen.getByRole("button", { name: /reload page/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("calls onReload when reload button is clicked", async () => {
+      const onReload = vi.fn();
+      render(<ServerError onReload={onReload} />);
+
+      const reloadButton = screen.getByRole("button", { name: /reload page/i });
+      await userEvent.click(reloadButton);
+
+      expect(onReload).toHaveBeenCalledOnce();
+    });
+
+    it("renders both retry and reload buttons when both props are provided", () => {
+      const onRetry = vi.fn();
+      const onReload = vi.fn();
+      render(<ServerError onRetry={onRetry} onReload={onReload} />);
+
+      expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /reload page/i })).toBeInTheDocument();
+    });
+
+    it("reload button is independent of retry loading state", async () => {
+      const onRetry = vi.fn(
+        () => new Promise((resolve) => setTimeout(resolve, 100)),
+      );
+      const onReload = vi.fn();
+      render(<ServerError onRetry={onRetry} onReload={onReload} />);
+
+      // Start a retry (async, will be in "Retrying…" state)
+      await userEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+      // Reload button is still present and not disabled
+      const reloadButton = screen.getByRole("button", { name: /reload page/i });
+      expect(reloadButton).not.toBeDisabled();
+    });
   });
 });
