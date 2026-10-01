@@ -353,6 +353,7 @@ describe("OnboardingTour — completion screen", () => {
   it("restarts the tour when 'Restart tour' is clicked", async () => {
     const { user } = await reachCompletion();
     await user.click(screen.getByRole("button", { name: /restart/i }));
+    expect(screen.queryByTestId("tour-complete")).not.toBeInTheDocument();
     const tabs = screen.getAllByRole("tab");
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText(/welcome to callora/i)).toBeInTheDocument();
@@ -451,11 +452,6 @@ describe("OnboardingTour — checkpoint / resume behavior", () => {
     expect(tabs[1]).toHaveAttribute("aria-selected", "true");
 
     setItemSpy.mockRestore();
-  });
-});art.*tour/i }));
-    expect(screen.queryByTestId("tour-complete")).not.toBeInTheDocument();
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
   });
 });
 

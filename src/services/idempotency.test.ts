@@ -2,15 +2,20 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   DEFAULT_REQUEST_TIMEOUT_MS,
   RequestTimeoutError,
+  backoffDelayMs,
+  createInFlightGuard,
   generateIdempotencyKey,
   isTimeoutError,
   runWithTimeout,
+  withRetry,
 } from './idempotency';
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('generateIdempotencyKey', () => {
@@ -170,40 +175,19 @@ describe('runWithTimeout', () => {
 
   it('defaults to a positive default budget', () => {
     expect(DEFAULT_REQUEST_TIMEOUT_MS).toBeGreaterThan(0);
-import { describe, it, expect, vi, afterEach } from "vitest";
-import {
-  generateIdempotencyKey,
-  createInFlightGuard,
-  runWithTimeout,
-  isTimeoutError,
-  backoffDelayMs,
-  withRetry,
-} from "./idempotency";
-
-afterEach(() => {
-  vi.useRealTimers();
-  vi.restoreAllMocks();
+  });
 });
 
-describe("generateIdempotencyKey", () => {
-  it("prepends the provided prefix", () => {
-    expect(generateIdempotencyKey("rotate")).toMatch(
-      /^rotate-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+$/,
-    );
-  });
+// ─── Burst / retry guarantees (issue #1205) ──────────────────────────────────
 
-  it("defaults to the 'idem' prefix", () => {
-    expect(generateIdempotencyKey().startsWith("idem-")).toBe(true);
-  });
-
-  it("produces 10,000 unique prefixed keys in a rapid burst", () => {
-    vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+describe('generateIdempotencyKey — burst', () => {
+  it('produces 10,000 unique keys in a rapid burst', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
 
     const seen = new Set<string>();
     for (let i = 0; i < 10_000; i += 1) {
-      const key = generateIdempotencyKey("rotate");
-      expect(key).toMatch(/^rotate-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+$/);
+      const key = generateIdempotencyKey();
+      expect(key).toMatch(UUID_V4);
       seen.add(key);
     }
     expect(seen.size).toBe(10_000);
@@ -280,58 +264,6 @@ describe("InFlightGuard", () => {
     const [av, bv] = await Promise.all([a, b]);
     expect(av).toBe(1);
     expect(bv).toBe(2);
-  });
-});
-
-describe("runWithTimeout", () => {
-  it("resolves with the task value when it finishes on time", async () => {
-    await expect(
-      runWithTimeout(() => Promise.resolve("ok"), 100),
-    ).resolves.toBe("ok");
-  });
-
-  it("rejects with a TimeoutError and aborts the signal when the deadline passes", async () => {
-    vi.useFakeTimers();
-    let aborted = false;
-    const pending = runWithTimeout(
-      (signal) =>
-        new Promise<string>((_, reject) => {
-          signal.addEventListener("abort", () => {
-            aborted = true;
-            reject(new Error("aborted"));
-          });
-        }),
-      100,
-      "rotate",
-    );
-
-    const assertion = expect(pending).rejects.toMatchObject({
-      name: "TimeoutError",
-      label: "rotate",
-    });
-    await vi.advanceTimersByTimeAsync(100);
-    await assertion;
-    expect(aborted).toBe(true);
-  });
-
-  it("marks the error as a TimeoutError for callers to distinguish", async () => {
-    vi.useFakeTimers();
-    const pending = runWithTimeout(
-      () => new Promise<void>(() => {}),
-      50,
-      "fetch",
-    );
-    const assertion = expect(pending).rejects.toSatisfy((e: unknown) =>
-      isTimeoutError(e),
-    );
-    await vi.advanceTimersByTimeAsync(50);
-    await assertion;
-  });
-
-  it("propagates a non-timeout rejection", async () => {
-    await expect(
-      runWithTimeout(() => Promise.reject(new Error("server error")), 100),
-    ).rejects.toThrow("server error");
   });
 });
 

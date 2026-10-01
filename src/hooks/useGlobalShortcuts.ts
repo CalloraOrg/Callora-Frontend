@@ -28,6 +28,13 @@ export const SHORTCUTS: Shortcut[] = [
   { key: 'Esc', description: 'Go back to Marketplace', category: 'ApiDetailPage' },
   { key: '1-5', description: 'Switch tabs (1=Overview, 2=Documentation, 3=Pricing, 4=Examples, 5=Reviews)', category: 'ApiDetailPage' },
   { key: 's', description: 'Select recommended pricing plan', category: 'Pricing' },
+  
+  // ApiUsage
+  { key: 't', description: 'Make test call', category: 'ApiUsage' },
+  { key: 'h', description: 'Toggle request history', category: 'ApiUsage' },
+  { key: 'c', description: 'Copy API key', category: 'ApiUsage' },
+  { key: 's', description: 'Share snapshot', category: 'ApiUsage' },
+  { key: 'e', description: 'Export CSV', category: 'ApiUsage' },
 ];
 
 

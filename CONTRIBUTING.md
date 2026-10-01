@@ -94,6 +94,17 @@ Before opening a pull request:
 `src/setupTests.ts` registers the shared matchers and per-test cleanup, and CSS
 imports are handled automatically.
 
+Conventions:
+
+- **Naming and location:** test files must be named `*.test.tsx` or `*.test.ts`
+  (only these match the `include` pattern in `vitest.config.ts`). Place them
+  next to the source file they test.
+- **Fake timers:** if a component or utility relies on `setTimeout`,
+  `setInterval`, or `Date`, use Vitest's fake timers (`vi.useFakeTimers()`)
+  instead of real waits, to keep tests fast and deterministic. Restore them
+  with `vi.useRealTimers()` afterwards; note that Testing Library's `waitFor`
+  can hang under fake timers.
+
 ## Manual verification
 
 For changes that automated tests cannot cover — layout, animation, theming,

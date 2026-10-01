@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
 import ServerError from "./components/ServerError";
@@ -6,8 +6,9 @@ import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut, normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
-import DepositPreview from "./components/DepositPreview";
-import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS } from "./config/constants";
+import { useNetworkFee } from "./components/DepositPreview";
+import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS } from "./config/constants";
+import type { WalletServiceErrorCode } from "./services/walletService";
 import CompareDrawer from "./components/CompareDrawer";
 import CompareTray from "./components/CompareTray";
 import ExternalLink from "./components/ExternalLink";
@@ -60,6 +61,11 @@ export function prefetchRoute(path: string) {
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
+
+type WalletServiceFailure = Error & {
+  code: WalletServiceErrorCode;
+  requiresReconciliation: boolean;
+};
 
 const STAGE_LABELS: Record<DepositStage, string> = {
   input: "Enter Amount",
@@ -161,11 +167,6 @@ const APP_ROUTES = {
   onboarding: "/onboarding",
   endpointSummary: "/endpoints",
 } as const;
-
-function createMockHash() {
-  const seed = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
-  return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
-}
 
 function buildExplorerLink(hash: string) {
   return `${EXPLORER_BASE_URL}${hash}`;
@@ -391,6 +392,9 @@ function App() {
   useGlobalShortcuts(handleGlobalKeyDown);
   const [depositStage, setDepositStage] = useState<DepositStage>("input");
   const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
+  const [walletAvailability, setWalletAvailability] = useState<"checking" | "available" | "missing">("checking");
+  const [depositFailureCode, setDepositFailureCode] = useState<WalletServiceErrorCode | null>(null);
+  const [depositRequiresReconciliation, setDepositRequiresReconciliation] = useState(false);
   const [txHash, setTxHash] = useState("");
   const [copied, setCopied] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
@@ -398,14 +402,14 @@ function App() {
   const [submittedStartingBalance, setSubmittedStartingBalance] = useState<number | null>(null);
   const [amountHint, setAmountHint] = useState<string | null>(null);
 
-  const timersRef = useRef<number[]>([]);
-
   const parsedAmount = Number(amountInput);
   const hasAmount = amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
   const activeAmount = submittedAmount ?? (hasAmount ? parsedAmount : 0);
   const previewCurrentBalance = submittedStartingBalance ?? vaultBalance;
   const projectedBalance = previewCurrentBalance + activeAmount;
   const isBusy = depositStage === "approving" || depositStage === "pending";
+  const hasUnconfirmedDeposit = depositRequiresReconciliation;
+  const { networkFee, isEstimated: isNetworkFeeEstimated } = useNetworkFee(NETWORK_FEE, isDepositOpen);
   const balanceDelta = formatUsdc(submittedAmount ?? (hasAmount ? parsedAmount : 0));
 
   let validationMessage = "";
@@ -425,10 +429,23 @@ function App() {
   const pendingHashLabel = txHash ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : null;
 
   useEffect(() => {
+    if (!isDepositOpen) return;
+
+    let isCurrent = true;
+    setWalletAvailability("checking");
+    import("./services/walletService")
+      .then(({ isWalletAvailable }) => isWalletAvailable())
+      .then((available) => {
+        if (isCurrent) setWalletAvailability(available ? "available" : "missing");
+      })
+      .catch(() => {
+        if (isCurrent) setWalletAvailability("missing");
+      });
+
     return () => {
-      timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
+      isCurrent = false;
     };
-  }, []);
+  }, [isDepositOpen]);
 
   useEffect(() => {
     if (location.pathname !== APP_ROUTES.billing && isDepositOpen) {
@@ -442,13 +459,7 @@ function App() {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
-  const clearTimers = () => {
-    timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
-    timersRef.current = [];
-  };
-
   const resetFlow = (nextAmount = amountInput, nextPreset = selectedPreset) => {
-    clearTimers();
     setAmountInput(nextAmount);
     setSelectedPreset(nextPreset);
     setDepositStage("input");
@@ -456,6 +467,8 @@ function App() {
     setCopied(false);
     setSubmittedAmount(null);
     setSubmittedStartingBalance(null);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
     setAmountHint(null);
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
@@ -464,7 +477,7 @@ function App() {
     navigate(APP_ROUTES.billing);
     const nextAmount = presetAmount !== undefined ? String(presetAmount) : amountInput;
     const nextPreset: number | "custom" = presetAmount !== undefined ? presetAmount : selectedPreset;
-    resetFlow(nextAmount, nextPreset);
+    if (!hasUnconfirmedDeposit) resetFlow(nextAmount, nextPreset);
     setIsDepositOpen(true);
   };
 
@@ -490,7 +503,7 @@ function App() {
   };
 
   const handleAmountChange = (value: string, preset: number | "custom" = "custom") => {
-    if (isBusy) return;
+    if (isBusy || hasUnconfirmedDeposit) return;
 
     const { value: normalized, truncated } = normalizeUsdcAmountInput(value);
     resetFlow(normalized, preset);
@@ -521,49 +534,65 @@ function App() {
     }
   };
 
-  const handleApproveTransaction = () => {
-    if (!hasValidAmount || isBusy) return;
+  const handleApproveTransaction = async () => {
+    if (!hasValidAmount || isBusy || hasUnconfirmedDeposit || walletAvailability !== "available") return;
 
     const approvedAmount = parsedAmount;
     const startingBalance = vaultBalance;
-    const nextHash = createMockHash();
-
-    clearTimers();
     setSubmittedAmount(approvedAmount);
     setSubmittedStartingBalance(startingBalance);
-    setTxHash(nextHash);
+    setTxHash("");
     setCopied(false);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
     setDepositStage("approving");
     setStatusMessage("Approve this USDC deposit in your wallet to continue.");
 
-    timersRef.current.push(
-      window.setTimeout(() => {
-        setDepositStage("pending");
-        setStatusMessage("Transaction submitted to Stellar. Waiting for confirmation.");
-      }, 1400),
-    );
+    let isWalletServiceError:
+      | ((error: unknown) => error is WalletServiceFailure)
+      | undefined;
 
-    timersRef.current.push(
-      window.setTimeout(() => {
-        if (demoOutcome === "confirmed") {
-          setDepositStage("confirmed");
-          setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
-          setStatusMessage(`${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`);
-        } else {
-          setDepositStage("failed");
-          setStatusMessage("The deposit was not confirmed. Review the details, then retry when your wallet is ready.");
-        }
-      }, 3600),
-    );
+    try {
+      const walletService = await import("./services/walletService");
+      isWalletServiceError = (error): error is WalletServiceFailure =>
+        error instanceof walletService.WalletServiceError;
+
+      const submittedDeposit = await walletService.submitVaultDeposit(amountInput, (hash) => {
+        setTxHash(hash);
+        setDepositStage("pending");
+        setStatusMessage("Transaction submitted to Stellar. Waiting for ledger confirmation.");
+      });
+
+      setTxHash(submittedDeposit.hash);
+      setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
+      setDepositStage("confirmed");
+      setStatusMessage(`${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`);
+    } catch (error) {
+      const walletError = isWalletServiceError?.(error) ? error : null;
+      const failureCode = walletError?.code ?? "NETWORK_ERROR";
+      setDepositFailureCode(failureCode);
+      setDepositRequiresReconciliation(walletError?.requiresReconciliation ?? false);
+      setDepositStage("failed");
+      setStatusMessage(
+        walletError
+          ? walletError.message
+          : "Could not submit the deposit. Check your wallet and Stellar network, then try again.",
+      );
+    }
   };
 
   const handleRetry = () => {
+    if (hasUnconfirmedDeposit) return;
     if (submittedAmount !== null) {
       setAmountInput(String(submittedAmount));
     }
 
     setSelectedPreset("custom");
     setDepositStage("input");
+    setTxHash("");
+    setCopied(false);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
     setStatusMessage("Review the transaction details and approve again.");
   };
 
@@ -723,17 +752,21 @@ function App() {
                   <aside className="surface prototype-panel">
                     <p className="eyebrow">Prototype state preview</p>
                     <h2>Review both success and failure flows.</h2>
-                    <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
-                      <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
-                        Confirmed path
-                      </button>
-                      <button role="radio" aria-checked={demoOutcome === "failed"} className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
-                        Failed path
-                      </button>
-                    </div>
-                    <p className="helper-text">
-                      The modal follows the real sequence. Use this toggle to preview the end-state a reviewer should see after wallet approval.
-                    </p>
+                    {ENABLE_DEMO_OUTCOME && (
+                      <>
+                        <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
+                          <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
+                            Confirmed path
+                          </button>
+                          <button role="radio" aria-checked={demoOutcome === "failed"} className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
+                            Failed path
+                          </button>
+                        </div>
+                        <p className="helper-text">
+                          Demo control for previewing the success and failure layouts.
+                        </p>
+                      </>
+                    )}
                   </aside>
                 </section>
               }
@@ -834,7 +867,7 @@ function App() {
 
               <div className="modal-body">
                 <div className="stage-strip" aria-label="Transaction flow status">
-                  {(["input", "approving", "pending", demoOutcome === "confirmed" ? "confirmed" : "failed"] as const).map((item) => {
+                  {(["input", "approving", "pending", depositStage === "failed" ? "failed" : "confirmed"] as const).map((item) => {
                     const isActive = item === depositStage || (item === "input" && depositStage === "input" && hasValidAmount);
 
                     return (
@@ -877,13 +910,13 @@ function App() {
                         inputMode="decimal"
                         value={amountInput}
                         onChange={(event) => handleAmountChange(event.target.value)}
-                        disabled={isBusy}
+                        disabled={isBusy || hasUnconfirmedDeposit}
                         placeholder="0.00"
                         aria-describedby={amountHint ? "deposit-help deposit-amount-hint" : "deposit-help"}
                         aria-invalid={validationMessage.length > 0 && depositStage === "input"}
                       />
                       <span>USDC</span>
-                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy} aria-label={`Set maximum amount: ${formatUsdShortcut(walletBalance)}`}>
+                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy || hasUnconfirmedDeposit} aria-label={`Set maximum amount: ${formatUsdShortcut(walletBalance)}`}>
                         Max
                       </button>
                     </div>
@@ -902,11 +935,11 @@ function App() {
 
                     <div className="preset-row" role="radiogroup" aria-label="Deposit amount preset">
                       {PRESET_AMOUNTS.map((preset) => (
-                        <button key={preset} role="radio" aria-checked={selectedPreset === preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
+                        <button key={preset} role="radio" aria-checked={selectedPreset === preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy || hasUnconfirmedDeposit}>
                           ${preset}
                         </button>
                       ))}
-                      <button role="radio" aria-checked={selectedPreset === "custom"} className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy}>
+                      <button role="radio" aria-checked={selectedPreset === "custom"} className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy || hasUnconfirmedDeposit}>
                         Custom
                       </button>
                     </div>
@@ -947,12 +980,15 @@ function App() {
 
                       <div className="preview-row">
                         <span>Network fee</span>
-                        <strong>{NETWORK_FEE}</strong>
+                        <strong>
+                          <span>{networkFee}</span>
+                          {isNetworkFeeEstimated && <span> (estimated)</span>}
+                        </strong>
                       </div>
 
                       <div className="preview-row total">
                         <span>Total cost</span>
-                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${NETWORK_FEE}` : `0.00 USDC + ${NETWORK_FEE}`}</strong>
+                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${networkFee}` : `0.00 USDC + ${networkFee}`}</strong>
                       </div>
                     </article>
 
@@ -974,8 +1010,8 @@ function App() {
 
                     {depositStage === "failed" && (
                       <article className="error-card">
-                        <strong>Approval not confirmed</strong>
-                        <p>No funds were added to the vault. Retry after confirming the wallet prompt or checking your network status.</p>
+                        <strong>{depositFailureCode === "SIGNATURE_REJECTED" ? "Signature rejected" : "Deposit failed"}</strong>
+                        <p>{statusMessage}</p>
                       </article>
                     )}
 
@@ -990,10 +1026,27 @@ function App() {
               </div>
 
               <div className="modal-actions">
-                {depositStage === "failed" ? (
-                  <button className="primary-button" onClick={handleRetry}>
-                    Retry deposit
+                {walletAvailability === "missing" ? (
+                  <div className="wallet-install-prompt" role="status">
+                    <p>Install Freighter to sign this Stellar deposit.</p>
+                    <a className="primary-button" href="https://www.freighter.app/" target="_blank" rel="noreferrer">
+                      Install Freighter
+                    </a>
+                  </div>
+                ) : walletAvailability === "checking" ? (
+                  <button className="primary-button" disabled>
+                    Checking for Freighter...
                   </button>
+                ) : depositStage === "failed" ? (
+                  hasUnconfirmedDeposit ? (
+                    <button className="primary-button" disabled title="Check the submitted transaction before creating another deposit.">
+                      Check transaction status before retrying
+                    </button>
+                  ) : (
+                    <button className="primary-button" onClick={handleRetry}>
+                      Retry deposit
+                    </button>
+                  )
                 ) : depositStage === "confirmed" ? (
                   <button className="primary-button" onClick={handleDepositAnother}>
                     Deposit another amount

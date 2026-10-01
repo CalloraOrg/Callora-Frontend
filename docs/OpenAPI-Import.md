@@ -4,7 +4,12 @@ The Callora OpenAPI importer uses a lightweight parser designed to extract endpo
 
 ## Supported Versions
 * **OpenAPI 3.x** is supported.
-* OpenAPI 2.x (Swagger) is not supported.
+* **Swagger 2.0** is supported and converted into the same endpoint stubs (issue #1075):
+  * `basePath` is prefixed to every path.
+  * `query`, `path` and `body` parameters are imported (operation-level declarations override path-item ones).
+  * Features the stubs cannot represent — `consumes` / `produces` media types, `header` / `formData` parameters, unresolved `$ref`s — are listed as non-fatal warnings in the preview instead of failing the import.
+  * The preview shows a "Converted from Swagger 2.0" notice.
+* Other Swagger versions (e.g. 1.2) are rejected.
 
 ## YAML Subset
 To ensure fast and reliable extraction in the browser without large dependencies, the parser supports a specific subset of YAML. 
@@ -25,9 +30,9 @@ To ensure fast and reliable extraction in the browser without large dependencies
 * Path keys with bare colons (e.g. `/foo:bar` must be quoted as `"/foo:bar"`)
 
 ## $ref Handling
-The parser does not resolve `$ref` pointers.
-* It only extracts stubs directly defined in the `paths` block.
-* If an endpoint's operations or summaries are defined externally via `$ref`, they will not be automatically resolved or included in the import preview.
+Local `$ref` pointers (`#/...`) are resolved for path items, parameters and request bodies (issue #1074).
+* Cyclic refs, refs nested deeper than 32 levels and refs whose target does not exist are reported as non-fatal problems; the endpoints that did parse are still shown, with the problems listed as warnings.
+* Remote or external refs (anything not starting with `#/`) are never fetched and are reported the same way.
 
 ## Error Reporting
 The importer captures errors and displays them inline:

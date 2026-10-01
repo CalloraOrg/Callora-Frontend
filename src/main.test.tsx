@@ -26,6 +26,14 @@ vi.mock("./hooks/useRouteLoading", async (importOriginal) => {
   };
 });
 
+// MarketplacePage reads its catalogue from the backend (#1045). Resolve it
+// with the bundled fixtures so the page can leave its loading shell offline.
+vi.mock("./api/catalogApi", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./api/catalogApi")>();
+  const { default: MOCK_APIS } = await import("./data/mockApis");
+  return { ...actual, fetchCatalog: vi.fn().mockResolvedValue(MOCK_APIS) };
+});
+
 type MountedRoute = {
   /** Stands in for the React root `main.tsx` creates. */
   target: RouteRenderTarget;
@@ -87,8 +95,9 @@ describe("renderRoute entry branches", () => {
     return route;
   }
 
-  function settleLoadingDelay() {
-    act(() => {
+  /** Advances past the loading delay and flushes pending data promises. */
+  async function settleLoadingDelay() {
+    await act(async () => {
       vi.advanceTimersByTime(LOADING_DELAY_MS);
     });
   }
@@ -134,7 +143,7 @@ describe("renderRoute entry branches", () => {
 
     // The lazy chunk really delivered the page: once its own loading delay
     // elapses the shell is replaced by the interactive marketplace.
-    settleLoadingDelay();
+    await settleLoadingDelay();
     expect(container.querySelector(".marketplace-search input")).not.toBeNull();
   });
 
@@ -165,7 +174,7 @@ describe("renderRoute entry branches", () => {
     expect(typeof detailPage?.props.onBack).toBe("function");
     expect(stopRouteLoading).toHaveBeenCalledTimes(1);
 
-    settleLoadingDelay();
+    await settleLoadingDelay();
     expect(
       screen.getByRole("heading", { name: "WeatherSim API" }),
     ).toBeInTheDocument();
@@ -180,7 +189,7 @@ describe("renderRoute entry branches", () => {
     await act(async () => {
       await pending;
     });
-    settleLoadingDelay();
+    await settleLoadingDelay();
 
     await act(async () => {
       screen.getByRole("button", { name: "Back" }).click();

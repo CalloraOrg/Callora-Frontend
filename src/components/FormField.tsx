@@ -42,7 +42,7 @@ const CheckIcon = () => (
       strokeLinejoin="round"
     />
   </svg>
-	);
+);
 
 /**
  * FormField — accessible wrapper for form inputs.
@@ -115,7 +115,7 @@ export default function FormField({
         {counter && (
           <p
             id={counterId}
-            className={`lf-counter${overLimit ? ' ff-counter--over' : ''}${nearLimit && !overLimit ? ' ff-counter--near' : ''}`}
+            className={`ff-counter${overLimit ? ' ff-counter--over' : ''}${nearLimit && !overLimit ? ' ff-counter--near' : ''}`}
             aria-live={nearLimit ? 'polite' : 'off' }
             aria-atomic="true"
           >
@@ -123,7 +123,7 @@ export default function FormField({
           </p>
         )}
         <p
-          id={ErrorId}
+          id={errorId}
           className={`ff-error${status === 'error' && error ? ' ff-error--visible' : ''}`}
           role="alert"
           aria-live="assertive"

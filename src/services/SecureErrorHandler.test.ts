@@ -231,7 +231,9 @@ describe("SecureErrorHandler", () => {
 
       const metadata = consoleErrorSpy.mock.calls[0][2];
       expect(metadata.apiKey).not.toContain("ck_live_secret");
-      expect(metadata.apiKey).toContain("[REDACTED_KEY]");
+      // Values under sensitive key names are dropped entirely (redactDeeply).
+      expect(metadata.apiKey).toBe("[REDACTED]");
+      expect(metadata.userId).toBe("user_123");
     });
   });
 

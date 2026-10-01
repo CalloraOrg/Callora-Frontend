@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import NotFound from "./NotFound";
+import NotFound, { resolveSearchMatches } from "./NotFound";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -163,7 +163,7 @@ describe("NotFound", () => {
       expect(mockNavigate).toHaveBeenCalledWith("/documentation");
     });
 
-    it("navigates to /dashboard when searching 'home'", async () => {
+    it("suggests Dashboard (and Home) when searching the ambiguous 'home'", async () => {
       const user = userEvent.setup();
       renderNotFound();
 
@@ -171,7 +171,11 @@ describe("NotFound", () => {
       await user.type(input, "home");
       await user.click(screen.getByRole("button", { name: /search/i }));
 
-      expect(mockNavigate).toHaveBeenCalledWith("/dashboard");
+      // "home" matches both Home and Dashboard, so the user picks (#1071).
+      expect(mockNavigate).not.toHaveBeenCalled();
+      const results = screen.getByRole("navigation", { name: /search suggestions/i });
+      expect(results.querySelector('a[href="/dashboard"]')).not.toBeNull();
+      expect(results.querySelector('a[href="/"]')).not.toBeNull();
     });
 
     it("navigates to /dashboard when searching 'dashboard'", async () => {
@@ -196,7 +200,7 @@ describe("NotFound", () => {
       expect(mockNavigate).toHaveBeenCalledWith("/documentation");
     });
 
-    it("navigates to /billing when searching 'bill'", async () => {
+    it("suggests Billing (and Billing History) when searching 'bill'", async () => {
       const user = userEvent.setup();
       renderNotFound();
 
@@ -204,7 +208,12 @@ describe("NotFound", () => {
       await user.type(input, "bill");
       await user.click(screen.getByRole("button", { name: /search/i }));
 
-      expect(mockNavigate).toHaveBeenCalledWith("/billing");
+      // "bill" matches Billing exactly and Billing History partially (#1071).
+      expect(mockNavigate).not.toHaveBeenCalled();
+      const results = screen.getByRole("navigation", { name: /search suggestions/i });
+      const hrefs = Array.from(results.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+      expect(hrefs[0]).toBe("/billing");
+      expect(hrefs).toContain("/billing/history");
     });
 
     it("navigates to /billing when searching 'deposit'", async () => {
@@ -402,5 +411,82 @@ describe("NotFound", () => {
       renderNotFound();
       expect(screen.getByLabelText("Search for a page")).toBeInTheDocument();
     });
+  });
+});
+
+// ── Route catalogue search (issue #1071) ─────────────────────────────────────
+
+function searchFor(value: string) {
+  const input = screen.getByLabelText(/search for a page/i);
+  fireEvent.change(input, { target: { value } });
+  fireEvent.submit(input.closest("form") as HTMLFormElement);
+}
+
+describe("resolveSearchMatches", () => {
+  it("matches 'usage' to the API Usage route", () => {
+    const matches = resolveSearchMatches("usage");
+    expect(matches.some((m) => m.path === "/api-usage")).toBe(true);
+  });
+
+  it("matches 'history' to the Billing History route", () => {
+    const matches = resolveSearchMatches("history");
+    expect(matches.some((m) => m.path === "/billing/history")).toBe(true);
+  });
+
+  it("matches previously-unrecognised terms like 'publish', 'webhooks' and 'theme'", () => {
+    expect(resolveSearchMatches("publish").some((m) => m.path === "/publish")).toBe(true);
+    expect(resolveSearchMatches("webhooks").some((m) => m.path === "/webhooks/deliveries")).toBe(true);
+    expect(resolveSearchMatches("theme").some((m) => m.path === "/theme-playground")).toBe(true);
+  });
+
+  it("returns no matches for empty or unknown queries", () => {
+    expect(resolveSearchMatches("")).toEqual([]);
+    expect(resolveSearchMatches("zzz-not-a-real-route-zzz")).toEqual([]);
+  });
+
+  it("returns multiple ranked matches for an ambiguous query", () => {
+    const matches = resolveSearchMatches("api");
+    expect(matches.length).toBeGreaterThan(1);
+  });
+});
+
+describe("NotFound search UI", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("navigates directly when searching 'usage'", () => {
+    renderNotFound();
+    searchFor("usage");
+    expect(mockNavigate).toHaveBeenCalledWith("/api-usage");
+  });
+
+  it("navigates directly when searching 'history'", () => {
+    renderNotFound();
+    searchFor("history");
+    expect(mockNavigate).toHaveBeenCalledWith("/billing/history");
+  });
+
+  it("renders a list of links when a query matches multiple routes", () => {
+    renderNotFound();
+    searchFor("api");
+
+    const results = screen.getByRole("navigation", { name: /search suggestions/i });
+    const links = results.querySelectorAll("a");
+    expect(links.length).toBeGreaterThan(1);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("shows the helper message for unknown search terms", () => {
+    renderNotFound();
+    searchFor("zzz-not-a-real-route-zzz");
+
+    expect(
+      screen.getByText(/no direct match yet\. try dashboard, marketplace, or documentation\./i),
+    ).toBeInTheDocument();
   });
 });

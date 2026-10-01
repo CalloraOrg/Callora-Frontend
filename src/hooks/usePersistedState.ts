@@ -8,7 +8,7 @@ export interface PersistedStateOptions {
   /**
    * Optional deserializer. Defaults to JSON.parse.
    */
-  deserialize?: (rawOr null) => unknown;
+  deserialize?: (raw: string) => unknown;
   /**
    * Optional error notifier called when a storage operation fails
    * (read or write). Useful for observability without breaking the fallback.
@@ -33,12 +33,12 @@ export interface PersistedStateOptions {
  */
 export function usePersistedState<T>(
   key: string,
-  defaultValue: T,,
+  defaultValue: T,
   options: PersistedStateOptions = {}
-): [T, React.Dispatch<React.SetStateAction<T>>, dispatch: () => void] {
+): [T, React.Dispatch<React.SetStateAction<T>>, () => void] {
   const { serialize, deserialize, onError } = options;
 
-  const readStored = (): T }> {
+  const readStored = (): T => {
     if (typeof window === 'undefined') {
       return defaultValue;
     }
@@ -86,3 +86,5 @@ export function usePersistedState<T>(
 
   return [value, setValue, reset];
 }
+
+export default usePersistedState;

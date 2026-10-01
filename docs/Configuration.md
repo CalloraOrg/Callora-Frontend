@@ -121,6 +121,11 @@ relative is what makes that work without a rebuild per environment.
 | `apiUrl(path)` | join a path onto `API_BASE` |
 | `normalizeBaseUrl(value)` | trim + strip trailing slashes |
 | `resolveStellarNetwork(raw)` | validate with dev-only warning |
+| `STELLAR_NETWORK_PASSPHRASE` | passphrase for `STELLAR_NETWORK`, used to sign deposits |
+| `STELLAR_RPC_URL` | `VITE_STELLAR_RPC_URL`, else the network's public RPC (none for mainnet) |
+| `STELLAR_VAULT_CONTRACT_ID` | `VITE_STELLAR_VAULT_CONTRACT_ID`, empty by default |
+| `ENABLE_DEMO_OUTCOME` | `VITE_ENABLE_DEMO_OUTCOME === "true"` on the dev server only |
+| `EXPLORER_BASE_URL` | stellar.expert transaction URL for `STELLAR_NETWORK` |
 
 `src/config/constants.ts` is the single place these variables are read. Read
 the exported constants instead of `import.meta.env` elsewhere so validation and

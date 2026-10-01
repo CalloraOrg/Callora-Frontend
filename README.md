@@ -30,6 +30,7 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - **Response diff highlighting**: Pass a `compareWith` prop to `CallHistoryRow` to show a line-by-line diff between two call responses, with added (green), removed (red), and unchanged context lines. Includes a Diff/Raw toggle, before/after call labels, and full WCAG 2.1 AA accessibility. See [docs/ResponseDiff.md](docs/ResponseDiff.md).
 - **SLA details card**: The GrantFox Wave Compute API SLA page (`/marketplace/grantfox-wave-compute/sla`) displays all SLA metrics with per-value copy-to-clipboard buttons. Each button shows a 2-second "Copied!" success state (green checkmark + label), announces the copy to screen readers via `aria-live`, and falls back to `execCommand` in non-HTTPS contexts. Powered by the reusable `useCopy` hook. See [docs/SlaCard-CopyToClipboard.md](docs/SlaCard-CopyToClipboard.md).
 - **Smooth theme transition**: Light/dark switches animate color tokens (background, text, border) over 240 ms instead of snapping. The transition is gated behind a `theme-transitions-ready` class that ThemeProvider adds after the first paint, preventing any flash on load. Animated elements (toasts, skeletons, spinners) are automatically excluded. Use the `.no-theme-transition` escape hatch on any element that must opt out.
+- **Theme resolution (pre-paint → transitions)**: Theme handling spans the inline script in `index.html`, `ThemeContext.tsx`, `ThemeToggle.tsx`, and `styles/theme-transition.css`. The storage key, allowed values, and transition gating are documented in [docs/Theming.md](docs/Theming.md).
 - **Endpoint hover preview**: On the API Detail documentation tab, hovering or focusing an individual endpoint card header reveals a compact floating panel showing the HTTP method badge, endpoint URL, parameter table (name / type / required), and an optional response-shape snippet. Keyboard accessible (Escape dismisses); all colours from design tokens. See `src/components/EndpointPreview.tsx`.
 - **Generic BottomSheet with visible drag handle** (GrantFox FWC26): `src/components/BottomSheet.tsx` is a reusable bottom-sheet dialog with a persistent pill-shaped drag handle. The pill widens and brightens on hover and during active drag. Supports two snap points (`"half"` / `"full"`), a `footer` slot, focus trap, Escape / backdrop dismiss, focus restore, body scroll lock, and full `prefers-reduced-motion` support. All colours use design tokens. See [docs/BottomSheet-drag-handle.md](docs/BottomSheet-drag-handle.md).
 - **Reduced-motion data transitions** (Issue #1005): Loading skeletons, spinners, the route-progress bar, stale-data fades, and the dashboard activity fetch all respect `prefers-reduced-motion` via a shared `usePrefersReducedMotion` hook + a global CSS fallback. Dashboard activity and webhook-delivery loading/error/stale changes are announced through `role="status"` / `role="alert"` live regions. See [docs/data-transitions-reduced-motion.md](docs/data-transitions-reduced-motion.md).
@@ -95,6 +96,16 @@ The tables below list every entry in `SHORTCUTS` (`src/hooks/useGlobalShortcuts.
 | Key | Action |
 | --- | ------ |
 | `s` | Select recommended pricing plan |
+
+#### ApiUsage
+
+| Key | Action |
+| --- | ------ |
+| `t` | Make test call |
+| `h` | Toggle request history |
+| `c` | Copy API key |
+| `s` | Share snapshot |
+| `e` | Export CSV |
 
 ### Typing in form fields
 
@@ -231,56 +242,7 @@ Most pages are registered in `src/App.tsx`: the `APP_ROUTES` map and the `<Route
 When you add a route (an `APP_ROUTES` entry, a `<Route>` in `src/App.tsx` or a path check in `src/main.tsx`), add a row here. `src/readme-routes.test.ts` fails when a route in the code is missing from this table or a row names a path the code doesn't serve.
 
 
-```
-callora-frontend/
-├── src/
-│   ├── App.tsx              # Router, layout, and route definitions
-│   ├── main.tsx             # Entry point
-│   ├── index.css            # Global styles and design tokens
-│   ├── ThemeContext.tsx      # Light/dark theme context
-│   ├── ThemeToggle.tsx      # Theme toggle component
-│   ├── ApiUsage.tsx         # API usage analytics view
-│   ├── config/              # Shared app configuration
-│   │   └── constants.ts     # App constants (URLs, deposit limits, loading delay)
-│   ├── components/          # Shared UI components
-│   │   ├── ApiCard.tsx
-│   │   ├── Breadcrumb.tsx
-│   │   ├── CodeExample.tsx
-│   │   ├── CommandPalette.css
-│   │   ├── CommandPalette.test.tsx
-│   │   ├── CommandPalette.tsx
-│   │   ├── CommandPalette_MANUAL_TEST_PLAN.md
-│   │   ├── Dashboard.tsx
-│   │   ├── EmptyState.tsx
-│   │   ├── EndpointGroupHover.tsx
-│   │   ├── EndpointPreview.tsx
-│   │   ├── FiltersSidebar.tsx
-│   │   ├── NotFound.tsx
-│   │   ├── SearchBar.tsx
-│   │   ├── ServerError.tsx
-│   │   ├── ServerErrorDemo.tsx
-│   │   └── Skeleton.tsx
-│   ├── pages/               # Standalone page components
-│   │   ├── ApiDetailPage.tsx
-│   │   ├── MarketplacePage.tsx
-│   │   └── RateLimitCard.tsx  # (Issue #537) Rate-limit quota card with middle-ellipsis breadcrumb
-│   ├── hooks/               # Custom React hooks
-│   │   └── useDebounce.ts
-│   ├── data/                # Static and mock data
-│   │   └── mockApis.ts
-│   ├── utils/               # Utility functions
-│   │   ├── diff.ts          # Line-level diff engine (computeDiff, diffJson, hasDifferences)
-│   │   └── format.ts        # Currency formatters (formatUsdc, formatUsdShortcut, formatPrice)
-│   └── vite-env.d.ts
-├── docs/
-│   ├── README.md            # Documentation index and topic guides
-│   ├── UI-Design-System.md  # Design tokens and component specifications
-│   └── ResponseDiff.md      # Response diff highlighting (CallHistoryRow)
-├── index.html
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
-```
+## Project layout
 
 - **`src/`**
   - `main.tsx` — Application entry point
@@ -295,9 +257,24 @@ callora-frontend/
   - **`state/`** — Zustand state management slices and global stores
   - **`styles/`** — Global CSS, design tokens, and utility classes
   - **`utils/`** — Pure utility functions (e.g., [Response Diff Engine](docs/ResponseDiff.md))
-- **`docs/`** — Technical documentation and architecture records
+- **`docs/`** — Technical documentation and architecture records (start at the [Documentation Index](docs/README.md))
 
 
 This repo is part of [Callora](https://github.com/CalloraOrg/callora). Backend and contracts live in separate repos: `callora-backend`, `callora-contracts`.
 
+### Stellar wallet deposits
+
+Deposits use the Freighter browser extension and the Callora Soroban vault. Configure the deployed vault contract ID before starting the frontend:
+
+```env
+VITE_STELLAR_NETWORK=testnet
+VITE_STELLAR_VAULT_CONTRACT_ID=<deployed-vault-contract-id>
+```
+
+`VITE_STELLAR_RPC_URL` can override the testnet RPC endpoint. Mainnet deployments must set `VITE_STELLAR_NETWORK=mainnet`, `VITE_STELLAR_RPC_URL`, and the matching mainnet vault contract ID together. Do not mix addresses or RPC endpoints across networks.
+
+The demo outcome radio group is hidden by default. In a Vite development server, set `VITE_ENABLE_DEMO_OUTCOME=true` to show it.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
+For theme architecture details — the pre-paint script's role, the `callora-theme` storage key and its `light`/`dark`/`system` values, transition gating via `theme-transitions-ready`, and the `.no-theme-transition` escape hatch — see [docs/Theming.md](docs/Theming.md).

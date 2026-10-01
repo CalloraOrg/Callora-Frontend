@@ -22,6 +22,39 @@ import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
 import { normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
 
+// Deposits are signed through Freighter via `src/services/walletService`
+// (issue #1043). The wallet is mocked so these tests drive the modal's
+// approving → pending → confirmed / failed transitions deterministically.
+const walletMocks = vi.hoisted(() => ({
+  isWalletAvailable: vi.fn(),
+  submitVaultDeposit: vi.fn(),
+}));
+
+vi.mock("./services/walletService", () => {
+  class WalletServiceError extends Error {
+    readonly code: string;
+    readonly requiresReconciliation: boolean;
+
+    constructor(code: string, message: string, requiresReconciliation = false) {
+      super(message);
+      this.name = "WalletServiceError";
+      this.code = code;
+      this.requiresReconciliation = requiresReconciliation;
+    }
+  }
+
+  return {
+    WalletServiceError,
+    isWalletAvailable: walletMocks.isWalletAvailable,
+    submitVaultDeposit: walletMocks.submitVaultDeposit,
+  };
+});
+
+beforeEach(() => {
+  walletMocks.isWalletAvailable.mockReset().mockResolvedValue(true);
+  walletMocks.submitVaultDeposit.mockReset();
+});
+
 /** Renders the app deep-linked to the billing page with the deposit modal open. */
 function renderDepositModal() {
   return render(
@@ -193,13 +226,14 @@ describe("deposit amount input", () => {
     expect(screen.queryByText(/7 decimal places/i)).toBeNull();
   });
 
-  it("validates and previews the normalised value that would be submitted", () => {
+  it("validates and previews the normalised value that would be submitted", async () => {
     renderDepositModal();
     const input = typeAmount("100.123456789");
 
     // 100.1234567 is above the minimum deposit and below the wallet balance.
     expect(input.getAttribute("aria-invalid")).toBe("false");
-    expect(screen.getByRole("button", { name: /Approve deposit transaction/i })).toBeEnabled();
+    // The approve button appears once the (mocked) Freighter check resolves.
+    expect(await screen.findByRole("button", { name: /Approve deposit transaction/i })).toBeEnabled();
 
     const deltaLabel = screen.getByText("Deposit amount").parentElement;
     expect(deltaLabel?.textContent).toContain("100.12 USDC");
@@ -218,12 +252,15 @@ describe("deposit amount input", () => {
 
 /**
  * Render at /billing?deposit=true with real timers until the modal is present
- * (the billing section suspends on a lazy InvoiceCard), then switch to fake
- * timers and advance past the ~400ms route-transition timers before asserting.
+ * (the billing section suspends on a lazy InvoiceCard) and the wallet check has
+ * resolved, then switch to fake timers and advance past the ~400ms
+ * route-transition timers before asserting.
  */
 async function renderModalReady() {
   renderDepositModal();
   const dialog = await screen.findByRole("dialog");
+  // Wait (on real timers) for the Freighter availability check to resolve.
+  await screen.findByRole("button", { name: "Approve deposit transaction" });
   vi.useFakeTimers();
   act(() => {
     vi.advanceTimersByTime(400);
@@ -282,19 +319,34 @@ describe("App deposit modal timed transitions", () => {
   });
 
   it("drives approving to pending to confirmed and updates the vault balance", async () => {
+    let reportSubmitted!: (hash: string) => void;
+    let confirmDeposit!: (result: { hash: string }) => void;
+    walletMocks.submitVaultDeposit.mockImplementation(
+      (_amount: string, onSubmitted: (hash: string) => void) => {
+        reportSubmitted = onSubmitted;
+        return new Promise((resolve) => {
+          confirmDeposit = resolve;
+        });
+      },
+    );
+
     const { amountInput } = await renderModalReady();
     setAmount(amountInput, "50");
 
-    fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" }));
+    });
     expect(screen.getAllByText("Approve in wallet...").length).toBeGreaterThan(0);
+    expect(walletMocks.submitVaultDeposit).toHaveBeenCalledWith("50", expect.any(Function));
 
+    const hash = "A".repeat(64);
     act(() => {
-      vi.advanceTimersByTime(1400);
+      reportSubmitted(hash);
     });
     expect(screen.getAllByText("Transaction submitted...").length).toBeGreaterThan(0);
 
-    act(() => {
-      vi.advanceTimersByTime(2200);
+    await act(async () => {
+      confirmDeposit({ hash });
     });
     expect(screen.getAllByText("Deposit successful").length).toBeGreaterThan(0);
     // 284.62 initial vault + 50 deposit = 334.62
@@ -302,34 +354,58 @@ describe("App deposit modal timed transitions", () => {
   });
 
   it("shows failure and retry restores the submitted amount", async () => {
-    renderDepositModal();
-    // The billing section suspends on a lazy InvoiceCard, so wait for the
-    // demo-outcome toggle with real timers before starting the failure path.
-    const failedToggle = await screen.findByRole("radio", { name: "Failed path" });
-    fireEvent.click(failedToggle);
-    vi.useFakeTimers();
-    act(() => {
-      vi.advanceTimersByTime(400);
-    });
-    const amountInput = screen.getByPlaceholderText("0.00") as HTMLInputElement;
+    const { WalletServiceError } = await import("./services/walletService");
+    walletMocks.submitVaultDeposit.mockRejectedValue(
+      new WalletServiceError("SIGNATURE_REJECTED", "The deposit signature was rejected in Freighter."),
+    );
+
+    const { amountInput } = await renderModalReady();
     setAmount(amountInput, "80");
 
-    fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" }));
-
-    act(() => {
-      vi.advanceTimersByTime(1400);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" }));
     });
-    expect(screen.getAllByText("Transaction submitted...").length).toBeGreaterThan(0);
 
-    act(() => {
-      vi.advanceTimersByTime(2200);
-    });
     expect(screen.getAllByText("Transaction failed").length).toBeGreaterThan(0);
-    expect(screen.getByText("Approval not confirmed")).toBeTruthy();
+    expect(screen.getByText("Signature rejected")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Retry deposit" }));
     const restored = screen.getByPlaceholderText("0.00") as HTMLInputElement;
     expect(restored.value).toBe("80");
     expect(screen.getByText("Review the transaction details and approve again.")).toBeTruthy();
+  });
+
+  it("blocks retry while a submitted deposit still needs reconciliation", async () => {
+    const { WalletServiceError } = await import("./services/walletService");
+    walletMocks.submitVaultDeposit.mockRejectedValue(
+      new WalletServiceError("NETWORK_TIMEOUT", "Check your wallet activity before retrying.", true),
+    );
+
+    const { amountInput } = await renderModalReady();
+    setAmount(amountInput, "80");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" }));
+    });
+
+    expect(screen.getByText("Deposit failed")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Check transaction status before retrying" }),
+    ).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Retry deposit" })).toBeNull();
+  });
+});
+
+describe("App deposit modal without a wallet", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("prompts to install Freighter instead of offering approval", async () => {
+    walletMocks.isWalletAvailable.mockResolvedValue(false);
+    renderDepositModal();
+
+    expect(await screen.findByRole("link", { name: "Install Freighter" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Approve deposit transaction" })).toBeNull();
   });
 });

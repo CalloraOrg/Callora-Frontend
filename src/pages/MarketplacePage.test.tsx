@@ -2,13 +2,57 @@
 
 import { act } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CollectionsProvider } from "../state/collectionsStore";
 import { compareStore } from "../state/compareStore";
 import MarketplacePage from "./MarketplacePage";
-import type { APIItem } from "../data/mockApis";
+import MOCK_APIS, { type APIItem } from "../data/mockApis";
+import { AccountProvider } from "../hooks/useAccountContext";
+import { _reset as resetAccounts, switchAccount } from "../state/accountStore";
+import { CATALOG_CACHE_KEY } from "../api/catalogApi";
+import { getCache } from "../utils/offlineApiCache";
 import { DENSITY_STORAGE_KEY } from "../state/uiPrefs";
+
+/** Reads a catalogue entry straight out of the offline cache. */
+function readCache(accountId: string, cacheKey: string) {
+  return getCache<APIItem[]>(accountId, cacheKey);
+}
+
+/**
+ * Queries scoped to the results grid. An API's name also appears in the
+ * "Recently active" rail, so unscoped `getByText` would be ambiguous.
+ */
+function grid() {
+  const el = document.querySelector(".marketplace-grid");
+  if (!el) throw new Error("results grid is not rendered");
+  return el;
+}
+
+/**
+ * The page reads its catalogue through `fetchCatalog`. Mocking the module (as
+ * opposed to stubbing `fetch`) is what lets each test drive the success,
+ * failure, and in-flight paths deterministically.
+ */
+const fetchCatalogMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../api/catalogApi", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api/catalogApi")>();
+  return {
+    ...actual,
+    fetchCatalog: fetchCatalogMock,
+  };
+});
+
+/** Seeds a catalogue response the mocked fetcher resolves with. */
+function mockCatalogResolves(items: APIItem[] = MOCK_APIS) {
+  fetchCatalogMock.mockResolvedValue(items);
+}
+
+/** Seeds a catalogue failure the mocked fetcher rejects with. */
+function mockCatalogRejects(message = "Could not reach the marketplace service.") {
+  fetchCatalogMock.mockRejectedValue(new Error(message));
+}
 
 function renderMarketplacePage() {
   return render(
@@ -30,11 +74,51 @@ function renderPage(initialEntries: string[] = ["/marketplace"]) {
   );
 }
 
-function settleMarketplaceTimers() {
-  act(() => {
+/**
+ * Renders the page under an AccountProvider so `switchAccount` actually
+ * changes the account the page reads — the only way to supersede an
+ * in-flight catalogue request without a retry button.
+ */
+function renderWithAccount() {
+  resetAccounts();
+  localStorage.clear();
+  return render(
+    <MemoryRouter initialEntries={["/marketplace"]}>
+      <AccountProvider>
+        <CollectionsProvider>
+          <MarketplacePage />
+        </CollectionsProvider>
+      </AccountProvider>
+    </MemoryRouter>,
+  );
+}
+
+/**
+ * Advances the fake clock and drains the microtask queue so the mocked
+ * catalogue promise settles inside `act` before assertions run.
+ */
+async function settleMarketplaceTimers() {
+  await act(async () => {
     vi.advanceTimersByTime(2000);
   });
 }
+
+/** Advances past the 300 ms search debounce and drains the microtask queue. */
+async function settleDebounce() {
+  await act(async () => {
+    vi.advanceTimersByTime(500);
+  });
+}
+
+// Every describe in this file exercises the same default: a catalogue that
+// loads successfully. Suites that care about failure override it per-test.
+beforeEach(() => {
+  fetchCatalogMock.mockReset();
+  mockCatalogResolves();
+  // The page caches the last good catalogue per account; clearing storage
+  // keeps a cached result from one test leaking into the next.
+  localStorage.clear();
+});
 
 describe("MarketplacePage", () => {
   beforeEach(() => {
@@ -55,9 +139,9 @@ describe("MarketplacePage", () => {
     });
   });
 
-  it("applies and persists the compact density selection", () => {
+  it("applies and persists the compact density selection", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const compactButton = screen.getByRole("button", { name: "Compact" });
     fireEvent.click(compactButton);
@@ -74,9 +158,9 @@ describe("MarketplacePage", () => {
     vi.useRealTimers();
   });
 
-  it("filters marketplace results when a tag chip is clicked", () => {
+  it("filters marketplace results when a tag chip is clicked", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const weatherTag = screen.getByRole("button", {
       name: "Filter marketplace by tag weather",
@@ -89,9 +173,9 @@ describe("MarketplacePage", () => {
     expect(screen.queryByText("QuickPay")).toBeNull();
   });
 
-  it("toggles an active tag filter off when the same tag is clicked again", () => {
+  it("toggles an active tag filter off when the same tag is clicked again", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const weatherTag = screen.getByRole("button", {
       name: "Filter marketplace by tag weather",
@@ -108,22 +192,22 @@ describe("MarketplacePage", () => {
     expect(screen.getByText("QuickPay")).toBeTruthy();
   });
 
-  it("keeps card navigation from firing when a tag chip is clicked", () => {
+  it("keeps card navigation from firing when a tag chip is clicked", async () => {
     const pushStateSpy = vi.spyOn(window.history, "pushState");
 
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const main = screen.getByRole("main");
     expect(main.classList.contains("marketplace-results")).toBe(true);
     expect(main.classList.contains("marketplace-results--tray-open")).toBe(false);
   });
 
-  it("applies marketplace-results--tray-open class when compare tray has APIs", () => {
+  it("applies marketplace-results--tray-open class when compare tray has APIs", async () => {
     compareStore.addApi({ id: "stub-api" } as APIItem);
 
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const main = screen.getByRole("main");
     expect(main.classList.contains("marketplace-results--tray-open")).toBe(true);
@@ -131,9 +215,9 @@ describe("MarketplacePage", () => {
     compareStore.clear();
   });
 
-  it("applies CSS classes for design-token-pinned spacing and typography", () => {
+  it("applies CSS classes for design-token-pinned spacing and typography", async () => {
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const page = document.querySelector(".marketplace-page");
     expect(page).toBeTruthy();
@@ -148,9 +232,9 @@ describe("MarketplacePage", () => {
     expect(grid).toBeTruthy();
   });
 
-  it("marketplace grid uses responsive minmax with token-based sizing", () => {
+  it("marketplace grid uses responsive minmax with token-based sizing", async () => {
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const grid = document.querySelector(".marketplace-grid");
     expect(grid).toBeTruthy();
@@ -165,9 +249,9 @@ describe("MarketplacePage", () => {
       return regions[regions.length - 1];
     }
 
-    it("renders a live region for screen reader announcements", () => {
+    it("renders a live region for screen reader announcements", async () => {
       renderMarketplacePage();
-      settleMarketplaceTimers();
+      await settleMarketplaceTimers();
 
       const regions = screen.getAllByTestId("live-region");
       expect(regions.length).toBeGreaterThanOrEqual(1);
@@ -176,9 +260,9 @@ describe("MarketplacePage", () => {
       expect(region.getAttribute("aria-live")).toBe("polite");
     });
 
-    it("announces when filters are cleared", () => {
+    it("announces when filters are cleared", async () => {
       renderMarketplacePage();
-      settleMarketplaceTimers();
+      await settleMarketplaceTimers();
 
       // First apply a filter to enable clear
       const weatherTag = screen.getByRole("button", {
@@ -200,9 +284,9 @@ describe("MarketplacePage", () => {
   });
   // ── tabular-nums (#476) ────────────────────────────────────────────────────
 
-  it("wraps page-count numbers in .numeric-tabular spans for tabular-nums alignment", () => {
+  it("wraps page-count numbers in .numeric-tabular spans for tabular-nums alignment", async () => {
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // All numeric spans inside the count label must carry the utility class.
     const count = document.querySelector(".marketplace-count");
@@ -213,9 +297,9 @@ describe("MarketplacePage", () => {
     expect(numericSpans.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("numeric-tabular spans contain only digit characters", () => {
+  it("numeric-tabular spans contain only digit characters", async () => {
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const count = document.querySelector(".marketplace-count");
     const numericSpans = count!.querySelectorAll("span.numeric-tabular");
@@ -225,18 +309,16 @@ describe("MarketplacePage", () => {
     });
   });
 
-  it("renders two .numeric-tabular spans showing '0' when no APIs match the search", () => {
+  it("renders two .numeric-tabular spans showing '0' when no APIs match the search", async () => {
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Type a search term that matches nothing
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "zzz_no_match_zzz" } });
 
     // Advance debounce (300 ms) + any remaining timers
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    await settleDebounce();
 
     const count = document.querySelector(".marketplace-count");
     expect(count).toBeTruthy();
@@ -273,33 +355,33 @@ describe("MarketplacePage URL filter state", () => {
     vi.useRealTimers();
   });
 
-  it("reads ?q= param and populates the search input", () => {
+  it("reads ?q= param and populates the search input", async () => {
     renderPage(["/marketplace?q=weather"]);
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const searchInput = screen.getByRole("searchbox");
     expect((searchInput as HTMLInputElement).value).toBe("weather");
   });
 
-  it("reads ?favorites=1 param and activates the favorites-only filter", () => {
+  it("reads ?favorites=1 param and activates the favorites-only filter", async () => {
     renderPage(["/marketplace?favorites=1"]);
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const favCheckbox = screen.getByRole("checkbox", { name: /favorites only/i });
     expect((favCheckbox as HTMLInputElement).checked).toBe(true);
   });
 
-  it("falls back to page 1 when an invalid cursor is provided", () => {
+  it("falls back to page 1 when an invalid cursor is provided", async () => {
     renderPage(["/marketplace?cursor=ZZOOWW__invalid"]);
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const prevBtn = screen.getByRole("button", { name: "Previous page" });
     expect(prevBtn).toBeDisabled();
   });
 
-  it("reads multiple filter params simultaneously", () => {
+  it("reads multiple filter params simultaneously", async () => {
     renderPage(["/marketplace?q=pay&favorites=1&sort=newest"]);
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const searchInput = screen.getByRole("searchbox");
     expect((searchInput as HTMLInputElement).value).toBe("pay");
@@ -308,9 +390,9 @@ describe("MarketplacePage URL filter state", () => {
     expect((favCheckbox as HTMLInputElement).checked).toBe(true);
   });
 
-  it("clearing filters removes all filter params from URL", () => {
+  it("clearing filters removes all filter params from URL", async () => {
     renderPage(["/marketplace?q=weather&favorites=1&categories=AI/ML"]);
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Use getAllByRole and pick the first "Clear filters" button (from FiltersSidebar)
     const clearBtns = screen.getAllByRole("button", { name: /clear filters/i });
@@ -347,9 +429,9 @@ describe("MarketplacePage status filter", () => {
     vi.useRealTimers();
   });
 
-  it("renders status filter options with color-blind pattern swatches", () => {
+  it("renders status filter options with color-blind pattern swatches", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const statusLabels = ["Operational", "Degraded", "Maintenance", "Down"];
     statusLabels.forEach((label) => {
@@ -358,9 +440,9 @@ describe("MarketplacePage status filter", () => {
     });
   });
 
-  it("each status label has an associated pattern swatch", () => {
+  it("each status label has an associated pattern swatch", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const statusValues = ["operational", "degraded", "maintenance", "down"];
     statusValues.forEach((status) => {
@@ -374,9 +456,9 @@ describe("MarketplacePage status filter", () => {
     });
   });
 
-  it("filters APIs by operational status", () => {
+  it("filters APIs by operational status", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const operational = screen.getByLabelText(/operational/i);
     fireEvent.click(operational);
@@ -384,9 +466,9 @@ describe("MarketplacePage status filter", () => {
     expect(screen.getByText(/showing/i)).toBeTruthy();
   });
 
-  it("reads ?statuses= param from URL", () => {
+  it("reads ?statuses= param from URL", async () => {
     renderPage(["/marketplace?statuses=down,maintenance"]);
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     expect(
       (screen.getByLabelText(/down/i) as HTMLInputElement).checked,
@@ -396,9 +478,9 @@ describe("MarketplacePage status filter", () => {
     ).toBe(true);
   });
 
-  it("clears status filter when clear filters is clicked", () => {
+  it("clears status filter when clear filters is clicked", async () => {
     renderPage(["/marketplace?statuses=degraded"]);
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     expect(
       (screen.getByLabelText(/degraded/i) as HTMLInputElement).checked,
@@ -442,9 +524,9 @@ describe("MarketplacePage tabular-nums (FWC26)", () => {
 
   // -- count bar ---------------------------------------------------------
 
-  it("count bar: every visible digit is wrapped in a .numeric-tabular span", () => {
+  it("count bar: every visible digit is wrapped in a .numeric-tabular span", async () => {
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const count = document.querySelector(".marketplace-count");
     expect(count).toBeTruthy();
@@ -454,9 +536,9 @@ describe("MarketplacePage tabular-nums (FWC26)", () => {
     expect(spans.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("count bar: all .numeric-tabular spans contain only digit characters", () => {
+  it("count bar: all .numeric-tabular spans contain only digit characters", async () => {
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const spans = document.querySelectorAll(
       ".marketplace-count span.numeric-tabular",
@@ -466,13 +548,13 @@ describe("MarketplacePage tabular-nums (FWC26)", () => {
     });
   });
 
-  it("count bar: shows two .numeric-tabular spans with value '0' when no APIs match", () => {
+  it("count bar: shows two .numeric-tabular spans with value '0' when no APIs match", async () => {
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "zzz_no_match_xyz" } });
-    act(() => { vi.advanceTimersByTime(500); });
+    await settleDebounce();
 
     const spans = document.querySelectorAll(
       ".marketplace-count span.numeric-tabular",
@@ -481,11 +563,11 @@ describe("MarketplacePage tabular-nums (FWC26)", () => {
     spans.forEach((span) => expect(span.textContent?.trim()).toBe("0"));
   });
 
-  it("count bar: marketplace-count container carries numeric-tabular as a belt-and-suspenders rule", () => {
+  it("count bar: marketplace-count container carries numeric-tabular as a belt-and-suspenders rule", async () => {
     // Verify the class is present on the container itself via the DOM tree,
     // confirming the CSS rule in typography.css would apply via inheritance.
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const count = document.querySelector(".marketplace-count");
     // The container class is .marketplace-count; the CSS sets font-variant-numeric
@@ -499,9 +581,9 @@ describe("MarketplacePage tabular-nums (FWC26)", () => {
 
   // -- filter badge -------------------------------------------------------
 
-  it("filter badge: carries .numeric-tabular class when at least one filter is active", () => {
+  it("filter badge: carries .numeric-tabular class when at least one filter is active", async () => {
     renderMarketplacePage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Activate a category filter via FiltersSidebar checkbox
     const financeCheckbox = screen.queryByRole("checkbox", {
@@ -510,7 +592,7 @@ describe("MarketplacePage tabular-nums (FWC26)", () => {
     // The sidebar is desktop-only; it may not render in a headless test viewport.
     // Fall back to confirming the badge appears via URL state.
     renderPage(["/marketplace?categories=Finance"]);
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const badge = document.querySelector(".marketplace-filter-badge");
     if (badge) {
@@ -521,10 +603,10 @@ describe("MarketplacePage tabular-nums (FWC26)", () => {
     void financeCheckbox; // suppress unused-variable lint
   });
 
-  it("filter badge: aria-label describes the count semantically", () => {
+  it("filter badge: aria-label describes the count semantically", async () => {
     // Use URL state to ensure a filter is active, making the badge visible
     renderPage(["/marketplace?categories=Finance"]);
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const badge = document.querySelector(".marketplace-filter-badge");
     if (badge) {
@@ -557,9 +639,9 @@ describe("MarketplacePage cursor pagination", () => {
     vi.useRealTimers();
   });
 
-  it("renders Prev/Next buttons for cursor-based navigation", () => {
+  it("renders Prev/Next buttons for cursor-based navigation", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const prevBtn = screen.getByRole("button", { name: "Previous page" });
     const nextBtn = screen.getByRole("button", { name: "Next page" });
@@ -567,25 +649,25 @@ describe("MarketplacePage cursor pagination", () => {
     expect(nextBtn).toBeTruthy();
   });
 
-  it("disables Previous button on first page", () => {
+  it("disables Previous button on first page", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const prevBtn = screen.getByRole("button", { name: "Previous page" });
     expect(prevBtn).toBeDisabled();
   });
 
-  it("enables Next button when more pages exist", () => {
+  it("enables Next button when more pages exist", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const nextBtn = screen.getByRole("button", { name: "Next page" });
     expect(nextBtn).not.toBeDisabled();
   });
 
-  it("navigates to next page and updates cursor in URL", () => {
+  it("navigates to next page and updates cursor in URL", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const nextBtn = screen.getByRole("button", { name: "Next page" });
     fireEvent.click(nextBtn);
@@ -594,9 +676,9 @@ describe("MarketplacePage cursor pagination", () => {
     expect(prevBtn).not.toBeDisabled();
   });
 
-  it("navigates back to previous page", () => {
+  it("navigates back to previous page", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const nextBtn = screen.getByRole("button", { name: "Next page" });
     fireEvent.click(nextBtn);
@@ -607,9 +689,9 @@ describe("MarketplacePage cursor pagination", () => {
     expect(prevBtn).toBeDisabled();
   });
 
-  it("disables Next button on last page", () => {
+  it("disables Next button on last page", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const nextBtn = screen.getByRole("button", { name: "Next page" });
     fireEvent.click(nextBtn);
@@ -620,9 +702,9 @@ describe("MarketplacePage cursor pagination", () => {
     expect(nextBtn).not.toBeDisabled();
   });
 
-  it("resets cursor when search filter changes", () => {
+  it("resets cursor when search filter changes", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const nextBtn = screen.getByRole("button", { name: "Next page" });
     fireEvent.click(nextBtn);
@@ -632,32 +714,32 @@ describe("MarketplacePage cursor pagination", () => {
 
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "weather" } });
-    act(() => { vi.advanceTimersByTime(500); });
+    await settleDebounce();
 
     const prevAfter = screen.getByRole("button", { name: "Previous page" });
     expect(prevAfter).toBeDisabled();
   });
 
-  it("shows cursor-page-indicator with current page info", () => {
+  it("shows cursor-page-indicator with current page info", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const indicator = document.querySelector(".cursor-page-indicator");
     expect(indicator).toBeTruthy();
     expect(indicator?.textContent).toContain("1");
   });
 
-  it("renders page-size selector alongside cursor pagination", () => {
+  it("renders page-size selector alongside cursor pagination", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const select = screen.getByLabelText("Items per page:");
     expect(select).toBeTruthy();
   });
 
-  it("changes page size and resets cursor", () => {
+  it("changes page size and resets cursor", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const nextBtn = screen.getByRole("button", { name: "Next page" });
     fireEvent.click(nextBtn);
@@ -696,7 +778,7 @@ describe("MarketplacePage loading skeleton transition", () => {
     vi.useRealTimers();
   });
 
-  it("renders MarketplacePageSkeleton while loading before timers settle", () => {
+  it("renders MarketplacePageSkeleton while loading before timers settle", async () => {
     renderPage();
 
     // Before timers settle, page should render MarketplacePageSkeleton
@@ -708,14 +790,14 @@ describe("MarketplacePage loading skeleton transition", () => {
     expect(cards.length).toBe(12);
   });
 
-  it("transitions smoothly from MarketplacePageSkeleton to loaded content when timers settle", () => {
+  it("transitions smoothly from MarketplacePageSkeleton to loaded content when timers settle", async () => {
     renderPage();
 
     // Verify initial loading shell
     expect(screen.getByLabelText("Marketplace loading shell")).toBeTruthy();
 
     // Advance timers to complete loading
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Verify loaded page elements
     expect(screen.queryByLabelText("Marketplace loading shell")).toBeNull();
@@ -748,16 +830,14 @@ describe("MarketplacePage empty state", () => {
     vi.useRealTimers();
   });
 
-  it("renders 'No results found' empty state when filters match no APIs", () => {
+  it("renders 'No results found' empty state when filters match no APIs", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Search for a term that matches no API
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "zzz_nonexistent_api_xyz" } });
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    await settleDebounce();
 
     // Empty state should be displayed
     const emptyState = screen.getByTestId("empty-state-filtered");
@@ -774,9 +854,9 @@ describe("MarketplacePage empty state", () => {
     ).toBeTruthy();
   });
 
-  it("renders 'No favorites yet' empty state when favorites filter is active with no favorites", () => {
+  it("renders 'No favorites yet' empty state when favorites filter is active with no favorites", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Enable favorites only filter
     const favCheckbox = screen.getByRole("checkbox", { name: /favorites only/i });
@@ -787,9 +867,9 @@ describe("MarketplacePage empty state", () => {
     expect(screen.getByText("No favorites yet")).toBeTruthy();
   });
 
-  it("empty state is hidden when listings exist (default render)", () => {
+  it("empty state is hidden when listings exist (default render)", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Grid should be visible with API cards
     const grid = document.querySelector(".marketplace-grid");
@@ -801,16 +881,14 @@ describe("MarketplacePage empty state", () => {
     expect(screen.queryByTestId("empty-state-error")).toBeNull();
   });
 
-  it("CTA 'Clear filters' button appears and works in empty state", () => {
+  it("CTA 'Clear filters' button appears and works in empty state", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Apply a filter that yields zero results
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "zzz_no_match_xyz" } });
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    await settleDebounce();
 
     // Find clear filters button via text (from EmptyState component)
     const clearBtn = screen.getByText("Clear all filters");
@@ -824,16 +902,14 @@ describe("MarketplacePage empty state", () => {
     expect(grid).toBeTruthy();
   });
 
-  it("empty state CTA renders a 'Browse all APIs' link when filters are active", () => {
+  it("empty state CTA renders a 'Browse all APIs' link when filters are active", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Apply a filter that yields zero results
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "zzz_no_match_xyz" } });
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    await settleDebounce();
 
     // Should have a secondary action button
     const browseBtn = screen.getByText("Browse all APIs");
@@ -845,16 +921,14 @@ describe("MarketplacePage empty state", () => {
     expect(grid).toBeTruthy();
   });
 
-  it("empty state illustration wrapper is aria-hidden (WCAG 1.1.1)", () => {
+  it("empty state illustration wrapper is aria-hidden (WCAG 1.1.1)", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Trigger empty state
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "zzz_nonexistent_aria_check" } });
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    await settleDebounce();
 
     const emptyState = screen.getByTestId("empty-state-filtered");
     const ariaHiddenDiv = emptyState.querySelector('[aria-hidden="true"]');
@@ -862,31 +936,27 @@ describe("MarketplacePage empty state", () => {
     expect(ariaHiddenDiv?.querySelector("svg")).toBeTruthy();
   });
 
-  it("shows count '0 of 0' when no APIs match filters", () => {
+  it("shows count '0 of 0' when no APIs match filters", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "zzz_nonexistent" } });
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    await settleDebounce();
 
     const count = document.querySelector(".marketplace-count");
     expect(count).toBeTruthy();
     expect(count?.textContent).toMatch(/Showing.*0.*of.*0/);
   });
 
-  it("clearing filters from empty state restores the grid", () => {
+  it("clearing filters from empty state restores the grid", async () => {
     renderPage();
-    settleMarketplaceTimers();
+    await settleMarketplaceTimers();
 
     // Search for non-matching term
     const input = screen.getByRole("searchbox");
     fireEvent.change(input, { target: { value: "zzz_nonexistent" } });
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    await settleDebounce();
 
     // Verify empty state is shown
     expect(screen.getByTestId("empty-state-filtered")).toBeTruthy();
@@ -901,5 +971,282 @@ describe("MarketplacePage empty state", () => {
 
     // Empty state should be gone
     expect(screen.queryByTestId("empty-state-filtered")).toBeNull();
+  });
+});
+
+// ── Catalogue loading (backend fetch, abort, cache) ──────────────────────────
+
+describe("MarketplacePage catalogue loading", () => {
+  const matchMediaMock = () =>
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    matchMediaMock();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    fetchCatalogMock.mockReset();
+  });
+
+  it("requests the catalogue through the API and renders what it returns", async () => {
+    mockCatalogResolves([MOCK_APIS[0]]);
+    renderPage();
+    await settleMarketplaceTimers();
+
+    expect(fetchCatalogMock).toHaveBeenCalledTimes(1);
+    // Only the fetched listing is on screen — the rest of the bundled fixture
+    // must not leak in.
+    expect(within(grid()).getByText("WeatherSim API")).toBeTruthy();
+    expect(within(grid()).queryByText("QuickPay")).toBeNull();
+  });
+
+  it("passes an AbortSignal to the fetcher", async () => {
+    renderPage();
+    await settleMarketplaceTimers();
+
+    const signal = fetchCatalogMock.mock.calls[0]?.[0];
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("shows a newly published API that the backend returns", async () => {
+    const brandNew = {
+      id: "brand-new-001",
+      name: "Brand New API",
+      provider: { name: "Acme Labs" },
+      description: "Published after the bundle was built.",
+      pricePerRequest: 0.02,
+      tags: ["brand", "new"],
+      category: "Data & Analytics",
+      createdAt: "2026-09-01",
+      usageCount: 1,
+      status: "operational" as const,
+    };
+    mockCatalogResolves([brandNew, ...MOCK_APIS]);
+    // `?sort=newest` also confirms the sort memo runs over the fetched list.
+    renderPage(["/marketplace?sort=newest"]);
+    await settleMarketplaceTimers();
+
+    // It is a first-class result, not just a count: the count grew by one and
+    // the card is rendered.
+    expect(document.querySelector(".marketplace-count")?.textContent).toContain(
+      String(MOCK_APIS.length + 1),
+    );
+    expect(within(grid()).getByText("Brand New API")).toBeTruthy();
+  });
+
+  it("renders the error EmptyState when the request is rejected and no cache exists", async () => {
+    mockCatalogRejects();
+    renderPage();
+    await settleMarketplaceTimers();
+
+    const main = screen.getByRole("main");
+    expect(within(main).getByTestId("empty-state-error")).toBeTruthy();
+    // The results area is taken over by the error — no grid, and no "empty
+    // marketplace" copy that would misattribute an outage to a lack of APIs.
+    // (Scoped to <main>: FiltersSidebar renders its own compact empty state.)
+    expect(main.querySelector(".marketplace-grid")).toBeNull();
+    expect(within(main).queryByTestId("empty-state-empty")).toBeNull();
+  });
+
+  it("recovers on retry: a successful retry replaces the error with results", async () => {
+    mockCatalogRejects();
+    renderPage();
+    await settleMarketplaceTimers();
+    expect(within(screen.getByRole("main")).getByTestId("empty-state-error"))
+      .toBeTruthy();
+
+    mockCatalogResolves();
+    const retry = screen.getByRole("button", { name: /retry/i });
+    await act(async () => {
+      fireEvent.click(retry);
+    });
+    await settleMarketplaceTimers();
+
+    expect(screen.queryByTestId("empty-state-error")).toBeNull();
+    expect(document.querySelector(".marketplace-grid")).toBeTruthy();
+    expect(within(grid()).getByText("WeatherSim API")).toBeTruthy();
+  });
+
+  it("aborts the in-flight request on unmount and performs no state update", async () => {
+    // Never-settling fetch: only an abort can end this request.
+    let capturedSignal: AbortSignal | undefined;
+    fetchCatalogMock.mockImplementation((signal: AbortSignal) => {
+      capturedSignal = signal;
+      return new Promise<APIItem[]>(() => {});
+    });
+
+    const view = renderPage();
+    await settleMarketplaceTimers();
+
+    expect(capturedSignal?.aborted).toBe(false);
+
+    await act(async () => {
+      view.unmount();
+    });
+
+    expect(capturedSignal?.aborted).toBe(true);
+  });
+
+  it("treats an AbortError rejection as a cancellation, not a failure", async () => {
+    fetchCatalogMock.mockImplementation(() => {
+      const err = new Error("The operation was aborted.");
+      err.name = "AbortError";
+      return Promise.reject(err);
+    });
+
+    renderPage();
+    await settleMarketplaceTimers();
+
+    // A cancellation must not be surfaced to the user as an outage.
+    expect(screen.queryByTestId("empty-state-error")).toBeNull();
+  });
+
+  it("renders the cached catalogue with a stale notice when the network fails", async () => {
+    // First load succeeds and populates the offline cache.
+    renderPage();
+    await settleMarketplaceTimers();
+    expect(
+      readCache("marketplace", CATALOG_CACHE_KEY)?.map((a) => a.id),
+    ).toContain("weather-001");
+
+    // A later refresh during an outage falls back to the cached copy.
+    mockCatalogRejects();
+    const view = renderPage();
+    await settleMarketplaceTimers();
+
+    const notice = view.container.querySelector(".marketplace-stale-notice");
+    expect(notice).toBeTruthy();
+    expect(notice?.textContent).toMatch(/could not reach the marketplace/i);
+    // Stale results still render instead of an error page.
+    expect(screen.queryByTestId("empty-state-error")).toBeNull();
+    expect(within(grid()).getByText("WeatherSim API")).toBeTruthy();
+  });
+
+  it("drops a superseded response so a slow first request cannot overwrite a newer one", async () => {
+    // The first request hangs and only resolves after a newer one has landed.
+    // Switching account re-runs the fetch effect, so request 1 is superseded
+    // and its late response must be dropped by the requestSeqRef guard.
+    let resolveFirst: ((items: APIItem[]) => void) | undefined;
+    fetchCatalogMock.mockImplementationOnce(
+      () =>
+        new Promise<APIItem[]>((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+
+    renderWithAccount();
+    await settleMarketplaceTimers();
+    expect(fetchCatalogMock).toHaveBeenCalledTimes(1);
+
+    // Newer request returns only the second listing.
+    mockCatalogResolves([MOCK_APIS[1]]);
+    await act(async () => {
+      switchAccount("account-2");
+    });
+    await settleMarketplaceTimers();
+    expect(fetchCatalogMock).toHaveBeenCalledTimes(2);
+    expect(within(grid()).getByText("QuickPay")).toBeTruthy();
+
+    // The abandoned first request now resolves late — it must be ignored.
+    await act(async () => {
+      resolveFirst?.([MOCK_APIS[0]]);
+    });
+    await settleMarketplaceTimers();
+
+    expect(within(grid()).getByText("QuickPay")).toBeTruthy();
+    expect(within(grid()).queryByText("WeatherSim API")).toBeNull();
+  });
+});
+
+describe("MarketplacePage inverted price range", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    localStorage.clear();
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  /** Last numeric-tabular span in the toolbar count is the filtered total. */
+  function filteredResultCount(): number {
+    const spans = document.querySelectorAll(
+      ".marketplace-count .numeric-tabular",
+    );
+    return Number(spans[spans.length - 1]?.textContent);
+  }
+
+  function setPriceRange(min: string, max: string) {
+    fireEvent.change(screen.getByLabelText("Minimum price"), {
+      target: { value: min },
+    });
+    fireEvent.change(screen.getByLabelText("Maximum price"), {
+      target: { value: max },
+    });
+  }
+
+  it("keeps results unfiltered by price while the range is inverted", async () => {
+    renderPage();
+    await settleMarketplaceTimers();
+
+    const unfilteredCount = filteredResultCount();
+    expect(unfilteredCount).toBeGreaterThan(0);
+
+    setPriceRange("0.5", "0.019");
+
+    expect(screen.getByText(/Min price cannot exceed max price/i)).toBeTruthy();
+    // An inverted range matches nothing if applied, so both bounds are
+    // skipped and the result set is left untouched.
+    expect(filteredResultCount()).toBe(unfilteredCount);
+  });
+
+  it("applies the corrected range after swapping an inverted range", async () => {
+    renderPage();
+    await settleMarketplaceTimers();
+
+    const unfilteredCount = filteredResultCount();
+    setPriceRange("0.5", "0.019");
+    expect(filteredResultCount()).toBe(unfilteredCount);
+
+    fireEvent.click(screen.getByTestId("filters-price-swap"));
+
+    expect(
+      (screen.getByLabelText("Minimum price") as HTMLInputElement).value,
+    ).toBe("0.019");
+    expect(
+      (screen.getByLabelText("Maximum price") as HTMLInputElement).value,
+    ).toBe("0.5");
+    expect(screen.queryByText(/Min price cannot exceed max price/i)).toBeNull();
+    // The corrected range is now really applied, so results narrow.
+    expect(filteredResultCount()).toBeLessThan(unfilteredCount);
   });
 });
