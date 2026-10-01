@@ -34,6 +34,44 @@ function resolveEndpointLabel(endpointId: string): string {
   return endpointId;
 }
 
+// ─── Export / Import helpers ─────────────────────────────────────────────────
+
+const EXPORT_VERSION = 1;
+
+interface ExportedCollection {
+  id: string;
+  name: string;
+  endpointIds: string[];
+}
+
+interface ExportPayload {
+  version: number;
+  collections: ExportedCollection[];
+}
+
+/** Validate an unknown parsed value as an ExportPayload. */
+function parseImportPayload(raw: unknown): ExportPayload | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.version !== "number") return null;
+  if (!Array.isArray(obj.collections)) return null;
+  const collections: ExportedCollection[] = [];
+  for (const item of obj.collections) {
+    if (!item || typeof item !== "object") return null;
+    const c = item as Record<string, unknown>;
+    if (typeof c.id !== "string" || c.id.length === 0) return null;
+    if (typeof c.name !== "string") return null;
+    if (!Array.isArray(c.endpointIds)) return null;
+    if (!c.endpointIds.every((e) => typeof e === "string")) return null;
+    collections.push({
+      id: c.id,
+      name: c.name,
+      endpointIds: c.endpointIds as string[],
+    });
+  }
+  return { version: obj.version, collections };
+}
+
 // ─── Sub-component: one collection row ───────────────────────────────────────
 
 interface CollectionRowProps {
@@ -365,15 +403,17 @@ export default function CollectionsMenu(_props: CollectionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [showNewInput, setShowNewInput] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const newInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // drag state
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const dragEnterIndex = useRef<number | null>(null);
 
-  const { reorderCollections } = useCollections();
+  const { reorderCollections, importCollections } = useCollections();
 
   // Focus new-collection input when it appears
   useEffect(() => {
@@ -424,6 +464,61 @@ export default function CollectionsMenu(_props: CollectionsMenuProps) {
       setNewName("");
     }
   };
+
+  // Export current collections as a JSON download
+  const handleExport = useCallback(() => {
+    const payload: ExportPayload = {
+      version: EXPORT_VERSION,
+      collections: collections.map((c) => ({
+        id: c.id,
+        name: c.name,
+        endpointIds: [...c.endpointIds],
+      })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "callora-collections.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [collections]);
+
+  // Import collections from a user-selected JSON file
+  const handleImportFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // Reset input so selecting the same file again re-triggers change
+      e.target.value = "";
+      if (!file) return;
+      try {
+        const text = await file.text();
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          setImportError("Could not parse file: not valid JSON.");
+          return;
+        }
+        const payload = parseImportPayload(parsed);
+        if (!payload) {
+          setImportError(
+            "Invalid file: expected { version, collections: [{ id, name, endpointIds }] }."
+          );
+          return;
+        }
+        importCollections(payload.collections);
+        setImportError(null);
+      } catch {
+        setImportError("Could not read file.");
+      }
+    },
+    [importCollections]
+  );
 
   // Drag handlers
   const handleDragStart = (index: number) => setDragIndex(index);
@@ -651,6 +746,64 @@ export default function CollectionsMenu(_props: CollectionsMenuProps) {
               <span aria-hidden="true">＋</span>
               New Collection
             </button>
+          )}
+
+          {/* Export / Import actions */}
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              marginTop: 10,
+            }}
+          >
+            <button
+              onClick={handleExport}
+              aria-label="Export collections as JSON"
+              className="ghost-button"
+              style={{
+                flex: 1,
+                minHeight: 34,
+                padding: "0 10px",
+                fontSize: "0.85rem",
+              }}
+            >
+              Export
+            </button>
+            <button
+              onClick={() => importInputRef.current?.click()}
+              aria-label="Import collections from JSON"
+              className="ghost-button"
+              style={{
+                flex: 1,
+                minHeight: 34,
+                padding: "0 10px",
+                fontSize: "0.85rem",
+              }}
+            >
+              Import
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImportFile}
+              aria-label="Import collections file"
+              style={{ display: "none" }}
+            />
+          </div>
+
+          {/* Import error message */}
+          {importError && (
+            <p
+              role="alert"
+              style={{
+                margin: "8px 0 0",
+                color: "var(--danger)",
+                fontSize: "0.8rem",
+              }}
+            >
+              {importError}
+            </p>
           )}
         </div>
       )}
