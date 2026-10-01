@@ -107,6 +107,102 @@ export function formatCount(value: number, locale?: string): string {
   }).format(value);
 }
 
+// ── Amount input normalisation ────────────────────────────────────────────────
+
+/**
+ * Fractional digits supported by USDC on Stellar.
+ *
+ * Amounts are stored with at most 7 decimal places, so anything a user types
+ * beyond that cannot be represented on-chain.
+ */
+export const USDC_DECIMALS = 7;
+
+/**
+ * Outcome of normalising a raw, user-typed USDC amount.
+ */
+export interface NormalizedUsdcInput {
+  /** Canonical amount string, safe to pass to `Number()`. Empty when the input has no digits. */
+  value: string;
+  /** True when fraction digits were dropped to respect `USDC_DECIMALS`. */
+  truncated: boolean;
+  /** True when the raw input had to be rewritten (separators, stray characters, extra dots). */
+  corrected: boolean;
+}
+
+/** Matches a whole string written with comma thousands separators, e.g. `1,234,567`. */
+const THOUSANDS_GROUPING = /^\d{1,3}(?:,\d{3})+$/;
+
+/**
+ * Normalise a raw amount typed or pasted into a deposit field.
+ *
+ * Rules, applied in order:
+ * 1. Characters other than digits, `.` and `,` are dropped.
+ * 2. The decimal separator is resolved: when both separators appear, the
+ *    last one wins (`1,234.56` and `1.234,56` both mean 1234.56); a lone
+ *    comma is a decimal separator unless the whole string is a comma
+ *    thousands grouping (`1,234` → `1234`, `10,5` → `10.5`).
+ * 3. Every remaining separator is dropped, so `1.2.3` becomes `1.23` instead of
+ *    `NaN`.
+ * 4. Fraction digits are capped at `USDC_DECIMALS` (7).
+ *
+ * @example normalizeUsdcAmountInput("1.2.3")      // { value: "1.23", ... }
+ * @example normalizeUsdcAmountInput("10,5")       // { value: "10.5", ... }
+ * @example normalizeUsdcAmountInput("1.123456789") // truncated: true → "1.1234567"
+ */
+export function normalizeUsdcAmountInput(raw: string): NormalizedUsdcInput {
+  const original = raw ?? "";
+
+  // 1. Keep only digits and the two supported separators.
+  const cleaned = original.replace(/[^\d.,]/g, "");
+
+  // 2. Decide which separator (if any) is the decimal point.
+  const lastDot = cleaned.lastIndexOf(".");
+  const lastComma = cleaned.lastIndexOf(",");
+  let decimalSeparator: "." | "," | null = null;
+  if (lastDot !== -1 && lastComma !== -1) {
+    decimalSeparator = lastDot > lastComma ? "." : ",";
+  } else if (lastDot !== -1) {
+    decimalSeparator = ".";
+  } else if (lastComma !== -1) {
+    // A string shaped entirely like `1,234,567` is grouping, not a decimal.
+    decimalSeparator = THOUSANDS_GROUPING.test(cleaned) ? null : ",";
+  }
+
+  // 3. Rebuild the amount with a single `.` decimal point. Grouping separators
+  //    and duplicate decimal points are dropped.
+  let value = "";
+  let seenDecimalPoint = false;
+  for (const char of cleaned) {
+    if (char === "." || char === ",") {
+      if (char === decimalSeparator && !seenDecimalPoint) {
+        value += ".";
+        seenDecimalPoint = true;
+      }
+      continue;
+    }
+    value += char;
+  }
+
+  // ``.5`` → ``0.5`` so the string always parses as a leading-zero number.
+  if (value.startsWith(".")) {
+    value = `0${value}`;
+  }
+
+  // 4. Cap the fraction at 7 digits (Stellar USDC precision).
+  let truncated = false;
+  const pointIndex = value.indexOf(".");
+  if (pointIndex !== -1 && value.length - pointIndex - 1 > USDC_DECIMALS) {
+    value = value.slice(0, pointIndex + 1 + USDC_DECIMALS);
+    truncated = true;
+  }
+
+  return {
+    value,
+    truncated,
+    corrected: truncated || value !== original.trim(),
+  };
+}
+
 // ── Duration / time formatters ────────────────────────────────────────────────
 
 /**

@@ -3,11 +3,22 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import LowBalanceBanner from "./LowBalanceBanner";
-import { LOW_BALANCE_USD } from "../config/constants";
+import {
+  LOW_BALANCE_USD,
+  LOW_BALANCE_SNOOZE_KEY,
+  LOW_BALANCE_SNOOZE_TTL_MS,
+} from "../config/constants";
+
+function readSnoozeRaw(): string | null {
+  return localStorage.getItem(LOW_BALANCE_SNOOZE_KEY);
+}
 
 describe("LowBalanceBanner", () => {
   beforeEach(() => {
+    localStorage.clear();
     sessionStorage.clear();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   afterEach(() => {
@@ -47,7 +58,7 @@ describe("LowBalanceBanner", () => {
     expect(handleOpenDeposit).toHaveBeenCalledTimes(1);
   });
 
-  it("hides banner and persists dismissal state in sessionStorage when dismissed", () => {
+  it("hides banner and persists dismissed balance + timestamp in localStorage", () => {
     const { container } = render(
       <LowBalanceBanner balance={5} openDeposit={() => {}} />
     );
@@ -56,16 +67,102 @@ describe("LowBalanceBanner", () => {
     fireEvent.click(dismissBtn);
 
     expect(container.firstChild).toBeNull();
-    expect(sessionStorage.getItem("lowBalanceBannerDismissed")).toBe("true");
+
+    const raw = readSnoozeRaw();
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw as string);
+    expect(parsed.balance).toBe(5);
+    expect(typeof parsed.dismissedAt).toBe("number");
   });
 
-  it("remains hidden if previously dismissed in sessionStorage", () => {
-    sessionStorage.setItem("lowBalanceBannerDismissed", "true");
+  it("keeps banner hidden across remounts while balance is unchanged", () => {
+    const { unmount } = render(
+      <LowBalanceBanner balance={5} openDeposit={() => {}} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Dismiss warning/i }));
+    unmount();
+
+    // Simulate a route change: fresh mount, same balance.
+    const { container } = render(
+      <LowBalanceBanner balance={5} openDeposit={() => {}} />
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("reappears when the balance decreases after dismissal", () => {
+    const { unmount } = render(
+      <LowBalanceBanner balance={5} openDeposit={() => {}} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Dismiss warning/i }));
+    unmount();
+
+    const { container } = render(
+      <LowBalanceBanner balance={3} openDeposit={() => {}} />
+    );
+    expect(container.firstChild).not.toBeNull();
+    expect(screen.getByRole("status")).toBeTruthy();
+  });
+
+  it("reappears when the balance changes at all after dismissal", () => {
+    const { unmount } = render(
+      <LowBalanceBanner balance={5} openDeposit={() => {}} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Dismiss warning/i }));
+    unmount();
+
+    // Partial top-up still under the threshold: situation changed, warn again.
+    const { container } = render(
+      <LowBalanceBanner balance={8} openDeposit={() => {}} />
+    );
+    expect(container.firstChild).not.toBeNull();
+  });
+
+  it("reappears after the snooze window expires and clears the record", () => {
+    vi.useFakeTimers();
+    const now = Date.now();
+    vi.setSystemTime(now);
+
+    render(<LowBalanceBanner balance={5} openDeposit={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /Dismiss warning/i }));
+    cleanup();
+
+    // Advance past the 24 h TTL.
+    vi.setSystemTime(now + LOW_BALANCE_SNOOZE_TTL_MS + 1);
 
     const { container } = render(
       <LowBalanceBanner balance={5} openDeposit={() => {}} />
     );
+    expect(container.firstChild).not.toBeNull();
+    expect(readSnoozeRaw()).toBeNull();
+  });
 
+  it("ignores malformed snooze records instead of crashing", () => {
+    localStorage.setItem(LOW_BALANCE_SNOOZE_KEY, "not-json{{");
+
+    const { container } = render(
+      <LowBalanceBanner balance={5} openDeposit={() => {}} />
+    );
+    expect(container.firstChild).not.toBeNull();
+  });
+
+  it("does not crash when localStorage throws on read and write", () => {
+    vi.spyOn(window.localStorage, "getItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    const setSpy = vi
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation(() => {
+        throw new Error("denied");
+      });
+
+    const { container } = render(
+      <LowBalanceBanner balance={5} openDeposit={() => {}} />
+    );
+    expect(container.firstChild).not.toBeNull();
+
+    // Dismiss still hides for this mount even though persistence failed.
+    fireEvent.click(screen.getByRole("button", { name: /Dismiss warning/i }));
     expect(container.firstChild).toBeNull();
+    expect(setSpy).toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { getPref } from '../utils/userPrefs';
-import { redactSensitiveData } from './SecureErrorHandler';
+import { redactDeeply } from './SecureErrorHandler';
 
 export interface AnalyticsEvent {
   eventName: string;
@@ -26,18 +26,8 @@ class AnalyticsService {
       return;
     }
 
-    // 3. Exclude secrets from telemetry and client-visible state
-    const safePayload: Record<string, unknown> = {};
-    if (event.payload) {
-      for (const [key, value] of Object.entries(event.payload)) {
-        if (typeof value === 'string') {
-          safePayload[key] = redactSensitiveData(value);
-        } else {
-          // Deep clone or omit complex objects if necessary
-          safePayload[key] = value; 
-        }
-      }
-    }
+    // 3. Exclude secrets from telemetry and client-visible state recursively
+    const safePayload = event.payload ? redactDeeply(event.payload) : {};
 
     // In a real application, this would send to an external analytics provider (e.g., Mixpanel, PostHog, etc)
     // For now, we simulate tracking by logging to the console.
