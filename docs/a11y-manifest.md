@@ -51,6 +51,14 @@ The three values are mutually exclusive and must be applied consistently.
   listed (and are included in the board totals) so the board stays a complete
   inventory.
 
+### How statuses affect the summary
+
+The board counts every status and computes
+`Audited (%) = round(audited / total × 100)`, where `total` is the number of
+entries **including** `n/a`. A component moved to `n/a` therefore still counts
+in the denominator. Keep this in mind before marking something `n/a`: it is an
+exclusion from auditing, not from the board.
+
 ## When to add or update an entry
 
 Update the manifest in the **same pull request** that changes the component
