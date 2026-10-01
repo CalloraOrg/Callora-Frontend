@@ -21,10 +21,10 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import { LOADING_DELAY_MS } from "../config/constants";
 import {
-  readDensityPreference,
-  persistDensityPreference,
+  getDensityPreference,
+  setDensityPreference,
   type DensityPreference,
-} from "../utils/density";
+} from "../state/uiPrefs";
 
 import FiltersBottomSheet from "../components/FiltersBottomSheet";
 import LiveRegion from "../components/LiveRegion";
@@ -76,8 +76,8 @@ export default function MarketplacePage(): JSX.Element {
 
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
 
-  const [density, setDensity] = useState<DensityPreference>(() =>
-    readDensityPreference(),
+  const [density, setDensity] = useState<DensityPreference>(
+    getDensityPreference,
   );
   const debouncedQuery = useDebounce(query, 300);
 
@@ -123,7 +123,7 @@ export default function MarketplacePage(): JSX.Element {
   }, [trackFetch, prefersReducedMotion]);
 
   useEffect(() => {
-    persistDensityPreference(density);
+    setDensityPreference(density);
   }, [density]);
 
   const hasActiveFilters = () => {
@@ -236,6 +236,8 @@ export default function MarketplacePage(): JSX.Element {
 
     if (sort === "price-asc")
       items = items.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
+    if (sort === "price-desc")
+      items = items.sort((a, b) => b.pricePerRequest - a.pricePerRequest);
     if (sort === "latency-asc")
       items = items.sort(
         (a, b) =>
@@ -250,6 +252,8 @@ export default function MarketplacePage(): JSX.Element {
           Date.parse(b.createdAt ?? "1970-01-01") -
           Date.parse(a.createdAt ?? "1970-01-01"),
       );
+    // "relevance" keeps the natural order from MOCK_APIS (index order acts as
+    // a proxy for relevance score until a real ranking signal is available).
 
     return items;
   }, [
@@ -545,17 +549,6 @@ export default function MarketplacePage(): JSX.Element {
             </div>
 
             <div className="marketplace-actions">
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortValue)}
-              >
-                <option value="relevance">Relevance</option>
-                <option value="priceAsc">Price: low → high</option>
-                <option value="priceDesc">Price: high → low</option>
-                <option value="popularity">Popularity</option>
-                <option value="newest">Newest</option>
-              </select>
-
               <button
                 ref={filtersTriggerRef}
                 className="ghost-button marketplace-filter-button"
