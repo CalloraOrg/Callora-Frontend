@@ -8,6 +8,7 @@
  *  - Adding endpoint to collection updates count
  *  - State persists to localStorage
  *  - Keyboard navigation works (Arrow keys to reorder, Enter/Delete on drag handle)
+ *  - Export and import collections as JSON
  */
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -15,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import React from "react";
 import CollectionsMenu from "./CollectionsMenu";
 import { CollectionsProvider, useCollections } from "../state/collectionsStore";
+import { collectionsReducer } from "../state/collectionsStore";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -357,5 +359,148 @@ describe("CollectionsMenu – keyboard navigation", () => {
     );
     // And because confirm returns true, the collection was deleted
     expect(screen.queryByText("Keyboard delete")).toBeNull();
+  });
+});
+
+// ─── Export / Import ─────────────────────────────────────────────────────────
+
+describe("CollectionsMenu – export collections", () => {
+  it("downloads a JSON file with a version field when Export is clicked", () => {
+    renderWithProvider(
+      <>
+        <Seeder collectionName="Exportable" endpointId="weather-001" />
+        <CollectionsMenu />
+      </>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /collections/i }));
+
+    // Capture the blob passed to URL.createObjectURL
+    const createObjectURL = vi.fn(() => "blob:mock");
+    const revokeObjectURL = vi.fn();
+    // @ts-expect-error – jsdom does not implement these
+    globalThis.URL.createObjectURL = createObjectURL;
+    // @ts-expect-error – jsdom does not implement these
+    globalThis.URL.revokeObjectURL = revokeObjectURL;
+
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+
+    fireEvent.click(screen.getByRole("button", { name: /export collections/i }));
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const blob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blob).toBeInstanceOf(Blob);
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  it("shows an error when there is nothing to export", () => {
+    renderWithProvider(<CollectionsMenu />);
+
+    fireEvent.click(screen.getByRole("button", { name: /collections/i }));
+    fireEvent.click(screen.getByRole("button", { name: /export collections/i }));
+
+    expect(screen.getByRole("alert")).toBeTruthy();
+  });
+});
+
+describe("CollectionsMenu – import collections", () => {
+  function importFile(contents: string) {
+    const file = new File([contents], "collections.json", {
+      type: "application/json",
+    });
+    const input = screen.getByLabelText(/import collections file/i) as HTMLInputElement;
+    Object.defineProperty(input, "files", { value: [file] });
+    fireEvent.change(input);
+  }
+
+  it("merges a valid file without duplicates", async () => {
+    renderWithProvider(
+      <>
+        <Seeder collectionName="Existing" />
+        <CollectionsMenu />
+      </>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /collections/i }));
+
+    const payload = {
+      version: 1,
+      collections: [
+        { id: "imported-1", name: "Imported", endpointIds: ["a"] },
+      ],
+    };
+    importFile(JSON.stringify(payload));
+
+    expect(await screen.findByText("Imported")).toBeTruthy();
+    expect(screen.getByText("Existing")).toBeTruthy();
+  });
+
+  it("de-duplicates collections by id when importing", async () => {
+    renderWithProvider(
+      <>
+        <Seeder collectionName="Existing" />
+        <CollectionsMenu />
+      </>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /collections/i }));
+
+    // Grab the existing collection's id from localStorage
+    const raw = localStorage.getItem("callora_collections");
+    const existingId = JSON.parse(raw!).collections[0].id;
+
+    const payload = {
+      version: 1,
+      collections: [
+        { id: existingId, name: "Duplicate", endpointIds: [] },
+        { id: "fresh-1", name: "Fresh", endpointIds: [] },
+      ],
+    };
+    importFile(JSON.stringify(payload));
+
+    expect(await screen.findByText("Fresh")).toBeTruthy();
+    // The duplicate id should not have overwritten the existing name
+    expect(screen.getByText("Existing")).toBeTruthy();
+    expect(screen.queryByText("Duplicate")).toBeNull();
+  });
+
+  it("shows an inline error and leaves state unchanged for malformed files", async () => {
+    renderWithProvider(
+      <>
+        <Seeder collectionName="Untouched" />
+        <CollectionsMenu />
+      </>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /collections/i }));
+
+    importFile("{ not valid json");
+
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.getByText("Untouched")).toBeTruthy();
+  });
+});
+
+describe("collectionsReducer – IMPORT_COLLECTIONS", () => {
+  it("merges imported collections and skips duplicate ids", () => {
+    const initial = {
+      collections: [
+        { id: "a", name: "Alpha", endpointIds: ["e1"] },
+      ],
+    };
+
+    const next = collectionsReducer(initial, {
+      type: "IMPORT_COLLECTIONS",
+      payload: [
+        { id: "a", name: "Alpha duplicate", endpointIds: [] },
+        { id: "b", name: "Beta", endpointIds: ["e2"] },
+      ],
+    });
+
+    expect(next.collections).toHaveLength(2);
+    expect(next.collections[0].name).toBe("Alpha");
+    expect(next.collections[1].id).toBe("b");
   });
 });
