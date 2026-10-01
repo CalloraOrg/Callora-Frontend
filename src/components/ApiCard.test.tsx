@@ -47,6 +47,12 @@ vi.mock("../state/compareStore", () => ({
   },
 }));
 
+vi.mock("./Toast", () => ({
+  useToast: () => ({
+    showToast: vi.fn(),
+  }),
+}));
+
 /* ── Shared fixture ─────────────────────────────────────────────────────── */
 
 const mockApi: APIItem = {
@@ -549,3 +555,38 @@ describe("ApiCard status badges and color-blind patterns", () => {
   });
 });
 
+describe("ApiCard compare", () => {
+  it("adds to compare and shows a toast when attempting a fourth API", () => {
+    const { useCompareStore, compareStore } = require("../state/compareStore");
+    const { useToast } = require("./Toast");
+    useCompareStore.mockReturnValueOnce({
+      apis: [
+        { id: "api-a" },
+        { id: "api-b" },
+        { id: "api-c" },
+      ],
+      isOpen: false,
+    });
+    
+    const showToastSpy = vi.fn();
+    useToast.mockReturnValueOnce({ showToast: showToastSpy });
+    compareStore.addApi.mockReturnValueOnce('full');
+
+    render(<ApiCard api={mockApi} />);
+
+    // Find compare button. It should be disabled.
+    const compareBtn = screen.getByRole("button", { name: `Add ${mockApi.name} to comparison` });
+    expect(compareBtn).toBeDisabled();
+    expect(compareBtn).toHaveAttribute("title", "Comparison is limited to 3 APIs");
+
+    // Click on card using 'c' keyboard shortcut
+    const card = screen.getByRole("button", { name: /View details for Stellar Metering API/i });
+    fireEvent.keyDown(card, { key: "c" });
+
+    expect(compareStore.addApi).toHaveBeenCalledWith(mockApi);
+    expect(showToastSpy).toHaveBeenCalledWith("Comparison is limited to 3 APIs", "error");
+    
+    // Check polite live region
+    expect(screen.getByTestId("api-card-live-region").textContent).toBe("Comparison is limited to 3 APIs");
+  });
+});

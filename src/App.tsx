@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
-import RouteProgressBar from "./components/RouteProgressBar";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
-import { formatUsdc, formatUsdShortcut } from "./utils/format";
+import { formatUsdc, formatUsdShortcut, normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
 import DepositPreview from "./components/DepositPreview";
 import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS } from "./config/constants";
 import CompareDrawer from "./components/CompareDrawer";
@@ -15,7 +14,6 @@ import ExternalLink from "./components/ExternalLink";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
-import { ToastProvider } from "./components/Toast";
 import { useAccountContext } from "./hooks/useAccountContext";
 
 // Route splitting: dynamic imports for all heavy page routes
@@ -31,6 +29,7 @@ const A11yAudit = lazy(() => import("./pages/A11yAudit"));
 const RateLimitCard = lazy(() => import("./pages/RateLimitCard"));
 const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
+const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
 const InvoiceCard = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.InvoiceCard })));
 
 // Prefetch cache map to ensure modules are loaded on hover / focus without delaying critical interaction
@@ -47,6 +46,7 @@ const routePrefetchers: Record<string, () => Promise<any>> = {
   "/a11y-audit": () => import("./pages/A11yAudit"),
   "/rate-limit": () => import("./pages/RateLimitCard"),
   "/webhooks/deliveries": () => import("./pages/WebhookDeliveries"),
+  "/endpoints": () => import("./pages/EndpointSummary"),
 };
 
 export function prefetchRoute(path: string) {
@@ -159,6 +159,7 @@ const APP_ROUTES = {
   slaCard: "/marketplace/grantfox-wave-compute/sla",
   webhookDeliveries: "/webhooks/deliveries",
   onboarding: "/onboarding",
+  endpointSummary: "/endpoints",
 } as const;
 
 function createMockHash() {
@@ -395,6 +396,7 @@ function App() {
   const [statusMessage, setStatusMessage] = useState("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   const [submittedAmount, setSubmittedAmount] = useState<number | null>(null);
   const [submittedStartingBalance, setSubmittedStartingBalance] = useState<number | null>(null);
+  const [amountHint, setAmountHint] = useState<string | null>(null);
 
   const timersRef = useRef<number[]>([]);
 
@@ -454,6 +456,7 @@ function App() {
     setCopied(false);
     setSubmittedAmount(null);
     setSubmittedStartingBalance(null);
+    setAmountHint(null);
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
@@ -489,8 +492,13 @@ function App() {
   const handleAmountChange = (value: string, preset: number | "custom" = "custom") => {
     if (isBusy) return;
 
-    const sanitized = value.replace(/[^\d.]/g, "");
-    resetFlow(sanitized, preset);
+    const { value: normalized, truncated } = normalizeUsdcAmountInput(value);
+    resetFlow(normalized, preset);
+    setAmountHint(
+      truncated
+        ? `USDC on Stellar supports ${USDC_DECIMALS} decimal places, so the amount was rounded down to ${normalized}.`
+        : null,
+    );
   };
 
   const handlePresetClick = (value: number) => {
@@ -568,9 +576,7 @@ function App() {
   };
 
   return (
-    <ToastProvider>
       <div className="app-shell">
-        <RouteProgressBar />
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
@@ -767,6 +773,8 @@ function App() {
 
             <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
 
+            <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
+
             {/* ── Billing History (FWC26) ──────────────────────────────── */}
             <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />
 
@@ -871,7 +879,7 @@ function App() {
                         onChange={(event) => handleAmountChange(event.target.value)}
                         disabled={isBusy}
                         placeholder="0.00"
-                        aria-describedby="deposit-help"
+                        aria-describedby={amountHint ? "deposit-help deposit-amount-hint" : "deposit-help"}
                         aria-invalid={validationMessage.length > 0 && depositStage === "input"}
                       />
                       <span>USDC</span>
@@ -883,6 +891,12 @@ function App() {
                     <p id="deposit-help" className="helper-text">
                       Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom deposits settle into your vault after wallet approval.
                     </p>
+
+                    {amountHint && (
+                      <p id="deposit-amount-hint" className="helper-text" role="status">
+                        {amountHint}
+                      </p>
+                    )}
 
                     {validationMessage && depositStage === "input" && <p className="error-text">{validationMessage}</p>}
 
@@ -998,15 +1012,66 @@ function App() {
           </div>
         )}
       </div>
-    </ToastProvider>
   );
 }
 
 function AccountSwitcher() {
-  const { account, accounts, switchAccount } = useAccountContext();
+  const { account, accounts, switchAccount, addAccount, removeAccount, renameAccount } = useAccountContext();
   const [open, setOpen] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [addError, setAddError] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameLabel, setRenameLabel] = useState("");
+  const [renameError, setRenameError] = useState("");
 
   if (accounts.length === 0) return null;
+
+  const handleAdd = () => {
+    setAddError("");
+    const trimmed = newLabel.trim();
+    if (!trimmed) {
+      setAddError("Label cannot be empty.");
+      return;
+    }
+    if (accounts.some((a) => a.label === trimmed)) {
+      setAddError("Label must be unique.");
+      return;
+    }
+    addAccount(trimmed);
+    setNewLabel("");
+    setShowAdd(false);
+    setOpen(false);
+  };
+
+  const handleRemoveCurrent = () => {
+    if (account) {
+      removeAccount(account.id);
+    }
+    setOpen(false);
+  };
+
+  const startRename = (acc: { id: string; label: string }) => {
+    setRenamingId(acc.id);
+    setRenameLabel(acc.label);
+    setRenameError("");
+  };
+
+  const handleRename = (accId: string) => {
+    setRenameError("");
+    const trimmed = renameLabel.trim();
+    if (!trimmed) {
+      setRenameError("Label cannot be empty.");
+      return;
+    }
+    if (accounts.some((a) => a.id !== accId && a.label === trimmed)) {
+      setRenameError("Label must be unique.");
+      return;
+    }
+    renameAccount(accId, trimmed);
+    setRenamingId(null);
+    setRenameLabel("");
+  };
 
   return (
     <div style={{ position: "relative" }}>
@@ -1039,26 +1104,96 @@ function AccountSwitcher() {
           }}
         >
           {accounts.map((acc) => (
-            <li
-              key={acc.id}
-              role="option"
-              aria-selected={account?.id === acc.id}
-              onClick={() => {
-                switchAccount(acc.id);
-                setOpen(false);
-              }}
-              style={{
-                padding: "8px 12px",
-                cursor: "pointer",
-                borderRadius: 4,
-                background: account?.id === acc.id ? "var(--accent)" : "transparent",
-                color: account?.id === acc.id ? "#fff" : "var(--text)",
-                fontSize: 13,
-              }}
-            >
-              {acc.label}
+            <li key={acc.id} style={{ marginBottom: 2 }}>
+              {renamingId === acc.id ? (
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input
+                    type="text"
+                    value={renameLabel}
+                    onChange={(e) => setRenameLabel(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleRename(acc.id); }}
+                    style={{ flex: 1, fontSize: 13, padding: "4px 6px" }}
+                    autoFocus
+                    aria-label="Rename account"
+                  />
+                  <button type="button" onClick={() => handleRename(acc.id)} style={{ fontSize: 12 }}>OK</button>
+                  <button type="button" onClick={() => { setRenamingId(null); setRenameLabel(""); }} style={{ fontSize: 12 }}>Cancel</button>
+                  {renameError && <span style={{ color: "red", fontSize: 11 }}>{renameError}</span>}
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span
+                    role="option"
+                    aria-selected={account?.id === acc.id}
+                    onClick={() => {
+                      switchAccount(acc.id);
+                      setOpen(false);
+                    }}
+                    style={{
+                      padding: "8px 12px",
+                      cursor: "pointer",
+                      borderRadius: 4,
+                      background: account?.id === acc.id ? "var(--accent)" : "transparent",
+                      color: account?.id === acc.id ? "#fff" : "var(--text)",
+                      fontSize: 13,
+                      flex: 1,
+                    }}
+                  >
+                    {acc.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => startRename(acc)}
+                    style={{ fontSize: 11, padding: "2px 6px", marginLeft: 4 }}
+                    aria-label={`Rename ${acc.label}`}
+                  >
+                    Rename
+                  </button>
+                </div>
+              )}
             </li>
           ))}
+          {showAdd ? (
+            <li style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <input
+                  type="text"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+                  placeholder="Account label"
+                  style={{ fontSize: 13, padding: "4px 6px" }}
+                  autoFocus
+                  aria-label="New account label"
+                />
+                <button type="button" onClick={handleAdd} style={{ fontSize: 12 }}>Add</button>
+                {addError && <span style={{ color: "red", fontSize: 11 }}>{addError}</span>}
+              </div>
+            </li>
+          ) : (
+            <li
+              style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}
+            >
+              <button
+                type="button"
+                onClick={() => { setShowAdd(true); setAddError(""); }}
+                style={{ fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--accent)" }}
+              >
+                + Add account
+              </button>
+            </li>
+          )}
+          {account && (
+            <li style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={handleRemoveCurrent}
+                style={{ fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--accent)" }}
+              >
+                Remove {account.label}
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

@@ -268,7 +268,10 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
             <p id={helpId} className="oai-drop-hint">
               Supports{' '}
               <code>.json</code>, <code>.yaml</code>, and <code>.yml</code>
-              {' '}— OpenAPI 3.x only
+              {' '}— OpenAPI 3.x only.{' '}
+              <a href="https://github.com/CalloraOrg/Callora-Frontend/blob/main/docs/OpenAPI-Import.md" target="_blank" rel="noopener noreferrer" className="oai-help-link">
+                View supported features
+              </a>
             </p>
             <button
               type="button"
@@ -483,6 +486,17 @@ const STYLES = `
     background: var(--surface-soft, rgba(255,255,255,0.06));
     border: 1px solid var(--line, rgba(169,184,255,0.16));
     color: var(--accent, #4e85ff);
+  }
+
+  .oai-help-link {
+    color: var(--accent, #4e85ff);
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    transition: text-decoration-color 180ms ease;
+  }
+  
+  .oai-help-link:hover {
+    text-decoration-color: var(--accent, #4e85ff);
   }
 
   .oai-browse-btn {
