@@ -13,7 +13,7 @@
  * 5. Quick action controls (Deposit, Top-up, Marketplace, Usage analytics)
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LowBalanceBanner from '../components/LowBalanceBanner';
 import UsageGauge from '../components/UsageGauge';
@@ -21,8 +21,9 @@ import Skeleton from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
 import { formatUsdc, formatPrice, formatTimeString } from '../utils/format';
-import { LOADING_DELAY_MS } from '../config/constants';
 import { usePinnedApis, pinnedApisStore } from '../state/pinnedApis';
+import { useAccountId } from '../hooks/useAccount';
+import { useRecentActivity } from '../hooks/useRecentActivity';
 import MOCK_APIS from '../data/mockApis';
 import '../components/Dashboard.css';
 
@@ -41,14 +42,8 @@ export interface DashboardOverviewProps {
   className?: string;
 }
 
-export interface OverviewActivityItem {
-  id: string;
-  type: 'deposit' | 'usage';
-  amount: number;
-  date: string;
-  endpoint?: string;
-  status?: 'operational' | 'degraded' | 'error' | 'success';
-}
+/** Re-exported for backwards compat; canonical definition lives in useRecentActivity. */
+export type { OverviewActivityItem } from '../hooks/useRecentActivity';
 
 export function DashboardOverview({
   vaultBalance = 150.0,
@@ -59,45 +54,15 @@ export function DashboardOverview({
   className = '',
 }: DashboardOverviewProps) {
   const navigate = useNavigate();
-  const [activity, setActivity] = useState<OverviewActivityItem[] | null>(null);
+  const accountId = useAccountId();
+  const { items: activity, status: activityStatus, error: activityError, retry: retryActivity } =
+    useRecentActivity(accountId);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const mock: OverviewActivityItem[] = [
-        {
-          id: 'act-1',
-          type: 'usage',
-          amount: 12.5,
-          date: new Date(Date.now() - 3600000).toISOString(),
-          endpoint: 'WeatherSim API /v1/forecast',
-          status: 'operational',
-        },
-        {
-          id: 'act-2',
-          type: 'deposit',
-          amount: 100.0,
-          date: new Date(Date.now() - 86400000).toISOString(),
-          endpoint: 'USDC Vault Settlement',
-          status: 'success',
-        },
-        {
-          id: 'act-3',
-          type: 'usage',
-          amount: 8.75,
-          date: new Date(Date.now() - 2 * 86400000).toISOString(),
-          endpoint: 'PayFlow Stellar /v2/transact',
-          status: 'operational',
-        },
-      ];
-      setActivity(mock);
-    }, LOADING_DELAY_MS);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  const isLoading = activity === null;
-  const totalUsage =
-    activity?.reduce((sum, item) => (item.type === 'usage' ? sum + item.amount : sum), 0) ?? 0;
+  const isLoading = activityStatus === 'loading';
+  const totalUsage = activity.reduce(
+    (sum, item) => (item.type === 'usage' ? sum + item.amount : sum),
+    0,
+  );
 
   const pinnedApiIds = usePinnedApis();
   const pinnedApis = useMemo(
@@ -273,17 +238,56 @@ export function DashboardOverview({
         {/* Recent Activity Section with PreviewCard Wrappers */}
         <div className="dashboard-activity">
           <h3 className="eyebrow">Recent activity</h3>
+
+          {/* Loading announcement for screen readers */}
           {isLoading && (
-            <div className="activity-skeletons">
-              {[...Array(3)].map((_, i) => (
-                <Skeleton key={i} width="100%" height={24} className="mb-2" />
-              ))}
+            <div role="status" aria-live="polite" aria-label="Loading recent activity">
+              <div className="activity-skeletons" aria-hidden="true">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} width="100%" height={24} className="mb-2" />
+                ))}
+              </div>
             </div>
           )}
-          {!isLoading && activity && activity.length === 0 && (
+
+          {/* Error state with retry — announced immediately via role="alert" */}
+          {activityStatus === 'error' && (
+            <div
+              role="alert"
+              className="activity-error"
+              style={{
+                padding: '12px 16px',
+                borderRadius: '8px',
+                border: '1px solid var(--danger, #ef4444)',
+                background: 'var(--bg-chip, rgba(255,255,255,0.03))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+              }}
+            >
+              <span style={{ color: 'var(--danger, #ef4444)', fontSize: '0.875rem' }}>
+                {activityError ?? 'Failed to load recent activity.'}
+              </span>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={retryActivity}
+                aria-label="Retry loading recent activity"
+                style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {activityStatus === 'success' && activity.length === 0 && (
             <EmptyState message="No activity yet. Deposit USDC to get started!" />
           )}
-          {!isLoading && activity && activity.length > 0 && (
+
+          {/* Activity list */}
+          {activityStatus === 'success' && activity.length > 0 && (
             <ul className="activity-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {activity.map((item) => {
                 const activityPreviewData: PreviewCardData = {

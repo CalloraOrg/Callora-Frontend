@@ -2,6 +2,13 @@ import React from 'react';
 
 export type FieldStatus = 'idle' | 'error' | 'success';
 
+export type FormFieldCounter = {
+  /** Current number of characters entered. */
+  current: number;
+  /** Maximum number of characters allowed. */
+  max: number;
+};
+
 export type FormFieldProps = {
   id: string;
   label: string;
@@ -9,6 +16,11 @@ export type FormFieldProps = {
   hint?: string;
   error?: string;
   status: FieldStatus;
+  /**
+   * Optional live character counter. When provided, a 'n / max' counter is
+   * rendered below the field and referenced from the input via aria-describedby.
+   */
+  counter?: FormFieldCounter;
   children: React.ReactElement;
 };
 
@@ -30,19 +42,24 @@ const CheckIcon = () => (
       strokeLinejoin="round"
     />
   </svg>
-);
+	);
 
 /**
  * FormField — accessible wrapper for form inputs.
  *
  * Renders a label (with optional required marker and success tick), the field
- * itself, an optional hint, and an error region that is always present in the
+ * itself, an optional hint, an error region that is always present in the
  * DOM so screen readers can reference it via aria-describedby even before an
  * error occurs. The child input element receives aria-invalid and
  * aria-describedby via React.cloneElement.
  *
  * Errors are surfaced only after the field has been touched (blurred) or the
  * form has been submitted — the parent controls this via the `status` prop.
+ *
+ * When a `counter` is provided, a live 'n / max' counter is rendered and
+ * referenced from the input via aria-describedby. The counter is only
+ * announced politely (aria-live="polite") when the remaining count is under
+ * 50 characters, so screen readers are not chattered on every keystroke.
  */
 export default function FormField({
   id,
@@ -51,18 +68,26 @@ export default function FormField({
   hint,
   error,
   status,
+  counter,
   children,
 }: FormFieldProps) {
   const errorId = `${id}-error`;
   const hintId = hint ? `${id}-hint` : undefined;
+  const counterId = counter ? `${id}-counter` : undefined;
 
   const existingDescribedBy = children.props['aria-describedby'];
-  const describedBy = [existingDescribedBy, hintId, errorId].filter(Boolean).join(' ');
+  const describedBy = [existingDescribedBy, hintId, counterId, errorId]
+    .filter(Boolean)
+    .join(' ');
 
   const enhancedChild = React.cloneElement(children, {
     'aria-invalid': status === 'error' ? true : undefined,
     'aria-describedby': describedBy,
   });
+
+  const remaining = counter ? counter.max - counter.current : 0;
+  const nearLimit = counter !== undefined && remaining < 50;
+  const overLimit = counter !== undefined && counter.current > counter.max;
 
   return (
     <>
@@ -87,8 +112,18 @@ export default function FormField({
             {hint}
           </p>
         )}
+        {counter && (
+          <p
+            id={counterId}
+            className={`lf-counter${overLimit ? ' ff-counter--over' : ''}${nearLimit && !overLimit ? ' ff-counter--near' : ''}`}
+            aria-live={nearLimit ? 'polite' : 'off' }
+            aria-atomic="true"
+          >
+            {counter.current} / {counter.max}
+          </p>
+        )}
         <p
-          id={errorId}
+          id={ErrorId}
           className={`ff-error${status === 'error' && error ? ' ff-error--visible' : ''}`}
           role="alert"
           aria-live="assertive"
@@ -132,6 +167,23 @@ const FF_STYLES = `
     margin: 0;
     font-size: 0.82rem;
     color: var(--muted, #93a0bf);
+  }
+
+  .ff-counter {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--muted, #93a0bf);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ff-counter--near {
+    color: var(--warning, #ffcb66);
+  }
+
+  .ff-counter--over {
+    color: var(--danger, #ff7d8d);
+    font-weight: 600;
   }
 
   .ff-error {

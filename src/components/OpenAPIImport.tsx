@@ -154,16 +154,18 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
     const result = parseOpenApiSpec(text, file.name);
 
     if (result.errors.length > 0 && result.endpoints.length === 0) {
-      setState({
+      setState({ kind: 'error', filename: file.name, errors: result.errors });
+      return;
+    }
+
+    // Partial success (e.g. an unresolvable $ref on one operation): show the
+    // endpoints that did parse, with the problems listed as warnings.
+    setState({
       kind: 'preview',
       endpoints: result.endpoints,
       filename: file.name,
       ...(result.errors.length > 0 ? { warnings: result.errors } : {}),
     });
-      return;
-    }
-
-    setState({ kind: 'preview', endpoints: result.endpoints, filename: file.name });
   }, []);
 
   // ── Drag-and-drop handlers ─────────────────────────────────────────────
@@ -278,7 +280,10 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
             <p id={helpId} className="oai-drop-hint">
               Supports{' '}
               <code>.json</code>, <code>.yaml</code>, and <code>.yml</code>
-              {' '}— OpenAPI 3.x only
+              {' '}— OpenAPI 3.x only.{' '}
+              <a href="https://github.com/CalloraOrg/Callora-Frontend/blob/main/docs/OpenAPI-Import.md" target="_blank" rel="noopener noreferrer" className="oai-help-link">
+                View supported features
+              </a>
             </p>
             <button
               type="button"
@@ -514,6 +519,17 @@ const STYLES = `
     background: var(--surface-soft, rgba(255,255,255,0.06));
     border: 1px solid var(--line, rgba(169,184,255,0.16));
     color: var(--accent, #4e85ff);
+  }
+
+  .oai-help-link {
+    color: var(--accent, #4e85ff);
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    transition: text-decoration-color 180ms ease;
+  }
+  
+  .oai-help-link:hover {
+    text-decoration-color: var(--accent, #4e85ff);
   }
 
   .oai-browse-btn {

@@ -20,7 +20,7 @@ describe('userPrefs - default code sample language', () => {
     });
 
     it('returns null when stored value is malformed JSON', () => {
-      localStorage.setItem(STORAGE_KEY, '{not valid json');
+      localStorage.setItem(STORAGE_KEY, '{not valid json");
       expect(getDefaultCodeLanguage()).toBeNull();
     });
   });

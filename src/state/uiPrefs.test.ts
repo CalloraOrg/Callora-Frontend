@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import {
+  DENSITY_STORAGE_KEY,
+  getDensityPreference,
+  setDensityPreference,
   isSectionCollapsed,
   toggleSectionCollapsed,
   setSectionCollapsed,
@@ -8,6 +11,83 @@ import {
 
 beforeEach(() => {
   localStorage.clear();
+});
+
+// Consolidated density preference coverage (#1186). These tests previously
+// lived in src/utils/density.test.ts, which tested the duplicate module that
+// has been removed in favor of state/uiPrefs.ts as the single owner of the
+// `callora.density` key.
+describe('uiPrefs - density preferences', () => {
+  it('defaults to comfortable when nothing is stored', () => {
+    expect(getDensityPreference()).toBe('comfortable');
+  });
+
+  it('persists compact selections and reads them back', () => {
+    expect(setDensityPreference('compact')).toBe('compact');
+
+    expect(localStorage.getItem(DENSITY_STORAGE_KEY)).toBe('compact');
+    expect(getDensityPreference()).toBe('compact');
+  });
+
+  it('round-trips comfortable selections', () => {
+    setDensityPreference('compact');
+    setDensityPreference('comfortable');
+
+    expect(localStorage.getItem(DENSITY_STORAGE_KEY)).toBe('comfortable');
+    expect(getDensityPreference()).toBe('comfortable');
+  });
+
+  it('falls back to comfortable for invalid stored values', () => {
+    localStorage.setItem(DENSITY_STORAGE_KEY, 'invalid');
+
+    expect(getDensityPreference()).toBe('comfortable');
+  });
+
+  it('exposes the canonical callora.density storage key', () => {
+    expect(DENSITY_STORAGE_KEY).toBe('callora.density');
+  });
+
+  it('returns comfortable when localStorage.getItem throws', () => {
+    const getItemSpy = vi
+      .spyOn(Storage.prototype, 'getItem')
+      .mockImplementation(() => {
+        throw new Error('storage unavailable');
+      });
+
+    try {
+      expect(getDensityPreference()).toBe('comfortable');
+    } finally {
+      getItemSpy.mockRestore();
+    }
+  });
+
+  it('does not throw when localStorage.setItem throws', () => {
+    const setItemSpy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('storage unavailable');
+      });
+
+    try {
+      expect(() => setDensityPreference('compact')).not.toThrow();
+      expect(setDensityPreference('compact')).toBe('compact');
+    } finally {
+      setItemSpy.mockRestore();
+    }
+  });
+
+  it('returns comfortable when window is undefined (SSR)', () => {
+    const originalWindow = globalThis.window;
+    // @ts-expect-error simulate a server environment for this test
+    delete globalThis.window;
+
+    try {
+      expect(getDensityPreference()).toBe('comfortable');
+      expect(setDensityPreference('compact')).toBe('compact');
+    } finally {
+      globalThis.window = originalWindow;
+    }
+  });
 });
 
 describe('uiPrefs - collapsed sections', () => {

@@ -249,6 +249,28 @@ describe('parseOpenApiSpec — YAML', () => {
       parseOpenApiSpec(MALFORMED_YAML_BAD_INDENT, 'bad.yaml'),
     ).not.toThrow();
   });
+
+  it('ignores %YAML directives', () => {
+    const spec = '%YAML 1.2\n---\nopenapi: 3.0.0\npaths: {}';
+    const result = parseOpenApiSpec(spec, 'directive.yaml');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('produces a ParseError naming anchors as unsupported and includes the line number', () => {
+    const spec = 'openapi: 3.0.0\npaths:\n  /test:\n    get: *alias';
+    // Line 1: openapi...
+    // Line 2: paths...
+    // Line 3:   /test...
+    // Line 4:     get: *alias
+    const result = parseOpenApiSpec(spec, 'alias.yaml');
+    
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].message).toMatch(/anchors and aliases are not supported/i);
+    expect(result.errors[0].line).toBe(4);
+    
+    // Ensure no exception escaped (the result object was safely returned)
+    expect(result.endpoints).toBeDefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
