@@ -33,13 +33,74 @@ Web app for the Callora API marketplace: developer dashboard, API management, an
 - **Endpoint hover preview**: On the API Detail documentation tab, hovering or focusing an individual endpoint card header reveals a compact floating panel showing the HTTP method badge, endpoint URL, parameter table (name / type / required), and an optional response-shape snippet. Keyboard accessible (Escape dismisses); all colours from design tokens. See `src/components/EndpointPreview.tsx`.
 - **Generic BottomSheet with visible drag handle** (GrantFox FWC26): `src/components/BottomSheet.tsx` is a reusable bottom-sheet dialog with a persistent pill-shaped drag handle. The pill widens and brightens on hover and during active drag. Supports two snap points (`"half"` / `"full"`), a `footer` slot, focus trap, Escape / backdrop dismiss, focus restore, body scroll lock, and full `prefers-reduced-motion` support. All colours use design tokens. See [docs/BottomSheet-drag-handle.md](docs/BottomSheet-drag-handle.md).
 - **Reduced-motion data transitions** (Issue #1005): Loading skeletons, spinners, the route-progress bar, stale-data fades, and the dashboard activity fetch all respect `prefers-reduced-motion` via a shared `usePrefersReducedMotion` hook + a global CSS fallback. Dashboard activity and webhook-delivery loading/error/stale changes are announced through `role="status"` / `role="alert"` live regions. See [docs/data-transitions-reduced-motion.md](docs/data-transitions-reduced-motion.md).
+- **Route splitting and prefetching** (Issue #1155): every heavy page in `src/App.tsx` is a `lazy()` chunk behind one shared `Suspense` boundary, and a `routePrefetchers` map warms a page's chunk on nav-link hover/focus. Adding a page means updating both the lazy import and the prefetch map. See [docs/RouteSplitting.md](docs/RouteSplitting.md).
 
 ## Keyboard shortcuts
+
+### Command Palette
+
+`src/components/CommandPalette.tsx` isn't rendered anywhere in the app yet, so these keys currently do nothing. They describe the component as built:
 
 - **Open Command Palette**: `Cmd + K` (macOS) or `Ctrl + K` (Windows/Linux)
 - **Navigate options**: `Up / Down Arrow` keys
 - **Select option**: `Enter`
 - **Close Palette**: `Escape` or backdrop click
+
+### Shortcut reference
+
+The tables below list every entry in `SHORTCUTS` (`src/hooks/useGlobalShortcuts.ts`), which is what the Shortcuts dialog renders, grouped by the same categories in the same order. For two-key shortcuts such as `g h`, press `g` and then `h`.
+
+`?` (open the Shortcuts dialog) and the `g` sequences are handled in `App.tsx`, so they work on pages rendered inside the app shell. Pages that `src/main.tsx` renders on its own after a full page load (`/publish`, `/marketplace`, `/details/:id` and `/latency-chart`) don't respond to them.
+
+**Not wired up yet:** four entries in the dialog have no handler for the action they describe: `u` (Upgrade plan), `/` (Focus search bar), `1-5` (Switch tabs) and `Esc` on the API detail page (Go back to Marketplace). They are listed so this reference matches the dialog.
+
+#### Global
+
+| Key | Action |
+| --- | ------ |
+| `?` | Open shortcuts help |
+| `Esc` | Close modals |
+
+#### Navigation
+
+| Key | Action |
+| --- | ------ |
+| `g h` | Go to Dashboard |
+| `g m` | Go to Marketplace |
+| `g b` | Go to Billing |
+| `g a` | Go to My APIs |
+
+#### Plan
+
+| Key | Action |
+| --- | ------ |
+| `u` | Upgrade plan |
+
+#### Marketplace
+
+| Key | Action |
+| --- | ------ |
+| `/` | Focus search bar |
+| `c` | Add/remove focused API card to comparison |
+
+#### ApiDetailPage
+
+| Key | Action |
+| --- | ------ |
+| `Esc` | Go back to Marketplace |
+| `1-5` | Switch tabs (1=Overview, 2=Documentation, 3=Pricing, 4=Examples, 5=Reviews) |
+
+#### Pricing
+
+| Key | Action |
+| --- | ------ |
+| `s` | Select recommended pricing plan |
+
+### Typing in form fields
+
+`?` and the `g` that starts a navigation sequence go through `useGlobalShortcuts`, which ignores key presses while focus is in an `input`, `textarea` or `select` element or in editable (`contenteditable`) content. Typing in a form therefore never opens the Shortcuts dialog or starts a `g` sequence. `c` (on a focused API card) and `s` (on the pricing table) are handled by those components, which also ignore key presses from text inputs.
+
+When you add a shortcut, add it to `SHORTCUTS` and to the matching table above. `src/hooks/useGlobalShortcuts.test.tsx` fails when the README and the Shortcuts dialog disagree.
 
 ## UI Design System
 
@@ -65,6 +126,37 @@ Key principles:
 
 3. Open [http://localhost:5173](http://localhost:5173).
 
+No `.env` file is required — every variable has a working default.
+
+## Configuration
+
+All configuration is read from `VITE_*` environment variables. Copy
+[`.env.example`](.env.example) to `.env.local` and adjust as needed:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable | Default | Purpose |
+| -------- | ------- | ------- |
+| `VITE_API_BASE_URL` | *(empty)* | API origin. Empty keeps requests relative so the dev server proxies them; set an absolute origin to call a backend directly (requires CORS). |
+| `VITE_STELLAR_NETWORK` | `testnet` | One of `testnet`, `mainnet`, `futurenet`. Unrecognised values fall back to `testnet` with a dev warning. |
+| `VITE_DEV_API_PROXY_TARGET` | `http://localhost:3000` | Dev-server-only: where `/api` is proxied. Never inlined into the bundle. |
+
+In development, `vite.config.ts` proxies `/api` to
+`VITE_DEV_API_PROXY_TARGET`, so the browser only ever talks to
+`localhost:5173` and **no CORS setup is needed**. Paths are forwarded without
+rewriting, and the value is read at startup, so a one-off override works too:
+
+```bash
+VITE_DEV_API_PROXY_TARGET=https://api.staging.callora.com npm run dev
+```
+
+Every `VITE_*` value is inlined into the shipped bundle and is therefore public
+— never put a secret in one. See [docs/Configuration.md](docs/Configuration.md)
+for the full reference, including where each value is read in code and how to
+add a new variable.
+
 ## Print stylesheet
 
 Added `src/styles/print.css` to hide UI chrome and expand collapsible
@@ -79,80 +171,84 @@ by removing interactive controls and making content fully visible. (Closes #708)
 **QuotaBanner empty state (WCAG 2.1 AA, Issue #702 / b#025):** When `showEmptyState` and `onSetupQuota` are set, `QuotaBanner` renders `EmptyState` `variant="quota-banner"` (gauge + bars illustration). The illustration is `aria-hidden`; the section is labelled via `aria-labelledby` → `headingId="quota-banner-empty-heading"`. The "Set up quota" CTA guides configuration. See `docs/QuotaBanner-EmptyState.md`.
 ## Scripts
 
-| Command           | Description                         |
-| ----------------- | ----------------------------------- |
-| `npm run dev`     | Start dev server (port 5173)        |
-| `npm run build`   | TypeScript check + production build |
-| `npm run preview` | Serve production build locally      |
+| Command                | Description                                    |
+| ---------------------- | ---------------------------------------------- |
+| `npm run dev`          | Start dev server (port 5173)                   |
+| `npm run build`        | TypeScript check + production build            |
+| `npm run preview`      | Serve production build locally                 |
+| `npm test`             | Run the Vitest suite in watch mode             |
+| `npm run test:coverage`| Run the suite once and write a coverage report |
+
+### Running tests
+
+Vitest discovers `src/**/*.test.{ts,tsx}`. Commands for the common cases:
+
+```bash
+npm test                                  # watch mode, re-runs on change
+npm test -- --run                         # single pass, no watch
+npm test -- --run src/components/Pagination.test.tsx   # one file
+npm test -- --run -t "clamps the page"    # one test by name
+npm run test:coverage                     # single pass + coverage report
+```
+
+`vitest.config.ts` provides the defaults: `globals: true` (so `describe`,
+`it`, and `expect` need no import), the `jsdom` environment, `src/setupTests.ts`
+for shared matchers and cleanup, and CSS handling for components that import
+stylesheets. Coverage output is written to `coverage/`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#testing) for what to test before opening
+a pull request.
 
 ## Routes
 
-| Path                | Description                               |
-| ------------------- | ----------------------------------------- |
-| `/`                 | Landing page                              |
-| `/dashboard`        | Developer dashboard                       |
-| `/marketplace`      | API marketplace                           |
-| `/billing`          | USDC deposit and settlements              |
-| `/api-usage`        | API usage analytics                       |
-| `/apis/my-apis`     | Published APIs management                 |
-| `/apis/plan-badge`  | Plan-tier badge assignment and empty state |
-| `/theme-playground` | Live theme token playground for designers |
-| `/500`              | Server error page                         |
-| `*`                 | 404 not found                             |
-| `/marketplace/grantfox-wave-compute/sla` | GrantFox Wave Compute API SLA details (FWC26) |
+Most pages are registered in `src/App.tsx`: the `APP_ROUTES` map and the `<Route>` elements that use it. On every full page load `src/main.tsx` checks the URL first and renders a few paths itself, outside the `App` shell. It matches by prefix, so `/marketplace/anything` also shows the marketplace. The "Rendered by" column shows which file serves each path.
+
+| Path | Description | Rendered by | Notes |
+| ---- | ----------- | ----------- | ----- |
+| `/` | Landing page | `App.tsx` | |
+| `/onboarding` | Guided multi-step tour for new users | `App.tsx` | |
+| `/dashboard` | Developer dashboard | `App.tsx` | |
+| `/marketplace` | API marketplace | `main.tsx`, `App.tsx` | `main.tsx` serves full page loads |
+| `/details/:id` | API detail page: overview, documentation, pricing, examples, reviews and embed tabs | `main.tsx` | `App.tsx` has no route for it; links push the URL and dispatch `popstate` |
+| `/publish` | Publish a new API listing | `main.tsx`, `App.tsx` | `main.tsx` serves full page loads |
+| `/apis/my-apis` | Published APIs management | `App.tsx` | |
+| `/apis/plan-badge` | Plan-tier badge assignment and empty state | `App.tsx` | |
+| `/api-usage` | API usage analytics | `App.tsx` | |
+| `/billing` | USDC deposit and settlements | `App.tsx` | |
+| `/billing/history` | Paginated history of past USDC billing transactions | `App.tsx` | |
+| `/webhooks/deliveries` | Webhook delivery log | `App.tsx` | |
+| `/documentation` | Documentation landing page | `App.tsx` | Placeholder copy |
+| `/status` | System status | `App.tsx` | Placeholder copy |
+| `/latency-chart` | API latency chart with min, average and P95 | `main.tsx` | Not linked from the app yet |
+| `/theme-playground` | Live theme token playground for designers | `App.tsx` | Internal tool |
+| `/design-system/docs` | UI component catalogue with live examples | `App.tsx` | Internal tool |
+| `/a11y-audit` | Accessibility audit board | `App.tsx` | Internal tool |
+| `/500` | Server error page | `App.tsx` | Demo only |
+| `/rate-limit` | Rate-limit configuration card | `App.tsx` | Demo only |
+| `/marketplace/grantfox-wave-compute/sla` | GrantFox Wave Compute API SLA details (FWC26) | `main.tsx` | Not wired up yet: it is in `APP_ROUTES`, but no `<Route>` renders `SlaCard`, so a page load here shows the marketplace |
+| `*` | 404 not found | `App.tsx` | Unmatched paths that reach `App.tsx` |
+
+When you add a route (an `APP_ROUTES` entry, a `<Route>` in `src/App.tsx` or a path check in `src/main.tsx`), add a row here. `src/readme-routes.test.ts` fails when a route in the code is missing from this table or a row names a path the code doesn't serve.
+
 
 ## Project layout
 
-```
-callora-frontend/
-├── src/
-│   ├── App.tsx              # Router, layout, and route definitions
-│   ├── main.tsx             # Entry point
-│   ├── index.css            # Global styles and design tokens
-│   ├── ThemeContext.tsx      # Light/dark theme context
-│   ├── ThemeToggle.tsx      # Theme toggle component
-│   ├── ApiUsage.tsx         # API usage analytics view
-│   ├── config/              # Shared app configuration
-│   │   └── constants.ts     # App constants (URLs, deposit limits, loading delay)
-│   ├── components/          # Shared UI components
-│   │   ├── ApiCard.tsx
-│   │   ├── Breadcrumb.tsx
-│   │   ├── CodeExample.tsx
-│   │   ├── CommandPalette.css
-│   │   ├── CommandPalette.test.tsx
-│   │   ├── CommandPalette.tsx
-│   │   ├── CommandPalette_MANUAL_TEST_PLAN.md
-│   │   ├── Dashboard.tsx
-│   │   ├── EmptyState.tsx
-│   │   ├── EndpointGroupHover.tsx
-│   │   ├── EndpointPreview.tsx
-│   │   ├── FiltersSidebar.tsx
-│   │   ├── NotFound.tsx
-│   │   ├── SearchBar.tsx
-│   │   ├── ServerError.tsx
-│   │   ├── ServerErrorDemo.tsx
-│   │   └── Skeleton.tsx
-│   ├── pages/               # Standalone page components
-│   │   ├── ApiDetailPage.tsx
-│   │   ├── MarketplacePage.tsx
-│   │   └── RateLimitCard.tsx  # (Issue #537) Rate-limit quota card with middle-ellipsis breadcrumb
-│   ├── hooks/               # Custom React hooks
-│   │   └── useDebounce.ts
-│   ├── data/                # Static and mock data
-│   │   └── mockApis.ts
-│   ├── utils/               # Utility functions
-│   │   ├── diff.ts          # Line-level diff engine (computeDiff, diffJson, hasDifferences)
-│   │   └── format.ts        # Currency formatters (formatUsdc, formatUsdShortcut, formatPrice)
-│   └── vite-env.d.ts
-├── docs/
-│   ├── UI-Design-System.md
-│   └── ResponseDiff.md      # Response diff highlighting (CallHistoryRow)
-├── index.html
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
-```
+- **`src/`**
+  - `main.tsx` — Application entry point
+  - `App.tsx` — Router, layout, and route definitions
+  - **`api/`** — API client configurations and network request handlers
+  - **`components/`** — Shared UI components following the [UI Design System](docs/UI-Design-System.md)
+  - **`config/`** — Shared application configuration and environment constants
+  - **`data/`** — Static assets and mock data definitions
+  - **`hooks/`** — Custom React hooks for shared logic
+  - **`pages/`** — Standalone route-level page components
+  - **`services/`** — Core business logic and external service integrations
+  - **`state/`** — Zustand state management slices and global stores
+  - **`styles/`** — Global CSS, design tokens, and utility classes
+  - **`utils/`** — Pure utility functions (e.g., [Response Diff Engine](docs/ResponseDiff.md))
+- **`docs/`** — Technical documentation and architecture records
 
-This repo is part of [Callora](https://github.com/your-org/callora). Backend and contracts live in separate repos: `callora-backend`, `callora-contracts`.
+
+This repo is part of [Callora](https://github.com/CalloraOrg/callora). Backend and contracts live in separate repos: `callora-backend`, `callora-contracts`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.

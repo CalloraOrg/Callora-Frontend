@@ -253,6 +253,14 @@ function parseYamlToMap(text: string): { root: YamlMap | null; errors: ParseErro
 
     const { key, rawValue } = parsed;
 
+    // NEW: Reject YAML anchors and aliases
+    if (rawValue !== null && (rawValue.startsWith('&') || rawValue.startsWith('*'))) {
+      errors.push({
+        message: 'YAML anchors and aliases are not supported.',
+        line: lineNumber
+      });
+    }
+
     // Block scalar markers
     if (rawValue === '|' || rawValue === '>') {
       parsedLines.push({ indent, key, value: '', lineNumber });

@@ -5,6 +5,10 @@ import StatusBadge from "../components/StatusBadge";
 import TokenEditor from "../components/TokenEditor";
 import useCopy from "../hooks/useCopy";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import {
+  evaluateContrastPair,
+  type ContrastCheckResult,
+} from "../utils/contrast";
 
 /** How long (ms) the copy/download status stays visible before clearing. */
 const STATUS_DURATION_MS = 2_000;
@@ -16,6 +20,13 @@ const DEFAULT_TOKENS = {
 };
 
 type TokenKey = keyof typeof DEFAULT_TOKENS;
+
+/**
+ * Foreground used by the preview cards. The playground only exposes the
+ * primary / accent / surface triple, so "text on surface" is measured against
+ * the fixed preview text colour rather than against an editable token.
+ */
+const PREVIEW_TEXT_COLOR = "#ffffff";
 
 export default function ThemePlayground() {
   useDocumentTitle('Theme Playground');
@@ -49,6 +60,29 @@ export default function ThemePlayground() {
     }, STATUS_DURATION_MS);
   };
 
+  const [exportWarning, setExportWarning] = useState<string | null>(null);
+
+  // The two readability pairs the exported palette must satisfy. Ratios are
+  // computed with the shared `contrast.ts` helpers so the playground and the
+  // automated WCAG suites cannot drift apart.
+  const contrastChecks: ContrastCheckResult[] = useMemo(
+    () => [
+      evaluateContrastPair(
+        "text-on-surface",
+        "Text on surface",
+        PREVIEW_TEXT_COLOR,
+        tokens.surface,
+      ),
+      evaluateContrastPair(
+        "accent-on-surface",
+        "Accent on surface",
+        tokens.accent,
+        tokens.surface,
+      ),
+    ],
+    [tokens.surface, tokens.accent],
+  );
+
   const cssPreview = useMemo(
     () =>
       [
@@ -72,14 +106,29 @@ export default function ThemePlayground() {
   );
 
   const handleTokenChange = (key: TokenKey, value: string) => {
+    // A stale warning would be misleading once a token changes.
+    setExportWarning(null);
     setTokens((current) => ({ ...current, [key]: value }));
   };
 
   const resetTokens = () => {
+    setExportWarning(null);
     setTokens(DEFAULT_TOKENS);
   };
 
   const exportCss = async () => {
+    const failing = contrastChecks.filter((check) => !check.passes);
+
+    // Warn, never block: a designer may deliberately export a work-in-progress
+    // palette, but they should not do it without knowing it fails AA.
+    setExportWarning(
+      failing.length === 0
+        ? null
+        : `Exported palette fails WCAG AA for: ${failing
+            .map((check) => check.label)
+            .join(", ")}.`,
+    );
+
     const success = await handleCopy(cssPreview);
 
     if (success) {
@@ -144,6 +193,16 @@ export default function ThemePlayground() {
         </div>
       </div>
 
+      {exportWarning && (
+        <p
+          className="theme-playground__export-warning"
+          data-testid="contrast-export-warning"
+          role="status"
+        >
+          {exportWarning}
+        </p>
+      )}
+
       {/* Announces copy success/failure and download outcomes to screen
           readers (WCAG 2.1 SC 4.1.3). */}
       <LiveRegion
@@ -171,22 +230,24 @@ export default function ThemePlayground() {
           aria-label="Theme token editor"
         >
           <TokenEditor
-            label="Primary token"
+            label="Primary"
             tokenKey="primary"
             value={tokens.primary}
             onChange={(value) => handleTokenChange("primary", value)}
           />
           <TokenEditor
-            label="Accent token"
+            label="Accent"
             tokenKey="accent"
             value={tokens.accent}
             onChange={(value) => handleTokenChange("accent", value)}
+            contrast={contrastChecks[1]}
           />
           <TokenEditor
-            label="Surface token"
+            label="Surface"
             tokenKey="surface"
             value={tokens.surface}
             onChange={(value) => handleTokenChange("surface", value)}
+            contrast={contrastChecks[0]}
           />
         </div>
 

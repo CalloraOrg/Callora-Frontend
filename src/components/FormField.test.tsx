@@ -194,6 +194,30 @@ describe('PublishApi validation (integration)', () => {
     const isInvalid = !Number.isFinite(price) || price < 0;
     expect(isInvalid).toBe(true);
   });
+
+  it('rejects a description exceeding the max length', () => {
+    const MAX_DESCRIPTION_LENGTH = 500;
+    const description = 'a'.repeat(MAX_DESCRIPTION_LENGTH + 1);
+    const errors: Record<string, string> = {};
+
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      errors.description = `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`;
+    }
+
+    expect(errors.description).toBe('Description must be 500 characters or fewer.');
+  });
+
+  it('accepts a description at the max length', () => {
+    const MAX_DESCRIPTION_LENGTH = 500;
+    const description = 'a'.repeat(MAX_DESCRIPTION_LENGTH);
+    const errors: Record<string, string> = {};
+
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      errors.description = `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`;
+    }
+
+    expect(errors.description).toBeUndefined();
+  });
 });
 
 describe('FormField blur-before-error behaviour', () => {
@@ -226,5 +250,84 @@ describe('FormField blur-before-error behaviour', () => {
 
     expect(screen.getByRole('textbox').getAttribute('aria-invalid')).toBe('true');
     expect(screen.getByText('Name is required.')).toBeTruthy();
+  });
+});
+
+describe('FormField character counter', () => {
+  it('renders a live character counter with the current length and max', () => {
+    render(
+      <FormField
+        id="description-field"
+        label="Description"
+        status="idle"
+        counter={{ current: 12, max: 500 }}
+      >
+        <textarea id="description-field" />
+      </FormField>,
+    );
+    expect(screen.getByText('12 / 500')).toBeTruthy();
+  });
+
+  it('references the counter id from aria-describedby', () => {
+    render(
+      <FormField
+        id="description-field"
+        label="Description"
+        status="idle"
+        counter={{ current: 12, max: 500 }}
+      >
+        <textarea id="description-field" />
+      </FormField>,
+    );
+    const input = screen.getByRole('textbox');
+    const describedBy = input.getAttribute('aria-describedby') ?? '';
+    expect(describedBy).toContain('description-field-counter');
+  });
+
+  it('announces remaining count politely when under 50 characters remain', () => {
+    render(
+      <FormField
+        id="description-field"
+        label="Description"
+        status="idle"
+        counter={{ current: 460, max: 500 }}
+      >
+        <textarea id="description-field" />
+      </FormField>,
+    );
+    const announcement = document.getElementById('description-field-counter-announcement');
+    expect(announcement?.getAttribute('aria-live')).toBe('polite');
+    expect(announcement?.textContent).toBeTruthy();
+  });
+
+  it('does not announce when 50 or more characters remain', () => {
+    render(
+      <FormField
+        id="description-field"
+        label="Description"
+        status="idle"
+        counter={{ current: 450, max: 500 }}
+      >
+        <textarea id="description-field" />
+      </FormField>,
+    );
+    const announcement = document.getElementById('description-field-counter-announcement');
+    expect(announcement?.textContent).toBe('');
+  });
+
+  it('shows a validation error when the counter exceeds the max', () => {
+    render(
+      <FormField
+        id="description-field"
+        label="Description"
+        status="error"
+        error="Description must be 500 characters or fewer."
+        counter={{ current: 501, max: 500 }}
+      >
+        <textarea id="description-field" />
+      </FormField>,
+    );
+    expect(screen.getByText('Description must be 500 characters or fewer.')).toBeTruthy();
+    expect(screen.getByText('501 / 500')).toBeTruthy();
   });
 });
