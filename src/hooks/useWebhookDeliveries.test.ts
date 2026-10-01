@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
-import { useWebhookDeliveries } from './useWebhookDeliveries';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { useWebhookDeliveries, type WebhookDeliveriesFetcher } from './useWebhookDeliveries';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 describe('useWebhookDeliveries', () => {
   beforeEach(() => {
@@ -26,23 +26,53 @@ describe('useWebhookDeliveries', () => {
     expect(result.current.isStale).toBe(false);
   });
 
-  it('should ignore older concurrent requests (race condition prevention)', async () => {
-    const { result, rerender } = renderHook(({ acc }) => useWebhookDeliveries(acc), {
-      initialProps: { acc: 'acc_1' }
+  it('should ignore older concurrent requests and clear rows when the account changes', async () => {
+    const fetcher: WebhookDeliveriesFetcher = vi.fn(
+      (accountId, _filter, signal) => new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          resolve({
+            data: [{
+              id: `${accountId}-delivery`,
+              url: 'https://example.com/webhook',
+              status: 'delivered',
+              attempts: 1,
+              lastAttemptAt: new Date().toISOString(),
+            }],
+            totalCount: 1,
+          });
+        }, 50);
+
+        signal.addEventListener('abort', () => {
+          clearTimeout(timeout);
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+      }),
+    );
+
+    const { result, rerender } = renderHook(
+      ({ acc }) => useWebhookDeliveries(acc, fetcher),
+      { initialProps: { acc: 'acc_1' as string | null } },
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(100);
     });
-    
-    // Switch to acc_2 before acc_1 resolves
+    expect(result.current.deliveries[0]?.id).toBe('acc_1-delivery');
+
     rerender({ acc: 'acc_2' });
+
+    expect(result.current.deliveries).toEqual([]);
+    expect(result.current.status).toBe('loading');
 
     await act(async () => {
       vi.advanceTimersByTime(100);
     });
 
-    // Should only have the state of acc_2, and status should be success
     expect(result.current.status).toBe('success');
+    expect(result.current.deliveries[0]?.id).toBe('acc_2-delivery');
   });
 
-  it('should explicitly mark state as stale during refetches', async () => {
+  it('should explicitly mark state as stale during same-account refetches', async () => {
     const { result } = renderHook(() => useWebhookDeliveries('acc_123'));
     
     await act(async () => {
@@ -50,7 +80,6 @@ describe('useWebhookDeliveries', () => {
     });
     expect(result.current.status).toBe('success');
 
-    // Trigger refetch
     act(() => {
       result.current.refresh();
     });
@@ -65,11 +94,26 @@ describe('useWebhookDeliveries', () => {
     expect(result.current.isStale).toBe(false);
   });
 
+  it('should surface errors from an injected fetcher', async () => {
+    const failingFetcher: WebhookDeliveriesFetcher = vi.fn(async () => {
+      throw new Error('Failed to fetch from authoritative source');
+    });
+
+    const { result } = renderHook(() => useWebhookDeliveries('acc_123', failingFetcher));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.status).toBe('error');
+    expect(result.current.error).toBe('Failed to fetch from authoritative source');
+  });
+
   it('should handle retry mutations and fetch authoritative state', async () => {
     const { result } = renderHook(() => useWebhookDeliveries('acc_123'));
     await act(async () => { vi.advanceTimersByTime(100); });
 
-    let retryPromise: any;
+    let retryPromise: Promise<void> | undefined;
     act(() => {
       retryPromise = result.current.retryDelivery('dlv_2_1');
     });
@@ -77,7 +121,7 @@ describe('useWebhookDeliveries', () => {
     expect(result.current.retryingId).toBe('dlv_2_1');
 
     await act(async () => {
-      vi.advanceTimersByTime(100); // 50 for retry, 50 for refresh
+      vi.advanceTimersByTime(100);
       await retryPromise;
     });
 

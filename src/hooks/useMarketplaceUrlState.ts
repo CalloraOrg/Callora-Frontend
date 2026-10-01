@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { SortValue } from "../components/SortDropdown";
+import { VALID_SORT_VALUES } from "../components/SortDropdown";
 
 export const DEFAULT_SORT: SortValue = "popularity";
 
@@ -98,7 +99,13 @@ export function useMarketplaceUrlState(): MarketplaceUrlState {
   const maxPriceParam = searchParams.get("maxPrice");
   const popularity = searchParams.get("popularity") ?? "any";
   const favoritesOnly = searchParams.get("favorites") === "1";
-  const sort = (searchParams.get("sort") ?? DEFAULT_SORT) as SortValue;
+  const rawSort = searchParams.get("sort") ?? DEFAULT_SORT;
+  // Reject unknown ?sort= values (e.g. stale bookmarks, manual URL edits) and
+  // fall back to the default so the sort control is never left in an invalid
+  // state with no matching option.
+  const sort: SortValue = VALID_SORT_VALUES.has(rawSort as SortValue)
+    ? (rawSort as SortValue)
+    : DEFAULT_SORT;
 
   // Memoized so the returned Set/array identity only changes when the
   // underlying param actually changes — never on an unrelated re-render.
@@ -107,16 +114,22 @@ export function useMarketplaceUrlState(): MarketplaceUrlState {
   const minPrice = useMemo(() => parseNumber(minPriceParam), [minPriceParam]);
   const maxPrice = useMemo(() => parseNumber(maxPriceParam), [maxPriceParam]);
 
+  // react-router's `setSearchParams` always starts from the params captured in
+  // the current render. Two writes dispatched in the same event handler — the
+  // "Swap values" price action sets min *and* max — would therefore each
+  // rebuild from that same stale snapshot and the second write would silently
+  // discard the first (min === max instead of a corrected range). Holding the
+  // most recent value in a ref lets consecutive updates compose; the ref is
+  // re-synced from the URL on the render that follows each navigation.
+  const latestParamsRef = useRef(searchParams);
+  latestParamsRef.current = searchParams;
+
   const update = useCallback(
     (mutate: (params: URLSearchParams) => void) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          mutate(next);
-          return next;
-        },
-        { replace: true },
-      );
+      const next = new URLSearchParams(latestParamsRef.current);
+      mutate(next);
+      latestParamsRef.current = next;
+      setSearchParams(next, { replace: true });
     },
     [setSearchParams],
   );
