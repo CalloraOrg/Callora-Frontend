@@ -869,3 +869,91 @@ describe('PublishApi endpoint validation (#1076)', () => {
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
   });
 });
+
+describe('PublishApi description length', () => {
+  const MAX_DESCRIPTION_LENGTH = 500;
+
+  function descriptionInput() {
+    return screen.getByLabelText(/description/i);
+  }
+
+  function counterNode() {
+    return document.getElementById('pa-description-counter');
+  }
+
+  it('shows a live character counter that updates as the user types', () => {
+    render(<PublishApi />);
+
+    expect(counterNode()?.textContent).toMatch(/0 \/ 500/);
+
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'Hello' },
+    });
+
+    expect(counterNode()?.textContent).toMatch(/5 \/ 500/);
+  });
+
+  it('references the counter via aria-describedby', () => {
+    render(<PublishApi />);
+
+    const input = descriptionInput();
+    expect(input.getAttribute('aria-describedby')).toContain('pa-description-counter');
+  });
+
+  it('shows a validation error when the description exceeds the limit', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { id: 'api_1' }));
+    vi.stubGlobal('fetch', fetchImpl);
+
+    render(<PublishApi />);
+    await fillValidForm();
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH + 1) },
+    });
+
+    await userEvent.click(submitButton());
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(errorNodeFor('pa-description')).toHaveTextContent(/maximum/i);
+    expect(descriptionInput()).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('does not show a validation error at the limit boundary', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(201, { id: 'api_1' }));
+    vi.stubGlobal('fetch', fetchImpl);
+
+    render(<PublishApi />);
+    await fillValidForm();
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(MAX_DESCRIPTION_LENGTH) },
+    });
+
+    await userEvent.click(submitButton());
+
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    expect(errorNodeFor('pa-description')).toHaveTextContent('');
+  });
+
+  it('announces the remaining count only when under 50 characters remain', () => {
+    render(<PublishApi />);
+
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(451) },
+    });
+
+    const liveRegion = document.getElementById('pa-description-counter-live');
+    expect(liveRegion).toBeDefined();
+    expect(liveRegion!.textContent).toMatch(/49/);
+  });
+
+  it('does not announce while more than 50 characters remain', () => {
+    render(<PublishApi />);
+
+    fireEvent.change(descriptionInput(), {
+      target: { value: 'x'.repeat(100) },
+    });
+
+    const liveRegion = document.getElementById('pa-description-counter-live');
+    expect(liveRegion).toBeDefined();
+    expect(liveRegion!.textContent).toBe('');
+  });
+});

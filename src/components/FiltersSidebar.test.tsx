@@ -219,6 +219,127 @@ describe("FiltersSidebar", () => {
       expect(errorEl?.getAttribute("role")).toBe("alert");
       expect(errorEl?.textContent).toContain("Min price cannot exceed max price");
     });
+
+    it("marks both price inputs aria-invalid while the range is inverted", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      const minInput = screen.getByLabelText("Minimum price");
+      const maxInput = screen.getByLabelText("Maximum price");
+      expect(minInput.getAttribute("aria-invalid")).toBe("true");
+      expect(maxInput.getAttribute("aria-invalid")).toBe("true");
+    });
+
+    it("does not mark price inputs aria-invalid when the range is valid", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={50} maxPrice={100} />);
+      const minInput = screen.getByLabelText("Minimum price");
+      const maxInput = screen.getByLabelText("Maximum price");
+      expect(minInput.getAttribute("aria-invalid")).toBe("false");
+      expect(maxInput.getAttribute("aria-invalid")).toBe("false");
+    });
+
+    it("applies the invalid modifier class to both price inputs", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      const minInput = screen.getByLabelText("Minimum price");
+      const maxInput = screen.getByLabelText("Maximum price");
+      expect(minInput.classList.contains("filter-input--invalid")).toBe(true);
+      expect(maxInput.classList.contains("filter-input--invalid")).toBe(true);
+    });
+
+    it("renders the hint inside the price range panel next to the inputs", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      const panel = screen.getByTestId("filter-panel-price");
+      const error = within(panel).getByTestId("filters-price-error");
+      expect(error.textContent).toContain("Min price cannot exceed max price");
+    });
+
+    it("does not render the swap button when the range is valid", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={50} maxPrice={100} />);
+      expect(screen.queryByTestId("filters-price-swap")).toBeNull();
+    });
+
+    it("swap button applies the corrected range", () => {
+      const setMinPrice = vi.fn();
+      const setMaxPrice = vi.fn();
+      render(
+        <FiltersSidebar
+          {...baseProps}
+          minPrice={100}
+          maxPrice={50}
+          setMinPrice={setMinPrice}
+          setMaxPrice={setMaxPrice}
+        />,
+      );
+      fireEvent.click(screen.getByTestId("filters-price-swap"));
+      expect(setMinPrice).toHaveBeenCalledWith(50);
+      expect(setMaxPrice).toHaveBeenCalledWith(100);
+    });
+
+    it("swap button clears the error once the corrected range is applied", () => {
+      const setMinPrice = vi.fn();
+      const setMaxPrice = vi.fn();
+      const { rerender } = render(
+        <FiltersSidebar
+          {...baseProps}
+          minPrice={100}
+          maxPrice={50}
+          setMinPrice={setMinPrice}
+          setMaxPrice={setMaxPrice}
+        />,
+      );
+      expect(screen.getByTestId("filters-price-swap")).toBeTruthy();
+
+      // Parent applies the swapped values.
+      rerender(
+        <FiltersSidebar
+          {...baseProps}
+          minPrice={50}
+          maxPrice={100}
+          setMinPrice={setMinPrice}
+          setMaxPrice={setMaxPrice}
+        />,
+      );
+      expect(screen.queryByTestId("filters-price-swap")).toBeNull();
+      expect(
+        screen.queryByTestId("filters-price-error"),
+      ).toBeNull();
+      expect(
+        screen.getByLabelText("Minimum price").getAttribute("aria-invalid"),
+      ).toBe("false");
+    });
+
+    it("swap button announces the corrected range to screen readers", async () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      fireEvent.click(screen.getByTestId("filters-price-swap"));
+      await new Promise((r) => setTimeout(r, 50));
+      const liveRegion = screen.getByTestId(
+        "live-region-filters-sidebar-announcements",
+      );
+      expect(liveRegion.textContent).toContain("Price range swapped");
+    });
+
+    it("does not render the error block when only one bound is set", () => {
+      const { unmount } = render(
+        <FiltersSidebar {...baseProps} minPrice={100} />,
+      );
+      expect(screen.queryByTestId("filters-price-error")).toBeNull();
+      unmount();
+
+      render(<FiltersSidebar {...baseProps} maxPrice={50} />);
+      expect(screen.queryByTestId("filters-price-error")).toBeNull();
+    });
+
+    it("renders the error and swap button inside the mobile sheet", () => {
+      render(<FiltersSidebar {...baseProps} minPrice={100} maxPrice={50} />);
+      const toggle = screen.getByRole(
+        "button",
+        { name: "Filters" },
+        { hidden: true },
+      );
+      toggle.style.display = "inline-block";
+      fireEvent.click(toggle);
+      const dialog = screen.getByRole("dialog", { name: /Filters/i });
+      expect(within(dialog).getByTestId("filters-price-error")).toBeTruthy();
+      expect(within(dialog).getByTestId("filters-price-swap")).toBeTruthy();
+    });
   });
 
   describe("mobile sheet behavior", () => {
