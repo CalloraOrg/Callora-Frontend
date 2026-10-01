@@ -158,3 +158,105 @@ describe("HealthTimeline timezone labels", () => {
     expect(screen.getByRole("button", { name: `${expectedPreviousHour}: Operational` })).toBeTruthy();
   });
 });
+
+describe("HealthTimeline pointer hover tooltips (issue #1137)", () => {
+  const operationalData: HealthStatus[] = Array(24).fill("operational");
+  const mixedData: HealthStatus[] = Array(24)
+    .fill("operational")
+    .map((_, i) => (i === 5 ? "degraded" : i === 10 ? "down" : "operational"));
+
+  /**
+   * Renders the timeline and returns the per-bar wrapper elements (which own
+   * the mouse/blur handlers) alongside the inner buttons (which own focus).
+   */
+  function renderTimeline(data: HealthStatus[]) {
+    render(<HealthTimeline data={data} />);
+    const group = screen.getByRole("group");
+    const bars = Array.from(group.children) as HTMLElement[];
+    const buttons = screen.getAllByRole("button");
+    return { bars, buttons };
+  }
+
+  it("shows the hour and status in a polite tooltip on mouseenter", () => {
+    const { bars, buttons } = renderTimeline(operationalData);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(bars[0]);
+
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toHaveAttribute("aria-live", "polite");
+    const [hour] = (buttons[0].getAttribute("aria-label") ?? "").split(": ");
+    expect(tooltip).toHaveTextContent(hour);
+    expect(tooltip).toHaveTextContent("Operational");
+  });
+
+  it("reports the degraded status for a degraded bar", () => {
+    const { bars } = renderTimeline(mixedData);
+
+    fireEvent.mouseEnter(bars[5]);
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Degraded");
+  });
+
+  it("reports the down status for a down bar", () => {
+    const { bars } = renderTimeline(mixedData);
+
+    fireEvent.mouseEnter(bars[10]);
+
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Down");
+  });
+
+  it("hides the tooltip on mouseleave", () => {
+    const { bars } = renderTimeline(operationalData);
+    fireEvent.mouseEnter(bars[0]);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+
+    fireEvent.mouseLeave(bars[0]);
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("shows only one tooltip when moving between bars", () => {
+    const { bars } = renderTimeline(operationalData);
+
+    fireEvent.mouseEnter(bars[0]);
+    fireEvent.mouseLeave(bars[0]);
+    fireEvent.mouseEnter(bars[1]);
+
+    expect(screen.getAllByRole("tooltip")).toHaveLength(1);
+  });
+
+  it("hides the tooltip when the bar wrapper loses focus (blur)", () => {
+    const { bars } = renderTimeline(operationalData);
+    fireEvent.mouseEnter(bars[2]);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+
+    fireEvent.blur(bars[2]);
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("hides the hover tooltip when ArrowRight moves focus to the next bar", () => {
+    const { bars, buttons } = renderTimeline(operationalData);
+    buttons[0].focus();
+    fireEvent.mouseEnter(bars[0]);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+
+    fireEvent.keyDown(buttons[0], { key: "ArrowRight" });
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(buttons[1]).toHaveFocus();
+  });
+
+  it("hides the hover tooltip when ArrowLeft moves focus to the previous bar", () => {
+    const { bars, buttons } = renderTimeline(operationalData);
+    buttons[5].focus();
+    fireEvent.mouseEnter(bars[5]);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+
+    fireEvent.keyDown(buttons[5], { key: "ArrowLeft" });
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(buttons[4]).toHaveFocus();
+  });
+});
