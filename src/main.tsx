@@ -6,6 +6,7 @@ import { AccountProvider } from "./hooks/useAccountContext";
 import RouteProgressBar from "./components/RouteProgressBar";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { ToastProvider } from "./components/Toast";
+import { AccountProvider } from "./hooks/useAccount";
 import "./index.css";
 import "./styles/print.css";
 import { ThemeProvider } from "./ThemeContext";
@@ -27,12 +28,16 @@ async function renderRoute() {
   const wrap = (children: React.ReactNode) => (
     <React.StrictMode>
       <ThemeProvider>
+        <AccountProvider>
+          <CollectionsProvider>
         <CollectionsProvider>
           <AccountProvider>
             <BrowserRouter>
               <RouteProgressBar />
               <ToastProvider>{children}</ToastProvider>
             </BrowserRouter>
+          </CollectionsProvider>
+        </AccountProvider>
           </AccountProvider>
         </CollectionsProvider>
       </ThemeProvider>
@@ -85,12 +90,16 @@ async function renderRoute() {
     <React.StrictMode>
       <BrowserRouter>
         <ThemeProvider>
+          <AccountProvider>
+            <CollectionsProvider>
           <CollectionsProvider>
             <AccountProvider>
               <RouteProgressBar />
               <ToastProvider>
                 <App />
               </ToastProvider>
+            </CollectionsProvider>
+          </AccountProvider>
             </AccountProvider>
           </CollectionsProvider>
         </ThemeProvider>

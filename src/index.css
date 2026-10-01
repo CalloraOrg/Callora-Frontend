@@ -570,6 +570,44 @@ code,
   min-width: 0;
 }
 
+/* ─── Account switcher (top bar) ──────────────────────────────────────── */
+.account-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.account-switcher__label {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.account-switcher__select {
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.account-switcher__select:hover {
+  border-color: var(--accent);
+}
+
+.account-switcher__select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
 .eyebrow {
   margin: 0 0 10px;
   font-size: 0.72rem;

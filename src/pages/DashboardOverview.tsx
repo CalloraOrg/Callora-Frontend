@@ -20,17 +20,30 @@ import UsageGauge from '../components/UsageGauge';
 import Skeleton from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
+import { formatUsdc, formatPrice } from '../utils/format';
+import { formatBalance, UNKNOWN_BALANCE_LABEL } from '../utils/balance';
 import { formatUsdc, formatPrice, formatTimeString } from '../utils/format';
 import { LOADING_DELAY_MS } from '../config/constants';
 import { usePinnedApis, pinnedApisStore } from '../state/pinnedApis';
 import MOCK_APIS from '../data/mockApis';
+import type { BalancesStatus } from '../hooks/useBalances';
 import '../components/Dashboard.css';
 
 export interface DashboardOverviewProps {
-  /** Current Vault balance in USDC */
-  vaultBalance?: number;
-  /** Available Wallet balance in USDC */
-  walletBalance?: number;
+  /** Current Vault balance in USDC, or `null` while unknown */
+  vaultBalance?: number | null;
+  /** Available Wallet balance in USDC, or `null` while unknown */
+  walletBalance?: number | null;
+  /**
+   * Lifecycle of the balance request. When omitted it is derived from the
+   * balances themselves, so callers that already hold real numbers (tests,
+   * previews) keep working without extra wiring.
+   */
+  balancesStatus?: BalancesStatus;
+  /** Failure reason shown next to the inline retry on the balance cards. */
+  balancesError?: string | null;
+  /** Invoked when the user asks to retry a failed balance request. */
+  onRetryBalances?: () => void;
   /** Average cost per call in USDC */
   costPerCall?: number;
   /** Average daily API calls */
@@ -51,8 +64,13 @@ export interface OverviewActivityItem {
 }
 
 export function DashboardOverview({
+  // Preview-only fallbacks so the component stays renderable on its own; the
+  // app always passes the balances it fetched for the active account.
   vaultBalance = 150.0,
   walletBalance = 450.0,
+  balancesStatus,
+  balancesError = null,
+  onRetryBalances,
   costPerCall = 0.005,
   callsPerDay = 120,
   openDeposit = () => {},
@@ -60,6 +78,12 @@ export function DashboardOverview({
 }: DashboardOverviewProps) {
   const navigate = useNavigate();
   const [activity, setActivity] = useState<OverviewActivityItem[] | null>(null);
+
+  // Callers that pass real numbers without an explicit status are treated as
+  // ready; a caller that passes `null` (unknown) must say so via the status.
+  const balancesState: BalancesStatus =
+    balancesStatus ?? (vaultBalance !== null && walletBalance !== null ? 'ready' : 'loading');
+  const balancesKnown = balancesState === 'ready';
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -106,16 +130,18 @@ export function DashboardOverview({
   );
 
   // Vault preview data
+  const dailySpend = costPerCall * callsPerDay;
+  const runwayDays = balancesKnown && dailySpend > 0 ? vaultBalance / dailySpend : null;
   const vaultPreviewData: PreviewCardData = {
     id: 'vault-overview',
     title: 'USDC Vault Overview',
     subtitle: 'Callora Stellar Vault Settlement Account',
     description: 'Pre-funded reserve for automatic API micropayments across subscribed services.',
     metrics: [
-      { label: 'Available', value: `${formatUsdc(vaultBalance)} USDC` },
-      { label: 'Est. Runway', value: `${Math.round(vaultBalance / (costPerCall * callsPerDay))} days` },
+      { label: 'Available', value: balancesKnown ? formatBalance(vaultBalance) : UNKNOWN_BALANCE_LABEL },
+      { label: 'Est. Runway', value: runwayDays === null ? UNKNOWN_BALANCE_LABEL : `${Math.round(runwayDays)} days` },
     ],
-    status: vaultBalance < 20 ? 'warning' : 'operational',
+    status: balancesKnown && vaultBalance < 20 ? 'warning' : 'operational',
     details: {
       'Auto-Refill': 'Disabled',
       'Settlement Layer': 'Stellar Soroban',
@@ -129,41 +155,99 @@ export function DashboardOverview({
     subtitle: 'Freighter Stellar Wallet (Public Net)',
     description: 'Instant deposit source for refilling Callora Vault reserve balances.',
     metrics: [
-      { label: 'Wallet Balance', value: `${formatUsdc(walletBalance)} USDC` },
+      { label: 'Wallet Balance', value: balancesKnown ? formatBalance(walletBalance) : UNKNOWN_BALANCE_LABEL },
       { label: 'Min Deposit', value: '10 USDC' },
     ],
     status: 'operational',
   };
 
+  const balancesUnavailableMessage = balancesError ?? 'Balances could not be loaded for this account.';
+
+  /** Inline loading / error state shown on a balance card. */
+  function renderBalanceFallback(label: string, testId: 'vault' | 'wallet') {
+    if (balancesState === 'loading') {
+      return (
+        <div className="dashboard-card__state" data-testid={`${testId}-balance-loading`} role="status" aria-busy="true">
+          <span className="sr-only">{`Loading ${label.toLowerCase()}…`}</span>
+          <Skeleton width="60%" height={28} />
+        </div>
+      );
+    }
+
+    return (
+      <div className="dashboard-card__state" data-testid={`${testId}-balance-error`}>
+        <strong className="dashboard-card__state-value">{UNKNOWN_BALANCE_LABEL}</strong>
+        <p className="dashboard-card__state-text" role="status">
+          {balancesUnavailableMessage}
+        </p>
+        <button type="button" className="ghost-button" onClick={() => onRetryBalances?.()}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={['dashboard-overview-container', className].filter(Boolean).join(' ')}>
-      <LowBalanceBanner balance={vaultBalance} openDeposit={openDeposit} />
+      <LowBalanceBanner
+        balance={balancesKnown ? vaultBalance : null}
+        status={balancesState}
+        openDeposit={openDeposit}
+      />
 
       <section className="dashboard-grid surface">
         {/* Balance Overview Cards with PreviewCard Wrappers */}
         <PreviewCard data={vaultPreviewData} position="bottom">
-          <div className="dashboard-card" data-testid="dashboard-card-vault">
+          <div className="dashboard-card" data-testid="dashboard-card-vault" data-balance-state={balancesState}>
             <h3 className="eyebrow">Vault balance</h3>
-            <strong className="tabular-nums numeric-tabular">{formatUsdc(vaultBalance)} USDC</strong>
+            {balancesKnown ? (
+              <strong className="tabular-nums numeric-tabular">{formatBalance(vaultBalance)}</strong>
+            ) : (
+              renderBalanceFallback('Vault balance', 'vault')
+            )}
           </div>
         </PreviewCard>
 
         <PreviewCard data={walletPreviewData} position="bottom">
-          <div className="dashboard-card" data-testid="dashboard-card-wallet">
+          <div className="dashboard-card" data-testid="dashboard-card-wallet" data-balance-state={balancesState}>
             <h3 className="eyebrow">Wallet available</h3>
-            <strong className="tabular-nums numeric-tabular">{formatUsdc(walletBalance)} USDC</strong>
+            {balancesKnown ? (
+              <strong className="tabular-nums numeric-tabular">{formatBalance(walletBalance)}</strong>
+            ) : (
+              renderBalanceFallback('Wallet available', 'wallet')
+            )}
           </div>
         </PreviewCard>
 
         {/* Screen-reader-friendly usage gauge */}
-        <UsageGauge
-          label="API usage this cycle"
-          used={totalUsage}
-          limit={vaultBalance}
-          unit="USDC"
-          costPerCall={costPerCall}
-          callsPerDay={callsPerDay}
-        />
+        {balancesKnown ? (
+          <UsageGauge
+            label="API usage this cycle"
+            used={totalUsage}
+            limit={vaultBalance}
+            unit="USDC"
+            costPerCall={costPerCall}
+            callsPerDay={callsPerDay}
+          />
+        ) : (
+          <div
+            className="usage-gauge"
+            data-testid="usage-gauge-unavailable"
+            data-state={balancesState}
+            aria-busy={balancesState === 'loading'}
+          >
+            <div className="usage-gauge__header">
+              <div>
+                <h3 className="eyebrow usage-gauge__title">API usage this cycle</h3>
+                <p className="usage-gauge__status">
+                  {balancesState === 'loading' ? 'Loading balances…' : 'Usage unavailable'}
+                </p>
+              </div>
+              <strong className="usage-gauge__percent">—</strong>
+            </div>
+            <Skeleton width="100%" height={14} borderRadius={999} />
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="dashboard-actions">

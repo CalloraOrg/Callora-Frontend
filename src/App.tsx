@@ -7,12 +7,21 @@ import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut } from "./utils/format";
+import { formatBalance } from "./utils/balance";
 import DepositPreview from "./components/DepositPreview";
 import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS } from "./config/constants";
 import CompareDrawer from "./components/CompareDrawer";
 import CompareTray from "./components/CompareTray";
 import ExternalLink from "./components/ExternalLink";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import AccountSwitcher from "./components/AccountSwitcher";
+import { useAccountId } from "./hooks/useAccount";
+import { useBalances } from "./hooks/useBalances";
+import MarketplacePage from "./pages/MarketplacePage";
+import ThemePlayground from "./pages/ThemePlayground";
+import DesignSystemDocs from "./pages/DesignSystemDocs";
+import A11yAudit from "./pages/A11yAudit";
+import RateLimitCard from "./pages/RateLimitCard";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { ToastProvider } from "./components/Toast";
@@ -341,10 +350,17 @@ function App() {
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
-  const [vaultBalance, setVaultBalance] = useState(284.62);
-  const [walletBalance] = useState(1260.5);
   const [amountInput, setAmountInput] = useState("50");
   const [selectedPreset, setSelectedPreset] = useState<number | "custom">(50);
+
+  // Balances are owned by the account they belong to: switching accounts
+  // re-reads them, and a failed read leaves them unknown rather than zero.
+  const accountId = useAccountId();
+  const { balances, status: balancesStatus, error: balancesError, refresh: refreshBalances } = useBalances(accountId);
+  const vaultBalance = balances?.vault ?? null;
+  const walletBalance = balances?.wallet ?? null;
+  const balancesUnavailableMessage =
+    balancesError ?? "Balances are unavailable right now. Retry to load this account's balances.";
 
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   useEffect(() => {
@@ -405,7 +421,7 @@ function App() {
   const hasAmount = amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
   const activeAmount = submittedAmount ?? (hasAmount ? parsedAmount : 0);
   const previewCurrentBalance = submittedStartingBalance ?? vaultBalance;
-  const projectedBalance = previewCurrentBalance + activeAmount;
+  const projectedBalance = previewCurrentBalance === null ? null : previewCurrentBalance + activeAmount;
   const isBusy = depositStage === "approving" || depositStage === "pending";
   const balanceDelta = formatUsdc(submittedAmount ?? (hasAmount ? parsedAmount : 0));
 
@@ -417,6 +433,11 @@ function App() {
     validationMessage = "Amount must be a valid number.";
   } else if (parsedAmount < MIN_DEPOSIT) {
     validationMessage = `Minimum deposit is ${formatUsdShortcut(MIN_DEPOSIT)}.`;
+  } else if (walletBalance === null) {
+    // Never fall back to a hardcoded ceiling: without a verified wallet
+    // balance we cannot tell a valid deposit from an unaffordable one, so the
+    // deposit stays blocked until balances load.
+    validationMessage = "Wallet balance is unavailable. Retry loading balances before depositing.";
   } else if (parsedAmount > walletBalance) {
     validationMessage = "Amount exceeds available wallet balance.";
   }
@@ -461,9 +482,12 @@ function App() {
   };
 
   const openDeposit = (presetAmount?: number) => {
+    // Guard against a caller forwarding the click event, which would otherwise
+    // stringify to "[object Object]" and poison the amount field.
+    const preset = typeof presetAmount === "number" ? presetAmount : undefined;
     navigate(APP_ROUTES.billing);
-    const nextAmount = presetAmount !== undefined ? String(presetAmount) : amountInput;
-    const nextPreset: number | "custom" = presetAmount !== undefined ? presetAmount : selectedPreset;
+    const nextAmount = preset !== undefined ? String(preset) : amountInput;
+    const nextPreset: number | "custom" = preset !== undefined ? preset : selectedPreset;
     resetFlow(nextAmount, nextPreset);
     setIsDepositOpen(true);
   };
@@ -501,6 +525,10 @@ function App() {
   };
 
   const handleMax = () => {
+    // "Max" is the full wallet balance, which is unknowable while the request
+    // is in flight or has failed — leave the amount untouched instead.
+    if (walletBalance === null) return;
+
     handleAmountChange(walletBalance.toFixed(2), "custom");
   };
 
@@ -518,6 +546,14 @@ function App() {
 
   const handleApproveTransaction = () => {
     if (!hasValidAmount || isBusy) return;
+
+    // Belt and braces: a deposit cannot start without a known vault balance to
+    // credit and a known wallet balance that covers the amount.
+    if (vaultBalance === null || walletBalance === null) {
+      setStatusMessage(balancesUnavailableMessage);
+      refreshBalances();
+      return;
+    }
 
     const approvedAmount = parsedAmount;
     const startingBalance = vaultBalance;
@@ -542,8 +578,11 @@ function App() {
       window.setTimeout(() => {
         if (demoOutcome === "confirmed") {
           setDepositStage("confirmed");
-          setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
           setStatusMessage(`${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`);
+          // The vault balance belongs to the API: re-read it instead of adding
+          // the deposit locally, so the UI never shows an amount the backend
+          // has not settled.
+          refreshBalances();
         } else {
           setDepositStage("failed");
           setStatusMessage("The deposit was not confirmed. Review the details, then retry when your wallet is ready.");
@@ -655,6 +694,21 @@ function App() {
 
             <Route path={APP_ROUTES.publish} element={<PublishApi />} />
 
+            <Route
+              path={APP_ROUTES.dashboard}
+              element={
+                <DashboardPage
+                  vaultBalance={vaultBalance}
+                  walletBalance={walletBalance}
+                  balancesStatus={balancesStatus}
+                  balancesError={balancesError}
+                  onRetryBalances={refreshBalances}
+                  costPerCall={0.08}
+                  callsPerDay={120}
+                  openDeposit={openDeposit}
+                />
+              }
+            />
             <Route path={APP_ROUTES.onboarding} element={<OnboardingTour onComplete={() => navigate(APP_ROUTES.dashboard)} />} />
 
             <Route path={APP_ROUTES.dashboard} element={<DashboardPage vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
@@ -686,15 +740,20 @@ function App() {
                     </div>
 
                     <div className="vault-grid">
-                      <article className="vault-balance-card">
+                      <article className="vault-balance-card" data-balance-state={balancesStatus}>
                         <span>Current vault balance</span>
-                        <strong>{formatUsdc(vaultBalance)} USDC</strong>
+                        <strong>{formatBalance(vaultBalance)}</strong>
                         <p>Funds are used for call routing, model execution, and premium features.</p>
+                        {balancesStatus === "error" && (
+                          <button type="button" className="ghost-button" onClick={refreshBalances}>
+                            Retry
+                          </button>
+                        )}
                       </article>
 
-                      <article className="vault-balance-card secondary">
+                      <article className="vault-balance-card secondary" data-balance-state={balancesStatus}>
                         <span>Wallet available</span>
-                        <strong>{formatUsdc(walletBalance)} USDC</strong>
+                        <strong>{formatBalance(walletBalance)}</strong>
                         <p>Deposits settle on Stellar. Network fee is shown before wallet approval.</p>
                       </article>
                     </div>
@@ -853,13 +912,13 @@ function App() {
                 <div className="modal-grid">
                   <div className="form-panel">
                     <div className="balance-row">
-                      <article className="balance-tile">
+                      <article className="balance-tile" data-balance-state={balancesStatus}>
                         <span>Vault balance</span>
-                        <strong>{formatUsdc(vaultBalance)} USDC</strong>
+                        <strong>{formatBalance(vaultBalance)}</strong>
                       </article>
-                      <article className="balance-tile">
+                      <article className="balance-tile" data-balance-state={balancesStatus}>
                         <span>Wallet available</span>
-                        <strong>{formatUsdc(walletBalance)} USDC</strong>
+                        <strong>{formatBalance(walletBalance)}</strong>
                       </article>
                     </div>
 
@@ -880,7 +939,15 @@ function App() {
                         aria-invalid={validationMessage.length > 0 && depositStage === "input"}
                       />
                       <span>USDC</span>
-                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy} aria-label={`Set maximum amount: ${formatUsdShortcut(walletBalance)}`}>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={handleMax}
+                        disabled={isBusy || walletBalance === null}
+                        aria-label={
+                          walletBalance === null ? "Set maximum amount: wallet balance unavailable" : `Set maximum amount: ${formatUsdShortcut(walletBalance)}`
+                        }
+                      >
                         Max
                       </button>
                     </div>
@@ -928,12 +995,12 @@ function App() {
 
                       <div className="preview-row">
                         <span>Current balance</span>
-                        <strong>{formatUsdc(previewCurrentBalance)} USDC</strong>
+                        <strong>{formatBalance(previewCurrentBalance)}</strong>
                       </div>
 
                       <div className="preview-row emphasis">
                         <span>New balance</span>
-                        <strong>{hasAmount || submittedAmount ? `${formatUsdc(projectedBalance)} USDC` : "--"}</strong>
+                        <strong>{hasAmount || submittedAmount ? formatBalance(projectedBalance) : "--"}</strong>
                       </div>
 
                       <div className="preview-row">
@@ -973,7 +1040,7 @@ function App() {
                     {depositStage === "confirmed" && (
                       <article className="success-card">
                         <strong>Deposit successful</strong>
-                        <p>Your updated vault balance is {formatUsdc(vaultBalance)} USDC and ready for usage.</p>
+                        <p>Your updated vault balance is {formatBalance(vaultBalance)} and ready for usage.</p>
                       </article>
                     )}
                   </div>

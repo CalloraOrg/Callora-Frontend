@@ -3,10 +3,18 @@ import { LOW_BALANCE_USD } from '../config/constants';
 import { WarningIcon } from './icons/WarningIcon';
 import { BoltIcon } from './icons/BoltIcon';
 import { formatUsdShortcut } from '../utils/format';
+import type { BalancesStatus } from '../hooks/useBalances';
 
 interface LowBalanceBannerProps {
-  balance: number;
+  /** Vault balance in USDC, or `null` when the balance is unknown. */
+  balance: number | null;
   openDeposit: (presetAmount?: number) => void;
+  /**
+   * Lifecycle of the balance request. The banner is only meaningful once the
+   * balance is actually known, so it stays hidden while loading or errored —
+   * warning about an unknown balance would be a false alarm.
+   */
+  status?: BalancesStatus;
 }
 
 /** Buffer top-up presets offered as quick chips inside the banner. */
@@ -18,9 +26,18 @@ const QUICK_TOP_UP_AMOUNTS = [25, 50, 100, 250, 500] as const;
  * can replenish the buffer without leaving the dashboard or navigating the
  * full deposit modal flow.
  *
+ * The banner is suppressed unless the balance is known (`status === "ready"`
+ * and a numeric `balance`). Warning while balances are loading, or after a
+ * failed request, would either flash a false alarm or nag a funded account
+ * based on a balance nobody has verified.
+ *
  * Part of GrantFox FWC26 (Stellar Wave) buffer top-up polish.
  */
-export default function LowBalanceBanner({ balance, openDeposit }: LowBalanceBannerProps) {
+export default function LowBalanceBanner({
+  balance,
+  openDeposit,
+  status = 'ready',
+}: LowBalanceBannerProps) {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -40,13 +57,13 @@ export default function LowBalanceBanner({ balance, openDeposit }: LowBalanceBan
   };
 
   const recommendedAmount = useMemo(() => {
-    const gap = LOW_BALANCE_USD - balance;
+    const gap = LOW_BALANCE_USD - (balance ?? 0);
     if (gap <= 0) return QUICK_TOP_UP_AMOUNTS[0];
     const nextPreset = QUICK_TOP_UP_AMOUNTS.find((a) => a >= gap + 10) ?? QUICK_TOP_UP_AMOUNTS[0];
     return nextPreset;
   }, [balance]);
 
-  if (dismissed || balance >= LOW_BALANCE_USD) {
+  if (dismissed || status !== 'ready' || balance === null || balance >= LOW_BALANCE_USD) {
     return null;
   }
 

@@ -69,3 +69,52 @@ describe("LowBalanceBanner", () => {
     expect(container.firstChild).toBeNull();
   });
 });
+
+// ─── Unknown balances: loading, failed, or not yet provided ──────────────────
+
+describe("LowBalanceBanner — unknown balances", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("stays hidden while balances are loading", () => {
+    const { container } = render(
+      <LowBalanceBanner balance={null} status="loading" openDeposit={() => {}} />,
+    );
+
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("stays hidden when the balance request failed, even if a stale balance is passed", () => {
+    const { container } = render(
+      <LowBalanceBanner balance={0} status="error" openDeposit={() => {}} />,
+    );
+
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("stays hidden for a null balance even when the status claims to be ready", () => {
+    const { container } = render(
+      <LowBalanceBanner balance={null} status="ready" openDeposit={() => {}} />,
+    );
+
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("does not fire a low-balance warning for an unknown balance", () => {
+    render(<LowBalanceBanner balance={null} status="loading" openDeposit={() => {}} />);
+
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(/Low balance warning/i)).toBeNull();
+  });
+
+  it("shows the warning once balances load and are genuinely low", () => {
+    render(<LowBalanceBanner balance={LOW_BALANCE_USD - 1} status="ready" openDeposit={() => {}} />);
+
+    expect(screen.getByRole("status")).toBeTruthy();
+  });
+});
