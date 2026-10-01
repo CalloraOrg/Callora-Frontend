@@ -33,7 +33,7 @@ type PublishFormState = {
   endpoints: EndpointEntry[];
 };
 
-type ValidatedFields = Exclude<keyof PublishFormState, 'description' | 'endpoints'>;
+type ValidatedFields = Exclude<keyof PublishFormState, 'endpoints'>;
 
 type TouchedState = Record<ValidatedFields, boolean>;
 
@@ -54,8 +54,15 @@ const INITIAL_TOUCHED: TouchedState = {
   apiName: false,
   baseUrl: false,
   category: false,
+  description: false,
   pricePerCall: false,
 };
+
+/** Maximum number of characters allowed in the API description. */
+const DESCRIPTION_MAX_LENGTH = 500;
+
+/** Announce the remaining count only when this many characters (or fewer) remain. */
+const DESCRIPTION_ANNOUNCE_THRESHOLD = 50;
 
 const CATEGORIES = [
   'AI & Machine Learning',
@@ -113,6 +120,10 @@ function validateForm(form: PublishFormState): ValidationErrors {
 
   if (!form.category) {
     errors.category = 'Please select a category.';
+  }
+
+  if (form.description.length > DESCRIPTION_MAX_LENGTH) {
+    errors.description = `Description must be ${DESCRIPTION_MAX_LENGTH} characters or fewer.`;
   }
 
   if (form.pricePerCall.trim() !== '') {
@@ -292,6 +303,36 @@ export default function PublishApi() {
   const [formError, setFormError] = useState<string | null>(null);
   const [listingId, setListingId] = useState<string | null>(null);
   const importSectionId = useId();
+  const descriptionCounterId = useId();
+  const descriptionAnnouncementId = useId();
+
+  const descriptionLength = form.description.length;
+  const descriptionRemaining = DESCRIPTION_MAX_LENGTH - descriptionLength;
+  const descriptionOverLimit = descriptionRemaining < 0;
+  const descriptionNearLimit =
+    !descriptionOverLimit && descriptionRemaining <= DESCRIPTION_ANNOUNCE_THRESHOLD;
+
+  /**
+   * Throttled polite announcement of the remaining character count.
+   *
+   * Only updates when the field is within the near-limit threshold, and only
+   * when the remaining count actually changes, so screen readers are not
+   * spammed on every keystroke.
+   */
+  const [descriptionAnnouncement, setDescriptionAnnouncement] = useState('');
+  const lastAnnouncedRemainingRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!descriptionNearLimit) {
+      lastAnnouncedRemainingRef.current = null;
+      setDescriptionAnnouncement('');
+      return;
+    }
+    if (lastAnnouncedRemainingRef.current === descriptionRemaining) return;
+    lastAnnouncedRemainingRef.current = descriptionRemaining;
+    setDescriptionAnnouncement(
+      `${descriptionRemaining} character${descriptionRemaining === 1 ? '' : 's'} remaining`,
+    );
+  }, [descriptionNearLimit, descriptionRemaining]);
 
   const { isExpired, dismiss: dismissExpiry } = useSessionExpiry();
 
@@ -475,6 +516,11 @@ export default function PublishApi() {
     [discardDraft, form, isFormValid],
   );
 
+  // ── Simulate a 401 for demo purposes ─────────────────────────────────
+  const handleSimulateExpiry = useCallback(() => {
+    signalExpiry();
+  }, [signalExpiry]);
+
   // ── Success screen ─────────────────────────────────────────────────────
 
   if (submitted) {
@@ -520,11 +566,6 @@ export default function PublishApi() {
   }
 
   // ── Main form ──────────────────────────────────────────────────────────
-
-  // ── Simulate a 401 for demo purposes ─────────────────────────────────
-  const handleSimulateExpiry = useCallback(() => {
-    signalExpiry();
-  }, [signalExpiry]);
 
   return (
     <>
