@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AccountProvider, useAccountContext } from "./useAccountContext";
-import { _reset } from "../state/accountStore";
+import { _reset, addAccount } from "../state/accountStore";
 import { useApiCache } from "./useApiCache";
 
 const ACCOUNT_A = "account-1";
@@ -22,6 +22,8 @@ function useCacheWithAccountSwitcher() {
 beforeEach(() => {
   localStorage.clear();
   _reset();
+  addAccount({ id: ACCOUNT_A, label: "Account A", apiKey: "fake-test-key-a" });
+  addAccount({ id: ACCOUNT_B, label: "Account B", apiKey: "fake-test-key-b" });
 });
 
 afterEach(() => {

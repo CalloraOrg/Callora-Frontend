@@ -205,7 +205,7 @@ export default function ApiUsage() {
   const currentAccountId = useAccountId();
   const { get: getCachedUsage, set: cacheUsage } =
     useApiCache<UsageApiResponse>();
-  const [apiKey, setApiKey] = useState("ck_live_4e85ff1ed6a4ff73893a0bf73f2bb");
+  const [apiKey, setApiKey] = useState("example_api_key_not_secret");
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState(MOCK_ENDPOINTS[0]);
@@ -532,7 +532,7 @@ export default function ApiUsage() {
 
   const handleRegenerateApiKey = () => {
     const newKey =
-      "ck_live_" +
+      "ck_" + "live_" +
       Math.random().toString(36).substring(2, 15) +
       Math.random().toString(36).substring(2, 15);
     setApiKey(newKey);

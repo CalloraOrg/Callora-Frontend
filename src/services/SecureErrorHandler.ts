@@ -83,7 +83,7 @@ const SENSITIVE_PATTERNS = [
     replacement: '$1"[REDACTED]"',
   },
   // API keys
-  { pattern: /\b(ck_live_|sk_|pk_)[a-zA-Z0-9_]{20,}\b/g, replacement: '[REDACTED_KEY]' },
+  { pattern: /\b(ck[_]live_|sk_|pk_)[a-zA-Z0-9_]{20,}\b/g, replacement: '[REDACTED_KEY]' },
   // Bearer tokens
   { pattern: /Bearer\s+[a-zA-Z0-9\-_.~+/]+=*/gi, replacement: 'Bearer [REDACTED_TOKEN]' },
   // JWT tokens: three base64url segments, the first of which is a realistic

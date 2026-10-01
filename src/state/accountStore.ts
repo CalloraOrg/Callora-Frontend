@@ -6,8 +6,13 @@ const ACCOUNTS_KEY = "callora_known_accounts";
 export type Account = {
   id: string;
   label: string;
-  apiKey: string;
   timezone?: string;
+};
+
+type AccountInput = Account & {
+  // Compatibility-only input for historical/test objects. Credential material
+  // is deliberately discarded before the account enters application state.
+  apiKey?: unknown;
 };
 
 type AccountState = {
@@ -25,6 +30,23 @@ const listeners = new Set<Listener>();
 
 function notify(): void {
   listeners.forEach((fn) => fn());
+}
+
+function sanitizeAccount(account: AccountInput): Account | null {
+  if (
+    typeof account.id !== "string" ||
+    !account.id.trim() ||
+    typeof account.label !== "string" ||
+    !account.label.trim()
+  ) {
+    return null;
+  }
+
+  const safe: Account = { id: account.id, label: account.label };
+  if (typeof account.timezone === "string" && account.timezone.trim()) {
+    safe.timezone = account.timezone;
+  }
+  return safe;
 }
 
 function persist(stateToSave: AccountState): void {
@@ -46,13 +68,29 @@ function load(): void {
   try {
     const current = window.localStorage.getItem(ACCOUNT_KEY);
     const raw = window.localStorage.getItem(ACCOUNTS_KEY);
-    const accounts = raw ? (JSON.parse(raw) as Account[]) : [];
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    const accounts = Array.isArray(parsed)
+      ? parsed
+          .map((item) =>
+            item && typeof item === "object"
+              ? sanitizeAccount(item as AccountInput)
+              : null,
+          )
+          .filter((account): account is Account => account !== null)
+      : [];
+
     state = {
-      currentAccountId: current,
-      accounts: accounts,
+      currentAccountId:
+        current && accounts.some((account) => account.id === current)
+          ? current
+          : null,
+      accounts,
     };
+
+    // Purge legacy credential-shaped fields while preserving local metadata.
+    persist(state);
   } catch {
-    /* ignore parse errors */
+    state = { currentAccountId: null, accounts: [] };
   }
 }
 
@@ -64,11 +102,12 @@ export function getCurrentAccount(): Account | null {
 }
 
 export function getKnownAccounts(): Account[] {
-  return [...state.accounts];
+  return state.accounts.map((account) => ({ ...account }));
 }
 
 export function getAccountById(accountId: string): Account | undefined {
-  return state.accounts.find((a) => a.id === accountId);
+  const account = state.accounts.find((candidate) => candidate.id === accountId);
+  return account ? { ...account } : undefined;
 }
 
 export function switchAccount(accountId: string): void {
@@ -80,9 +119,12 @@ export function switchAccount(accountId: string): void {
   notify();
 }
 
-export function addAccount(account: Account): void {
-  if (state.accounts.find((a) => a.id === account.id)) return;
-  state.accounts.push(account);
+export function addAccount(account: AccountInput): void {
+  const safe = sanitizeAccount(account);
+  if (!safe || state.accounts.some((candidate) => candidate.id === safe.id)) {
+    return;
+  }
+  state.accounts.push(safe);
   persist(state);
   notify();
 }
@@ -92,7 +134,7 @@ let accountCounter = 0;
 export function createAccount(label: string): Account {
   accountCounter += 1;
   const id = `account-${Date.now()}-${accountCounter}-${Math.random().toString(36).slice(2, 8)}`;
-  const account: Account = { id, label, apiKey: `ck_live_${Math.random().toString(36).slice(2)}` };
+  const account: Account = { id, label };
   addAccount(account);
   return account;
 }

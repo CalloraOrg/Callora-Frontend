@@ -6,8 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import MarketplacePage from "./MarketplacePage";
 import { CollectionsProvider } from "../state/collectionsStore";
+import { ToastProvider } from "../components/Toast";
 import { AccountProvider } from "../hooks/useAccountContext";
-import { switchAccount } from "../state/accountStore";
+import { addAccount, _reset as resetAccounts, switchAccount } from "../state/accountStore";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
 
 /**
@@ -74,12 +75,15 @@ function renderWithRouter(
       />
     </Routes>
   );
-  const tree = withAccount ? (
-    <AccountProvider>
+  const content = (
+    <ToastProvider>
       <CollectionsProvider>{inner}</CollectionsProvider>
-    </AccountProvider>
+    </ToastProvider>
+  );
+  const tree = withAccount ? (
+    <AccountProvider>{content}</AccountProvider>
   ) : (
-    <CollectionsProvider>{inner}</CollectionsProvider>
+    content
   );
   return render(
     <MemoryRouter initialEntries={initialEntries} initialIndex={initialIndex}>
@@ -102,6 +106,7 @@ describe("MarketplacePage – URL authority & no stale state (#989)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.clear();
+    resetAccounts();
     matchMediaStub(false);
     fetchCatalogMock.mockReset();
     fetchCatalogMock.mockResolvedValue(MOCK_APIS as APIItem[]);
@@ -197,10 +202,13 @@ describe("MarketplacePage – URL authority & no stale state (#989)", () => {
   });
 
   it("account switch resets filters so a previous account's state can't leak", async () => {
+    resetAccounts();
+    addAccount({ id: "account-1", label: "Account 1", apiKey: "fake-test-key-1" });
+    addAccount({ id: "account-2", label: "Account 2", apiKey: "fake-test-key-2" });
+
     // Reduced motion => initial loading resolves without a real timer.
     matchMediaStub(true);
     renderWithRouter(["/marketplace?statuses=down&favorites=1"]);
-    // AccountProvider seeds accounts + becomes ready within the initial render.
     await settleTimers();
 
     expect(

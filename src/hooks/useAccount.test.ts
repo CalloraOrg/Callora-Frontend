@@ -10,8 +10,8 @@ let ACCOUNT_2: { id: string; label: string; apiKey: string };
 beforeEach(() => {
   localStorage.clear();
   _reset();
-  ACCOUNT_1 = { id: "account-1", label: "Account 1", apiKey: "ck_live_aaa" };
-  ACCOUNT_2 = { id: "account-2", label: "Account 2", apiKey: "ck_live_bbb" };
+  ACCOUNT_1 = { id: "account-1", label: "Account 1", apiKey: "fake-test-key-a" };
+  ACCOUNT_2 = { id: "account-2", label: "Account 2", apiKey: "fake-test-key-b" };
 });
 
 afterEach(() => {
