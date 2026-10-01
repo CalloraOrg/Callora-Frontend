@@ -1,3 +1,5 @@
+import { invalidateAccountCache } from "../utils/offlineApiCache";
+
 const ACCOUNT_KEY = "callora_current_account";
 const ACCOUNTS_KEY = "callora_known_accounts";
 
@@ -65,6 +67,10 @@ export function getKnownAccounts(): Account[] {
   return [...state.accounts];
 }
 
+export function getAccountById(accountId: string): Account | undefined {
+  return state.accounts.find((a) => a.id === accountId);
+}
+
 export function switchAccount(accountId: string): void {
   if (state.currentAccountId === accountId) return;
   const account = state.accounts.find((a) => a.id === accountId);
@@ -79,6 +85,43 @@ export function addAccount(account: Account): void {
   state.accounts.push(account);
   persist(state);
   notify();
+}
+
+let accountCounter = 0;
+
+export function createAccount(label: string): Account {
+  accountCounter += 1;
+  const id = `account-${Date.now()}-${accountCounter}-${Math.random().toString(36).slice(2, 8)}`;
+  const account: Account = { id, label, apiKey: `ck_live_${Math.random().toString(36).slice(2)}` };
+  addAccount(account);
+  return account;
+}
+
+export function removeAccount(accountId: string): boolean {
+  const idx = state.accounts.findIndex((a) => a.id === accountId);
+  if (idx === -1) return false;
+  const wasCurrent = state.currentAccountId === accountId;
+  state.accounts.splice(idx, 1);
+  if (wasCurrent && state.accounts.length > 0) {
+    state.currentAccountId = state.accounts[0].id;
+  } else if (wasCurrent) {
+    state.currentAccountId = null;
+  }
+  persist(state);
+  invalidateAccountCache(accountId);
+  notify();
+  return true;
+}
+
+export function renameAccount(accountId: string, newLabel: string): boolean {
+  if (!newLabel.trim()) return false;
+  const account = state.accounts.find((a) => a.id === accountId);
+  if (!account) return false;
+  if (state.accounts.some((a) => a.id !== accountId && a.label === newLabel.trim())) return false;
+  account.label = newLabel.trim();
+  persist(state);
+  notify();
+  return true;
 }
 
 export function subscribe(listener: Listener): () => void {
