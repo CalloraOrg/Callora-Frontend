@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import OpenAPIImport from '../components/OpenAPIImport';
 import type { ParsedEndpoint } from '../components/OpenAPIImport';
 import FormField from '../components/FormField';
@@ -11,10 +10,7 @@ import useSessionExpiry from '../hooks/useSessionExpiry';
 import { generateIdempotencyKey } from '../services/idempotency';
 import { submitPublishApi } from '../services/publishApi';
 import type { PublishApiFieldErrors, PublishApiInput } from '../services/publishApi';
-import { useFormPersistence } from '../hooks/useFormPersistence';
-import { useSessionExpiry } from '../hooks/useSessionExpiry';
 import { useBeforeUnload } from '../hooks/useBeforeUnload';
-import SessionExpiryBanner from '../components/SessionExpiryBanner';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,13 +29,11 @@ type PublishFormState = {
   endpoints: EndpointEntry[];
 };
 
-type ValidatedFields = Exclude<keyof PublishFormState, 'description' | 'endpoints'>;
+type ValidatedFields = Exclude<keyof PublishFormState, 'endpoints'>;
 
 type TouchedState = Record<ValidatedFields, boolean>;
 
 type ValidationErrors = Partial<Record<ValidatedFields, string>>;
-
-const PUBLISH_FORM_DRAFT_KEY = 'callora:publish-form:draft';
 
 const INITIAL_FORM: PublishFormState = {
   apiName: '',
@@ -54,8 +48,15 @@ const INITIAL_TOUCHED: TouchedState = {
   apiName: false,
   baseUrl: false,
   category: false,
+  description: false,
   pricePerCall: false,
 };
+
+/** Maximum number of characters allowed in the API description. */
+const DESCRIPTION_MAX_LENGTH = 500;
+
+/** Announce the remaining count only when this many characters (or fewer) remain. */
+const DESCRIPTION_ANNOUNCE_THRESHOLD = 50;
 
 const CATEGORIES = [
   'AI & Machine Learning',
@@ -113,6 +114,10 @@ function validateForm(form: PublishFormState): ValidationErrors {
 
   if (!form.category) {
     errors.category = 'Please select a category.';
+  }
+
+  if (form.description.length > DESCRIPTION_MAX_LENGTH) {
+    errors.description = `Description is over the maximum of ${DESCRIPTION_MAX_LENGTH} characters.`;
   }
 
   if (form.pricePerCall.trim() !== '') {
@@ -276,11 +281,8 @@ function toPublishPayload(form: PublishFormState): PublishApiInput {
  */
 export default function PublishApi() {
   useDocumentTitle('Publish API');
-  const { value: form, setValue: setForm, discard: discardDraft } = useFormPersistence(
-    DRAFT_STORAGE_KEY,
-    INITIAL_FORM,
-    { isValid: isPublishFormDraft },
-  );
+  const { value: form, setValue: setForm, discard: discardDraft, isRestored } =
+    useFormPersistence(DRAFT_STORAGE_KEY, INITIAL_FORM, { isValid: isPublishFormDraft });
   const [touched, setTouched] = useState<TouchedState>(INITIAL_TOUCHED);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -292,6 +294,34 @@ export default function PublishApi() {
   const [formError, setFormError] = useState<string | null>(null);
   const [listingId, setListingId] = useState<string | null>(null);
   const importSectionId = useId();
+
+  const descriptionLength = form.description.length;
+  const descriptionRemaining = DESCRIPTION_MAX_LENGTH - descriptionLength;
+  const descriptionOverLimit = descriptionRemaining < 0;
+  const descriptionNearLimit =
+    !descriptionOverLimit && descriptionRemaining <= DESCRIPTION_ANNOUNCE_THRESHOLD;
+
+  /**
+   * Throttled polite announcement of the remaining character count.
+   *
+   * Only updates when the field is within the near-limit threshold, and only
+   * when the remaining count actually changes, so screen readers are not
+   * spammed on every keystroke.
+   */
+  const [descriptionAnnouncement, setDescriptionAnnouncement] = useState('');
+  const lastAnnouncedRemainingRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!descriptionNearLimit) {
+      lastAnnouncedRemainingRef.current = null;
+      setDescriptionAnnouncement('');
+      return;
+    }
+    if (lastAnnouncedRemainingRef.current === descriptionRemaining) return;
+    lastAnnouncedRemainingRef.current = descriptionRemaining;
+    setDescriptionAnnouncement(
+      `${descriptionRemaining} character${descriptionRemaining === 1 ? '' : 's'} remaining`,
+    );
+  }, [descriptionNearLimit, descriptionRemaining]);
 
   const { isExpired, dismiss: dismissExpiry } = useSessionExpiry();
 
@@ -326,25 +356,19 @@ export default function PublishApi() {
   // showing why until the provider edits it.
   const errors: ValidationErrors = { ...clientErrors, ...serverErrors };
   const isFormValid = Object.keys(clientErrors).length === 0;
-  // ── Session expiry & form persistence ────────────────────────────────
-  const { clearDraft, wasRestored } = useFormPersistence(
-    PUBLISH_FORM_DRAFT_KEY,
-    form as unknown as Record<string, unknown>,
-    setForm as unknown as React.Dispatch<React.SetStateAction<Record<string, unknown>>>,
-    { restoreOnMount: true },
-  );
-  const { isExpired, dismiss: dismissExpiry, countdown, signalExpiry } = useSessionExpiry();
 
-  const hasUnsavedChanges = useMemo(() => {
-    return form.apiName !== '' || form.baseUrl !== '' || form.category !== '' ||
-           form.description !== '' || form.pricePerCall !== '' ||
-           form.endpoints.length > 0;
-  }, [form]);
+  const hasUnsavedChanges = useMemo(
+    () =>
+      form.apiName !== '' ||
+      form.baseUrl !== '' ||
+      form.category !== '' ||
+      form.description !== '' ||
+      form.pricePerCall !== '' ||
+      form.endpoints.length > 0,
+    [form],
+  );
 
   useBeforeUnload(hasUnsavedChanges);
-
-  const errors = validateForm(form);
-  const isFormValid = Object.keys(errors).length === 0;
 
   // ── Field change handlers ──────────────────────────────────────────────
 
@@ -469,8 +493,6 @@ export default function PublishApi() {
         submittingRef.current = false;
         if (mountedRef.current) setSubmitting(false);
       }
-      setSubmitted(true);
-      clearDraft();
     },
     [discardDraft, form, isFormValid],
   );
@@ -508,7 +530,6 @@ export default function PublishApi() {
                 setFormError(null);
                 setListingId(null);
                 setImportOpen(false);
-                clearDraft();
               }}
             >
               Publish another API
@@ -521,24 +542,9 @@ export default function PublishApi() {
 
   // ── Main form ──────────────────────────────────────────────────────────
 
-  // ── Simulate a 401 for demo purposes ─────────────────────────────────
-  const handleSimulateExpiry = useCallback(() => {
-    signalExpiry();
-  }, [signalExpiry]);
-
   return (
     <>
       <style>{STYLES}</style>
-      <SessionExpiryBanner
-        isVisible={isExpired}
-        countdown={countdown}
-        onDismiss={dismissExpiry}
-      />
-      {wasRestored && !isExpired && (
-        <div className="pa-draft-restored" role="status" aria-live="polite">
-          Draft restored from a previous session.
-        </div>
-      )}
       <div className="pa-shell">
         {isExpired && <SessionExpiryBanner onDismiss={dismissExpiry} />}
 
@@ -586,7 +592,7 @@ export default function PublishApi() {
         </section>
 
         {/* ── Draft restored notice (with dismiss) ─────────────── */}
-        {wasRestored && !isExpired && (
+        {isRestored && (
           <div className="pa-draft-banner surface">
             <span aria-hidden="true">💾</span>
             <span>Your previous draft has been restored. Your form data is being saved automatically.</span>
@@ -594,8 +600,7 @@ export default function PublishApi() {
               type="button"
               className="pa-btn-secondary pa-draft-dismiss"
               onClick={() => {
-                clearDraft();
-                setForm(INITIAL_FORM);
+                discardDraft(INITIAL_FORM);
                 setTouched(INITIAL_TOUCHED);
                 setSubmitAttempted(false);
               }}
@@ -604,18 +609,6 @@ export default function PublishApi() {
             </button>
           </div>
         )}
-
-        {/* ── Session expiry simulation (demo) ──────────────────── */}
-        <div className="pa-demo-controls surface">
-          <p className="pa-demo-label">Session controls (demo)</p>
-          <button
-            type="button"
-            className="pa-btn-secondary"
-            onClick={handleSimulateExpiry}
-          >
-            Simulate session expiry
-          </button>
-        </div>
 
         {/* ── Publish form ───────────────────────────────────────── */}
         <form
@@ -709,19 +702,27 @@ export default function PublishApi() {
               />
             </FormField>
 
-            <div className="pa-field">
-              <label className="pa-label" htmlFor="pa-description">
-                Description
-              </label>
+            <FormField
+              id="pa-description"
+              label="Description"
+              error={errors.description}
+              status={fieldStatus('description', errors, touched, submitAttempted)}
+              counter={{ current: descriptionLength, max: DESCRIPTION_MAX_LENGTH }}
+            >
               <textarea
                 id="pa-description"
                 className="pa-textarea"
                 value={form.description}
                 onChange={handleField('description')}
+                onBlur={handleBlur('description')}
                 placeholder="Describe what your API does, its use cases, and any notable constraints."
                 rows={4}
               />
-            </div>
+            </FormField>
+            {/* Throttled announcement: only speaks once fewer than 50 characters remain. */}
+            <p id="pa-description-counter-live" className="sr-only" aria-live="polite" aria-atomic="true">
+              {descriptionAnnouncement}
+            </p>
           </fieldset>
 
           {/* ── Endpoint list ────────────────────────────────────── */}
@@ -1274,23 +1275,6 @@ const STYLES = `
   @keyframes pa-fade-out {
     0%, 70% { opacity: 1; }
     100% { opacity: 0; pointer-events: none; }
-  }
-
-  /* ── Demo controls ─────────────────────────────────────────────────── */
-
-  .pa-demo-controls {
-    padding: 14px 18px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .pa-demo-label {
-    margin: 0;
-    font-size: 0.82rem;
-    color: var(--muted, #93a0bf);
-    font-weight: 600;
   }
 
   @media (max-width: 600px) {

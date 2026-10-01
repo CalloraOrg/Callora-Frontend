@@ -30,13 +30,16 @@ describe('useWebhookDeliveries', () => {
     const fetcher: WebhookDeliveriesFetcher = vi.fn(
       (accountId, _filter, signal) => new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          resolve([{
-            id: `${accountId}-delivery`,
-            url: 'https://example.com/webhook',
-            status: 'delivered',
-            attempts: 1,
-            lastAttemptAt: new Date().toISOString(),
-          }]);
+          resolve({
+            data: [{
+              id: `${accountId}-delivery`,
+              url: 'https://example.com/webhook',
+              status: 'delivered',
+              attempts: 1,
+              lastAttemptAt: new Date().toISOString(),
+            }],
+            totalCount: 1,
+          });
         }, 50);
 
         signal.addEventListener('abort', () => {
