@@ -176,7 +176,7 @@ describe('CommandPalette Component', () => {
       fireEvent.keyDown(window, { key: 'k', metaKey: true, ctrlKey: true });
     });
 
-    const item = screen.getByText('Go to Billing');
+    const item = screen.getByRole('option', { name: 'Go to Billing' });
     act(() => {
       fireEvent.click(item);
     });
@@ -193,7 +193,7 @@ describe('CommandPalette Component', () => {
     });
 
     // Find the toggle theme command
-    const lightThemeBtn = screen.getByText('Use Light Theme');
+    const lightThemeBtn = screen.getByRole('option', { name: 'Use Light Theme' });
     
     act(() => {
       fireEvent.click(lightThemeBtn);
@@ -232,5 +232,96 @@ describe('CommandPalette Component', () => {
       fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
     });
     expect(document.activeElement).toBe(closeBtn);
+  });
+
+  it('matches WeatherSim API with fuzzy query "wthr"', async () => {
+    renderComponent();
+    
+    act(() => {
+      fireEvent.keyDown(window, { key: 'k', metaKey: true, ctrlKey: true });
+    });
+
+    const input = screen.getByPlaceholderText('Type a command or API name...');
+    
+    act(() => {
+      fireEvent.change(input, { target: { value: 'wthr' } });
+    });
+
+    expect(screen.getByRole('option', { name: 'Jump to WeatherSim API' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'Go to Dashboard' })).toBeNull();
+  });
+
+  it('matches "dep" to deposit command', async () => {
+    renderComponent();
+    
+    act(() => {
+      fireEvent.keyDown(window, { key: 'k', metaKey: true, ctrlKey: true });
+    });
+
+    const input = screen.getByPlaceholderText('Type a command or API name...');
+    
+    act(() => {
+      fireEvent.change(input, { target: { value: 'dep' } });
+    });
+
+    expect(screen.getByRole('option', { name: 'Open Deposit modal' })).toBeTruthy();
+  });
+
+  it('orders results by match score (best match first)', async () => {
+    renderComponent();
+    
+    act(() => {
+      fireEvent.keyDown(window, { key: 'k', metaKey: true, ctrlKey: true });
+    });
+
+    const input = screen.getByPlaceholderText('Type a command or API name...');
+    
+    act(() => {
+      fireEvent.change(input, { target: { value: 'wea' } });
+    });
+
+    const options = screen.getAllByRole('option');
+    expect(options.length).toBeGreaterThan(0);
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    expect(options[0]).toHaveTextContent('Jump to WeatherSim API');
+  });
+
+  it('highlights matched characters in results', async () => {
+    renderComponent();
+    
+    act(() => {
+      fireEvent.keyDown(window, { key: 'k', metaKey: true, ctrlKey: true });
+    });
+
+    const input = screen.getByPlaceholderText('Type a command or API name...');
+    
+    act(() => {
+      fireEvent.change(input, { target: { value: 'wea' } });
+    });
+
+    const weatherOption = screen.getByRole('option', { name: 'Jump to WeatherSim API' });
+    const highlights = weatherOption.querySelectorAll('.command-palette-match-highlight');
+    expect(highlights.length).toBeGreaterThan(0);
+    const highlightText = Array.from(highlights).map(h => h.textContent).join('');
+    expect(highlightText.toLowerCase()).toContain('wea');
+  });
+
+  it('screen readers read plain option name without highlights', async () => {
+    renderComponent();
+    
+    act(() => {
+      fireEvent.keyDown(window, { key: 'k', metaKey: true, ctrlKey: true });
+    });
+
+    const input = screen.getByPlaceholderText('Type a command or API name...');
+    
+    act(() => {
+      fireEvent.change(input, { target: { value: 'wea' } });
+    });
+
+    const weatherOption = screen.getByRole('option', { name: 'Jump to WeatherSim API' });
+    const srText = weatherOption.querySelector('.command-palette-item-name-sr');
+    expect(srText).toBeTruthy();
+    expect(srText?.textContent).toBe('Jump to WeatherSim API');
   });
 });
