@@ -7,42 +7,121 @@ export type Review = {
   verified: boolean;
 };
 
-
-
-export type APIItem = {
-  id: string;
+/**
+ * A named query parameter for an endpoint.
+ */
+export type EndpointParam = {
+  /** Parameter name as it appears in the query string or body. */
   name: string;
-  provider: { name: string; url?: string; avatar?:string;};
-   version?: string;
-  status?: "operational" | "degraded" | "maintenance";
-  description: string;
-  pricePerRequest: number;
-  pricePerCall?: number;
-  avgLatencyMs?: number;
-  uptimePercent?: number;
-  rating?: number;
-  tags?: string[];
-  category?: string;
-  createdAt?: string;
-  usageCount?: number;
-  features?: string[];
-  useCases?: string[];
-  endpoints?: Array<any>;
-  stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
-  ratingDistribution?: Record<number, number>;
-  hourlyHealth?: ("operational" | "degraded" | "down")[];
-  reviews?: Review[];
-  sparklineValues?: number[];
+  /** Primitive type of the parameter value. */
+  type: "string" | "number" | "boolean" | "array" | "object";
+  /** Whether the parameter must be supplied by the caller. */
+  required: boolean;
 };
 
+/**
+ * A single callable endpoint exposed by an API.
+ * Replaces the previous `Array<any>` endpoints shape.
+ */
+export type Endpoint = {
+  /** Stable identifier unique within an API's endpoint list. */
+  id: string;
+  /** Human-readable label for the endpoint. */
+  title: string;
+  /** Relative or absolute URL path for the endpoint. */
+  url: string;
+  /** HTTP method used to invoke the endpoint. */
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /** Optional grouping label for UI display (e.g. "Forecast"). */
+  group?: string;
+  /** Query/body parameters accepted by the endpoint. */
+  params?: EndpointParam[];
+  /** Representative response payload (JSON string) for documentation. */
+  response?: string;
+};
+
+/**
+ * Aggregated runtime statistics for an API.
+ * Canonical fields are `totalCalls`, `avgResponseMs`, and `uptimePct`.
+ */
+export type APIStats = {
+  /** Total number of calls made against the API. */
+  totalCalls?: number;
+  /** Average response latency in milliseconds. Canonical over top-level `avgLatencyMs`. */
+  avgResponseMs?: number;
+  /** Uptime percentage (0–100). Canonical over top-level `uptimePercent`. */
+  uptimePct?: number;
+};
+
+/**
+ * Contract for an API catalogue entry shared with Callora-Backend.
+ *
+ * Canonical fields:
+ *   - `pricePerRequest`: authoritative price per call.
+ *   - `stats.avgResponseMs`: authoritative average latency.
+ *   - `stats.uptimePct`: authoritative uptime percentage.
+ *
+ * Deprecated duplicates (retained for backward compatibility):
+ *   - `pricePerCall`: use `pricePerRequest`. Consumed by CompareDrawer and ApiCard.
+ *   - `avgLatencyMs`: use `stats.avgResponseMs`. Consumed by CompareDrawer and ApiCard.
+ *   - `uptimePercent`: use `stats.uptimePct`. Consumed by CompareDrawer and ApiCard.
+ */
+export type APIItem = {
+  /** Stable unique identifier for the API catalogue entry. */
+  id: string;
+  /** Display name of the API. */
+  name: string;
+  /** Provider metadata (name, optional url and avatar). */
+  provider: { name: string; url?: string; avatar?: string };
+  /** Semantic version of the API. */
+  version?: string;
+  /** Current operational status. */
+  status?: "operational" | "degraded" | "maintenance";
+  /** Human-readable description of the API. */
+  description: string;
+  /** Canonical price per request (in display currency). */
+  pricePerRequest: number;
+  /** @deprecated Use `pricePerRequest`. Consumed by CompareDrawer and ApiCard. */
+  pricePerCall?: number;
+  /** @deprecated Use `stats.avgResponseMs`. Consumed by CompareDrawer and ApiCard. */
+  avgLatencyMs?: number;
+  /** @deprecated Use `stats.uptimePct`. Consumed by CompareDrawer and ApiCard. */
+  uptimePercent?: number;
+  /** Average user rating (1–5). */
+  rating?: number;
+  /** Search/filter tags. */
+  tags?: string[];
+  /** Category label for grouping. */
+  category?: string;
+  /** ISO date the entry was added to the catalogue. */
+  createdAt?: string;
+  /** Cumulative usage count across all consumers. */
+  usageCount?: number;
+  /** Notable features highlighted in the UI. */
+  features?: string[];
+  /** Recommended use cases. */
+  useCases?: string[];
+  /** Callable endpoints exposed by the API. */
+  endpoints?: Endpoint[];
+  /** Aggregated runtime statistics. Canonical source for latency and uptime. */
+  stats?: APIStats;
+  /** Mapping of rating value (1 to 5) to review count. */
+  ratingDistribution?: Record<number, number>;
+  /** Hourly health status for the last 24 hours. */
+  hourlyHealth?: ("operational" | "degraded" | "down")[];
+  /** User reviews. */
+  reviews?: Review[];
+  /** Sparkline values for the trend chart. */
+  sparklineValues?: number[];
+};
 
 export const MOCK_APIS: APIItem[] = [
   {
     id: "weather-001",
     name: "WeatherSim API",
     provider: { name: "Acme Labs", url: "#" },
-     version: "2.3.1",
-  status: "operational",
+    version: "2.3.1",
+    status: "operational",
     description:
       "WeatherSim provides hyper-local weather forecasts, historical climate data, and simulated conditions for testing your services.",
     pricePerRequest: 0.01,
@@ -113,7 +192,7 @@ export const MOCK_APIS: APIItem[] = [
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
     ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
-    hourlyHealth: Array(24).fill("operational").map((_, i) => i === 12 || i === 13 ? "degraded" : "operational"),
+    hourlyHealth: Array(24).fill("operational").map(( i) => i === 12 || i === 13 ? "degraded" : "operational"),
     sparklineValues: [15, 17, 16, 19, 21, 20, 24, 25, 23, 26, 28, 27],
   },
   {
@@ -121,7 +200,7 @@ export const MOCK_APIS: APIItem[] = [
     name: "QuickPay",
     provider: { name: "PayFast", url: "#" },
     status: "degraded",
- version: "1.8.0",
+    version: "1.8.0",
     description: "Simple payment processing with card and ACH support",
     pricePerRequest: 0.001,
     pricePerCall: 0.001,
@@ -199,8 +278,8 @@ export const MOCK_APIS: APIItem[] = [
     id: "msg-01",
     name: "ChatStream",
     provider: { name: "Comms Inc.", url: "#" },
-     version: "3.0.2",
-  status: "maintenance",
+    version: "3.0.2",
+    status: "maintenance",
     description: "Scalable messaging and notifications for apps.",
     pricePerRequest: 0.0005,
     pricePerCall: 0.0005,
@@ -274,18 +353,18 @@ export const MOCK_APIS: APIItem[] = [
     const avgLatencyMs = i % 5 === 0 ? undefined : 140 + i * 18;
     const uptimePercent =
       i % 3 === 0 ? undefined : Number((99.2 + i * 0.07).toFixed(2));
-const status:  APIItem["status"] =
-  i % 3 === 0
-    ? "operational"
-    : i % 3 === 1
-    ? "degraded"
-    : "maintenance";
+    const status: APIItem["status"] =
+      i % 3 === 0
+        ? "operational"
+        : i % 3 === 1
+        ? "degraded"
+        : "maintenance";
     return {
       id: `demo-${i}`,
       name: `Demo API ${i + 1}`,
       provider: { name: i % 2 === 0 ? "OpenTools" : "ThirdParty", url: "#" },
-       version: `1.${i}.0`,
-       status,
+      version: `1.${i}.0`,
+      status,
       description: `Demo API number ${i + 1} showcasing features and endpoints.`,
       pricePerRequest,
       pricePerCall: i % 4 === 0 ? undefined : pricePerRequest,

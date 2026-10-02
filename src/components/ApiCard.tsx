@@ -6,6 +6,14 @@
  * allowing users to add/remove the endpoint from collections.
  */
 
+/**
+ * ApiCard.tsx
+ *
+ * Marketplace API card.
+ * Includes a bookmark/save button that opens a small popover
+ * allowing users to add/remove the endpoint from collections.
+ */
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ContextMenu } from './ContextMenu';
 import Skeleton from "./Skeleton";
@@ -26,6 +34,7 @@ import WhyApi from "./WhyApi";
 import { colorFromId } from "../utils/colorFromId";
 import { ClockIcon, BoltIcon } from "./icons";
 import { useToast } from "./Toast";
+
 
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -644,9 +653,12 @@ export default function ApiCard({
 
   const isMobile = useMediaQuery("(max-width: 768px)");
 
+  // Canonical field selection: prefer the documented canonical fields and fall
+  // back to deprecated duplicates only for backwards compatibility. See
+  // `src/data/mockApis.ts` for the APIItem contract and deprecation notes.
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
-  const avgLatencyMs = api.avgLatencyMs;
-  const uptimePercent = api.uptimePercent;
+  const avgLatencyMs = api.avgLatencyMs ?? api.stats?.avgResponseMs;
+  const uptimePercent = api.uptimePercent ?? api.stats?.uptimePct;
   const isCompact = density === "compact" || isMobile;
 
   const [liveMessage, setLiveMessage] = useState("");

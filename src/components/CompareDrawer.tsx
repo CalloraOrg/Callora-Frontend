@@ -3,6 +3,7 @@ import { useCompareStore, compareStore } from "../state/compareStore";
 import type { APIItem } from "../data/mockApis";
 import { formatPrice } from "../utils/format";
 import RatingHistogram from "./RatingHistogram";
+import { getPricePerCall, getAvgLatencyMs, getUptimePercent } from "../data/mockApis";
 import "./CompareDrawer.css";
 
 // ── Best-value helpers ────────────────────────────────────────────────────────
@@ -140,12 +141,12 @@ export default function CompareDrawer() {
               >
                 Clear
               </button>
-              <button
+<button
                 className="close-button"
                 onClick={() => compareStore.setOpen(false)}
                 aria-label="Close drawer"
               >
-                ✕
+                ✍
               </button>
             </div>
           </div>
@@ -157,14 +158,18 @@ export default function CompareDrawer() {
               </div>
             ) : (
               <div className="compare-grid">
-                {apis.map((api, colIdx) => (
+{apis.map((api, colIdx) => {
+                  const pricePerCall = getPricePerCall(api);
+                  const avgLatencyMs = getAvgLatencyMs(api);
+                  const uptimePercent = getUptimePercent(api);
+                  return (
                   <div key={api.id} className="compare-column">
                     <button
                       className="compare-column-remove"
                       onClick={() => handleRemove(api.id, api.name)}
                       aria-label={`Remove ${api.name} from comparison`}
                     >
-                      <span aria-hidden="true">✕</span>
+                      <span aria-hidden="true">✍</span>
                     </button>
 
                     <div className="compare-column-header">{api.name}</div>
@@ -172,29 +177,26 @@ export default function CompareDrawer() {
                     {/* ── Price / call ─────────────────────────────────── */}
                     <div className="compare-stat">
                       <span className="compare-stat-label">Price / call</span>
-                      <span
+<span
                         className={`compare-stat-value${colIdx === bestPriceIdx ? " compare-best-value" : ""}`}
                       >
-                        {effectivePrices[colIdx] !== undefined
-                          ? `$${formatPrice(effectivePrices[colIdx] as number)}`
-                          : "—"}
+                        {pricePerCall !== undefined ? `$${formatPrice(pricePerCall)}` : "—"}
                         {colIdx === bestPriceIdx && (
                           <span className="compare-best-label" aria-label="Best value">
                             Best value
                           </span>
                         )}
                       </span>
+                      </span>
                     </div>
 
                     {/* ── Latency ──────────────────────────────────────── */}
                     <div className="compare-stat">
                       <span className="compare-stat-label">Latency</span>
-                      <span
+<span
                         className={`compare-stat-value${colIdx === bestLatencyIdx ? " compare-best-value" : ""}`}
                       >
-                        {api.avgLatencyMs !== undefined
-                          ? `${api.avgLatencyMs} ms`
-                          : "—"}
+                        {avgLatencyMs !== undefined ? `${avgLatencyMs} ms` : "—"}
                         {colIdx === bestLatencyIdx && (
                           <span className="compare-best-label" aria-label="Best value">
                             Best value
@@ -206,11 +208,11 @@ export default function CompareDrawer() {
                     {/* ── Uptime ───────────────────────────────────────── */}
                     <div className="compare-stat">
                       <span className="compare-stat-label">Uptime</span>
-                      <span
+<span
                         className={`compare-stat-value${colIdx === bestUptimeIdx ? " compare-best-value" : ""}`}
                       >
-                        {api.uptimePercent !== undefined
-                          ? `${api.uptimePercent.toFixed(2)}%`
+                        {uptimePercent !== undefined
+                          ? `${uptimePercent.toFixed(2)}%`
                           : "—"}
                         {colIdx === bestUptimeIdx && (
                           <span className="compare-best-label" aria-label="Best value">
@@ -259,7 +261,8 @@ export default function CompareDrawer() {
                       </span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
