@@ -26,6 +26,7 @@ import { useId, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
 import StatusBadge, { type StatusVariant } from '../components/StatusBadge';
+import DateRangePicker from '../components/DateRangePicker';
 import { formatUsdcAmount, formatDateShort, resolveTimeZone } from '../utils/format';
 import { useAccountContext } from '../hooks/useAccountContext';
 
@@ -218,6 +219,8 @@ export function BillingHistory() {
   const [statusFilter, setStatusFilter] = useState<TxStatus | 'All'>('All');
   const [directionFilter, setDirectionFilter] = useState<TxDirection | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState<string | null>(null);
 
   // ── Sort state (URL-persisted) ────────────────────────────────────────────
   const [searchParams, setSearchParams] = useSearchParams();
@@ -255,9 +258,11 @@ export function BillingHistory() {
     if (typeFilter !== 'All') parts.push(`type: ${typeFilter}`);
     if (statusFilter !== 'All') parts.push(`status: ${statusFilter}`);
     if (directionFilter !== 'All') parts.push(`direction: ${directionFilter}`);
+    if (startDate) parts.push(`from: ${startDate}`);
+    if (endDate) parts.push(`to: ${endDate}`);
     if (searchQuery.trim()) parts.push(`search: "${searchQuery}"`);
     return parts.length === 0 ? 'Showing all transactions' : `Filtered by ${parts.join(', ')}`;
-  }, [typeFilter, statusFilter, directionFilter, searchQuery]);
+  }, [typeFilter, statusFilter, directionFilter, searchQuery, startDate, endDate]);
 
   // ── Derived filtered/sorted list ──────────────────────────────────────────
   const filteredTxs = useMemo(() => {
@@ -265,6 +270,17 @@ export function BillingHistory() {
       if (typeFilter !== 'All' && tx.type !== typeFilter) return false;
       if (statusFilter !== 'All' && tx.status !== statusFilter) return false;
       if (directionFilter !== 'All' && tx.direction !== directionFilter) return false;
+      if (startDate || endDate) {
+        const txTime = new Date(tx.timestamp).getTime();
+        if (startDate) {
+          const start = new Date(`${startDate}T00:00:00`).getTime();
+          if (txTime < start) return false;
+        }
+        if (endDate) {
+          const end = new Date(`${endDate}T23:59:59.999`).getTime();
+          if (txTime > end) return false;
+        }
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -275,8 +291,7 @@ export function BillingHistory() {
       }
       return true;
     });
-
-    if (!sortColumn) return filtered;
+if (!sortColumn) return filtered;
 
     return [...filtered].sort((a, b) => {
       let cmp = 0;
@@ -288,7 +303,7 @@ export function BillingHistory() {
       }
       return sortDirection === 'asc' ? cmp : -cmp;
     });
-  }, [typeFilter, statusFilter, directionFilter, searchQuery, sortColumn, sortDirection]);
+  }, [typeFilter, statusFilter, directionFilter, searchQuery, startDate, endDate, sortColumn, sortDirection]);
 
   // ── Totals ─────────────────────────────────────────────────────────────────
   const netBalance = useMemo(() => {
@@ -476,6 +491,47 @@ export function BillingHistory() {
             <option value="debit">Debit</option>
           </select>
         </label>
+
+        {/* Date range filter */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span
+            style={{ fontSize: '0.7rem', color: 'var(--text-secondary, #9ca3af)', fontWeight: 600 }}
+          >
+            Date range
+          </span>
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onChange={(start, end) => {
+              setStartDate(start);
+              setEndDate(end);
+            }}
+          />
+        </div>
+
+        {/* Clear dates affordance */}
+        {(startDate || endDate) && (
+          <button
+            type="button"
+            onClick={() => {
+              setStartDate(null);
+              setEndDate(null);
+            }}
+            aria-label="Clear date range filter"
+            style={{
+              alignSelf: 'flex-end',
+              padding: '5px 10px',
+              borderRadius: '6px',
+              border: '1px solid var(--line, rgba(255,255,255,0.15))',
+              background: 'var(--bg-chip, rgba(255,255,255,0.04))',
+              color: 'var(--text-secondary, #9ca3af)',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+            }}
+          >
+            Clear dates
+          </button>
+        )}
       </div>
 
       {/* ── Summary strip ────────────────────────────────────────────────── */}
