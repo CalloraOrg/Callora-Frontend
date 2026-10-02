@@ -149,6 +149,8 @@ export default function FiltersSidebar({
   const prefersReducedMotion = usePrefersReducedMotion();
 
   // Inverted price range — show a warning without silently discarding filters.
+  // MarketplacePage skips price filtering entirely while this is true, so the
+  // hint below is what stops the no-op from looking like an applied filter.
   const hasPriceRangeError = minPrice !== null && maxPrice !== null && minPrice > maxPrice;
 
   const hasActiveFilters =
@@ -171,6 +173,16 @@ export default function FiltersSidebar({
     setAnnouncement(msg);
     announceTimerRef.current = setTimeout(() => setAnnouncement(""), 3000);
   }, []);
+
+  /** Swap min/max so an inverted range becomes a valid one in a single click. */
+  const handleSwapPrice = useCallback(() => {
+    if (minPrice === null || maxPrice === null) return;
+    setMinPrice(maxPrice);
+    setMaxPrice(minPrice);
+    announce(
+      `Price range swapped. Min price $${maxPrice}, max price $${minPrice}.`,
+    );
+  }, [minPrice, maxPrice, setMinPrice, setMaxPrice, announce]);
 
   // Announce when categories change
   const prevCategoryCount = useRef(selectedCategories.size);
@@ -359,20 +371,36 @@ export default function FiltersSidebar({
             />
           </div>
           {hasPriceRangeError && (
-            <p
-              id="filters-price-error"
-              className="error-text"
-              role="alert"
-              style={{
-                display: "flex",
-                gap: 6,
-                alignItems: "center",
-                margin: 0,
-              }}
+            <div
+              className="filters-price-error"
+              data-testid="filters-price-error-block"
+              style={{ display: "grid", gap: "var(--mkt-space-sm, 4px)" }}
             >
-              <WarningIcon size={16} aria-hidden="true" />
-              Min price cannot exceed max price
-            </p>
+              <p
+                id="filters-price-error"
+                data-testid="filters-price-error"
+                className="error-text"
+                role="alert"
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "center",
+                  margin: 0,
+                }}
+              >
+                <WarningIcon size={16} aria-hidden="true" />
+                Min price cannot exceed max price
+              </p>
+              <button
+                type="button"
+                className="ghost-button filters-price-swap"
+                onClick={handleSwapPrice}
+                data-testid="filters-price-swap"
+                style={{ justifySelf: "start" }}
+              >
+                Swap values
+              </button>
+            </div>
           )}
         </div>
       </FilterGroup>

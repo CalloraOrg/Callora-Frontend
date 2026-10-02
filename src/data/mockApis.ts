@@ -390,7 +390,13 @@ export const MOCK_APIS: APIItem[] = [
 
 export function findApiById(id: string | undefined) {
   if (!id) return undefined;
-  return MOCK_APIS.find((a) => a.id === id || a.id === decodeURIComponent(id));
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(id);
+  } catch {
+    return undefined;
+  }
+  return MOCK_APIS.find((a) => a.id === id || a.id === decoded);
 }
 
 export default MOCK_APIS;

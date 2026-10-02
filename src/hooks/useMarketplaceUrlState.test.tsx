@@ -144,4 +144,23 @@ describe("useMarketplaceUrlState (URL is the single source of truth)", () => {
     expect(captured!.queryDraft).toBe("hello");
     expect(screen.getByTestId("params").textContent).toContain("q=hello");
   });
+
+  it("composes two setters dispatched in the same tick instead of clobbering", () => {
+    const { getByTestId } = renderHookHarness([
+      "/marketplace?minPrice=0.5&maxPrice=0.019",
+    ]);
+
+    // The "Swap values" action: both bounds are written in one event, so the
+    // second write must build on the first instead of the pre-write URL.
+    act(() => {
+      captured!.setMinPrice(0.019);
+      captured!.setMaxPrice(0.5);
+    });
+
+    expect(captured!.minPrice).toBe(0.019);
+    expect(captured!.maxPrice).toBe(0.5);
+    const params = getByTestId("params").textContent ?? "";
+    expect(params).toContain("minPrice=0.019");
+    expect(params).toContain("maxPrice=0.5");
+  });
 });
