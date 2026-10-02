@@ -11,6 +11,10 @@ export interface WebhookDelivery {
   status: "delivered" | "failed" | "pending";
   attempts: number;
   lastAttemptAt: string;
+  createdAt?: string | Date;
+  requestBody?: string | object;
+  responseStatus?: number;
+  responseBody?: string | object;
 }
 
 export interface WebhookFilter {
@@ -18,21 +22,26 @@ export interface WebhookFilter {
   page: number;
 }
 
-// Mock API function
-export const fetchDeliveries = async (
+export type WebhookDeliveriesFetcher = (
   accountId: string,
   filter: WebhookFilter,
   signal: AbortSignal,
-): Promise<WebhookDelivery[]> => {
+) => Promise<{ data: WebhookDelivery[]; totalCount: number }>;
+
+// Mock API function
+export const fetchDeliveries: WebhookDeliveriesFetcher = async (
+  _accountId,
+  filter,
+  signal,
+) => {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       if (signal.aborted) {
         return reject(new DOMException("Aborted", "AbortError"));
       }
-      if (accountId === "error-account") {
-        return reject(new Error("Failed to fetch from authoritative source"));
-      }
 
+      // Mock total of 50 items, but return 2 items per page for testing
+      const totalCount = 50;
       const data: WebhookDelivery[] = [
         {
           id: `dlv_1_${filter.page}`,
@@ -40,6 +49,10 @@ export const fetchDeliveries = async (
           status: "delivered",
           attempts: 1,
           lastAttemptAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          requestBody: { event: "payment.succeeded", amount: 100 },
+          responseStatus: 200,
+          responseBody: { ok: true },
         },
         {
           id: `dlv_2_${filter.page}`,
@@ -47,6 +60,10 @@ export const fetchDeliveries = async (
           status: "failed",
           attempts: 3,
           lastAttemptAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          requestBody: { event: "payment.failed", amount: 50 },
+          responseStatus: 500,
+          responseBody: { error: "Internal Server Error" },
         },
       ];
 
@@ -55,7 +72,7 @@ export const fetchDeliveries = async (
         filtered = data.filter((d) => d.status === filter.status);
       }
 
-      resolve(filtered);
+      resolve({ data: filtered, totalCount });
     }, 50);
 
     signal.addEventListener("abort", () => clearTimeout(timeout));
@@ -93,8 +110,13 @@ function isRetryableDeliveryError(error: unknown): boolean {
   return false;
 }
 
-export function useWebhookDeliveries(accountId: string) {
+export function useWebhookDeliveries(
+  accountId: string | null,
+  fetcher: WebhookDeliveriesFetcher = fetchDeliveries,
+) {
   const [deliveries, setDeliveries] = useState<WebhookDelivery[]>([]);
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
   const [filter, setFilter] = useState<WebhookFilter>({
     page: 1,
     status: "all",
@@ -107,24 +129,37 @@ export function useWebhookDeliveries(accountId: string) {
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const requestCounter = useRef(0);
+  const previousAccountId = useRef<string | null>(null);
 
   const loadData = useCallback(
-    async (currentAccountId: string, currentFilter: WebhookFilter) => {
+    async (
+      currentAccountId: string,
+      currentFilter: WebhookFilter,
+      preserveCurrentData = true,
+    ) => {
       const reqId = ++requestCounter.current;
 
-      setStatus((prev) => {
-        if (prev === "success" || prev === "error") {
-          setIsStale(true);
-          return prev;
-        }
-        return "loading";
-      });
+      if (preserveCurrentData) {
+        setStatus((prev) => {
+          if (prev === "success" || prev === "error") {
+            setIsStale(true);
+            return prev;
+          }
+          return "loading";
+        });
+      } else {
+        setDeliveries([]);
+        setTotalCount(0);
+        setLoadedAccountId(null);
+        setStatus("loading");
+        setIsStale(false);
+      }
       setError(null);
 
       const abortController = new AbortController();
 
       try {
-        const data = await fetchDeliveries(
+        const response = await fetcher(
           currentAccountId,
           currentFilter,
           abortController.signal,
@@ -132,7 +167,9 @@ export function useWebhookDeliveries(accountId: string) {
 
         if (reqId !== requestCounter.current) return;
 
-        setDeliveries(data);
+        setDeliveries(response.data);
+        setTotalCount(response.totalCount);
+        setLoadedAccountId(currentAccountId);
         setStatus("success");
         setIsStale(false);
       } catch (err: any) {
@@ -144,18 +181,32 @@ export function useWebhookDeliveries(accountId: string) {
         setIsStale(false);
       }
     },
-    [],
+    [fetcher],
   );
 
   useEffect(() => {
-    loadData(accountId, filter);
+    if (!accountId) {
+      requestCounter.current += 1;
+      previousAccountId.current = null;
+      setDeliveries([]);
+      setTotalCount(0);
+      setLoadedAccountId(null);
+      setStatus("idle");
+      setError(null);
+      setIsStale(false);
+      return;
+    }
+
+    const accountChanged = previousAccountId.current !== accountId;
+    previousAccountId.current = accountId;
+    loadData(accountId, filter, !accountChanged);
   }, [accountId, filter, loadData]);
 
   const retryDelivery = async (deliveryId: string) => {
-    if (retryingId === deliveryId) return;
+    if (!accountId || retryingId === deliveryId) return;
 
     setRetryingId(deliveryId);
-    const idempotencyKey = generateIdempotencyKey("delivery-retry");
+    const idempotencyKey = generateIdempotencyKey();
 
     try {
       let attempt = 0;
@@ -177,15 +228,16 @@ export function useWebhookDeliveries(accountId: string) {
         }
       }
       await loadData(accountId, filter);
-    } catch (err) {
-      throw err;
     } finally {
       setRetryingId(null);
     }
   };
 
   return {
-    deliveries,
+    // Never show a previous account's rows (or totals) while the active
+    // account's data is loading.
+    deliveries: loadedAccountId === accountId ? deliveries : [],
+    totalCount: loadedAccountId === accountId ? totalCount : 0,
     status,
     error,
     isStale,
@@ -193,6 +245,9 @@ export function useWebhookDeliveries(accountId: string) {
     setFilter,
     retryDelivery,
     retryingId,
-    refresh: () => loadData(accountId, filter),
+    refresh: () => {
+      if (!accountId) return;
+      void loadData(accountId, filter);
+    },
   };
 }

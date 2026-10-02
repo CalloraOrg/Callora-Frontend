@@ -15,6 +15,7 @@ const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('generateIdempotencyKey', () => {
@@ -245,6 +246,21 @@ describe('runWithTimeout', () => {
     await vi.advanceTimersByTimeAsync(DEFAULT_REQUEST_TIMEOUT_MS - 1);
     await vi.advanceTimersByTimeAsync(1);
     await assertion;
+});
+
+// ─── Burst / retry guarantees (issue #1205) ──────────────────────────────────
+
+describe('generateIdempotencyKey — burst', () => {
+  it('produces 10,000 unique keys in a rapid burst', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+
+    const seen = new Set<string>();
+    for (let i = 0; i < 10_000; i += 1) {
+      const key = generateIdempotencyKey();
+      expect(key).toMatch(UUID_V4);
+      seen.add(key);
+    }
+    expect(seen.size).toBe(10_000);
   });
 });
 
@@ -261,6 +277,8 @@ describe('InFlightGuard', () => {
     const p2 = guard.run('rotate-key', task);
     const p3 = guard.run('rotate-key', task);
 
+    expect(p2).toBe(p1);
+    expect(p3).toBe(p1);
     expect(guard.size()).toBe(1);
     expect(guard.isRunning('rotate-key')).toBe(true);
 
@@ -329,6 +347,10 @@ describe('InFlightGuard', () => {
 
 describe('backoffDelayMs', () => {
   it('grows exponentially', () => {
+});
+
+describe("backoffDelayMs", () => {
+  it("grows exponentially", () => {
     expect(backoffDelayMs(0, 1000)).toBe(1000);
     expect(backoffDelayMs(1, 1000)).toBe(2000);
     expect(backoffDelayMs(2, 1000)).toBe(4000);
@@ -373,6 +395,7 @@ describe('withRetry', () => {
         { maxRetries: 2, baseDelayMs: 1, delay },
       ),
     ).rejects.toThrow('always fails');
+    ).rejects.toBe(err);
 
     expect(calls).toBe(3);
     expect(delay).toHaveBeenCalledTimes(2);
@@ -380,6 +403,21 @@ describe('withRetry', () => {
 
   it('honors the shouldRetry predicate to stop immediately', async () => {
     const err = new Error('non-retryable');
+  it("does not retry when maxRetries is zero", async () => {
+    const err = new Error("first attempt failed");
+    const task = vi.fn().mockRejectedValue(err);
+    const delay = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      withRetry(task, { maxRetries: 0, baseDelayMs: 1, delay }),
+    ).rejects.toBe(err);
+
+    expect(task).toHaveBeenCalledTimes(1);
+    expect(delay).not.toHaveBeenCalled();
+  });
+
+  it("honors the shouldRetry predicate to stop immediately", async () => {
+    const err = new Error("non-retryable");
     let calls = 0;
     const delay = vi.fn().mockResolvedValue(undefined);
 

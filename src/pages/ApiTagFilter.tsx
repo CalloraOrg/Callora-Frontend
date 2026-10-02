@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import MOCK_APIS from "../data/mockApis";
+import MOCK_APIS, { type APIItem } from "../data/mockApis";
 import Skeleton from "../components/Skeleton";
 import { TagIcon } from "../components/icons";
 import Tooltip from "../components/Tooltip";
@@ -7,12 +7,17 @@ import KbdHint from "../components/KbdHint";
 import type { Shortcut } from "../hooks/useGlobalShortcuts";
 
 /**
- * Extracts all unique tags from the mock API data, sorted alphabetically.
- * Memoised callers can cache for the lifetime of the page.
+ * Extracts all unique tags from a catalogue, sorted alphabetically.
+ *
+ * Defaults to the bundled mock dataset so existing callers keep working;
+ * MarketplacePage passes the catalogue it fetched so the facets always match
+ * the listings actually on screen.
  */
-export function getAllUniqueTags(): string[] {
+export function getAllUniqueTags(
+  apis: readonly APIItem[] = MOCK_APIS,
+): string[] {
   const tagSet = new Set<string>();
-  for (const api of MOCK_APIS) {
+  for (const api of apis) {
     if (api.tags) {
       for (const t of api.tags) {
         tagSet.add(t.toLowerCase());
@@ -29,6 +34,12 @@ export interface ApiTagFilterProps {
   selectedTag: string | null;
   /** Called when a tag is toggled. Pass null to clear. */
   onTagChange: (tag: string | null) => void;
+  /**
+   * Catalogue the per-tag counts are derived from. Defaults to the bundled
+   * mock dataset; MarketplacePage passes the catalogue it fetched so the counts
+   * beside each pill match the listings actually on screen.
+   */
+  apis?: readonly APIItem[];
   /** Optional hover delay in ms for tooltips on tag icon buttons. Defaults to 0. */
   hoverDelayMs?: number;
   /** Optional touch long-press duration in ms for tooltips. Defaults to 500. */
@@ -98,6 +109,7 @@ export default function ApiTagFilter({
   tags,
   selectedTag,
   onTagChange,
+  apis = MOCK_APIS,
   hoverDelayMs = 0,
   longPressMs = 500,
   isLoading = false,
@@ -106,7 +118,7 @@ export default function ApiTagFilter({
 
   const tagCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const api of MOCK_APIS) {
+    for (const api of apis) {
       if (!api.tags) continue;
       for (const t of api.tags) {
         const key = t.toLowerCase();
@@ -114,7 +126,7 @@ export default function ApiTagFilter({
       }
     }
     return counts;
-  }, [tags]);
+  }, [apis]);
 
   if (isLoading) {
     return <ApiTagFilterSkeleton />;

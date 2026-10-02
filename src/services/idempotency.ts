@@ -169,6 +169,60 @@ export async function runWithTimeout<T>(
  * double click from opening two requests at all, rather than relying on the
  * server to de-duplicate the replay. A settled key is released immediately,
  * including on failure, so an error never permanently blocks the action.
+
+/**
+ * Exponential backoff for `attempt` (0-based), capped at `maxDelayMs`.
+ */
+export function backoffDelayMs(
+  attempt: number,
+  baseDelayMs: number,
+  maxDelayMs = 30_000,
+): number {
+  const exponent = Math.pow(2, Math.max(0, attempt));
+  return Math.min(Math.max(0, baseDelayMs) * exponent, maxDelayMs);
+}
+
+export type RetryOptions = {
+  /** Attempts allowed after the first one. */
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs?: number;
+  /** Return false to fail fast instead of retrying. */
+  shouldRetry?: (error: unknown, attempt: number) => boolean;
+  /** Injectable wait, so tests need not wait in real time. */
+  delay?: (ms: number) => Promise<void>;
+};
+
+const defaultDelay = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Call `fn`, retrying with backoff while `shouldRetry` allows it. */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions,
+): Promise<T> {
+  const { maxRetries, baseDelayMs, maxDelayMs, shouldRetry, delay = defaultDelay } = options;
+
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt >= maxRetries || (shouldRetry && !shouldRetry(error, attempt))) {
+        throw error;
+      }
+      await delay(backoffDelayMs(attempt, baseDelayMs, maxDelayMs));
+      attempt += 1;
+    }
+  }
+}
+
+/**
+ * Collapses concurrent work for the same key onto a single promise.
+ *
+ * Used where a user could trigger the same write twice from different places
+ * (a retry button in two components, a poll racing a manual refresh) and the
+ * second call should join the first instead of issuing its own request.
  */
 export class InFlightGuard<T = unknown> {
   private readonly inflight = new Map<string, { promise: Promise<T> }>();
@@ -187,9 +241,7 @@ export class InFlightGuard<T = unknown> {
 
   run(key: string, task: () => Promise<T>): Promise<T> {
     const existing = this.inflight.get(key);
-    if (existing) {
-      return existing.promise;
-    }
+    if (existing) return existing.promise;
 
     const promise = Promise.resolve().then(() => task());
     const entry = { promise };

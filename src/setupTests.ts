@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
+import type { Mock } from "vitest";
 
 // Only install browser-global mocks when a DOM is present. Under the `node`
 // environment (e.g. pure-logic/contrast tests) these globals do not exist.
@@ -62,7 +63,7 @@ if (typeof window !== "undefined") {
     unobserve: vi.fn(),
     disconnect: vi.fn(),
     trigger: (entries: IntersectionObserverEntry[]) => callback(entries, {} as IntersectionObserver),
-  }));
+  })) as unknown as Mock;
 
   Object.defineProperty(window, "IntersectionObserver", {
     value: mockIntersectionObserver,
