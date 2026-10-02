@@ -298,3 +298,79 @@
     min-width: 0;
   }
 }
+
+/* ── Best-value highlight (Issue #1062) ─────────────────────────────────── */
+
+/*
+ * .compare-best-value wraps the stat value span when that column wins the row.
+ * Uses the --accent token so the highlight is theme-aware and never colour-only
+ * (the text label ".compare-best-label" carries the meaning for AT / greyscale).
+ */
+.compare-stat-value.compare-best-value {
+  color: var(--accent, #4e85ff);
+  font-weight: 700;
+}
+
+.compare-best-label {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent, #4e85ff);
+  background: color-mix(in srgb, var(--accent, #4e85ff) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #4e85ff) 30%, transparent);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── Status badges (Issue #1062) ────────────────────────────────────────── */
+
+.compare-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.compare-status-badge::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.compare-status-badge--operational {
+  color: var(--success, #22c55e);
+  background: color-mix(in srgb, var(--success, #22c55e) 12%, transparent);
+}
+
+.compare-status-badge--operational::before {
+  background: var(--success, #22c55e);
+}
+
+.compare-status-badge--degraded {
+  color: var(--warning, #f59e0b);
+  background: color-mix(in srgb, var(--warning, #f59e0b) 12%, transparent);
+}
+
+.compare-status-badge--degraded::before {
+  background: var(--warning, #f59e0b);
+}
+
+.compare-status-badge--maintenance {
+  color: var(--muted, #8899aa);
+  background: color-mix(in srgb, var(--muted, #8899aa) 12%, transparent);
+}
+
+.compare-status-badge--maintenance::before {
+  background: var(--muted, #8899aa);
+}

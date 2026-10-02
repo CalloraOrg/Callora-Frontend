@@ -1,21 +1,20 @@
-import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
-import RouteProgressBar from "./components/RouteProgressBar";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
-import { formatUsdc, formatUsdShortcut } from "./utils/format";
-import DepositPreview from "./components/DepositPreview";
-import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS } from "./config/constants";
+import { formatUsdc, formatUsdShortcut, normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
+import { useNetworkFee } from "./components/DepositPreview";
+import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS } from "./config/constants";
+import type { WalletServiceErrorCode } from "./services/walletService";
 import CompareDrawer from "./components/CompareDrawer";
 import CompareTray from "./components/CompareTray";
 import ExternalLink from "./components/ExternalLink";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
-import { ToastProvider } from "./components/Toast";
 import { useAccountContext } from "./hooks/useAccountContext";
 import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
 import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
@@ -36,6 +35,7 @@ const A11yAudit = lazy(() => import("./pages/A11yAudit"));
 const RateLimitCard = lazy(() => import("./pages/RateLimitCard"));
 const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
+const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
 const InvoiceCard = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.InvoiceCard })));
 
 // Prefetch cache map to ensure modules are loaded on hover / focus without delaying critical interaction
@@ -52,6 +52,7 @@ const routePrefetchers: Record<string, () => Promise<any>> = {
   "/a11y-audit": () => import("./pages/A11yAudit"),
   "/rate-limit": () => import("./pages/RateLimitCard"),
   "/webhooks/deliveries": () => import("./pages/WebhookDeliveries"),
+  "/endpoints": () => import("./pages/EndpointSummary"),
 };
 
 export function prefetchRoute(path: string) {
@@ -65,6 +66,11 @@ export function prefetchRoute(path: string) {
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
+
+type WalletServiceFailure = Error & {
+  code: WalletServiceErrorCode;
+  requiresReconciliation: boolean;
+};
 
 const STAGE_LABELS: Record<DepositStage, string> = {
   input: "Enter Amount",
@@ -168,12 +174,8 @@ const APP_ROUTES = {
   detailsBase: "/details/",
   latencyChart: "/latency-chart",
   endpointSummary: "/endpoint-summary",
+  endpointSummary: "/endpoints",
 } as const;
-
-function createMockHash() {
-  const seed = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
-  return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
-}
 
 function buildExplorerLink(hash: string) {
   return `${EXPLORER_BASE_URL}${hash}`;
@@ -402,13 +404,15 @@ function App() {
   useGlobalShortcuts(handleGlobalKeyDown);
   const [depositStage, setDepositStage] = useState<DepositStage>("input");
   const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
+  const [walletAvailability, setWalletAvailability] = useState<"checking" | "available" | "missing">("checking");
+  const [depositFailureCode, setDepositFailureCode] = useState<WalletServiceErrorCode | null>(null);
+  const [depositRequiresReconciliation, setDepositRequiresReconciliation] = useState(false);
   const [txHash, setTxHash] = useState("");
   const [copied, setCopied] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   const [submittedAmount, setSubmittedAmount] = useState<number | null>(null);
   const [submittedStartingBalance, setSubmittedStartingBalance] = useState<number | null>(null);
-
-  const timersRef = useRef<number[]>([]);
+  const [amountHint, setAmountHint] = useState<string | null>(null);
 
   const parsedAmount = Number(amountInput);
   const hasAmount = amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
@@ -416,6 +420,8 @@ function App() {
   const previewCurrentBalance = submittedStartingBalance ?? vaultBalance;
   const projectedBalance = previewCurrentBalance + activeAmount;
   const isBusy = depositStage === "approving" || depositStage === "pending";
+  const hasUnconfirmedDeposit = depositRequiresReconciliation;
+  const { networkFee, isEstimated: isNetworkFeeEstimated } = useNetworkFee(NETWORK_FEE, isDepositOpen);
   const balanceDelta = formatUsdc(submittedAmount ?? (hasAmount ? parsedAmount : 0));
 
   let validationMessage = "";
@@ -435,10 +441,23 @@ function App() {
   const pendingHashLabel = txHash ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : null;
 
   useEffect(() => {
+    if (!isDepositOpen) return;
+
+    let isCurrent = true;
+    setWalletAvailability("checking");
+    import("./services/walletService")
+      .then(({ isWalletAvailable }) => isWalletAvailable())
+      .then((available) => {
+        if (isCurrent) setWalletAvailability(available ? "available" : "missing");
+      })
+      .catch(() => {
+        if (isCurrent) setWalletAvailability("missing");
+      });
+
     return () => {
-      timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
+      isCurrent = false;
     };
-  }, []);
+  }, [isDepositOpen]);
 
   useEffect(() => {
     if (location.pathname !== APP_ROUTES.billing && isDepositOpen) {
@@ -452,13 +471,7 @@ function App() {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
-  const clearTimers = () => {
-    timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
-    timersRef.current = [];
-  };
-
   const resetFlow = (nextAmount = amountInput, nextPreset = selectedPreset) => {
-    clearTimers();
     setAmountInput(nextAmount);
     setSelectedPreset(nextPreset);
     setDepositStage("input");
@@ -466,6 +479,9 @@ function App() {
     setCopied(false);
     setSubmittedAmount(null);
     setSubmittedStartingBalance(null);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
+    setAmountHint(null);
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
@@ -473,7 +489,7 @@ function App() {
     navigate(APP_ROUTES.billing);
     const nextAmount = presetAmount !== undefined ? String(presetAmount) : amountInput;
     const nextPreset: number | "custom" = presetAmount !== undefined ? presetAmount : selectedPreset;
-    resetFlow(nextAmount, nextPreset);
+    if (!hasUnconfirmedDeposit) resetFlow(nextAmount, nextPreset);
     setIsDepositOpen(true);
   };
 
@@ -499,10 +515,15 @@ function App() {
   };
 
   const handleAmountChange = (value: string, preset: number | "custom" = "custom") => {
-    if (isBusy) return;
+    if (isBusy || hasUnconfirmedDeposit) return;
 
-    const sanitized = value.replace(/[^\d.]/g, "");
-    resetFlow(sanitized, preset);
+    const { value: normalized, truncated } = normalizeUsdcAmountInput(value);
+    resetFlow(normalized, preset);
+    setAmountHint(
+      truncated
+        ? `USDC on Stellar supports ${USDC_DECIMALS} decimal places, so the amount was rounded down to ${normalized}.`
+        : null,
+    );
   };
 
   const handlePresetClick = (value: number) => {
@@ -525,49 +546,65 @@ function App() {
     }
   };
 
-  const handleApproveTransaction = () => {
-    if (!hasValidAmount || isBusy) return;
+  const handleApproveTransaction = async () => {
+    if (!hasValidAmount || isBusy || hasUnconfirmedDeposit || walletAvailability !== "available") return;
 
     const approvedAmount = parsedAmount;
     const startingBalance = vaultBalance;
-    const nextHash = createMockHash();
-
-    clearTimers();
     setSubmittedAmount(approvedAmount);
     setSubmittedStartingBalance(startingBalance);
-    setTxHash(nextHash);
+    setTxHash("");
     setCopied(false);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
     setDepositStage("approving");
     setStatusMessage("Approve this USDC deposit in your wallet to continue.");
 
-    timersRef.current.push(
-      window.setTimeout(() => {
-        setDepositStage("pending");
-        setStatusMessage("Transaction submitted to Stellar. Waiting for confirmation.");
-      }, 1400),
-    );
+    let isWalletServiceError:
+      | ((error: unknown) => error is WalletServiceFailure)
+      | undefined;
 
-    timersRef.current.push(
-      window.setTimeout(() => {
-        if (demoOutcome === "confirmed") {
-          setDepositStage("confirmed");
-          setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
-          setStatusMessage(`${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`);
-        } else {
-          setDepositStage("failed");
-          setStatusMessage("The deposit was not confirmed. Review the details, then retry when your wallet is ready.");
-        }
-      }, 3600),
-    );
+    try {
+      const walletService = await import("./services/walletService");
+      isWalletServiceError = (error): error is WalletServiceFailure =>
+        error instanceof walletService.WalletServiceError;
+
+      const submittedDeposit = await walletService.submitVaultDeposit(amountInput, (hash) => {
+        setTxHash(hash);
+        setDepositStage("pending");
+        setStatusMessage("Transaction submitted to Stellar. Waiting for ledger confirmation.");
+      });
+
+      setTxHash(submittedDeposit.hash);
+      setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
+      setDepositStage("confirmed");
+      setStatusMessage(`${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`);
+    } catch (error) {
+      const walletError = isWalletServiceError?.(error) ? error : null;
+      const failureCode = walletError?.code ?? "NETWORK_ERROR";
+      setDepositFailureCode(failureCode);
+      setDepositRequiresReconciliation(walletError?.requiresReconciliation ?? false);
+      setDepositStage("failed");
+      setStatusMessage(
+        walletError
+          ? walletError.message
+          : "Could not submit the deposit. Check your wallet and Stellar network, then try again.",
+      );
+    }
   };
 
   const handleRetry = () => {
+    if (hasUnconfirmedDeposit) return;
     if (submittedAmount !== null) {
       setAmountInput(String(submittedAmount));
     }
 
     setSelectedPreset("custom");
     setDepositStage("input");
+    setTxHash("");
+    setCopied(false);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
     setStatusMessage("Review the transaction details and approve again.");
   };
 
@@ -580,9 +617,7 @@ function App() {
   };
 
   return (
-    <ToastProvider>
       <div className="app-shell">
-        <RouteProgressBar />
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
@@ -749,17 +784,21 @@ function App() {
                   <aside className="surface prototype-panel">
                     <p className="eyebrow">Prototype state preview</p>
                     <h2>Review both success and failure flows.</h2>
-                    <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
-                      <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
-                        Confirmed path
-                      </button>
-                      <button role="radio" aria-checked={demoOutcome === "failed"} className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
-                        Failed path
-                      </button>
-                    </div>
-                    <p className="helper-text">
-                      The modal follows the real sequence. Use this toggle to preview the end-state a reviewer should see after wallet approval.
-                    </p>
+                    {ENABLE_DEMO_OUTCOME && (
+                      <>
+                        <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
+                          <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
+                            Confirmed path
+                          </button>
+                          <button role="radio" aria-checked={demoOutcome === "failed"} className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
+                            Failed path
+                          </button>
+                        </div>
+                        <p className="helper-text">
+                          Demo control for previewing the success and failure layouts.
+                        </p>
+                      </>
+                    )}
                   </aside>
                 </section>
               }
@@ -798,6 +837,8 @@ function App() {
             <Route path="/a11y-audit" element={<A11yAudit />} />
 
             <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
+
+            <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
 
             {/* ── Billing History (FWC26) ──────────────────────────────── */}
             <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />
@@ -858,7 +899,7 @@ function App() {
 
               <div className="modal-body">
                 <div className="stage-strip" aria-label="Transaction flow status">
-                  {(["input", "approving", "pending", demoOutcome === "confirmed" ? "confirmed" : "failed"] as const).map((item) => {
+                  {(["input", "approving", "pending", depositStage === "failed" ? "failed" : "confirmed"] as const).map((item) => {
                     const isActive = item === depositStage || (item === "input" && depositStage === "input" && hasValidAmount);
 
                     return (
@@ -901,13 +942,13 @@ function App() {
                         inputMode="decimal"
                         value={amountInput}
                         onChange={(event) => handleAmountChange(event.target.value)}
-                        disabled={isBusy}
+                        disabled={isBusy || hasUnconfirmedDeposit}
                         placeholder="0.00"
-                        aria-describedby="deposit-help"
+                        aria-describedby={amountHint ? "deposit-help deposit-amount-hint" : "deposit-help"}
                         aria-invalid={validationMessage.length > 0 && depositStage === "input"}
                       />
                       <span>USDC</span>
-                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy} aria-label={`Set maximum amount: ${formatUsdShortcut(walletBalance)}`}>
+                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy || hasUnconfirmedDeposit} aria-label={`Set maximum amount: ${formatUsdShortcut(walletBalance)}`}>
                         Max
                       </button>
                     </div>
@@ -916,15 +957,21 @@ function App() {
                       Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom deposits settle into your vault after wallet approval.
                     </p>
 
+                    {amountHint && (
+                      <p id="deposit-amount-hint" className="helper-text" role="status">
+                        {amountHint}
+                      </p>
+                    )}
+
                     {validationMessage && depositStage === "input" && <p className="error-text">{validationMessage}</p>}
 
                     <div className="preset-row" role="radiogroup" aria-label="Deposit amount preset">
                       {PRESET_AMOUNTS.map((preset) => (
-                        <button key={preset} role="radio" aria-checked={selectedPreset === preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
+                        <button key={preset} role="radio" aria-checked={selectedPreset === preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy || hasUnconfirmedDeposit}>
                           ${preset}
                         </button>
                       ))}
-                      <button role="radio" aria-checked={selectedPreset === "custom"} className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy}>
+                      <button role="radio" aria-checked={selectedPreset === "custom"} className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy || hasUnconfirmedDeposit}>
                         Custom
                       </button>
                     </div>
@@ -965,12 +1012,15 @@ function App() {
 
                       <div className="preview-row">
                         <span>Network fee</span>
-                        <strong>{NETWORK_FEE}</strong>
+                        <strong>
+                          <span>{networkFee}</span>
+                          {isNetworkFeeEstimated && <span> (estimated)</span>}
+                        </strong>
                       </div>
 
                       <div className="preview-row total">
                         <span>Total cost</span>
-                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${NETWORK_FEE}` : `0.00 USDC + ${NETWORK_FEE}`}</strong>
+                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${networkFee}` : `0.00 USDC + ${networkFee}`}</strong>
                       </div>
                     </article>
 
@@ -992,8 +1042,8 @@ function App() {
 
                     {depositStage === "failed" && (
                       <article className="error-card">
-                        <strong>Approval not confirmed</strong>
-                        <p>No funds were added to the vault. Retry after confirming the wallet prompt or checking your network status.</p>
+                        <strong>{depositFailureCode === "SIGNATURE_REJECTED" ? "Signature rejected" : "Deposit failed"}</strong>
+                        <p>{statusMessage}</p>
                       </article>
                     )}
 
@@ -1008,10 +1058,27 @@ function App() {
               </div>
 
               <div className="modal-actions">
-                {depositStage === "failed" ? (
-                  <button className="primary-button" onClick={handleRetry}>
-                    Retry deposit
+                {walletAvailability === "missing" ? (
+                  <div className="wallet-install-prompt" role="status">
+                    <p>Install Freighter to sign this Stellar deposit.</p>
+                    <a className="primary-button" href="https://www.freighter.app/" target="_blank" rel="noreferrer">
+                      Install Freighter
+                    </a>
+                  </div>
+                ) : walletAvailability === "checking" ? (
+                  <button className="primary-button" disabled>
+                    Checking for Freighter...
                   </button>
+                ) : depositStage === "failed" ? (
+                  hasUnconfirmedDeposit ? (
+                    <button className="primary-button" disabled title="Check the submitted transaction before creating another deposit.">
+                      Check transaction status before retrying
+                    </button>
+                  ) : (
+                    <button className="primary-button" onClick={handleRetry}>
+                      Retry deposit
+                    </button>
+                  )
                 ) : depositStage === "confirmed" ? (
                   <button className="primary-button" onClick={handleDepositAnother}>
                     Deposit another amount
@@ -1030,15 +1097,66 @@ function App() {
           </div>
         )}
       </div>
-    </ToastProvider>
   );
 }
 
 function AccountSwitcher() {
-  const { account, accounts, switchAccount } = useAccountContext();
+  const { account, accounts, switchAccount, addAccount, removeAccount, renameAccount } = useAccountContext();
   const [open, setOpen] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [addError, setAddError] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameLabel, setRenameLabel] = useState("");
+  const [renameError, setRenameError] = useState("");
 
   if (accounts.length === 0) return null;
+
+  const handleAdd = () => {
+    setAddError("");
+    const trimmed = newLabel.trim();
+    if (!trimmed) {
+      setAddError("Label cannot be empty.");
+      return;
+    }
+    if (accounts.some((a) => a.label === trimmed)) {
+      setAddError("Label must be unique.");
+      return;
+    }
+    addAccount(trimmed);
+    setNewLabel("");
+    setShowAdd(false);
+    setOpen(false);
+  };
+
+  const handleRemoveCurrent = () => {
+    if (account) {
+      removeAccount(account.id);
+    }
+    setOpen(false);
+  };
+
+  const startRename = (acc: { id: string; label: string }) => {
+    setRenamingId(acc.id);
+    setRenameLabel(acc.label);
+    setRenameError("");
+  };
+
+  const handleRename = (accId: string) => {
+    setRenameError("");
+    const trimmed = renameLabel.trim();
+    if (!trimmed) {
+      setRenameError("Label cannot be empty.");
+      return;
+    }
+    if (accounts.some((a) => a.id !== accId && a.label === trimmed)) {
+      setRenameError("Label must be unique.");
+      return;
+    }
+    renameAccount(accId, trimmed);
+    setRenamingId(null);
+    setRenameLabel("");
+  };
 
   return (
     <div style={{ position: "relative" }}>
@@ -1071,26 +1189,96 @@ function AccountSwitcher() {
           }}
         >
           {accounts.map((acc) => (
-            <li
-              key={acc.id}
-              role="option"
-              aria-selected={account?.id === acc.id}
-              onClick={() => {
-                switchAccount(acc.id);
-                setOpen(false);
-              }}
-              style={{
-                padding: "8px 12px",
-                cursor: "pointer",
-                borderRadius: 4,
-                background: account?.id === acc.id ? "var(--accent)" : "transparent",
-                color: account?.id === acc.id ? "#fff" : "var(--text)",
-                fontSize: 13,
-              }}
-            >
-              {acc.label}
+            <li key={acc.id} style={{ marginBottom: 2 }}>
+              {renamingId === acc.id ? (
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input
+                    type="text"
+                    value={renameLabel}
+                    onChange={(e) => setRenameLabel(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleRename(acc.id); }}
+                    style={{ flex: 1, fontSize: 13, padding: "4px 6px" }}
+                    autoFocus
+                    aria-label="Rename account"
+                  />
+                  <button type="button" onClick={() => handleRename(acc.id)} style={{ fontSize: 12 }}>OK</button>
+                  <button type="button" onClick={() => { setRenamingId(null); setRenameLabel(""); }} style={{ fontSize: 12 }}>Cancel</button>
+                  {renameError && <span style={{ color: "red", fontSize: 11 }}>{renameError}</span>}
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span
+                    role="option"
+                    aria-selected={account?.id === acc.id}
+                    onClick={() => {
+                      switchAccount(acc.id);
+                      setOpen(false);
+                    }}
+                    style={{
+                      padding: "8px 12px",
+                      cursor: "pointer",
+                      borderRadius: 4,
+                      background: account?.id === acc.id ? "var(--accent)" : "transparent",
+                      color: account?.id === acc.id ? "#fff" : "var(--text)",
+                      fontSize: 13,
+                      flex: 1,
+                    }}
+                  >
+                    {acc.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => startRename(acc)}
+                    style={{ fontSize: 11, padding: "2px 6px", marginLeft: 4 }}
+                    aria-label={`Rename ${acc.label}`}
+                  >
+                    Rename
+                  </button>
+                </div>
+              )}
             </li>
           ))}
+          {showAdd ? (
+            <li style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <input
+                  type="text"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+                  placeholder="Account label"
+                  style={{ fontSize: 13, padding: "4px 6px" }}
+                  autoFocus
+                  aria-label="New account label"
+                />
+                <button type="button" onClick={handleAdd} style={{ fontSize: 12 }}>Add</button>
+                {addError && <span style={{ color: "red", fontSize: 11 }}>{addError}</span>}
+              </div>
+            </li>
+          ) : (
+            <li
+              style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}
+            >
+              <button
+                type="button"
+                onClick={() => { setShowAdd(true); setAddError(""); }}
+                style={{ fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--accent)" }}
+              >
+                + Add account
+              </button>
+            </li>
+          )}
+          {account && (
+            <li style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={handleRemoveCurrent}
+                style={{ fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--accent)" }}
+              >
+                Remove {account.label}
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

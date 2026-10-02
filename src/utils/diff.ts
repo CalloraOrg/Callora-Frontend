@@ -39,6 +39,10 @@ export interface DiffLine {
  * Compute the Longest Common Subsequence table for two string arrays.
  * Returns a 2-D memoisation table where lcs[i][j] is the length of the LCS
  * of a[0..i-1] and b[0..j-1].
+ *
+ * The table is `(m + 1) × (n + 1)` numbers, i.e. ~9M cells for a 3 000-line
+ * pair and ~25M for a 5 000-line pair. Those are the sizes this implementation
+ * is expected to handle; callers with larger payloads should truncate first.
  */
 function buildLcsTable(a: string[], b: string[]): number[][] {
   const m = a.length;
@@ -64,6 +68,14 @@ function buildLcsTable(a: string[], b: string[]): number[][] {
 /**
  * Walk the LCS table backwards to produce the diff sequence.
  * Appends DiffLine objects (without line numbers) into `out`.
+ *
+ * The walk is iterative by design: a recursive version needs one stack frame
+ * per input line, so two multi-thousand-line payloads (the sizes
+ * `CallHistoryRow`'s compare view can receive) blow the call stack with
+ * `RangeError: Maximum call stack size exceeded`. The visit order and the
+ * tie-breaking rule (`j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])`) are
+ * identical to the recursive form — the entries are collected backwards and
+ * reversed once at the end.
  */
 function walkLcs(
   dp: number[][],
@@ -73,17 +85,24 @@ function walkLcs(
   j: number,
   out: Omit<DiffLine, 'lineA' | 'lineB'>[],
 ): void {
-  if (i === 0 && j === 0) return;
+  const reversed: Omit<DiffLine, 'lineA' | 'lineB'>[] = [];
 
-  if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
-    walkLcs(dp, a, b, i - 1, j - 1, out);
-    out.push({ type: 'unchanged', value: a[i - 1] });
-  } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-    walkLcs(dp, a, b, i, j - 1, out);
-    out.push({ type: 'added', value: b[j - 1] });
-  } else {
-    walkLcs(dp, a, b, i - 1, j, out);
-    out.push({ type: 'removed', value: a[i - 1] });
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+      reversed.push({ type: 'unchanged', value: a[i - 1] });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      reversed.push({ type: 'added', value: b[j - 1] });
+      j--;
+    } else {
+      reversed.push({ type: 'removed', value: a[i - 1] });
+      i--;
+    }
+  }
+
+  for (let k = reversed.length - 1; k >= 0; k--) {
+    out.push(reversed[k]);
   }
 }
 
@@ -95,6 +114,10 @@ function walkLcs(
  * Both arguments are treated as raw text.  Line endings (\r\n or \n) are
  * normalised to \n before splitting so the diff is consistent across
  * platforms.
+ *
+ * Identical inputs short-circuit: every line is reported as `unchanged` and
+ * the `O(n·m)` LCS table is never allocated, so the worst case for repeated
+ * comparison of an unchanged large response is a single linear scan.
  *
  * @param before  Original (left / "A") text.
  * @param after   Revised  (right / "B") text.
@@ -111,13 +134,24 @@ export function computeDiff(before: string, after: string): DiffLine[] {
   // Normalise line endings
   const normalise = (s: string) => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  const linesA = normalise(before).split('\n');
-  const linesB = normalise(after).split('\n');
+  const normalisedBefore = normalise(before);
+  const normalisedAfter = normalise(after);
+
+  const linesA = normalisedBefore.split('\n');
+  const linesB = normalisedAfter.split('\n');
+
+  // Identical payloads need no diff at all — skip the quadratic table.
+  if (normalisedBefore === normalisedAfter) {
+    return linesA.map((value, index) => ({
+      type: 'unchanged' as const,
+      value,
+      lineA: index + 1,
+      lineB: index + 1,
+    }));
+  }
 
   const raw: Omit<DiffLine, 'lineA' | 'lineB'>[] = [];
 
-  // For large inputs, use a linearised iterative walk to avoid stack overflow.
-  // The recursive walkLcs is safe for typical API response sizes (< ~2 000 lines).
   const dp = buildLcsTable(linesA, linesB);
   walkLcs(dp, linesA, linesB, linesA.length, linesB.length, raw);
 
