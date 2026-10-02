@@ -1,24 +1,18 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { rankRouteMatches, RouteMatch } from "../config/routeCatalogue";
 
-function resolveSearchPath(query: string) {
-  const value = query.trim().toLowerCase();
+const MAX_SUGGESTIONS = 5;
 
-  if (!value) return null;
-  if (value.includes("home") || value.includes("dashboard")) return "/dashboard";
-  if (value.includes("market")) return "/marketplace";
-  if (value.includes("doc") || value.includes("guide")) return "/documentation";
-  if (value.includes("bill") || value.includes("vault") || value.includes("deposit")) {
-    return "/billing";
-  }
-
-  return null;
+export function resolveSearchMatches(query: string): RouteMatch[] {
+  return rankRouteMatches(query).slice(0, MAX_SUGGESTIONS);
 }
 
 export default function NotFound({ onGoHome }: { onGoHome: () => void }) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMessage, setSearchMessage] = useState("");
+  const [suggestions, setSuggestions] = useState<RouteMatch[]>([]);
 
   const handleGoBack = () => {
     if (window.history.length > 1) {
@@ -31,15 +25,23 @@ export default function NotFound({ onGoHome }: { onGoHome: () => void }) {
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const destination = resolveSearchPath(searchQuery);
+    const matches = resolveSearchMatches(searchQuery);
 
-    if (!destination) {
+    if (matches.length === 0) {
+      setSuggestions([]);
       setSearchMessage("No direct match yet. Try Dashboard, Marketplace, or Documentation.");
       return;
     }
 
+    if (matches.length === 1) {
+      setSuggestions([]);
+      setSearchMessage("");
+      navigate(matches[0].path);
+      return;
+    }
+
     setSearchMessage("");
-    navigate(destination);
+    setSuggestions(matches);
   };
 
   return (
@@ -69,7 +71,11 @@ export default function NotFound({ onGoHome }: { onGoHome: () => void }) {
             type="search"
             placeholder="Try Dashboard, Marketplace, or Documentation"
             value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              if (suggestions.length > 0) setSuggestions([]);
+              if (searchMessage) setSearchMessage("");
+            }}
           />
           <button className="secondary-button" type="submit">
             Search
@@ -79,6 +85,20 @@ export default function NotFound({ onGoHome }: { onGoHome: () => void }) {
           <p className="helper-text" role="status" aria-live="polite">
             {searchMessage}
           </p>
+        )}
+        {suggestions.length > 0 && (
+          <nav className="not-found-search-results" aria-label="Search suggestions" aria-live="polite">
+            <p className="helper-text">Did you mean:</p>
+            <ul>
+              {suggestions.map((match) => (
+                <li key={match.path}>
+                  <Link to={match.path} onClick={() => setSuggestions([])}>
+                    {match.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         )}
       </form>
 

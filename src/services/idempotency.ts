@@ -145,34 +145,64 @@ export async function runWithTimeout<T>(
   } finally {
     if (timer !== undefined) {
       clearTimeout(timer);
-export interface TimeoutError extends Error {
-  name: "TimeoutError";
-  label?: string;
+    }
+  }
 }
 
-export function createTimeoutError(label?: string): TimeoutError {
-  const err: TimeoutError = new Error(
-    `Operation timed out${label ? `: ${label}` : ""}.`,
-  ) as TimeoutError;
-  err.name = "TimeoutError";
-  err.label = label;
-  return err;
+/**
+ * Exponential backoff for `attempt` (0-based), capped at `maxDelayMs`.
+ */
+export function backoffDelayMs(
+  attempt: number,
+  baseDelayMs: number,
+  maxDelayMs = 30_000,
+): number {
+  const exponent = Math.pow(2, Math.max(0, attempt));
+  return Math.min(Math.max(0, baseDelayMs) * exponent, maxDelayMs);
 }
 
-export function isTimeoutError(error: unknown): error is TimeoutError {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { name?: unknown }).name === "TimeoutError"
-  );
+export type RetryOptions = {
+  /** Attempts allowed after the first one. */
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs?: number;
+  /** Return false to fail fast instead of retrying. */
+  shouldRetry?: (error: unknown, attempt: number) => boolean;
+  /** Injectable wait, so tests need not wait in real time. */
+  delay?: (ms: number) => Promise<void>;
+};
+
+const defaultDelay = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Call `fn`, retrying with backoff while `shouldRetry` allows it. */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions,
+): Promise<T> {
+  const { maxRetries, baseDelayMs, maxDelayMs, shouldRetry, delay = defaultDelay } = options;
+
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt >= maxRetries || (shouldRetry && !shouldRetry(error, attempt))) {
+        throw error;
+      }
+      await delay(backoffDelayMs(attempt, baseDelayMs, maxDelayMs));
+      attempt += 1;
+    }
+  }
 }
 
-let idemCounter = 0;
-export function generateIdempotencyKey(prefix = "idem"): string {
-  idemCounter += 1;
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `${prefix}-${Date.now().toString(36)}-${idemCounter.toString(36)}-${rand}`;
-}
+/**
+ * Collapses concurrent work for the same key onto a single promise.
+ *
+ * Used where a user could trigger the same write twice from different places
+ * (a retry button in two components, a poll racing a manual refresh) and the
+ * second call should join the first instead of issuing its own request.
+ */
 export class InFlightGuard<T = unknown> {
   private readonly inflight = new Map<string, { promise: Promise<T> }>();
 
@@ -190,9 +220,7 @@ export class InFlightGuard<T = unknown> {
 
   run(key: string, task: () => Promise<T>): Promise<T> {
     const existing = this.inflight.get(key);
-    if (existing) {
-      return existing.promise;
-    }
+    if (existing) return existing.promise;
 
     const promise = Promise.resolve().then(() => task());
     const entry = { promise };
@@ -211,84 +239,4 @@ export class InFlightGuard<T = unknown> {
 
 export function createInFlightGuard<T = unknown>(): InFlightGuard<T> {
   return new InFlightGuard<T>();
-}
-
-export function runWithTimeout<T>(
-  task: (signal: AbortSignal) => Promise<T>,
-  ms: number,
-  label?: string,
-): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    let settled = false;
-    const controller = new AbortController();
-
-    const finish = (settle: (v: T) => void, value: T | unknown) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      settle(value as T);
-    };
-
-    const timer = setTimeout(() => {
-      controller.abort();
-      finish(reject, createTimeoutError(label));
-    }, ms);
-
-    Promise.resolve()
-      .then(() => task(controller.signal))
-      .then(
-        (value) => finish(resolve, value),
-        (error) => finish(reject, error),
-      );
-  });
-}
-
-export function backoffDelayMs(
-  attempt: number,
-  baseDelayMs: number,
-  maxDelayMs = 30_000,
-): number {
-  const exponent = Math.pow(2, Math.max(0, attempt));
-  return Math.min(Math.max(0, baseDelayMs) * exponent, maxDelayMs);
-}
-
-export interface RetryOptions {
-  maxRetries: number;
-  baseDelayMs: number;
-  maxDelayMs?: number;
-  shouldRetry?: (error: unknown, attempt: number) => boolean;
-  delay?: (ms: number) => Promise<void>;
-}
-
-const defaultDelay = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions,
-): Promise<T> {
-  const {
-    maxRetries,
-    baseDelayMs,
-    maxDelayMs,
-    shouldRetry,
-    delay = defaultDelay,
-  } = options;
-
-  let attempt = 0;
-  for (;;) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (
-        attempt >= maxRetries ||
-        (shouldRetry && !shouldRetry(error, attempt))
-      ) {
-        throw error;
-      }
-      const wait = backoffDelayMs(attempt, baseDelayMs, maxDelayMs);
-      await delay(wait);
-      attempt += 1;
-    }
-  }
 }

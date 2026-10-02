@@ -106,3 +106,60 @@ export function meetsWCAG_AA(a: string, b: string): boolean {
   if (!ca || !cb) return false;
   return getContrastRatio(ca, cb) >= WCAG_AA_NORMAL;
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Design-time pair evaluation for the theme playground (issue #1065)
+// ──────────────────────────────────────────────────────────────────────────────
+
+/** Outcome of evaluating one foreground/background pair. */
+export interface ContrastCheckResult {
+  /** Stable id used for `data-testid` hooks in the UI. */
+  id: string;
+  /** Human-readable pair name, e.g. `Text on surface`. */
+  label: string;
+  /** Measured contrast ratio, or `null` when a colour could not be parsed. */
+  ratio: number | null;
+  /** True when the pair clears WCAG AA for normal text (4.5:1). */
+  passes: boolean;
+  /** True when the pair clears the large-text / non-text threshold (3:1). */
+  passesLargeText: boolean;
+}
+
+/**
+ * Contrast ratio for two CSS colour strings, or `null` when either colour
+ * cannot be parsed.
+ *
+ * [`getContrastRatio`] needs parsed channels, and returning `undefined` for an
+ * unparseable colour lets a UI render `NaN:1`. Callers that display the ratio
+ * should use this function and handle `null` explicitly.
+ */
+export function getContrastRatioOrNull(a: string, b: string): number | null {
+  const ca = parseColor(a);
+  const cb = parseColor(b);
+  if (!ca || !cb) return null;
+  return getContrastRatio(ca, cb);
+}
+
+/**
+ * Evaluate a named foreground/background pair for design-time reporting.
+ *
+ * `passes` follows the WCAG AA normal-text threshold and `passesLargeText` the
+ * large-text/non-text threshold, so a caller can report both without
+ * duplicating the constants. An unparseable colour yields `ratio: null` and
+ * both flags `false` — never a `NaN` ratio.
+ */
+export function evaluateContrastPair(
+  id: string,
+  label: string,
+  foreground: string,
+  background: string,
+): ContrastCheckResult {
+  const ratio = getContrastRatioOrNull(foreground, background);
+  return {
+    id,
+    label,
+    ratio,
+    passes: ratio !== null && ratio >= WCAG_AA_NORMAL,
+    passesLargeText: ratio !== null && ratio >= WCAG_AA_LARGE,
+  };
+}

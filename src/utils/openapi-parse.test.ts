@@ -79,6 +79,49 @@ paths:
 // A JSON string that is just not an object.
 const JSON_ARRAY = JSON.stringify([1, 2, 3]);
 
+// A Swagger 2.0 document exercising basePath, parameters, and unsupported
+// features (`consumes` / `produces` / `formData`).
+const SWAGGER2_JSON = JSON.stringify({
+  swagger: '2.0',
+  info: { title: 'Legacy API', version: '1.0.0' },
+  basePath: '/api/v1',
+  consumes: ['application/json'],
+  produces: ['application/json'],
+  paths: {
+    '/users': {
+      get: { summary: 'List users' },
+      post: {
+        summary: 'Create user',
+        parameters: [{ name: 'payload', in: 'body', required: true }],
+      },
+    },
+    '/users/{id}': {
+      parameters: [{ name: 'id', in: 'path', required: true, type: 'string' }],
+      get: { summary: 'Get user' },
+      delete: {
+        summary: 'Delete user',
+        parameters: [
+          { name: 'id', in: 'path', required: true, type: 'string' },
+          { name: 'verbose', in: 'query', type: 'boolean' },
+          { name: 'upload', in: 'formData', type: 'file' },
+        ],
+      },
+    },
+  },
+});
+
+const SWAGGER2_YAML = `
+swagger: '2.0'
+info:
+  title: Legacy YAML
+  version: 1.0.0
+basePath: /v2
+paths:
+  /ping:
+    get:
+      summary: Ping
+`;
+
 // ---------------------------------------------------------------------------
 // Unsupported file types
 // ---------------------------------------------------------------------------
@@ -249,6 +292,28 @@ describe('parseOpenApiSpec — YAML', () => {
       parseOpenApiSpec(MALFORMED_YAML_BAD_INDENT, 'bad.yaml'),
     ).not.toThrow();
   });
+
+  it('ignores %YAML directives', () => {
+    const spec = '%YAML 1.2\n---\nopenapi: 3.0.0\npaths: {}';
+    const result = parseOpenApiSpec(spec, 'directive.yaml');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('produces a ParseError naming anchors as unsupported and includes the line number', () => {
+    const spec = 'openapi: 3.0.0\npaths:\n  /test:\n    get: *alias';
+    // Line 1: openapi...
+    // Line 2: paths...
+    // Line 3:   /test...
+    // Line 4:     get: *alias
+    const result = parseOpenApiSpec(spec, 'alias.yaml');
+    
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].message).toMatch(/anchors and aliases are not supported/i);
+    expect(result.errors[0].line).toBe(4);
+    
+    // Ensure no exception escaped (the result object was safely returned)
+    expect(result.endpoints).toBeDefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -256,11 +321,26 @@ describe('parseOpenApiSpec — YAML', () => {
 // ---------------------------------------------------------------------------
 
 describe('parseOpenApiSpec — version validation', () => {
-  it('rejects an OpenAPI 2.x (Swagger) spec', () => {
+  it('accepts a Swagger 2.0 document instead of rejecting it (issue #1075)', () => {
     const swagger2 = JSON.stringify({ swagger: '2.0', paths: {} });
-    // The `openapi` field is missing → version error
     const result = parseOpenApiSpec(swagger2, 'swagger.json');
-    expect(result.errors[0].message).toMatch(/openapi.*field|openapi.*version/i);
+    expect(result.errors).toHaveLength(0);
+    expect(result.source).toBe('swagger2');
+  });
+
+  it('rejects a Swagger version other than 2.0', () => {
+    const spec = JSON.stringify({ swagger: '1.2', paths: {} });
+    const result = parseOpenApiSpec(spec, 'old-swagger.json');
+    expect(result.endpoints).toHaveLength(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].message).toContain('Only Swagger 2.0 is supported');
+  });
+
+  it('reports source: openapi3 for 3.x documents', () => {
+    const spec = JSON.stringify({ openapi: '3.0.0', paths: {} });
+    const result = parseOpenApiSpec(spec, 'spec.json');
+    expect(result.source).toBe('openapi3');
+    expect(result.warnings).toHaveLength(0);
   });
 
   it('rejects a spec with openapi: "2.0"', () => {
@@ -293,6 +373,128 @@ describe('parseOpenApiSpec — version validation', () => {
     const spec = JSON.stringify({ openapi: 3, paths: {} });
     const result = parseOpenApiSpec(spec, 'spec.json');
     expect(result.errors).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Swagger 2.0 conversion (issue #1075)
+// ---------------------------------------------------------------------------
+
+describe('parseOpenApiSpec — Swagger 2.0', () => {
+  it('extracts every endpoint from a 2.0 document', () => {
+    const result = parseOpenApiSpec(SWAGGER2_JSON, 'legacy.json');
+
+    expect(result.errors).toHaveLength(0);
+    expect(result.source).toBe('swagger2');
+    expect(result.endpoints.map((e) => `${e.method} ${e.path}`)).toEqual([
+      'GET /api/v1/users',
+      'POST /api/v1/users',
+      'GET /api/v1/users/{id}',
+      'DELETE /api/v1/users/{id}',
+    ]);
+  });
+
+  it('prefixes basePath onto every path', () => {
+    const result = parseOpenApiSpec(SWAGGER2_JSON, 'legacy.json');
+    expect(result.endpoints.every((e) => e.path.startsWith('/api/v1'))).toBe(true);
+  });
+
+  it('leaves paths untouched when basePath is "/" or absent', () => {
+    const rootBase = JSON.stringify({
+      swagger: '2.0',
+      basePath: '/',
+      paths: { '/ping': { get: {} } },
+    });
+    expect(parseOpenApiSpec(rootBase, 'a.json').endpoints[0].path).toBe('/ping');
+
+    const noBase = JSON.stringify({
+      swagger: '2.0',
+      paths: { '/ping': { get: {} } },
+    });
+    expect(parseOpenApiSpec(noBase, 'b.json').endpoints[0].path).toBe('/ping');
+  });
+
+  it('maps query / path / body parameters onto the endpoint', () => {
+    const result = parseOpenApiSpec(SWAGGER2_JSON, 'legacy.json');
+    const del = result.endpoints.find((e) => e.method === 'DELETE');
+
+    expect(del?.parameters).toEqual([
+      { name: 'id', in: 'path', required: true },
+      { name: 'verbose', in: 'query', required: false },
+    ]);
+
+    const post = result.endpoints.find((e) => e.method === 'POST');
+    expect(post?.parameters).toEqual([{ name: 'payload', in: 'body', required: true }]);
+  });
+
+  it('lets operation-level parameters override path-item ones', () => {
+    const spec = JSON.stringify({
+      swagger: '2.0',
+      paths: {
+        '/things': {
+          parameters: [{ name: 'limit', in: 'query', required: true }],
+          get: { parameters: [{ name: 'limit', in: 'query', required: false }] },
+        },
+      },
+    });
+    const result = parseOpenApiSpec(spec, 'override.json');
+    expect(result.endpoints[0].parameters).toEqual([
+      { name: 'limit', in: 'query', required: false },
+    ]);
+  });
+
+  it('warns about unsupported 2.0 features instead of failing', () => {
+    const result = parseOpenApiSpec(SWAGGER2_JSON, 'legacy.json');
+    expect(result.errors).toHaveLength(0);
+    expect(result.endpoints.length).toBeGreaterThan(0);
+
+    const messages = result.warnings.map((w) => w.message).join('\n');
+    expect(messages).toContain('"consumes"');
+    expect(messages).toContain('"produces"');
+    expect(messages).toContain('"formData"');
+  });
+
+  it('de-duplicates repeated warnings across operations', () => {
+    const spec = JSON.stringify({
+      swagger: '2.0',
+      paths: {
+        '/a': { get: { parameters: [{ name: 'x', in: 'formData' }] } },
+        '/b': { get: { parameters: [{ name: 'y', in: 'formData' }] } },
+      },
+    });
+    const result = parseOpenApiSpec(spec, 'formdata.json');
+    const formDataWarnings = result.warnings.filter((w) => w.message.includes('"formData"'));
+    expect(formDataWarnings).toHaveLength(1);
+  });
+
+  it('warns about unresolved $ref parameters', () => {
+    const spec = JSON.stringify({
+      swagger: '2.0',
+      paths: {
+        '/a': { get: { parameters: [{ $ref: '#/parameters/PageSize' }] } },
+      },
+    });
+    const result = parseOpenApiSpec(spec, 'ref.json');
+    expect(result.errors).toHaveLength(0);
+    expect(result.warnings.some((w) => w.message.includes('$ref'))).toBe(true);
+  });
+
+  it('converts a Swagger 2.0 YAML document', () => {
+    const result = parseOpenApiSpec(SWAGGER2_YAML, 'legacy.yaml');
+    expect(result.errors).toHaveLength(0);
+    expect(result.source).toBe('swagger2');
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.endpoints[0].path).toBe('/v2/ping');
+  });
+
+  it('reports no warnings for a clean 2.0 document', () => {
+    const spec = JSON.stringify({
+      swagger: '2.0',
+      paths: { '/ping': { get: { summary: 'Ping' } } },
+    });
+    const result = parseOpenApiSpec(spec, 'clean.json');
+    expect(result.warnings).toHaveLength(0);
+    expect(result.endpoints[0].summary).toBe('Ping');
   });
 });
 
@@ -344,5 +546,208 @@ describe('parseOpenApiSpec — endpoint extraction', () => {
       expect(typeof ep.method).toBe('string');
       expect(ep.summary === undefined || typeof ep.summary === 'string').toBe(true);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// $ref resolution (local components)
+// ---------------------------------------------------------------------------
+
+describe('parseOpenApiSpec — $ref parameters (JSON)', () => {
+  it('resolves parameters referenced via #/components/parameters', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.3',
+      info: { title: 'Ref API', version: '1.0.0' },
+      paths: {
+        '/users/{id}': {
+          get: {
+            summary: 'Get user',
+            parameters: [{ $ref: '#/components/parameters/UserId' }],
+          },
+        },
+      },
+      components: {
+        parameters: {
+          UserId: {
+            name: 'id',
+            in: 'path',
+            required: true,
+            description: 'User id',
+            schema: { type: 'string' },
+          },
+        },
+      },
+    });
+
+    const result = parseOpenApiSpec(spec, 'ref.json');
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.endpoints[0].parameters).toEqual([
+      {
+        name: 'id',
+        in: 'path',
+        required: true,
+        description: 'User id',
+      },
+    ]);
+    // No fatal errors for a successful local resolve.
+    expect(result.errors.filter((e) => e.message.includes('Unresolved'))).toHaveLength(0);
+  });
+
+  it('merges path-level and operation-level resolved parameters', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.0',
+      paths: {
+        '/items/{id}': {
+          parameters: [{ $ref: '#/components/parameters/ItemId' }],
+          get: {
+            parameters: [
+              {
+                name: 'verbose',
+                in: 'query',
+                required: false,
+              },
+            ],
+          },
+        },
+      },
+      components: {
+        parameters: {
+          ItemId: { name: 'id', in: 'path', required: true },
+        },
+      },
+    });
+
+    const result = parseOpenApiSpec(spec, 'merge.json');
+    const names = result.endpoints[0].parameters?.map((p) => p.name);
+    expect(names).toEqual(['id', 'verbose']);
+  });
+
+  it('reports cyclic refs as a non-fatal warning and still returns endpoints', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.0',
+      paths: {
+        '/cycle': {
+          get: {
+            parameters: [{ $ref: '#/components/parameters/A' }],
+          },
+        },
+      },
+      components: {
+        parameters: {
+          A: { $ref: '#/components/parameters/B' },
+          B: { $ref: '#/components/parameters/A' },
+        },
+      },
+    });
+
+    const result = parseOpenApiSpec(spec, 'cycle.json');
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.endpoints[0].parameters ?? []).toHaveLength(0);
+    expect(result.errors.some((e) => /cyclic/i.test(e.message))).toBe(true);
+  });
+
+  it('reports remote refs without fetching and does not throw', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.0',
+      paths: {
+        '/remote': {
+          get: {
+            parameters: [
+              { $ref: 'https://example.com/params.json#/UserId' },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(() => parseOpenApiSpec(spec, 'remote.json')).not.toThrow();
+    const result = parseOpenApiSpec(spec, 'remote.json');
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.errors.some((e) => /remote|external|not fetched/i.test(e.message))).toBe(
+      true,
+    );
+  });
+
+  it('reports unresolved local refs as non-fatal errors', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.0',
+      paths: {
+        '/missing': {
+          get: {
+            parameters: [{ $ref: '#/components/parameters/DoesNotExist' }],
+          },
+        },
+      },
+      components: { parameters: {} },
+    });
+
+    const result = parseOpenApiSpec(spec, 'missing.json');
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.errors.some((e) => /unresolved/i.test(e.message))).toBe(true);
+  });
+
+  it('resolves requestBody schema $ref to a schema name hint', () => {
+    const spec = JSON.stringify({
+      openapi: '3.0.0',
+      paths: {
+        '/users': {
+          post: {
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/User' },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: {
+        schemas: {
+          User: { type: 'object', title: 'User' },
+        },
+      },
+    });
+
+    const result = parseOpenApiSpec(spec, 'body.json');
+    expect(result.endpoints[0].requestBodySchema).toBe('User');
+  });
+});
+
+describe('parseOpenApiSpec — $ref parameters (YAML)', () => {
+  it('resolves local parameter $ref from a YAML spec', () => {
+    const yaml = `
+openapi: 3.0.3
+info:
+  title: YAML Ref API
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      summary: Get pet
+      parameters:
+        - $ref: '#/components/parameters/PetId'
+components:
+  parameters:
+    PetId:
+      name: petId
+      in: path
+      required: true
+      description: Pet identifier
+`;
+
+    const result = parseOpenApiSpec(yaml, 'ref.yaml');
+    expect(result.errors.filter((e) => /unresolved|cyclic|remote/i.test(e.message))).toHaveLength(
+      0,
+    );
+    expect(result.endpoints).toHaveLength(1);
+    expect(result.endpoints[0].parameters).toEqual([
+      {
+        name: 'petId',
+        in: 'path',
+        required: true,
+        description: 'Pet identifier',
+      },
+    ]);
   });
 });

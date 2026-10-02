@@ -7,8 +7,9 @@
  *
  * Token flow (prevents replay and cross-tenant attacks):
  * 1. User clicks "Rotate Key"
- * 2. Frontend generates a confirmation token based on user context
- * 3. Frontend calls /api/rotate-key with the token
+ * 2. Frontend obtains a confirmation token (TODO: currently client-side placeholder;
+ *    production expects server-issued token. See docs/Key-Rotation.md)
+ * 3. Frontend calls /api/rotate-key with the token and idempotency key
  * 4. Backend validates token matches user context
  * 5. Backend verifies token hasn't expired or been replayed
  * 6. Backend rotates key and returns new key (or error)
@@ -226,7 +227,7 @@ export async function rotateKeyWithToken(
   rotationRequest: RotationRequest,
   sessionToken: string, // Bearer token from current session
 ): Promise<KeyRotationApiResponse> {
-  const idempotencyKey = generateIdempotencyKey("key-rotate");
+  const idempotencyKey = generateIdempotencyKey();
 
   try {
     return await rotationGuard.run(rotationRequest.keyId, () =>
@@ -241,7 +242,6 @@ export async function rotateKeyWithToken(
                 signal,
               ),
             ROTATION_TIMEOUT_MS,
-            "rotateKeyWithToken",
           ),
         {
           maxRetries: ROTATION_MAX_RETRIES,
