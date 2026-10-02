@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../ThemeContext';
 import MOCK_APIS from '../data/mockApis';
@@ -10,6 +10,84 @@ interface Command {
   category: 'Navigation' | 'Actions' | 'APIs';
   action: () => void;
   icon?: string;
+}
+
+interface ScoredCommand extends Command {
+  score: number;
+  matchIndices: number[];
+}
+
+// ---------------------------------------------------------------------------
+// Fuzzy matching utility
+// ---------------------------------------------------------------------------
+
+function computeMatchScore(query: string, target: string): { score: number; matchIndices: number[] } {
+  const q = query.toLowerCase();
+  const t = target.toLowerCase();
+
+  if (q === '') return { score: 0, matchIndices: [] };
+
+  let score = 0;
+  const matchIndices: number[] = [];
+  let tIdx = 0;
+  let lastMatchIdx = -2;
+  let consecutiveMatches = 0;
+
+  for (let i = 0; i < q.length; i++) {
+    const qChar = q[i];
+    let found = false;
+
+    while (tIdx < t.length) {
+      if (t[tIdx] === qChar) {
+        found = true;
+        matchIndices.push(tIdx);
+
+        const isWordStart = tIdx === 0 || /[\s\-_./]/.test(t[tIdx - 1]);
+        const isConsecutive = tIdx === lastMatchIdx + 1;
+
+        if (isWordStart) {
+          score += 10;
+        }
+        if (isConsecutive) {
+          consecutiveMatches++;
+          score += consecutiveMatches * 2;
+        } else {
+          consecutiveMatches = 1;
+          score += 1;
+        }
+
+        lastMatchIdx = tIdx;
+        tIdx++;
+        break;
+      }
+      tIdx++;
+    }
+
+    if (!found) {
+      return { score: 0, matchIndices: [] };
+    }
+  }
+
+  const lengthBonus = Math.max(0, 20 - t.length);
+  score += lengthBonus;
+
+  return { score, matchIndices };
+}
+
+function highlightMatches(name: string, matchIndices: number[]): React.ReactNode {
+  if (matchIndices.length === 0) return name;
+  const indices = new Set(matchIndices);
+  const parts: React.ReactNode[] = [];
+  let lastIdx = 0;
+  for (let i = 0; i < name.length; i++) {
+    if (indices.has(i)) {
+      if (i > lastIdx) parts.push(name.slice(lastIdx, i));
+      parts.push(<mark key={i} className="command-palette-match-highlight">{name[i]}</mark>);
+      lastIdx = i + 1;
+    }
+  }
+  if (lastIdx < name.length) parts.push(name.slice(lastIdx));
+  return parts;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,21 +262,7 @@ export default function CommandPalette() {
 
   const allCommands = [...standardCommands, ...apiCommands];
 
-  const filteredCommands = allCommands.filter((cmd) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      cmd.name.toLowerCase().includes(q) ||
-      cmd.category.toLowerCase().includes(q)
-    );
-  });
-
-  // ---------------------------------------------------------------------------
-  // Recent-aware display lists
-  // ---------------------------------------------------------------------------
-
-  // Empty query → show Recent group first, then everything else.
-  // Non-empty query → filtered results, but recently-used items float to top.
-  const { displayGroups, flatList } = React.useMemo(() => {
+  const { displayGroups, flatList } = useMemo(() => {
     if (searchQuery === '') {
       const recentCmds = recentIds
         .map((id) => allCommands.find((c) => c.id === id))
@@ -212,7 +276,6 @@ export default function CommandPalette() {
         groups.push({ label: 'Recent', commands: recentCmds });
       }
 
-      // Group the remainder by category
       const byCategory = new Map<string, Command[]>();
       for (const cmd of rest) {
         const bucket = byCategory.get(cmd.category) ?? [];
@@ -225,9 +288,20 @@ export default function CommandPalette() {
 
       const flat = groups.flatMap((g) => g.commands);
       return { displayGroups: groups, flatList: flat };
-    } else {
-      // Filter first, then sort recent ids to the top as a tie-breaker
-      const matched = filteredCommands.slice().sort((a, b) => {
+    }
+
+    const q = searchQuery.toLowerCase();
+    const scoredCommands: ScoredCommand[] = allCommands
+      .map((cmd) => {
+        const nameResult = computeMatchScore(q, cmd.name);
+        const categoryResult = computeMatchScore(q, cmd.category);
+        const bestScore = Math.max(nameResult.score, categoryResult.score);
+        if (bestScore === 0) return null;
+        return { ...cmd, score: bestScore, matchIndices: nameResult.matchIndices };
+      })
+      .filter((c): c is ScoredCommand => c !== null)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
         const aIdx = recentIds.indexOf(a.id);
         const bIdx = recentIds.indexOf(b.id);
         const aRecent = aIdx === -1 ? Infinity : aIdx;
@@ -235,23 +309,19 @@ export default function CommandPalette() {
         return aRecent - bRecent;
       });
 
-      // Group by category (keeping recent-sorted order within each category
-      // would feel odd – so we just use a single implicit grouping by category
-      // while preserving the sorted order across the full list)
-      const byCategory = new Map<string, Command[]>();
-      for (const cmd of matched) {
-        const bucket = byCategory.get(cmd.category) ?? [];
-        bucket.push(cmd);
-        byCategory.set(cmd.category, bucket);
-      }
-      const groups = [...byCategory.entries()].map(([label, commands]) => ({
-        label,
-        commands,
-      }));
-      const flat = groups.flatMap((g) => g.commands);
-      return { displayGroups: groups, flatList: flat };
+    const byCategory = new Map<string, ScoredCommand[]>();
+    for (const cmd of scoredCommands) {
+      const bucket = byCategory.get(cmd.category) ?? [];
+      bucket.push(cmd);
+      byCategory.set(cmd.category, bucket);
     }
-  }, [searchQuery, allCommands, filteredCommands, recentIds]);
+    const groups = [...byCategory.entries()].map(([label, commands]) => ({
+      label,
+      commands,
+    }));
+    const flat = groups.flatMap((g) => g.commands);
+    return { displayGroups: groups, flatList: flat };
+  }, [searchQuery, allCommands, recentIds]);
 
   // Helper: run a command, record it, then close
   const executeCommand = useCallback(
@@ -451,6 +521,8 @@ export default function CommandPalette() {
                 {group.commands.map((cmd) => {
                   const index = flatList.indexOf(cmd);
                   const isSelected = index === selectedIndex;
+                  const scoredCmd = cmd as ScoredCommand;
+                  const matchIndices = scoredCmd.matchIndices ?? [];
                   return (
                     <div
                       key={cmd.id}
@@ -466,9 +538,14 @@ export default function CommandPalette() {
                       <span className="command-palette-item-icon" aria-hidden="true">
                         {cmd.icon || '⚡'}
                       </span>
-                      <span className="command-palette-item-name">{cmd.name}</span>
+                      <span className="command-palette-item-name">
+                        <span className="command-palette-item-name-visual" aria-hidden="true">
+                          {highlightMatches(cmd.name, matchIndices)}
+                        </span>
+                        <span className="command-palette-item-name-sr">{cmd.name}</span>
+                      </span>
                       {isSelected && (
-                        <span className="command-palette-item-hint">Enter</span>
+                        <span className="command-palette-item-hint" aria-hidden="true">Enter</span>
                       )}
                     </div>
                   );
