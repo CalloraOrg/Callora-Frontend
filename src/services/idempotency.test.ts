@@ -34,6 +34,20 @@ describe('generateIdempotencyKey', () => {
     expect(['8', '9', 'a', 'b']).toContain(key[19].toLowerCase());
   });
 
+  it('keeps the UUID intact behind a caller-supplied prefix', () => {
+    const key = generateIdempotencyKey('key-rotate');
+    expect(key.startsWith('key-rotate-')).toBe(true);
+    expect(key.slice('key-rotate-'.length)).toMatch(UUID_V4);
+  });
+
+  it('produces unique prefixed keys across calls', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 1000; i += 1) {
+      seen.add(generateIdempotencyKey('rotate'));
+    }
+    expect(seen.size).toBe(1000);
+  });
+
   it('falls back to a manual UUID when randomUUID is unavailable', () => {
     vi.stubGlobal('crypto', { getRandomValues: (arr: Uint8Array) => arr.fill(0xab) });
     const key = generateIdempotencyKey();
@@ -115,6 +129,53 @@ describe('runWithTimeout', () => {
     expect(seen!.aborted).toBe(true);
   });
 
+  it('carries the operation label so a timeout can be attributed', async () => {
+    vi.useFakeTimers();
+    let aborted = false;
+    const pending = runWithTimeout(
+      (signal) =>
+        new Promise<string>((_resolve, _reject) => {
+          // A well-behaved task records the abort but never rejects with it,
+          // so the timeout error is what reaches the caller.
+          signal.addEventListener('abort', () => {
+            aborted = true;
+          });
+        }),
+      100,
+      'rotateKeyWithToken',
+    );
+
+    const assertion = expect(pending).rejects.toMatchObject({
+      name: 'RequestTimeoutError',
+      timeoutMs: 100,
+      label: 'rotateKeyWithToken',
+      message: 'Request timed out after 100ms (rotateKeyWithToken).',
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await assertion;
+    expect(aborted).toBe(true);
+  });
+
+  it('lets a task that rejects on abort surface its own abort error', async () => {
+    // The documented companion path for fetch: the signal aborts and the
+    // request rejects with its own error. The caller still gets a rejection
+    // rather than a hung promise, and can tell the two flavors apart.
+    const pending = runWithTimeout(
+      (signal) =>
+        new Promise<string>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+      5,
+      'rotateKeyWithToken',
+    );
+
+    const reason = await pending.catch((error: unknown) => error);
+    expect(reason).toBeInstanceOf(Error);
+    // The task settles first, so its own error reaches the caller; KeyRotation
+    // pairs this with the abort check instead of isTimeoutError.
+    expect((reason as Error).message).toBe('aborted');
+  });
+
   it('propagates a task error unchanged when it settles first', async () => {
     const boom = new Error('network down');
     await expect(runWithTimeout(() => Promise.reject(boom), 1000)).rejects.toBe(boom);
@@ -176,6 +237,15 @@ describe('runWithTimeout', () => {
   it('defaults to a positive default budget', () => {
     expect(DEFAULT_REQUEST_TIMEOUT_MS).toBeGreaterThan(0);
   });
+
+  it('applies the default budget when no timeout is supplied', async () => {
+    vi.useFakeTimers();
+    const pending = runWithTimeout(() => new Promise<never>(() => {}));
+    const assertion = expect(pending).rejects.toBeInstanceOf(RequestTimeoutError);
+
+    await vi.advanceTimersByTimeAsync(DEFAULT_REQUEST_TIMEOUT_MS - 1);
+    await vi.advanceTimersByTimeAsync(1);
+    await assertion;
 });
 
 // ─── Burst / retry guarantees (issue #1205) ──────────────────────────────────
@@ -194,25 +264,23 @@ describe('generateIdempotencyKey — burst', () => {
   });
 });
 
-describe("InFlightGuard", () => {
-  it("coalesces concurrent duplicate submissions into a single side effect", async () => {
+describe('InFlightGuard', () => {
+  it('coalesces concurrent duplicate submissions into a single side effect', async () => {
     const guard = createInFlightGuard<number>();
     let calls = 0;
     const task = () => {
       calls += 1;
-      return new Promise<number>((resolve) =>
-        setTimeout(() => resolve(42), 20),
-      );
+      return new Promise<number>((resolve) => setTimeout(() => resolve(42), 20));
     };
 
-    const p1 = guard.run("rotate-key", task);
-    const p2 = guard.run("rotate-key", task);
-    const p3 = guard.run("rotate-key", task);
+    const p1 = guard.run('rotate-key', task);
+    const p2 = guard.run('rotate-key', task);
+    const p3 = guard.run('rotate-key', task);
 
     expect(p2).toBe(p1);
     expect(p3).toBe(p1);
     expect(guard.size()).toBe(1);
-    expect(guard.isRunning("rotate-key")).toBe(true);
+    expect(guard.isRunning('rotate-key')).toBe(true);
 
     await Promise.resolve();
     expect(calls).toBe(1);
@@ -220,10 +288,10 @@ describe("InFlightGuard", () => {
     await expect(Promise.all([p1, p2, p3])).resolves.toEqual([42, 42, 42]);
     expect(calls).toBe(1);
     expect(guard.size()).toBe(0);
-    expect(guard.isRunning("rotate-key")).toBe(false);
+    expect(guard.isRunning('rotate-key')).toBe(false);
   });
 
-  it("allows a fresh attempt after the previous one resolves", async () => {
+  it('allows a fresh attempt after the previous one resolves', async () => {
     const guard = createInFlightGuard<number>();
     let calls = 0;
     const task = () => {
@@ -231,40 +299,54 @@ describe("InFlightGuard", () => {
       return Promise.resolve(calls);
     };
 
-    const first = await guard.run("delivery", task);
-    const second = await guard.run("delivery", task);
+    const first = await guard.run('delivery', task);
+    const second = await guard.run('delivery', task);
     expect(first).toBe(1);
     expect(second).toBe(2);
     expect(calls).toBe(2);
   });
 
-  it("does not poison the key after a failure (recovery)", async () => {
+  it('does not poison the key after a failure (recovery)', async () => {
     const guard = createInFlightGuard<number>();
     const task = vi
       .fn<() => Promise<number>>()
-      .mockRejectedValueOnce(new Error("boom"))
+      .mockRejectedValueOnce(new Error('boom'))
       .mockResolvedValueOnce(7);
 
-    const first = guard.run("delivery", task).catch((e: Error) => e.message);
-    await expect(Promise.resolve(first)).resolves.toBe("boom");
+    const first = guard.run('delivery', task).catch((e: Error) => e.message);
+    await expect(Promise.resolve(first)).resolves.toBe('boom');
 
-    const second = await guard.run("delivery", task);
+    const second = await guard.run('delivery', task);
     expect(second).toBe(7);
     expect(task).toHaveBeenCalledTimes(2);
   });
 
-  it("tracks distinct keys independently", async () => {
+  it('tracks distinct keys independently', async () => {
     const guard = createInFlightGuard<number>();
     const task = (value: number) => () => Promise.resolve(value);
 
-    const a = guard.run("a", task(1));
-    const b = guard.run("b", task(2));
+    const a = guard.run('a', task(1));
+    const b = guard.run('b', task(2));
     expect(guard.size()).toBe(2);
 
     const [av, bv] = await Promise.all([a, b]);
     expect(av).toBe(1);
     expect(bv).toBe(2);
   });
+
+  it('releases the key when the registry is cleared', () => {
+    const guard = createInFlightGuard<number>();
+    guard.run('a', () => new Promise<number>(() => {}));
+    expect(guard.size()).toBe(1);
+
+    guard.clear();
+    expect(guard.size()).toBe(0);
+    expect(guard.isRunning('a')).toBe(false);
+  });
+});
+
+describe('backoffDelayMs', () => {
+  it('grows exponentially', () => {
 });
 
 describe("backoffDelayMs", () => {
@@ -275,28 +357,32 @@ describe("backoffDelayMs", () => {
     expect(backoffDelayMs(3, 1000)).toBe(8000);
   });
 
-  it("clamps at the maximum delay", () => {
+  it('clamps at the maximum delay', () => {
     expect(backoffDelayMs(10, 1000, 5000)).toBe(5000);
+  });
+
+  it('treats a negative attempt as the first retry', () => {
+    expect(backoffDelayMs(-2, 1000)).toBe(1000);
   });
 });
 
-describe("withRetry", () => {
-  it("retries transient failures and eventually succeeds", async () => {
+describe('withRetry', () => {
+  it('retries transient failures and eventually succeeds', async () => {
     let calls = 0;
     const result = await withRetry(
       async () => {
         calls += 1;
-        if (calls < 3) throw new Error("transient");
-        return "ok";
+        if (calls < 3) throw new Error('transient');
+        return 'ok';
       },
       { maxRetries: 5, baseDelayMs: 1 },
     );
-    expect(result).toBe("ok");
+    expect(result).toBe('ok');
     expect(calls).toBe(3);
   });
 
-  it("rethrows the final error after maxRetries (retry exhaustion)", async () => {
-    const err = new Error("always fails");
+  it('rethrows the final error after maxRetries (retry exhaustion)', async () => {
+    const err = new Error('always fails');
     let calls = 0;
     const delay = vi.fn().mockResolvedValue(undefined);
 
@@ -308,12 +394,15 @@ describe("withRetry", () => {
         },
         { maxRetries: 2, baseDelayMs: 1, delay },
       ),
+    ).rejects.toThrow('always fails');
     ).rejects.toBe(err);
 
     expect(calls).toBe(3);
     expect(delay).toHaveBeenCalledTimes(2);
   });
 
+  it('honors the shouldRetry predicate to stop immediately', async () => {
+    const err = new Error('non-retryable');
   it("does not retry when maxRetries is zero", async () => {
     const err = new Error("first attempt failed");
     const task = vi.fn().mockRejectedValue(err);
@@ -345,9 +434,24 @@ describe("withRetry", () => {
           delay,
         },
       ),
-    ).rejects.toThrow("non-retryable");
+    ).rejects.toThrow('non-retryable');
 
     expect(calls).toBe(1);
     expect(delay).not.toHaveBeenCalled();
+  });
+
+  it('backs off with the configured delay sequence', async () => {
+    const delay = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      withRetry(() => Promise.reject(new Error('transient')), {
+        maxRetries: 2,
+        baseDelayMs: 100,
+        maxDelayMs: 150,
+        delay,
+      }),
+    ).rejects.toThrow('transient');
+
+    expect(delay.mock.calls.map(([ms]) => ms)).toEqual([100, 150]);
   });
 });

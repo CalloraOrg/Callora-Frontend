@@ -16,6 +16,8 @@ import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { useAccountContext } from "./hooks/useAccountContext";
+import { useMediaQuery } from "./hooks/useMediaQuery";
+import MobileNavPanel from "./components/MobileNavPanel";
 
 // Route splitting: dynamic imports for all heavy page routes
 const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
@@ -167,6 +169,46 @@ const APP_ROUTES = {
   onboarding: "/onboarding",
   endpointSummary: "/endpoints",
 } as const;
+
+/** Topbar links, rendered inline on desktop and inside the panel when collapsed. */
+const PRIMARY_NAV_ITEMS = [
+  { to: APP_ROUTES.dashboard, label: "Dashboard" },
+  { to: APP_ROUTES.marketplace, label: "Marketplace" },
+  { to: APP_ROUTES.myApis, label: "My APIs" },
+  { to: APP_ROUTES.billing, label: "Billing" },
+  { to: APP_ROUTES.billingHistory, label: "Billing History" },
+  { to: APP_ROUTES.themePlayground, label: "Theme Playground" },
+  { to: APP_ROUTES.designSystem, label: "Design System" },
+] as const;
+
+/** At or below this width the topbar links collapse into a menu button. Mirrors the `@media` rule in index.css. */
+export const MOBILE_NAV_QUERY = "(max-width: 768px)";
+
+const NAV_PANEL_ID = "primary-nav-panel";
+
+function PrimaryNavLinks({ variant = "inline", onNavigate }: { variant?: "inline" | "stacked"; onNavigate?: () => void }) {
+  return (
+    <nav className={variant === "stacked" ? "nav nav--stacked" : "nav"} aria-label="Primary navigation">
+      {PRIMARY_NAV_ITEMS.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+          onMouseEnter={() => prefetchRoute(item.to)}
+          onFocus={() => prefetchRoute(item.to)}
+          onClick={onNavigate}
+        >
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+function createMockHash() {
+  const seed = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+  return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
+}
 
 function buildExplorerLink(hash: string) {
   return `${EXPLORER_BASE_URL}${hash}`;
@@ -340,6 +382,17 @@ function App() {
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [isNavOpen, setIsNavOpen] = useState(false);
+  const navTriggerRef = useRef<HTMLButtonElement>(null);
+  const isCompactNav = useMediaQuery(MOBILE_NAV_QUERY);
+
+  const closeNav = useCallback(() => {
+    setIsNavOpen(false);
+    // The panel unmounts with this state update, so hand focus back to the
+    // button that opened it (WCAG 2.4.3).
+    navTriggerRef.current?.focus();
+  }, []);
+
   const [vaultBalance, setVaultBalance] = useState(284.62);
   const [walletBalance] = useState(1260.5);
   const [amountInput, setAmountInput] = useState("50");
@@ -452,6 +505,19 @@ function App() {
       setIsDepositOpen(false);
     }
   }, [isDepositOpen, location.pathname]);
+
+  const previousPathRef = useRef(location.pathname);
+  useEffect(() => {
+    const pathChanged = previousPathRef.current !== location.pathname;
+    previousPathRef.current = location.pathname;
+
+    if (!isNavOpen) return;
+    // Dismiss the panel once the destination renders, or once there is room for
+    // the inline links again after a resize.
+    if (pathChanged || !isCompactNav) {
+      setIsNavOpen(false);
+    }
+  }, [location.pathname, isNavOpen, isCompactNav]);
 
   useEffect(() => {
     startRouteLoading();
@@ -619,59 +685,28 @@ function App() {
           </div>
 
           <div className="topbar-actions">
-            <nav className="nav" aria-label="Primary navigation">
-              <NavLink 
-                to={APP_ROUTES.dashboard} 
-                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
-                onMouseEnter={() => prefetchRoute(APP_ROUTES.dashboard)}
-                onFocus={() => prefetchRoute(APP_ROUTES.dashboard)}
-              >
-                Dashboard
-              </NavLink>
-              <NavLink 
-                to={APP_ROUTES.marketplace} 
-                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
-                onMouseEnter={() => prefetchRoute(APP_ROUTES.marketplace)}
-                onFocus={() => prefetchRoute(APP_ROUTES.marketplace)}
-              >
-                Marketplace
-              </NavLink>
-              <NavLink 
-                to={APP_ROUTES.myApis} 
-                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
-                onMouseEnter={() => prefetchRoute(APP_ROUTES.myApis)}
-                onFocus={() => prefetchRoute(APP_ROUTES.myApis)}
-              >
-                My APIs
-              </NavLink>
-              <NavLink to={APP_ROUTES.billing} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
-                Billing
-              </NavLink>
-              <NavLink 
-                to={APP_ROUTES.billingHistory} 
-                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
-                onMouseEnter={() => prefetchRoute(APP_ROUTES.billingHistory)}
-                onFocus={() => prefetchRoute(APP_ROUTES.billingHistory)}
-              >
-                Billing History
-              </NavLink>
-              <NavLink 
-                to={APP_ROUTES.themePlayground} 
-                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
-                onMouseEnter={() => prefetchRoute(APP_ROUTES.themePlayground)}
-                onFocus={() => prefetchRoute(APP_ROUTES.themePlayground)}
-              >
-                Theme Playground
-              </NavLink>
-              <NavLink 
-                to={APP_ROUTES.designSystem} 
-                className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
-                onMouseEnter={() => prefetchRoute(APP_ROUTES.designSystem)}
-                onFocus={() => prefetchRoute(APP_ROUTES.designSystem)}
-              >
-                Design System
-              </NavLink>
-            </nav>
+            {isCompactNav ? (
+              <>
+                <button
+                  type="button"
+                  className="nav-menu-button"
+                  ref={navTriggerRef}
+                  onClick={() => (isNavOpen ? closeNav() : setIsNavOpen(true))}
+                  aria-expanded={isNavOpen}
+                  aria-controls={NAV_PANEL_ID}
+                >
+                  <span aria-hidden="true">☰</span>
+                  Menu
+                </button>
+                {isNavOpen && (
+                  <MobileNavPanel id={NAV_PANEL_ID} label="Site navigation" onClose={closeNav}>
+                    <PrimaryNavLinks variant="stacked" onNavigate={closeNav} />
+                  </MobileNavPanel>
+                )}
+              </>
+            ) : (
+              <PrimaryNavLinks />
+            )}
             <AccountSwitcher />
             <ThemeToggle />
           </div>

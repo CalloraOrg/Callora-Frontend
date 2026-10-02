@@ -24,11 +24,14 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
  */
 export class RequestTimeoutError extends Error {
   readonly timeoutMs: number;
+  /** Optional operation name, so a timeout can be attributed in logs. */
+  readonly label?: string;
 
-  constructor(timeoutMs: number) {
-    super(`Request timed out after ${timeoutMs}ms.`);
+  constructor(timeoutMs: number, label?: string) {
+    super(`Request timed out after ${timeoutMs}ms${label ? ` (${label})` : ''}.`);
     this.name = 'RequestTimeoutError';
     this.timeoutMs = timeoutMs;
+    this.label = label;
   }
 }
 
@@ -73,32 +76,39 @@ function toHex(bytes: Uint8Array): string {
  * A fresh key is produced on every call. Callers that need the *same* key
  * across retries must store the first value and reuse it — that is the entire
  * point of the header.
+ *
+ * @param prefix - optional operation label kept as a readable hint in front of
+ *   the UUID, so server-side logs can attribute a key to a flow.
  */
-export function generateIdempotencyKey(): string {
+export function generateIdempotencyKey(prefix?: string): string {
   const cryptoObj: Crypto | undefined = globalThis.crypto;
 
-  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
-    try {
-      return cryptoObj.randomUUID();
-    } catch {
-      // Some environments expose randomUUID but throw on it (for example a
-      // non-secure context). Fall through to the manual builder.
+  const uuid = (() => {
+    if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
+      try {
+        return cryptoObj.randomUUID();
+      } catch {
+        // Some environments expose randomUUID but throw on it (for example a
+        // non-secure context). Fall through to the manual builder.
+      }
     }
-  }
 
-  const bytes = fillRandomBytes(new Uint8Array(16));
-  // Version 4 (random) and RFC 4122 variant bits.
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const bytes = fillRandomBytes(new Uint8Array(16));
+    // Version 4 (random) and RFC 4122 variant bits.
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
 
-  const hex = toHex(bytes);
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20, 32),
-  ].join('-');
+    const hex = toHex(bytes);
+    return [
+      hex.slice(0, 8),
+      hex.slice(8, 12),
+      hex.slice(12, 16),
+      hex.slice(16, 20),
+      hex.slice(20, 32),
+    ].join('-');
+  })();
+
+  return prefix ? `${prefix}-${uuid}` : uuid;
 }
 
 /**
@@ -111,12 +121,15 @@ export function generateIdempotencyKey(): string {
  *
  * @param task - receives the abort signal and performs the request
  * @param timeoutMs - positive budget in milliseconds
+ * @param label - optional operation name carried on the timeout error
  * @throws {RequestTimeoutError} when the budget elapses first
+ * @throws {TypeError} when `task` is not a function
  * @throws {RangeError} when `timeoutMs` is not a positive finite number
  */
 export async function runWithTimeout<T>(
   task: (signal: AbortSignal) => Promise<T>,
   timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
+  label?: string,
 ): Promise<T> {
   if (typeof task !== 'function') {
     throw new TypeError('runWithTimeout requires a task function.');
@@ -131,7 +144,7 @@ export async function runWithTimeout<T>(
   const timeout = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
       controller.abort();
-      reject(new RequestTimeoutError(timeoutMs));
+      reject(new RequestTimeoutError(timeoutMs, label));
     }, timeoutMs);
   });
 
@@ -148,6 +161,14 @@ export async function runWithTimeout<T>(
     }
   }
 }
+
+/**
+ * Coalesce concurrent calls that share a key into one in-flight task.
+ *
+ * This is the client-side counterpart to the idempotency header: it stops a
+ * double click from opening two requests at all, rather than relying on the
+ * server to de-duplicate the replay. A settled key is released immediately,
+ * including on failure, so an error never permanently blocks the action.
 
 /**
  * Exponential backoff for `attempt` (0-based), capped at `maxDelayMs`.
@@ -239,4 +260,62 @@ export class InFlightGuard<T = unknown> {
 
 export function createInFlightGuard<T = unknown>(): InFlightGuard<T> {
   return new InFlightGuard<T>();
+}
+
+/** Exponential backoff for `attempt` (0-based), clamped to `maxDelayMs`. */
+export function backoffDelayMs(
+  attempt: number,
+  baseDelayMs: number,
+  maxDelayMs = 30_000,
+): number {
+  const exponent = Math.pow(2, Math.max(0, attempt));
+  return Math.min(Math.max(0, baseDelayMs) * exponent, maxDelayMs);
+}
+
+export interface RetryOptions {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs?: number;
+  shouldRetry?: (error: unknown, attempt: number) => boolean;
+  delay?: (ms: number) => Promise<void>;
+}
+
+const defaultDelay = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Retry `fn` with exponential backoff.
+ *
+ * Only bounded, transient failures should reach `maxRetries`; callers pass
+ * `shouldRetry` to fail fast on responses that will never succeed (for
+ * example a 4xx), which also avoids hammering the provider.
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions,
+): Promise<T> {
+  const {
+    maxRetries,
+    baseDelayMs,
+    maxDelayMs,
+    shouldRetry,
+    delay = defaultDelay,
+  } = options;
+
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (
+        attempt >= maxRetries ||
+        (shouldRetry && !shouldRetry(error, attempt))
+      ) {
+        throw error;
+      }
+      const wait = backoffDelayMs(attempt, baseDelayMs, maxDelayMs);
+      await delay(wait);
+      attempt += 1;
+    }
+  }
 }

@@ -670,6 +670,98 @@ code,
   box-shadow: 0 4px 12px rgba(78, 133, 255, 0.25);
 }
 
+/* ── Collapsed primary navigation (issue #1067) ──────────────────────────
+ * The menu button and the panel are mounted only when `useMediaQuery` reports
+ * the viewport is at or below MOBILE_NAV_QUERY (App.tsx), so nothing here needs
+ * a matching media query to hide the inline links. The @media block below only
+ * reflows the topbar row. Keep the width in sync with MOBILE_NAV_QUERY.
+ */
+.nav-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 16px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  backdrop-filter: blur(18px);
+  transition: all var(--transition-speed) ease;
+}
+
+.nav-menu-button:hover,
+.nav-menu-button:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.mobile-nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(4, 8, 18, 0.64);
+}
+
+.mobile-nav-panel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 51;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+/* Descendant selectors so these win over the `.nav` rules in the
+ * max-width: 1024px block further down the file. */
+.mobile-nav-panel .nav {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: auto;
+  overflow-x: visible;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  backdrop-filter: none;
+}
+
+.mobile-nav-panel .nav a {
+  min-height: 44px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: var(--text);
+}
+
+@media (max-width: 768px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .topbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-menu-button {
+    transition: none;
+  }
+}
+
 .theme-toggle {
   display: inline-flex;
   align-items: center;
