@@ -1,82 +1,92 @@
-# AP@Item Contract
+# APHItem Contract
 
-This document defines the canonical shape of `APIIm%`$` and its component types as consumed by the Callora Frontend. It is the shared contract that the Callora-Backend catalogue must satisfy.
+This document defines the authoritative contract for the `APIIme` type used in `src/data/mockApis.ts`. It exists to align the frontend catalogue with the Callora-Backend catalogue so that every consumer knows which field is authoritative when duplicates disagree.
 
-The types live in `ssrc/data/mockApis.ts` (`APIItem`, `Endpoint`, `EndpointParam`, `Review`).
+The goal is to resolve the following ambiguities:
+
+-  `pricePerRequest` vs. `pricePerCall`
+-  `avgLatencyMs` vs `stats.avgResponseMs`
+-  `uptimePercent` vs `stats.uptimePct`
+-  `endpoints: Array<any>` (untyped)
 
 ## Canonical fields
 
-Every field on `APIIm%` is documented below. A value marked **Canonical** is the authoritative source of truth; duplicates marked **Deprecated** must not be read by new code.
+The following fields are canonical. When a duplicate disagrees with a canonical field, the canonical field wins.
 
-| Field | Type | Required | Status | Description |
-| --- | --- | --- | --- | --- |
-| `id` | string | yes | Canonical | Stable unique identifier for the API. |
-| `name` | string | yes | Canonical | Display name. |
-| `provider` | `{ name: string; url?: string; avatar?: string }` | yes | Canonical | Provider metadata. `name` required; `url`/`avatar` optional. |
-| `version` | string | no | Canonical | Semantic version of the API. |
-| `status` | `"operational" \
- "degraded" \ "maintenance"` | no | Canonical | Current operational status. |
-| `description` | string | yes | Canonical | Human-readable description. |
-| `pricePerRequest` | number | yes | **Canonical** | Price charged per request, in USD. |
-| `pricePerCall` | number | no | **Deprecated** | Duplicate of `pricePerRequest`. Use `pricePerRequest`. |
-| `avgLatencyMs` | number | no | **Canonical** | Average response latency in milliseconds. |
-| `uptimePercent` | number | no | **Canonical** | Uptime percentage (0–100). |
-| `rating` | number | no | Canonical | Average user rating (1–5). |
-| `tags` | string[] | no | Canonical | Free-form tags for filtering/search. |
-| `category` | string | no | Canonical | Category label for grouping. |
-| `createdAt` | string | no | Canonical | ISO date string of when the API was added. |
-| `usageCount` | number | no | **Canonical** | Total number of calls made against the API. |
-| `features` | string[] | no | Canonical | Feature bullets for display. |
-| `useCases` | string[] | no | Canonical | Use-case bullets for display. |
-| `endpoints` | `Endpoint[]` | no | Canonical | Typed list of endpoints (replaces `Array<any>`). |
-| `stats` | { totalCalls?: number; avgResponseMs?: number; uptimePct?: number } | no | **Deprecated** | Deprecated duplicate container. See duplicate mapping below. |
-| `ratingDistribution` | `Record<number, number>` | no | Canonical | Map of star rating (1-5) to count of reviews. |
-| `hourlyHealth` | `("operational" \ "degraded" \
- "down")[]` | no | Canonical | 24-hour health history, index 0 = oldest. |
-| `reviews` | `Review[]` | no | Canonical | User reviews. |
-| `sparklineValues` | number[] | no | Canonical | Sparkline sample values for mini charts. |
-
-## Duplicate fields and canonical choice
-
-The codebase historically mixed two names for the same concept. The canonical column is authoritative; the deprecated column is retained only for backward compatibility and must not be read by new code.
-
-| Concept | Canonical field | Deprecated field | Components that read the deprecated field |
+| Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| Price per request | `pricePerRequest` | `pricePerCall` | `src/components/CompareDrawer.tsx` (consumes/displays pricing) |
-| Average latency (ms) | `avgLatencyMs` | `stats.avgResponseMs` | `src/components/CompareDrawer.tsx`, `src/components/ApiCard.tsx` |
-| Uptime percentage | `uptimePercent` | `stats.uptimePct` | `src/components/CompareDrawer.tsx`, `src/components/ApiCard.tsx` |
-| Total calls | `usageCount` | `stats.totalCalls` | `src/components/CompareDrawer.tsx`, `src/components/ApiCard.tsx` |
+| `id` | `string` | Yes | Stable, unique identifier for the API. Used by `findApiById` and routing. |
+| `name` | `string` | Yes | Display name of the API. |
+| `provider` | `{ name: string; url?: string; avatar?: string }` | Yes | Provider metadata. `name` is required; `url` and `avatar` are optional. |
+| `description` | `string` | Yes | Human-readable description of the API. |
+| `pricePerRequest` | `number` | Yes | **Canonical price field.** Price per request in United States Dollars. |
+| `avgLatencyMs` | `number` | No | **Canonical latency field.** Average latency in milliseconds. |
+| `uptimePercent` | `number` | No | **Canonical uptime field.** Uptime percentage (0-100). |
+| `endpoints` | `Endpoint[]` | No | Typed list of endpoints. See `Endpoint` below. Replaces the former `Array<any>`. |
+| `version` | `string` | No | Semantic version of the API. |
+| `status` | `"operational" \" degraded\" \" maintenance"` | No | Current operational status. |
+| `rating` | `number` | No | Average user rating (1-5). |
+| `tags` | `string[]` | No | Free-text tags for filtering. |
+| `category` | `string` | No | Category label. |
+| `createdAt` | `string` | No | ISO date string of when the API was added. |
+| `usageCount` | `number` | No | Total number of requests served. Canonical over `stats.totalCalls`. |
+| `features` | `string[]` | No | List of feature bullets. |
+| `useCases` | `string[]` | No | List of example use cases. |
+| `ratingDistribution` | `Record<number, number>` | No | Count of ratings per star value. |
+| `hourlyHealth` | `("operational" \" degraded" \" down")[]` | No | 24-entry hourly health timeline. |
+| `reviews` | `Review[]` | No | User reviews. |
+| `sparklineValues` | `number[]` | No | Sparkline series for mini charts. |
 
-Note: the components listed above are the ones that currently read or display the duplicate fields. They must be migrated to the canonical field as part of the backend alignment.
+## Deprecated fields (duplicates)
 
-## Endpoint type
+These fields are kept for backward compatibility but are **deprecated**. New code must read the canonical field instead. Each deprecated field lists the components that still reference it so they can be migrated.
 
-`endpoints` is no longer `Array<any>`. It is now `Endpoint[]`, where:
+| Deprecated field | Canonical replacement | Affected components |
+| --- | --- | --- |
+| `pricePerCall` | `pricePerRequest` | `src/components/CompareDrawer.tsx`, `src/components/ApiCard.tsx` |
+| `stats.avgResponseMs` | `avgLatencyMs` | `src/components/CompareDrawer.tsx`, `src/components/ApiCard.tsx` |
+| `stats.uptimePct` | `uptimePercent` | `src/components/CompareDrawer.tsx`, `src/components/ApiCard.tsx` |
+
+Note: `stats.totalCalls` is also superseded by the canonical `usageCount` field. `stats.avgResponseMs` and `stats.uptimePct` are the duplicates of the canonical `avgLatencyMs` and `uptimePercent` fields.
+
+## Endpoint shape
 
 ```ts
 export type EndpointParam = {
+  /** Parameter name as it appears in the request. */
   name: string;
-  type: "string" | "number" | "boolean" | "array" | "object";
+  /** Parameter type label (e.g. "string", "number", "array"). */
+  type: string;
+  /** Whether the parameter is required. */
   required: boolean;
 };
 
+export type EndpointMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+
 export type Endpoint = {
+  /** Stable identifier within the API. */
   id: string;
+  /** Human-readable title. */
   title: string;
+  /** Relative path of the endpoint. */
   url: string;
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /** HTTP method. */
+  method: EndpointMethod;
+  /** Optional grouping label for UI sections. */
   group?: string;
+  /** Request parameters. */
   params?: EndpointParam[];
+  /** Example response body (string or structured). */
   response?: string;
 };
 ```
 
+## Migration guidance
+
+1. **Read canonical fields only.** Any component that currently reads `pricePerCall`, `stats.avgResponseMs`, or `stats.uptimePct` should read `pricePerRequest`, `avgLatencyMs`, and `uptimePercent` respectively.
+2. **Write canonical fields only.** New mock data and backend responses must populate the canonical fields. Deprecated fields may be omitted.
+3. **Typed endpoints.** All `endpoints` arrays must conform to `Endpoint[]`.
+
 ## Backend alignment
 
-When the Callora-Backend catalogue lands, it must serve the canonical fields above. Specifically:
-
-- Serve `pricePerRequest`, not `pricePerCall`.
-- Serve `avgLatencyMs`, `uptimePercent`, and `usageCount` at the top level, not inside `stats`.
-- Serve `endpoints` as an array of objects matching `Endpoint`.
-
-The deprecated fields may be served during a transition period but must equal their canonical counterparts and must be removed once all consumers are migrated.
+The Callora-Backend catalogue should return the canonical fields as the source of truth. The deprecated duplicates are frontend-only compatibility shims and should not be required from the backend. When the backend catalogue lands, the frontend will drop the deprecated fields from `APIItem`.

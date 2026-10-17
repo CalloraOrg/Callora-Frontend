@@ -8,53 +8,53 @@ export type Review = {
 };
 
 /**
- * A single parameter accepted by an endpoint.
+ * An endpoint exposed by an API.
+ * Replaces the previous `Array<any>` endpoints typing.
  */
 export type EndpointParam = {
-  /** Parameter name as it appears in the query string or request body. */
+  /** Parameter name as sent in the request. */
   name: string;
-  /** Primitive type of the parameter value. */
-  type: "string" | "number" | "boolean" | "array" | "object";
-  /** Whether the parameter must be supplied by the caller. */
+  /** Primitive type of the parameter (e.g. "string", "number", "array"). */
+  type: string;
+  /** Whether the parameter must be supplied. */
   required: boolean;
 };
 
-/**
- * A single API endpoint exposed by a provider.
- * Replaces the previous `Array<any>` typing on `APIItem.endpoints`.
- */
 export type Endpoint = {
-  /** Stable unique identifier within an API. */
+  /** Stable identifier for the endpoint within an API. */
   id: string;
-  /** Human-readable label shown in UI lists. */
+  /** Human-readable title for the endpoint. */
   title: string;
-  /** Relative path or absolute URL of the endpoint. */
+  /** Path of the endpoint (relative to the API base URL). */
   url: string;
-  /** HTTP method used to invoke the endpoint. */
+  /** HTTP method used to call the endpoint. */
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  /** Optional grouping label for UI sections. */
+  /** Logical grouping used to organize endpoints in the UI. */
   group?: string;
-  /** Query/path/body parameters accepted by the endpoint. */
+  /** Parameters accepted by the endpoint. */
   params?: EndpointParam[];
-  /** Example response body (JSON string) for documentation/preview. */
+  /** Example JSON response body (as a string). */
   response?: string;
 };
 
 /**
- * Canonical model for an API catalogue item.
+ * Shape of a single API catalogue entry.
  *
- * Canonical vs. deprecated duplicates (see docs/APIItem-Contract.md):
- *  - Price:           `pricePerRequest` (canonical) >> `pricePerCall` (deprecated)
- *  - Latency:         `avgLatencyMs`      (canonical) >> `stats.avgResponseMs` (deprecated)
- *  - Uptime:          `uptimePercent`     (canonical) >> `stats.uptimePct` (deprecated)
- *  - Total calls:      `usageCount`        (canonical) >> `stats.totalCalls` (deprecated)
+ * Canonical vs deprecated duplicate fields:
+ * - Pricing: ``pricePerRequest`` is canonical; ``pricePerCall`` is deprecated
+ *   (used by CompareDrawer and ApiCard).
+ * - Latency: ``avgLatencyMs`` is canonical; ``atvgResponseMs`` (inside ``stats``) is
+ *   deprecated (used by CompareDrawer and ApiCard).
+ * - Uptime: ``uptimePercent`` on the top level is canonical; ``stats.uptimePct`` and
+ *   ``stats.avgResponseMs`` are deprecated duplicates (used by CompareDrawer and
+ *   ApiCard).
  */
 export type APIItem = {
-  /** Stable unique identifier for the API. */
+  /** Unique API identifier. */
   id: string;
   /** Display name of the API. */
   name: string;
-  /** Provider metadata (name required; url/avatar optional). */
+  /** Provider metadata (name, optional url and avatar). */
   provider: { name: string; url?: string; avatar?: string };
   /** Semantic version of the API. */
   version?: string;
@@ -62,54 +62,58 @@ export type APIItem = {
   status?: "operational" | "degraded" | "maintenance";
   /** Human-readable description of the API. */
   description: string;
-  /** CANONICAL: price charged per request, in USD. */
+  /** CANONICAL: price charged per request. */
   pricePerRequest: number;
-  /** DEPRECATED: use `pricePerRequest`. Retained for backward compatibility. */
+  /**
+   * DEPRECATED: duplicate of `pricePerRequest`. Used by CompareDrawer and
+   * ApiCard. Retained only for backward compatibility; do not read for new code.
+   */
+  /** @deprecated use `pricePerRequest` instead. */
   pricePerCall?: number;
-  /** CANONICAL: average response latency in milliseconds. */
+  /** CANONICAL: average latency in milliseconds. */
   avgLatencyMs?: number;
   /** CANONICAL: uptime percentage (0–100). */
   uptimePercent?: number;
   /** Average user rating (1–5). */
   rating?: number;
-  /** Free-form tags for filtering/search. */
+  /** Search/tagging keywords. */
   tags?: string[];
-  /** Category label for grouping. */
+  /** Category label for grouping APIs. */
   category?: string;
-  /** ISO date string of when the API was added to the catalogue. */
+  /** ISO date string of when the API was added. */
   createdAt?: string;
-  /** CANONICAL: total number of calls made against the API. */
+  /** Cumulative number of calls made against the API. */
   usageCount?: number;
-  /** Feature bullets for display. */
+  /** Feature highlights for display. */
   features?: string[];
-  /** Use-case bullets for display. */
+  /** Sample use cases for the API. */
   useCases?: string[];
   /** Typed list of endpoints exposed by the API. */
   endpoints?: Endpoint[];
   /**
-   * DEPRECATED: duplicates canonical top-level fields. Use top-level fields instead:
-   *   - `stats.totalCalls`     -> `usageCount`
-   *   - `stats.avgResponseMs` -> `avgLatencyMs`
-   *   - `stats.uptimePct`     -> `uptimePercent`
+   * DEPRECATED: duplicate stats object. Use top-level `avgLatencyMs`,
+   * `uptimePercent`, and `usageCount` instead. Used by CompareDrawer and ApiCard.
+   * @deprecated use top-level fields instead.
    */
   stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
-  /** Map of star rating (1-5) to count of reviews. */
+  /** Map of rating value (1-5) to count of reviews. */
   ratingDistribution?: Record<number, number>;
-  /** 24-hour health history, index 0 = oldest. */
+  /** Hourly health status for the last 24 hours. */
   hourlyHealth?: ("operational" | "degraded" | "down")[];
-  /** User reviews. */
+  /** User reviews for the API. */
   reviews?: Review[];
-  /** Sparkline sample values for mini charts. */
+  /** Sparkline values for mini charts. */
   sparklineValues?: number[];
 };
+
 
 export const MOCK_APIS: APIItem[] = [
   {
     id: "weather-001",
     name: "WeatherSim API",
     provider: { name: "Acme Labs", url: "#" },
-    version: "2.3.1",
-    status: "operational",
+     version: "2.3.1",
+  status: "operational",
     description:
       "WeatherSim provides hyper-local weather forecasts, historical climate data, and simulated conditions for testing your services.",
     pricePerRequest: 0.01,
@@ -188,7 +192,7 @@ export const MOCK_APIS: APIItem[] = [
     name: "QuickPay",
     provider: { name: "PayFast", url: "#" },
     status: "degraded",
-    version: "1.8.0",
+ version: "1.8.0",
     description: "Simple payment processing with card and ACH support",
     pricePerRequest: 0.001,
     pricePerCall: 0.001,
@@ -266,8 +270,8 @@ export const MOCK_APIS: APIItem[] = [
     id: "msg-01",
     name: "ChatStream",
     provider: { name: "Comms Inc.", url: "#" },
-    version: "3.0.2",
-    status: "maintenance",
+     version: "3.0.2",
+  status: "maintenance",
     description: "Scalable messaging and notifications for apps.",
     pricePerRequest: 0.0005,
     pricePerCall: 0.0005,
@@ -341,18 +345,18 @@ export const MOCK_APIS: APIItem[] = [
     const avgLatencyMs = i % 5 === 0 ? undefined : 140 + i * 18;
     const uptimePercent =
       i % 3 === 0 ? undefined : Number((99.2 + i * 0.07).toFixed(2));
-    const status: APIItem["status"] =
-      i % 3 === 0
-        ? "operational"
-        : i % 3 === 1
-        ? "degraded"
-        : "maintenance";
+const status:  APIItem["status"] =
+  i % 3 === 0
+    ? "operational"
+    : i % 3 === 1
+    ? "degraded"
+    : "maintenance";
     return {
       id: `demo-${i}`,
       name: `Demo API ${i + 1}`,
       provider: { name: i % 2 === 0 ? "OpenTools" : "ThirdParty", url: "#" },
-      version: `1.${i}.0`,
-      status,
+       version: `1.${i}.0`,
+       status,
       description: `Demo API number ${i + 1} showcasing features and endpoints.`,
       pricePerRequest,
       pricePerCall: i % 4 === 0 ? undefined : pricePerRequest,

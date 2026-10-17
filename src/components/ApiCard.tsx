@@ -1,5 +1,3 @@
-
-// @ts-nocheck
 /**
  * ApiCard.tsx
  *
@@ -28,22 +26,6 @@ import WhyApi from "./WhyApi";
 import { colorFromId } from "../utils/colorFromId";
 import { ClockIcon, BoltIcon } from "./icons";
 import { useToast } from "./Toast";
-
-// ─── APIItem field contract (see src/data/mockApis.ts) ───────────────────────
-//
-// Canonical fields (prefer these):
-//   - pricePerCall        (canonical) — replaces deprecated `pricePerRequest`
-//   - stats.avgLatencyMs  (canonical) — replaces deprecated `avgLatencyMs`
-//   - stats.uptimePct     (canonical) — replaces deprecated `uptimePercent`
-//   - endpoints: Endpoint[] (canonical) — replaces `Array<any>`
-//
-// Deprecated duplicates (kept only for backward compatibility):
-//   - pricePerRequest  → use pricePerCall        (consumers: ApiCard, CompareDrawer)
-//   - avgLatencyMs     → use stats.avgLatencyMs  (consumers: ApiCard, CompareDrawer)
-//   - uptimePercent    → use stats.uptimePct     (consumers: ApiCard, CompareDrawer)
-//
-// ApiCard resolves each duplicate below via `??` so the canonical field wins
-// whenever it is present; deprecated fields are only a fallback.
 
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -587,6 +569,17 @@ function PinButton({ apiId, prefersReducedMotion = false, onStatusChange }: { ap
 
 const EM_DASH = "—";
 
+/**
+ * Resolve the canonical per-call price for an APIItem.
+ *
+ * `pricePerCall` is the canonical field (see `APIItem` docs in
+ * `data/mockApis.ts`). `pricePerRequest` is deprecated and only read as a
+ * fallback for legacy records that have not been migrated yet.
+ */
+function resolvePricePerCall(api: APIItem): number | undefined {
+  return api.pricePerCall ?? api.pricePerRequest;
+}
+
 const CARD_SHORTCUTS: readonly Shortcut[] = [
   { key: "Enter", description: "View details", category: "Marketplace" },
   { key: "C", description: "Add/remove comparison", category: "Marketplace" },
@@ -612,7 +605,6 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
-// Canonical fields: pricePerCall, stats.avgLatencyMs, stats.uptimePct.
 export default function ApiCard({
   api,
   loading = false,
@@ -663,7 +655,7 @@ export default function ApiCard({
 
   const isMobile = useMediaQuery("(max-width: 768px)");
 
-  const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
+  const pricePerCall = resolvePricePerCall(api);
   const avgLatencyMs = api.stats?.avgLatencyMs ?? api.avgLatencyMs;
   const uptimePercent = api.stats?.uptimePct ?? api.uptimePercent;
   const isCompact = density === "compact" || isMobile;
@@ -776,8 +768,7 @@ export default function ApiCard({
     {
       label: "Copy Endpoint URL",
       action: () => {
-        const primaryEndpoint: Endpoint | undefined = api.endpoints?.[0];
-        const url = primaryEndpoint?.url ?? `/${api.id}`;
+        const url: string = (api.endpoints?.[0] as Endpoint | undefined)?.url ?? `/${api.id}`;
         navigator.clipboard.writeText(url).catch(() => {
           /* clipboard unavailable in tests */
         });
@@ -941,7 +932,7 @@ export default function ApiCard({
       </div>
 
       <div className="api-marketplace-card-tags" style={{ display: "flex", gap: "var(--mkt-space-md)", flexWrap: "wrap" }}>
-        {(api.tags ?? []).slice(0, 4).map((t) => (
+        {(api.tags ?? []).slice(0, 4).map((t: string) => (
           <TagChip key={t} tag={t} active={activeTag?.toLowerCase() === t.toLowerCase()} onClick={onTagClick} />
         ))}
       </div>

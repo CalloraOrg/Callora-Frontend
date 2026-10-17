@@ -7,18 +7,6 @@ import "./CompareDrawer.css";
 
 // ── Best-value helpers ────────────────────────────────────────────────────────
 
-// NOTE: This component reads only the canonical APIItem fields
-// (pricePerRequest, stats.avgResponseMs, stats.uptimePct). Deprecated
-// duplicates are intentionally not referenced here; see data/mockApis.ts
-// for the full field contract.
-//
-// Deprecated field → canonical replacement → consumers of the deprecated field:
-//   pricePerCall   → pricePerRequest        → ApiCard.tsx (legacy fallback)
-//   avgLatencyMs   → stats.avgResponseMs    → ApiCard.tsx (legacy fallback)
-//   uptimePercent  → stats.uptimePct        → ApiCard.tsx (legacy fallback)
-//
-// CompareDrawer.tsx must never read the deprecated duplicates above.
-
 /**
  * Return the index of the best value in an array of optionally-undefined
  * numbers. Returns -1 when fewer than 2 defined values exist (no winner to
@@ -101,22 +89,19 @@ export default function CompareDrawer() {
   if (!isOpen) return null;
 
   // ── Derive effective price per column ──────────────────────────────────────
-  // Canonical field is pricePerRequest. pricePerCall is deprecated and must
-  // not be read here; see data/mockApis.ts for the field contract.
+  // Canonical: pricePerRequest (always present). Deprecated: pricePerCall.
   const effectivePrices: (number | undefined)[] = apis.map(
-    (api) => api.pricePerRequest
+    (api) => api.pricePerCall ?? api.pricePerRequest
   );
 
   // ── Pre-compute best-value indices ─────────────────────────────────────────
   const bestPriceIdx = bestIndex(effectivePrices, "low");
-  // Canonical latency is stats.avgResponseMs; avgLatencyMs is deprecated.
   const bestLatencyIdx = bestIndex(
-    apis.map((a) => a.stats?.avgResponseMs),
+    apis.map((a) => a.stats?.avgResponseMs ?? a.avgLatencyMs),
     "low"
   );
-  // Canonical uptime is stats.uptimePct; uptimePercent is deprecated.
   const bestUptimeIdx = bestIndex(
-    apis.map((a) => a.stats?.uptimePct),
+    apis.map((a) => a.uptimePercent ?? a.stats?.uptimePct),
     "high"
   );
   const bestRatingIdx = bestIndex(
@@ -207,8 +192,8 @@ export default function CompareDrawer() {
                       <span
                         className={`compare-stat-value${colIdx === bestLatencyIdx ? " compare-best-value" : ""}`}
                       >
-                        {api.stats?.avgResponseMs !== undefined
-                          ? `${api.stats.avgResponseMs} ms`
+                        {(api.stats?.avgResponseMs ?? api.avgLatencyMs) !== undefined
+                          ? `${api.stats?.avgResponseMs ?? api.avgLatencyMs} ms`
                           : "—"}
                         {colIdx === bestLatencyIdx && (
                           <span className="compare-best-label" aria-label="Best value">
@@ -224,8 +209,8 @@ export default function CompareDrawer() {
                       <span
                         className={`compare-stat-value${colIdx === bestUptimeIdx ? " compare-best-value" : ""}`}
                       >
-                        {api.stats?.uptimePct !== undefined
-                          ? `${api.stats.uptimePct.toFixed(2)}%`
+                        {(api.uptimePercent ?? api.stats?.uptimePct) !== undefined
+                          ? `${(api.uptimePercent ?? api.stats?.uptimePct)!.toFixed(2)}%`
                           : "—"}
                         {colIdx === bestUptimeIdx && (
                           <span className="compare-best-label" aria-label="Best value">
