@@ -26,6 +26,7 @@ import WhyApi from "./WhyApi";
 import { colorFromId } from "../utils/colorFromId";
 import { ClockIcon, BoltIcon } from "./icons";
 import { useToast } from "./Toast";
+import { resolvePricePerCall, resolveAvgLatencyMs, resolveUptimePercent } from "../data/mockApis";
 
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -644,18 +645,9 @@ export default function ApiCard({
 
   const isMobile = useMediaQuery("(max-width: 768px)");
 
-  // Canonical field resolution (see APIItem contract in data/mockApis.ts):
-  // - pricePerCall is canonical; pricePerRequest is deprecated (legacy alias).
-  //   Deprecated field consumers: ApiCard (fallback below), CompareDrawer.
-  // - avgLatencyMs is canonical; stats.avgLatencyMs is deprecated.
-  //   Deprecated field consumers: ApiCard (fallback below).
-  // - uptimePercent is canonical; stats.uptimePct is deprecated.
-  //   Deprecated field consumers: ApiCard (fallback below).
-  // - endpoints is typed as Endpoint[] (see Endpoint in data/mockApis.ts);
-  //   never Array<any>. ApiCard reads endpoints[0].url only.
-  const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
-  const avgLatencyMs = api.avgLatencyMs ?? api.stats?.avgLatencyMs;
-  const uptimePercent = api.uptimePercent ?? api.stats?.uptimePct;
+  const pricePerCall = resolvePricePerCall(api);
+  const avgLatencyMs = resolveAvgLatencyMs(api);
+  const uptimePercent = resolveUptimePercent(api);
   const isCompact = density === "compact" || isMobile;
 
   const [liveMessage, setLiveMessage] = useState("");
@@ -930,7 +922,7 @@ export default function ApiCard({
       </div>
 
       <div className="api-marketplace-card-tags" style={{ display: "flex", gap: "var(--mkt-space-md)", flexWrap: "wrap" }}>
-        {(api.tags || []).slice(0, 4).map((t: string) => (
+        {(api.tags ?? []).slice(0, 4).map((t: string) => (
           <TagChip key={t} tag={t} active={activeTag?.toLowerCase() === t.toLowerCase()} onClick={onTagClick} />
         ))}
       </div>

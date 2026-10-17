@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useCompareStore, compareStore } from "../state/compareStore";
-import type { APIItem, Endpoint } from "../data/mockApis";
+import type { APIItem } from "../data/mockApis";
 import { formatPrice } from "../utils/format";
 import RatingHistogram from "./RatingHistogram";
 import "./CompareDrawer.css";
@@ -34,13 +34,6 @@ function bestIndex(
 
   return winner.i;
 }
-
-// ── Deprecated field usage map ────────────────────────────────────────────────
-// Canonical fields are preferred; deprecated duplicates are read only as
-// fallbacks so this component keeps working during backend migration.
-//   pricePerRequest  (canonical)  ← pricePerCall  (deprecated, used here)
-//   stats.avgResponseMs (canonical) ← avgLatencyMs (deprecated, used here)
-//   uptimePercent    (canonical)  ← stats.uptimePct (deprecated, used here)
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
@@ -96,7 +89,7 @@ export default function CompareDrawer() {
   if (!isOpen) return null;
 
   // ── Derive effective price per column ──────────────────────────────────────
-  // Canonical: pricePerRequest. Deprecated: pricePerCall (see APIItem docs).
+  // Canonical: pricePerRequest. Deprecated: pricePerCall (use only as fallback).
   const effectivePrices: (number | undefined)[] = apis.map(
     (api) => api.pricePerRequest ?? api.pricePerCall
   );
@@ -108,7 +101,7 @@ export default function CompareDrawer() {
     "low"
   );
   const bestUptimeIdx = bestIndex(
-    apis.map((a) => a.uptimePercent ?? a.stats?.uptimePct),
+    apis.map((a) => a.stats?.uptimePct ?? a.uptimePercent),
     "high"
   );
   const bestRatingIdx = bestIndex(
@@ -216,8 +209,8 @@ export default function CompareDrawer() {
                       <span
                         className={`compare-stat-value${colIdx === bestUptimeIdx ? " compare-best-value" : ""}`}
                       >
-                        {(api.uptimePercent ?? api.stats?.uptimePct) !== undefined
-                          ? `${(api.uptimePercent ?? api.stats?.uptimePct)!.toFixed(2)}%`
+                        {(api.stats?.uptimePct ?? api.uptimePercent) !== undefined
+                          ? `${(api.stats?.uptimePct ?? api.uptimePercent)!.toFixed(2)}%`
                           : "—"}
                         {colIdx === bestUptimeIdx && (
                           <span className="compare-best-label" aria-label="Best value">
@@ -263,18 +256,6 @@ export default function CompareDrawer() {
                       <span className="compare-stat-label">Category</span>
                       <span className="compare-stat-value">
                         {api.category ?? "—"}
-                      </span>
-                    </div>
-
-                    {/* ── Endpoints ────────────────────────────────────── */}
-                    <div className="compare-stat">
-                      <span className="compare-stat-label">Endpoints</span>
-                      <span className="compare-stat-value">
-                        {api.endpoints && api.endpoints.length > 0
-                          ? api.endpoints
-                              .map((ep: Endpoint) => `${ep.method} ${ep.path}`)
-                              .join(", ")
-                          : "—"}
                       </span>
                     </div>
                   </div>
