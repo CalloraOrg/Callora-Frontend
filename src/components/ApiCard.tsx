@@ -25,6 +25,7 @@ import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
 import { colorFromId } from "../utils/colorFromId";
 import { ClockIcon, BoltIcon } from "./icons";
+import { useToast } from "./Toast";
 
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -643,9 +644,18 @@ export default function ApiCard({
 
   const isMobile = useMediaQuery("(max-width: 768px)");
 
+  // Canonical field resolution (see APIItem contract in data/mockApis.ts):
+  // - pricePerCall is canonical; pricePerRequest is deprecated (legacy alias).
+  //   Deprecated field consumers: ApiCard (fallback below), CompareDrawer.
+  // - avgLatencyMs is canonical; stats.avgLatencyMs is deprecated.
+  //   Deprecated field consumers: ApiCard (fallback below).
+  // - uptimePercent is canonical; stats.uptimePct is deprecated.
+  //   Deprecated field consumers: ApiCard (fallback below).
+  // - endpoints is typed as Endpoint[] (see Endpoint in data/mockApis.ts);
+  //   never Array<any>. ApiCard reads endpoints[0].url only.
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
-  const avgLatencyMs = api.avgLatencyMs;
-  const uptimePercent = api.uptimePercent;
+  const avgLatencyMs = api.avgLatencyMs ?? api.stats?.avgLatencyMs;
+  const uptimePercent = api.uptimePercent ?? api.stats?.uptimePct;
   const isCompact = density === "compact" || isMobile;
 
   const [liveMessage, setLiveMessage] = useState("");
@@ -659,6 +669,7 @@ export default function ApiCard({
   const { apis: comparedApis } = useCompareStore();
   const isCompared = comparedApis.some((item) => item.id === api.id);
   const canCompare = isCompared || comparedApis.length < 3;
+  const { showToast } = useToast();
 
   const sparklineValues = useMemo(() => {
     if (api.sparklineValues && api.sparklineValues.length > 0) {
@@ -681,9 +692,15 @@ export default function ApiCard({
     if (isCompared) {
       compareStore.removeApi(api.id);
       announce(`Removed ${api.name} from comparison`);
-    } else if (canCompare) {
-      compareStore.addApi(api);
-      announce(`Added ${api.name} to comparison`);
+    } else {
+      const result = compareStore.addApi(api);
+      if (result === 'full') {
+        const msg = 'Comparison is limited to 3 APIs';
+        showToast(msg, 'error');
+        announce(msg);
+      } else if (result === 'added') {
+        announce(`Added ${api.name} to comparison`);
+      }
     }
   };
 
@@ -824,6 +841,7 @@ export default function ApiCard({
          onFocus={() => setIsCompareHovered(true)}
          onBlur={() => setIsCompareHovered(false)}
          disabled={!canCompare}
+         title={!canCompare ? "Comparison is limited to 3 APIs" : undefined}
          className="api-card__compare-btn"
          style={{
            position: "absolute",
@@ -912,7 +930,7 @@ export default function ApiCard({
       </div>
 
       <div className="api-marketplace-card-tags" style={{ display: "flex", gap: "var(--mkt-space-md)", flexWrap: "wrap" }}>
-        {((api.tags as string[]) || []).slice(0, 4).map((t: string) => (
+        {(api.tags || []).slice(0, 4).map((t: string) => (
           <TagChip key={t} tag={t} active={activeTag?.toLowerCase() === t.toLowerCase()} onClick={onTagClick} />
         ))}
       </div>

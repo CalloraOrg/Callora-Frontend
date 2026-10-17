@@ -7,31 +7,118 @@ export type Review = {
   verified: boolean;
 };
 
-
-
-export type APIItem = {
-  id: string;
+/**
+ * An individual request parameter for an endpoint.
+ */
+export type EndpointParam = {
+  /** Parameter name as it appears in the request (query, path, or body). */
   name: string;
-  provider: { name: string; url?: string; avatar?:string;};
-   version?: string;
+  /** Primitive type of the parameter value. */
+  type: "string" | "number" | "boolean" | "array" | "object";
+  /** Whether the parameter must be supplied by the client. */
+  required: boolean;
+};
+
+/**
+ * A single API endpoint descriptor. Replaces the previous `Array<any>`
+ * typing for `APIItem.endpoints`.
+ */
+export type Endpoint = {
+  /** Stable identifier unique within an API's endpoint list. */
+  id: string;
+  /** Human-readable title for the endpoint. */
+  title: string;
+  /** Relative path of the endpoint (e.g. `/v1/forecast`). */
+  url: string;
+  /** HTTP method used to invoke the endpoint. */
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /** Optional logical grouping (resource area) for UI display. */
+  group?: string;
+  /** Request parameters accepted by the endpoint. */
+  params?: EndpointParam[];
+  /** Example JSON response body (serialized string). */
+  response?: string;
+};
+
+/**
+ * Canonical stats shape. Prefer this over the deprecated top-level
+ * duplicates (`avgLatencyMs`, `uptimePercent`).
+ */
+export type APIStats = {
+  /** Total number of calls recorded for this API. */
+  totalCalls?: number;
+  /** Average response latency in milliseconds. Canonical source for latency. */
+  avgResponseMs?: number;
+  /** Uptime percentage (0–100). Canonical source for uptime. */
+  uptimePct?: number;
+};
+
+/**
+ * API catalogue item.
+ *
+ * Canonical vs. deprecated fields:
+ * - Price: `pricePerRequest` is canonical; `pricePerCall` is deprecated
+ *   (consumed by CompareDrawer).
+ * - Latency: `stats.avgResponseMs` is canonical; `avgLatencyMs` is deprecated
+ *   (consumed by ApiCard).
+ * - Uptime: `stats.uptimePct` is canonical; `uptimePercent` is deprecated
+ *   (consumed by ApiCard).
+ */
+export type APIItem = {
+  /** Stable unique identifier for the API. */
+  id: string;
+  /** Display name of the API. */
+  name: string;
+  /** Provider metadata (name required; url and avatar optional). */
+  provider: { name: string; url?: string; avatar?: string };
+  /** Semantic version of the API (optional). */
+  version?: string;
+  /** Current operational status. */
   status?: "operational" | "degraded" | "maintenance";
+  /** Human-readable description of the API. */
   description: string;
+  /** CANONICAL: price charged per request (in the catalogue's currency). */
   pricePerRequest: number;
+  /**
+   * DEPRECATED: duplicate of `pricePerRequest`. Used by `CompareDrawer`;
+   * migrate to `pricePerRequest`. May be removed once consumers migrate.
+   */
   pricePerCall?: number;
+  /**
+   * DEPRECATED: duplicate of `stats.avgResponseMs`. Used by `ApiCard`;
+   * migrate to `stats.avgResponseMs`.
+   */
   avgLatencyMs?: number;
+  /**
+   * DEPRECATED: duplicate of `stats.uptimePct`. Used by `ApiCard`;
+   * migrate to `stats.uptimePct`.
+   */
   uptimePercent?: number;
+  /** Average user rating (1-5). */
   rating?: number;
+  /** Search/filter tags. */
   tags?: string[];
+  /** Category label for grouping. */
   category?: string;
+  /** ISO date string when the API was added to the catalogue. */
   createdAt?: string;
+  /** Aggregate usage count across all consumers. */
   usageCount?: number;
+  /** Marketing feature bullets. */
   features?: string[];
+  /** Suggested use cases. */
   useCases?: string[];
-  endpoints?: Array<any>;
-  stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
+  /** Typed endpoint descriptors (replaces Array<any>). */
+  endpoints?: Endpoint[];
+  /** Canonical aggregate stats. */
+  stats?: APIStats;
+  /** Map of star rating (1-5) to count of reviews. */
   ratingDistribution?: Record<number, number>;
+  /** Per-hour health buckets (24 entries, oldest → newest). */
   hourlyHealth?: ("operational" | "degraded" | "down")[];
+  /** User reviews. */
   reviews?: Review[];
+  /** Sparkline sample values for trend charts. */
   sparklineValues?: number[];
 };
 
@@ -285,33 +372,37 @@ const status:  APIItem["status"] =
       name: `Demo API ${i + 1}`,
       provider: { name: i % 2 === 0 ? "OpenTools" : "ThirdParty", url: "#" },
        version: `1.${i}.0`,
-       status,
-      description: `Demo API number ${i + 1} showcasing features and endpoints.`,
+      status,
+      description: `Generated demo API #${i + 1} for catalogue testing.`,
       pricePerRequest,
-      pricePerCall: i % 4 === 0 ? undefined : pricePerRequest,
+      pricePerCall: pricePerRequest,
       avgLatencyMs,
       uptimePercent,
-      rating: Number((3.5 + Math.random() * 1.5).toFixed(1)),
-      tags: [i % 2 === 0 ? "analytics" : "utility"],
-      category: i % 2 === 0 ? "Data & Analytics" : "Other",
-      createdAt: new Date(Date.now() - i * 86400000).toISOString(),
-      usageCount: Math.floor(Math.random() * 500000),
-      features: [],
-      useCases: [],
-      endpoints: [],
+      rating: Number((3.5 + (i % 15) * 0.1).toFixed(1)),
+      tags: ["demo", `group-${i % 3}`],
+      category: i % 2 === 0 ? "Data & Analytics" : "Utilities",
+      createdAt: `2026-01-${String((i % 27) + 1).padStart(2, "0")}`,
+      usageCount: 1000 * (i + 1),
+      features: ["Demo feature"],
+      useCases: ["Testing"],
+      endpoints: [
+        {
+          id: `demo-${i}-echo`,
+          title: "Echo",
+          url: "/v1/echo",
+          method: "GET",
+          group: "Demo",
+          params: [{ name: "message", type: "string", required: true }],
+          response: '{ "echo": "hello" }',
+        },
+      ],
       stats: {
-        totalCalls: Math.floor(Math.random() * 500000),
+        totalCalls: 1000 * (i + 1),
         avgResponseMs: avgLatencyMs,
         uptimePct: uptimePercent,
       },
-      hourlyHealth: Array(24).fill("operational").map(() => Math.random() > 0.9 ? (Math.random() > 0.5 ? "degraded" : "down") : "operational"),
+      hourlyHealth: Array(24).fill("operational"),
+      sparklineValues: [10 + i, 12 + i, 11 + i, 14 + i, 13 + i, 15 + i, 16 + i, 14 + i, 17 + i, 18 + i, 19 + i, 20 + i],
     };
   }),
 ];
-
-export function findApiById(id: string | undefined) {
-  if (!id) return undefined;
-  return MOCK_APIS.find((a) => a.id === id || a.id === decodeURIComponent(id));
-}
-
-export default MOCK_APIS;
