@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useCompareStore, compareStore } from "../state/compareStore";
-import type { APIItem } from "../data/mockApis";
+import type { APIItem, Endpoint } from "../data/mockApis";
 import { formatPrice } from "../utils/format";
 import RatingHistogram from "./RatingHistogram";
 import "./CompareDrawer.css";
@@ -86,22 +86,35 @@ export default function CompareDrawer() {
     setTimeout(() => setAnnouncement(""), 3000);
   };
 
+  // ── Canonical field accessors ──────────────────────────────────────────────
+  // The APIItem contract (see src/data/mockApis.ts) defines canonical fields
+  // and marks legacy duplicates as deprecated. Components MUST read only the
+  // canonical fields so the backend catalogue has a single source of truth.
+  //
+  //   pricePerRequest  → canonical (pricePerCall is deprecated)
+  //   stats.avgResponseMs → canonical (avgLatencyMs is deprecated)
+  //   stats.uptimePct  → canonical (uptimePercent is deprecated)
+  const getPrice = (api: APIItem): number | undefined => api.pricePerRequest;
+  const getLatency = (api: APIItem): number | undefined =>
+    api.stats?.avgResponseMs;
+  const getUptime = (api: APIItem): number | undefined => api.stats?.uptimePct;
+
   if (!isOpen) return null;
 
   // ── Derive effective price per column ──────────────────────────────────────
-  // Canonical: pricePerRequest (always present). Deprecated: pricePerCall.
+  // Use pricePerCall when defined, fall back to pricePerRequest (always present).
   const effectivePrices: (number | undefined)[] = apis.map(
-    (api) => api.pricePerCall ?? api.pricePerRequest
+    (api) => getPrice(api)
   );
 
   // ── Pre-compute best-value indices ─────────────────────────────────────────
   const bestPriceIdx = bestIndex(effectivePrices, "low");
   const bestLatencyIdx = bestIndex(
-    apis.map((a) => a.stats?.avgResponseMs ?? a.avgLatencyMs),
+    apis.map((a) => getLatency(a)),
     "low"
   );
   const bestUptimeIdx = bestIndex(
-    apis.map((a) => a.uptimePercent ?? a.stats?.uptimePct),
+    apis.map((a) => getUptime(a)),
     "high"
   );
   const bestRatingIdx = bestIndex(
@@ -192,8 +205,8 @@ export default function CompareDrawer() {
                       <span
                         className={`compare-stat-value${colIdx === bestLatencyIdx ? " compare-best-value" : ""}`}
                       >
-                        {(api.stats?.avgResponseMs ?? api.avgLatencyMs) !== undefined
-                          ? `${api.stats?.avgResponseMs ?? api.avgLatencyMs} ms`
+                        {getLatency(api) !== undefined
+                          ? `${getLatency(api)} ms`
                           : "—"}
                         {colIdx === bestLatencyIdx && (
                           <span className="compare-best-label" aria-label="Best value">
@@ -209,8 +222,8 @@ export default function CompareDrawer() {
                       <span
                         className={`compare-stat-value${colIdx === bestUptimeIdx ? " compare-best-value" : ""}`}
                       >
-                        {(api.uptimePercent ?? api.stats?.uptimePct) !== undefined
-                          ? `${(api.uptimePercent ?? api.stats?.uptimePct)!.toFixed(2)}%`
+                        {getUptime(api) !== undefined
+                          ? `${(getUptime(api) as number).toFixed(2)}%`
                           : "—"}
                         {colIdx === bestUptimeIdx && (
                           <span className="compare-best-label" aria-label="Best value">
@@ -256,6 +269,18 @@ export default function CompareDrawer() {
                       <span className="compare-stat-label">Category</span>
                       <span className="compare-stat-value">
                         {api.category ?? "—"}
+                      </span>
+                    </div>
+
+                    {/* ── Endpoints ────────────────────────────────────── */}
+                    <div className="compare-stat">
+                      <span className="compare-stat-label">Endpoints</span>
+                      <span className="compare-stat-value">
+                        {api.endpoints && api.endpoints.length > 0
+                          ? api.endpoints
+                              .map((ep: Endpoint) => ep.path)
+                              .join(", ")
+                          : "—"}
                       </span>
                     </div>
                   </div>

@@ -8,112 +8,112 @@ export type Review = {
 };
 
 /**
- * An endpoint exposed by an API.
- * Replaces the previous `Array<any>` endpoints typing.
+ * A single query parameter for an endpoint.
  */
 export type EndpointParam = {
-  /** Parameter name as sent in the request. */
+  /** Parameter name as sent on the wire. */
   name: string;
-  /** Primitive type of the parameter (e.g. "string", "number", "array"). */
-  type: string;
+  /** Primitive type of the parameter value. */
+  type: "string" | "number" | "boolean" | "array" | "object";
   /** Whether the parameter must be supplied. */
   required: boolean;
+  /** Optional human-readable description. */
+  description?: string;
 };
 
+/**
+ * A single API endpoint exposed by a provider.
+ * Replaces the previous untyped `Array<any>`.
+ */
 export type Endpoint = {
-  /** Stable identifier for the endpoint within an API. */
+  /** Stable identifier unique within an API. */
   id: string;
   /** Human-readable title for the endpoint. */
   title: string;
-  /** Path of the endpoint (relative to the API base URL). */
+  /** Path or absolute URL of the endpoint. */
   url: string;
   /** HTTP method used to call the endpoint. */
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   /** Logical grouping used to organize endpoints in the UI. */
   group?: string;
-  /** Parameters accepted by the endpoint. */
+  /** Query or body parameters accepted by the endpoint. */
   params?: EndpointParam[];
-  /** Example JSON response body (as a string). */
+  /** Example response payload (JSON string). */
   response?: string;
 };
 
 /**
- * Shape of a single API catalogue entry.
- *
- * Canonical vs deprecated duplicate fields:
- * - Pricing: ``pricePerRequest`` is canonical; ``pricePerCall`` is deprecated
- *   (used by CompareDrawer and ApiCard).
- * - Latency: ``avgLatencyMs`` is canonical; ``atvgResponseMs`` (inside ``stats``) is
- *   deprecated (used by CompareDrawer and ApiCard).
- * - Uptime: ``uptimePercent`` on the top level is canonical; ``stats.uptimePct`` and
- *   ``stats.avgResponseMs`` are deprecated duplicates (used by CompareDrawer and
- *   ApiCard).
+ * Canonical duplicate-field policy:
+ * - Price: `pricePerRequest` is canonical; `pricePerCall` is deprecated.
+ * - Latency: `avgLatencyMs` is canonical; `stats.avgResponseMs` is deprecated.
+ * - Uptime: `uptimePercent` is canonical; `stats.uptimePct` is deprecated.
  */
 export type APIItem = {
-  /** Unique API identifier. */
+  /** Unique identifier for the API. */
   id: string;
   /** Display name of the API. */
   name: string;
-  /** Provider metadata (name, optional url and avatar). */
+  /** Provider metadata. */
   provider: { name: string; url?: string; avatar?: string };
   /** Semantic version of the API. */
   version?: string;
   /** Current operational status. */
   status?: "operational" | "degraded" | "maintenance";
-  /** Human-readable description of the API. */
+  /** Short description of the API. */
   description: string;
-  /** CANONICAL: price charged per request. */
+  /** Canonical price per request (United States dollars). */
   pricePerRequest: number;
-  /**
-   * DEPRECATED: duplicate of `pricePerRequest`. Used by CompareDrawer and
-   * ApiCard. Retained only for backward compatibility; do not read for new code.
-   */
-  /** @deprecated use `pricePerRequest` instead. */
+  /** @deprecated Use `pricePerRequest`. Read by: src/components/CompareDrawer.tsx. */
   pricePerCall?: number;
-  /** CANONICAL: average latency in milliseconds. */
+  /** Canonical average latency in milliseconds. */
   avgLatencyMs?: number;
-  /** CANONICAL: uptime percentage (0–100). */
+  /** Canonical uptime percentage (0–100). */
   uptimePercent?: number;
   /** Average user rating (1–5). */
   rating?: number;
-  /** Search/tagging keywords. */
+  /** Search/taxonomy tags. */
   tags?: string[];
-  /** Category label for grouping APIs. */
+  /** Category label. */
   category?: string;
-  /** ISO date string of when the API was added. */
+  /** ISO date the API was added to the catalogue. */
   createdAt?: string;
-  /** Cumulative number of calls made against the API. */
+  /** Total number of requests served. */
   usageCount?: number;
-  /** Feature highlights for display. */
+  /** Feature bullet points. */
   features?: string[];
-  /** Sample use cases for the API. */
+  /** Suggested use cases. */
   useCases?: string[];
-  /** Typed list of endpoints exposed by the API. */
+  /** Typed endpoint list (formerly Array<any>). */
   endpoints?: Endpoint[];
   /**
-   * DEPRECATED: duplicate stats object. Use top-level `avgLatencyMs`,
-   * `uptimePercent`, and `usageCount` instead. Used by CompareDrawer and ApiCard.
-   * @deprecated use top-level fields instead.
+   * Aggregated stats.
+   * @deprecated `avgResponseMs` — use `avgLatencyMs`. Read by: src/components/ApiCard.tsx.
+   * @deprecated `uptimePct` — use `uptimePercent`. Read by: src/components/ApiCard.tsx.
    */
-  stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
-  /** Map of rating value (1-5) to count of reviews. */
+  stats?: {
+    totalCalls?: number;
+    /** @deprecated Use `avgLatencyMs`. */
+    avgResponseMs?: number;
+    /** @deprecated Use `uptimePercent`. */
+    uptimePct?: number;
+  };
+  /** Map of star rating (1–5) to count. */
   ratingDistribution?: Record<number, number>;
-  /** Hourly health status for the last 24 hours. */
+  /** 24-hour rolling health status. */
   hourlyHealth?: ("operational" | "degraded" | "down")[];
-  /** User reviews for the API. */
+  /** User reviews. */
   reviews?: Review[];
-  /** Sparkline values for mini charts. */
+  /** Sparkline data points for trend charts. */
   sparklineValues?: number[];
 };
 
-
-export const MOCK_APIS: APIItem[] = [
+export const MICK_APIS: APIItem[] = [
   {
     id: "weather-001",
     name: "WeatherSim API",
     provider: { name: "Acme Labs", url: "#" },
-     version: "2.3.1",
-  status: "operational",
+    version: "2.3.1",
+    status: "operational",
     description:
       "WeatherSim provides hyper-local weather forecasts, historical climate data, and simulated conditions for testing your services.",
     pricePerRequest: 0.01,
@@ -184,7 +184,7 @@ export const MOCK_APIS: APIItem[] = [
     ],
     stats: { totalCalls: 382412, avgResponseMs: 180, uptimePct: 99.97 },
     ratingDistribution: { 5: 85, 4: 25, 3: 10, 2: 2, 1: 2 },
-    hourlyHealth: Array(24).fill("operational").map((_, i) => i === 12 || i === 13 ? "degraded" : "operational"),
+    hourlyHealth: Array(24).fill("operational").map((_, i) => (i === 12 || i === 13 ? "degraded" : "operational")),
     sparklineValues: [15, 17, 16, 19, 21, 20, 24, 25, 23, 26, 28, 27],
   },
   {
@@ -192,7 +192,7 @@ export const MOCK_APIS: APIItem[] = [
     name: "QuickPay",
     provider: { name: "PayFast", url: "#" },
     status: "degraded",
- version: "1.8.0",
+    version: "1.8.0",
     description: "Simple payment processing with card and ACH support",
     pricePerRequest: 0.001,
     pricePerCall: 0.001,
@@ -270,8 +270,8 @@ export const MOCK_APIS: APIItem[] = [
     id: "msg-01",
     name: "ChatStream",
     provider: { name: "Comms Inc.", url: "#" },
-     version: "3.0.2",
-  status: "maintenance",
+    version: "3.0.2",
+    status: "maintenance",
     description: "Scalable messaging and notifications for apps.",
     pricePerRequest: 0.0005,
     pricePerCall: 0.0005,
@@ -336,7 +336,7 @@ export const MOCK_APIS: APIItem[] = [
         verified: true,
       },
     ],
-    hourlyHealth: Array(24).fill("operational").map((_, i) => i > 18 && i < 22 ? "down" : "operational"),
+    hourlyHealth: Array(24).fill("operational").map((_, i) => (i > 18 && i < 22 ? "down" : "operational")),
     sparklineValues: [8, 10, 9, 12, 14, 13, 16, 17, 15, 18, 20, 19],
   },
   // minimal demo items
@@ -345,18 +345,18 @@ export const MOCK_APIS: APIItem[] = [
     const avgLatencyMs = i % 5 === 0 ? undefined : 140 + i * 18;
     const uptimePercent =
       i % 3 === 0 ? undefined : Number((99.2 + i * 0.07).toFixed(2));
-const status:  APIItem["status"] =
-  i % 3 === 0
-    ? "operational"
-    : i % 3 === 1
-    ? "degraded"
-    : "maintenance";
+    const status: APIItem["status"] =
+      i % 3 === 0
+        ? "operational"
+        : i % 3 === 1
+        ? "degraded"
+        : "maintenance";
     return {
       id: `demo-${i}`,
       name: `Demo API ${i + 1}`,
       provider: { name: i % 2 === 0 ? "OpenTools" : "ThirdParty", url: "#" },
-       version: `1.${i}.0`,
-       status,
+      version: `1.${i}.0`,
+      status,
       description: `Demo API number ${i + 1} showcasing features and endpoints.`,
       pricePerRequest,
       pricePerCall: i % 4 === 0 ? undefined : pricePerRequest,
@@ -375,7 +375,7 @@ const status:  APIItem["status"] =
         avgResponseMs: avgLatencyMs,
         uptimePct: uptimePercent,
       },
-      hourlyHealth: Array(24).fill("operational").map(() => Math.random() > 0.9 ? (Math.random() > 0.5 ? "degraded" : "down") : "operational"),
+      hourlyHealth: Array(24).fill("operational").map(() => (Math.random() > 0.9 ? (Math.random() > 0.5 ? "degraded" : "down") : "operational")),
     };
   }),
 ];
