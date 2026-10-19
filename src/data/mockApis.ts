@@ -34,6 +34,8 @@ export type APIItem = {
   hourlyHealth?: ("operational" | "degraded" | "down")[];
   reviews?: Review[];
   sparklineValues?: number[];
+  pricingOnRequest?: boolean;
+  baseUrl?: string;
 };
 
 

@@ -908,7 +908,7 @@ export default function ApiCard({
            style={{ textAlign: "right", paddingRight: "var(--mkt-card-price-padding-right)", flexShrink: 0 }}
          >
            <div style={{ color: "var(--muted)", fontSize: "var(--mkt-font-size-micro)" }}>
-             {`$${formatPrice(pricePerCall)}`} / call
+             {api.pricingOnRequest ? "Pricing on request" : `${`$${formatPrice(pricePerCall)}`} / call`}
            </div>
            {api.rating !== undefined && (
              <div style={{ color: "var(--muted)", marginTop: "var(--mkt-card-margin-top-sm)" }}>
@@ -965,7 +965,13 @@ export default function ApiCard({
         <div className="api-card__stats" aria-label="API stats">
           <div className="api-card__stat">
             <span className="api-card__stat-label">Price / call</span>
-            {renderStatValue(pricePerCall !== undefined ? `$${formatPrice(pricePerCall)}` : undefined)}
+            {renderStatValue(
+              api.pricingOnRequest
+                ? "Pricing on request"
+                : pricePerCall !== undefined
+                  ? `$${formatPrice(pricePerCall)}`
+                  : undefined
+            )}
           </div>
 
           <div className="api-card__stat">

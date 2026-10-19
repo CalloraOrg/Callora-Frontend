@@ -37,9 +37,9 @@ backend, never here.
 
 Base origin the browser uses for Callora API requests. Default: **empty**.
 
-- **Empty (default, local development).** Requests stay relative — `/api/marketplace`
-  is fetched from `http://localhost:5173/api/marketplace` and the dev server
-  proxies it to the backend. Because the browser sees one origin, **no CORS
+- **Empty (default, local development).** Requests stay relative — `/api/apis` (the
+  marketplace catalogue endpoint) is fetched from `http://localhost:5173/api/apis` and the dev server
+  proxies it to Callora-Backend. Because the browser sees one origin, **no CORS
   setup is required** and cookies behave normally.
 - **Absolute origin** (e.g. `https://api.staging.callora.com`). Requests go
   straight to that origin and the dev proxy is bypassed. That backend must send
@@ -99,7 +99,7 @@ What this buys you:
 - **No CORS in development.** The browser only ever talks to
   `localhost:5173`; the forwarding happens in Node, where the same-origin
   policy does not apply.
-- **No rewrite.** `/api/marketplace` arrives at the backend unchanged, so the
+- **No rewrite.** `/api/apis` arrives at the backend unchanged, so the
   frontend and backend agree on paths in every environment.
 - **`changeOrigin: true`** rewrites the outgoing `Host` header to the target's
   host. Backends that route or validate on `Host` (common behind a load
@@ -109,6 +109,21 @@ Production builds are static assets: the same relative `/api/...` calls are
 served by whatever reverse proxy sits in front of the app, which must forward
 `/api` to the backend the same way the dev proxy does. Keeping requests
 relative is what makes that work without a rebuild per environment.
+
+## Backend catalogue contract (`GET /api/apis`)
+
+The marketplace catalogue connects to the Callora-Backend `GET /api/apis` route.
+Key contract details and adapter behavior:
+- **Path:** Built using `apiUrl('/api/apis')`.
+- **Response Format:** Callora-Backend returns a cursor-paginated response `{ data: BackendApiRow[], meta: { limit, nextCursor, hasMore } }`.
+- **`APIItem` Adaptation:** The pure adapter `adaptBackendApi` in `src/api/catalogApi.ts` transforms backend rows to the client's `APIItem` interface:
+  - Stringifies numeric `id` to string.
+  - Maps `developer.name` to `provider.name`, `developer.website` to `provider.url`, and `logo_url` to `provider.avatar`.
+  - Maps `base_url` to `baseUrl`.
+  - Derives `pricePerRequest` from the minimum endpoint price. If pricing is not specified or 0 without endpoints, sets `pricingOnRequest: true` so cards display "Pricing on request".
+  - Tolerant: Missing optional developer fields gracefully fall back to "Unknown provider" without dropping the row.
+- **Conditional Requests & 304 Caching:** Catalog fetch requests send `If-None-Match` using cached `ETag` and reuse cached data on `304 Not Modified`.
+- **Fallback Policy:** When `API_BASE` is configured, errors reject rather than silently falling back to sample data, surfacing stale-data or error states in `MarketplacePage`. When unconfigured, mock sample data is displayed with a "Sample data" indicator.
 
 ## Where configuration lives in code
 

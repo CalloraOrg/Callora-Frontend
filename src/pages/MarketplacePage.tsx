@@ -16,6 +16,7 @@ import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
 import type { APIItem } from "../data/mockApis";
+import { API_BASE } from "../config/constants";
 import { useDebounce } from "../hooks/useDebounce";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import {
@@ -518,7 +519,23 @@ export default function MarketplacePage(): JSX.Element {
     <div className="marketplace-page">
       {/* Top row: title + search only */}
       <div className="marketplace-header">
-        <h1>API Marketplace</h1>
+        <h1>
+          API Marketplace
+          {!API_BASE && (
+            <span
+              className="marketplace-sample-data-badge"
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--muted)",
+                marginLeft: "0.5rem",
+                fontWeight: "normal",
+                verticalAlign: "middle",
+              }}
+            >
+              Sample data
+            </span>
+          )}
+        </h1>
         <div className="marketplace-search-row">
           <div className="marketplace-search">
             <SearchBar value={queryDraft} onChange={commitQuery} />
