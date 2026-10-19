@@ -1,21 +1,80 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ApiCard, { ApiCardSkeleton } from "../components/ApiCard";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import SearchBar from "../components/SearchBar";
 import FiltersSidebar from "../components/FiltersSidebar";
-import EmptyState, { type EmptyStateProps } from "../components/EmptyState";
-import MOCK_APIS, { type APIItem } from "../data/mockApis";
+import EmptyState from "../components/EmptyState";
 import { useDebounce } from "../hooks/useDebounce";
-import { LOADING_DELAY_MS } from "../config/constants";
+import { fetchCatalog, type CatalogParams, type CatalogResponse } from "../api/catalogApi";
+import type { APIItem } from "../data/mockApis";
+import MOCK_APIS from "../data/mockApis";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+const isBackendMode = Boolean(API_BASE);
+
+function getCategoryFromSelection(selectedCategories: Set<string>): string | undefined {
+  return selectedCategories.size === 1 ? selectedCategories.values().next().value : undefined;
+}
+
+function filterItemsClientSide(
+  items: APIItem[],
+  debouncedSearch: string,
+  selectedCategories: Set<string>,
+  minPrice: number | null,
+  maxPrice: number | null,
+  popularity: string,
+  sort: string
+): APIItem[] {
+  let filtered = items.slice();
+
+  if (debouncedSearch.trim()) {
+    const q = debouncedSearch.toLowerCase();
+    filtered = filtered.filter((a) => {
+      return (
+        a.name.toLowerCase().includes(q) ||
+        a.description.toLowerCase().includes(q) ||
+        a.provider?.name?.toLowerCase().includes(q) ||
+        (a.tags || []).some((t) => t.toLowerCase().includes(q))
+      );
+    });
+  }
+
+  if (selectedCategories.size > 0) {
+    filtered = filtered.filter((a) => selectedCategories.has(a.category ?? ""));
+  }
+
+  const hasInvertedPrice = minPrice !== null && maxPrice !== null && minPrice > maxPrice;
+  if (!hasInvertedPrice) {
+    if (minPrice !== null) filtered = filtered.filter((a) => a.pricePerRequest >= minPrice);
+    if (maxPrice !== null) filtered = filtered.filter((a) => a.pricePerRequest <= maxPrice);
+  }
+
+  if (popularity === "mostUsed") {
+    filtered = filtered.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
+  } else if (popularity === "newest") {
+    filtered = filtered.sort(
+      (a, b) =>
+        Date.parse(b.createdAt ?? "1970-01-01") - Date.parse(a.createdAt ?? "1970-01-01"),
+    );
+  }
+
+  if (sort === "priceAsc") filtered = filtered.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
+  if (sort === "priceDesc") filtered = filtered.sort((a, b) => b.pricePerRequest - a.pricePerRequest);
+  if (sort === "popularity") filtered = filtered.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
+  if (sort === "newest")
+    filtered = filtered.sort(
+      (a, b) => Date.parse(b.createdAt ?? "1970-01-01") - Date.parse(a.createdAt ?? "1970-01-01"),
+    );
+
+  return filtered;
+}
 
 export default function MarketplacePage(): JSX.Element {
-  useDocumentTitle('Marketplace – Callora', 'Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.');
+  useDocumentTitle("Marketplace – Callora", "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.");
   const [search, setSearch] = useState("");
-  // Debounce search input to prevent excessive re-renders on large lists
   const debouncedSearch = useDebounce(search, 300);
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [minPrice, setMinPrice] = useState<number | null>(null);
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const [popularity, setPopularity] = useState<string>("any");
@@ -24,16 +83,10 @@ export default function MarketplacePage(): JSX.Element {
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [catalogItems, setCatalogItems] = useState<APIItem[]>([]);
 
-  useEffect(() => {
-    // Simulate initial data loading with occasional error for testing
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      // Uncomment below to test error state
-      // setFetchError("Failed to fetch APIs. Please try again.");
-    }, LOADING_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
+  const abortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
 
   const toggleCategory = (c: string) => {
     const copy = new Set(selectedCategories);
@@ -51,10 +104,6 @@ export default function MarketplacePage(): JSX.Element {
     setSearch("");
   };
 
-  /**
-   * Determine if any filters are currently active.
-   * Used to distinguish between "no APIs exist" vs "filters too narrow" empty states.
-   */
   const hasActiveFilters = () => {
     return (
       search.trim() !== "" ||
@@ -65,97 +114,86 @@ export default function MarketplacePage(): JSX.Element {
     );
   };
 
-  /**
-   * Handle retry for fetch errors.
-   * Clears error state and simulates refetch.
-   */
   const handleRetryFetch = async () => {
     setFetchError(null);
     setIsLoading(true);
-    // Simulate network request
     await new Promise((resolve) => setTimeout(resolve, 500));
     setIsLoading(false);
   };
 
-  const filtered = useMemo(() => {
-    let items = MOCK_APIS.slice();
-
+  const fetchParams = useMemo<CatalogParams>(() => {
+    const params: CatalogParams = {};
     if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
-      items = items.filter((a) => {
-        return (
-          a.name.toLowerCase().includes(q) ||
-          a.description.toLowerCase().includes(q) ||
-          a.provider?.name?.toLowerCase().includes(q) ||
-          (a.tags || []).some((t) => t.toLowerCase().includes(q))
-        );
+      params.search = debouncedSearch.trim();
+    }
+    const category = getCategoryFromSelection(selectedCategories);
+    if (category) {
+      params.category = category;
+    }
+    return params;
+  }, [debouncedSearch, selectedCategories]);
+
+  useEffect(() => {
+    if (!isBackendMode) {
+      setCatalogItems(MOCK_APIS);
+      setIsLoading(false);
+      return;
+    }
+
+    const seq = ++requestSeqRef.current;
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setIsLoading(true);
+    setFetchError(null);
+
+    fetchCatalog(controller.signal, fetchParams)
+      .then((response: CatalogResponse) => {
+        if (seq !== requestSeqRef.current) return;
+        setCatalogItems(response.items);
+        setIsLoading(false);
+      })
+      .catch((err: Error) => {
+        if (seq !== requestSeqRef.current) return;
+        if (err.name === "AbortError") return;
+        setFetchError(err.message);
+        setIsLoading(false);
       });
-    }
 
-    if (selectedCategories.size > 0) {
-      items = items.filter((a) => selectedCategories.has(a.category ?? ""));
-    }
+    return () => {
+      controller.abort();
+    };
+  }, [fetchParams, isBackendMode]);
 
-    const hasInvertedPrice = minPrice !== null && maxPrice !== null && minPrice > maxPrice;
-    if (!hasInvertedPrice) {
-      if (minPrice !== null)
-        items = items.filter((a) => a.pricePerRequest >= minPrice);
-      if (maxPrice !== null)
-        items = items.filter((a) => a.pricePerRequest <= maxPrice);
-    }
-
-    // popularity-based ordering
-    if (popularity === "mostUsed") {
-      items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
-    } else if (popularity === "newest") {
-      items = items.sort(
-        (a, b) =>
-          Date.parse(b.createdAt ?? "1970-01-01") -
-          Date.parse(a.createdAt ?? "1970-01-01"),
-      );
-    }
-
-    // explicit sort options
-    if (sort === "priceAsc")
-      items = items.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
-    if (sort === "priceDesc")
-      items = items.sort((a, b) => b.pricePerRequest - a.pricePerRequest);
-    if (sort === "popularity")
-      items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
-    if (sort === "newest")
-      items = items.sort(
-        (a, b) =>
-          Date.parse(b.createdAt ?? "1970-01-01") -
-          Date.parse(a.createdAt ?? "1970-01-01"),
-      );
-
-    return items;
-  }, [debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sort]);
+  const filtered = useMemo(() => {
+    return filterItemsClientSide(
+      catalogItems,
+      debouncedSearch,
+      selectedCategories,
+      minPrice,
+      maxPrice,
+      popularity,
+      sort
+    );
+  }, [catalogItems, debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sort]);
 
   const displayedItems = filtered.slice(0, shown);
 
   const handleViewDetails = (api: APIItem) => {
     history.pushState({}, "", `/details/${api.id}`);
-    // inform our small client router that the URL changed
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
   return (
     <div className="marketplace-page">
-      {/* Top row: title + search only */}
-      <div
-        className="marketplace-header"
-      >
+      <div className="marketplace-header">
         <h1>API Marketplace</h1>
         <div className="marketplace-search">
           <SearchBar value={search} onChange={setSearch} />
         </div>
       </div>
 
-      {/* Bottom: filters left, content right */}
-      <div
-        className="marketplace-layout"
-      >
+      <div className="marketplace-layout">
         <aside className="marketplace-sidebar">
           <FiltersSidebar
             selectedCategories={selectedCategories}
@@ -171,9 +209,7 @@ export default function MarketplacePage(): JSX.Element {
         </aside>
 
         <main className="marketplace-results">
-          <div
-            className="marketplace-toolbar"
-          >
+          <div className="marketplace-toolbar">
             <div className="marketplace-count">
               {filtered.length === 0 ? (
                 <>Showing 0 of 0 APIs</>
@@ -203,19 +239,14 @@ export default function MarketplacePage(): JSX.Element {
           </div>
 
           {fetchError ? (
-            <EmptyState
-              variant="error"
-              onRetry={handleRetryFetch}
-            />
+            <EmptyState variant="error" onRetry={handleRetryFetch} />
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}
               onClearFilters={hasActiveFilters() ? clearFilters : undefined}
             />
           ) : (
-            <div
-              className="marketplace-grid"
-            >
+            <div className="marketplace-grid">
               {isLoading ? (
                 Array.from({ length: shown }).map((_, i) => (
                   <ApiCardSkeleton key={i} />
@@ -230,10 +261,7 @@ export default function MarketplacePage(): JSX.Element {
 
           {filtered.length > shown && (
             <div style={{ marginTop: 16, textAlign: "center" }}>
-              <button
-                className="primary-button"
-                onClick={() => setShown((s) => s + 12)}
-              >
+              <button className="primary-button" onClick={() => setShown((s) => s + 12)}>
                 Load more
               </button>
             </div>
@@ -248,10 +276,7 @@ export default function MarketplacePage(): JSX.Element {
           className="marketplace-filter-modal"
           onClick={() => setShowFiltersMobile(false)}
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="marketplace-filter-panel"
-          >
+          <div onClick={(e) => e.stopPropagation()} className="marketplace-filter-panel">
             <h3>Filters</h3>
             <FiltersSidebar
               selectedCategories={selectedCategories}
@@ -265,10 +290,7 @@ export default function MarketplacePage(): JSX.Element {
               clearFilters={clearFilters}
             />
             <div className="marketplace-filter-footer">
-              <button
-                className="primary-button"
-                onClick={() => setShowFiltersMobile(false)}
-              >
+              <button className="primary-button" onClick={() => setShowFiltersMobile(false)}>
                 Done
               </button>
             </div>
