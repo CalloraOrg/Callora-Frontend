@@ -15,8 +15,8 @@
  *   - Tx hash truncation in the table
  */
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountProvider } from '../hooks/useAccountContext';
 import { addAccount, switchAccount, _reset } from '../state/accountStore';
 import { MemoryRouter } from 'react-router-dom';
@@ -669,5 +669,69 @@ describe('BillingHistory — mobile cards', () => {
     expect(within(credit).getByRole('heading', { name: MOCK_TRANSACTIONS[0].description })).toBeTruthy();
     expect(within(credit).getByText(/^\+/)).toBeTruthy();
     expect(within(debit).getByText(/^\u2212/)).toBeTruthy();
+  });
+});
+
+// ── Details sheet (issue #1320) ───────────────────────────────────────────────
+
+const sheetTx = MOCK_TRANSACTIONS[0];
+
+/** Render the mobile layout, focus and tap the first card's Details button. */
+function openSheet() {
+  setViewport('mobile');
+  renderBH();
+  const card = screen.getByTestId(`bh-card-${sheetTx.id}`);
+  const trigger = within(card).getByRole('button', { name: /^details/i });
+  trigger.focus();
+  fireEvent.click(trigger);
+  return { trigger, dialog: screen.queryByRole('dialog') as HTMLElement };
+}
+
+describe('BillingHistory — details sheet', () => {
+  afterEach(() => {
+    cleanup();
+    _reset();
+    window.matchMedia = originalMatchMedia;
+  });
+
+  it('Details opens a dialog with hash, network and confirmations', () => {
+    const { dialog } = openSheet();
+    expect(dialog).toBeTruthy();
+    expect(within(dialog).getByText(sheetTx.txHash)).toBeTruthy();
+    expect(within(dialog).getByText(sheetTx.network)).toBeTruthy();
+    expect(within(dialog).getByText(String(sheetTx.confirmations))).toBeTruthy();
+  });
+
+  it('Escape closes the sheet and returns focus to the Details button', async () => {
+    const { trigger, dialog } = openSheet();
+    expect(dialog).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+});
+
+describe('BillingHistory — details sheet actions', () => {
+  afterEach(() => {
+    cleanup();
+    _reset();
+    window.matchMedia = originalMatchMedia;
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+  });
+
+  it('the close button closes the sheet', () => {
+    const { dialog } = openSheet();
+    expect(dialog).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: /^close/i }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Copy puts the full hash on the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { dialog } = openSheet();
+    expect(dialog).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: /copy/i }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(sheetTx.txHash));
   });
 });

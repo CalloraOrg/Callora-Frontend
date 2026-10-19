@@ -22,7 +22,7 @@
  *   Blur / Tab away   Closes the preview when focus leaves the row.
  */
 
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
 import StatusBadge, { type StatusVariant } from '../components/StatusBadge';
@@ -31,6 +31,8 @@ import { useAccountContext } from '../hooks/useAccountContext';
 import './BillingHistory.css';
 import TransactionCard from '../components/TransactionCard';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import BottomSheet from '../components/BottomSheet';
+import { TransactionDetails } from '../components/TransactionDetails';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -221,6 +223,12 @@ function txToPreviewData(tx: BillingTransaction): PreviewCardData {
 export function BillingHistory() {
   const { timezone } = useAccountContext();
   const isMobile = useMediaQuery(MOBILE_QUERY);
+  const [selectedTx, setSelectedTx] = useState<BillingTransaction | null>(null);
+  const detailsTriggerRef = useRef<HTMLElement | null>(null);
+  const openDetails = (tx: BillingTransaction, trigger: HTMLButtonElement) => {
+    detailsTriggerRef.current = trigger;
+    setSelectedTx(tx);
+  };
   const dateZone = resolveTimeZone(timezone);
   const zoneAbbreviation = new Intl.DateTimeFormat(undefined, {
     timeZone: dateZone,
@@ -438,7 +446,7 @@ export function BillingHistory() {
               tx={tx}
               dateText={formatDateShort(tx.timestamp, undefined, dateZone)}
               statusLabel={TX_STATUS_LABELS[tx.status]}
-              onDetails={() => undefined}
+              onDetails={openDetails}
             />
           ))}
         </ul>
@@ -577,6 +585,14 @@ export function BillingHistory() {
         <kbd className="bh-kbd">Esc</kbd>{' '}
         to close it and return focus to that row.
       </p>
+      <BottomSheet
+        open={isMobile && selectedTx !== null}
+        onClose={() => setSelectedTx(null)}
+        title={selectedTx ? `${selectedTx.description} details` : 'Transaction details'}
+        triggerRef={detailsTriggerRef}
+      >
+        {selectedTx && <TransactionDetails data={txToPreviewData(selectedTx)} />}
+      </BottomSheet>
     </section>
   );
 }
