@@ -13,7 +13,8 @@
  * Run with: npm test -- --run src/App.deposit.test.tsx
  */
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import App from "./App";
@@ -28,9 +29,26 @@ import { normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
 const walletMocks = vi.hoisted(() => ({
   isWalletAvailable: vi.fn(),
   submitVaultDeposit: vi.fn(),
+  getWalletAddress: vi.fn(),
+  fetch: vi.fn(),
+  signTransaction: vi.fn(),
+  network: "testnet",
 }));
 
-vi.mock("./services/walletService", () => {
+vi.mock("@stellar/freighter-api", () => ({
+  isConnected: async () => ({ isConnected: true }),
+  requestAccess: async () => ({ address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }),
+  getNetwork: async () => ({ networkPassphrase: "Test SDF Network ; September 2015" }),
+  signTransaction: walletMocks.signTransaction,
+}));
+
+vi.mock("./config/constants", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./config/constants")>(),
+  get STELLAR_NETWORK() { return walletMocks.network; },
+}));
+
+vi.mock("./services/walletService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./services/walletService")>();
   class WalletServiceError extends Error {
     readonly code: string;
     readonly requiresReconciliation: boolean;
@@ -44,16 +62,31 @@ vi.mock("./services/walletService", () => {
   }
 
   return {
+    ...actual,
     WalletServiceError,
     isWalletAvailable: walletMocks.isWalletAvailable,
     submitVaultDeposit: walletMocks.submitVaultDeposit,
+    getWalletAddress: walletMocks.getWalletAddress,
   };
 });
 
 beforeEach(() => {
+  // Node's TextEncoder returns a Node-realm Uint8Array. The SDK validates
+  // these bytes with instanceof, so align jsdom's constructor for real XDR.
+  vi.stubGlobal("Uint8Array", new TextEncoder().encode("").constructor);
+  walletMocks.network = "testnet";
+  walletMocks.getWalletAddress.mockReset().mockResolvedValue("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF");
+  walletMocks.signTransaction.mockReset().mockImplementation(async (xdr: string) => ({ signedTxXdr: xdr, signerAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }));
+  vi.stubGlobal("fetch", walletMocks.fetch);
+  walletMocks.fetch.mockReset().mockResolvedValue({ ok: true, status: 200, json: async () => ({
+    sequence: "123", balances: [{ asset_code: "USDC", asset_issuer: "GDXDZNSTNORCX4373EGGYS4Q3U3XVZMBSIMMRHG5S5GCCF7JHC7QZWAZ" }],
+    fee_charged: { mode: "100" },
+  }) });
   walletMocks.isWalletAvailable.mockReset().mockResolvedValue(true);
   walletMocks.submitVaultDeposit.mockReset();
 });
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 /** Renders the app deep-linked to the billing page with the deposit modal open. */
 function renderDepositModal() {
@@ -407,5 +440,119 @@ describe("App deposit modal without a wallet", () => {
 
     expect(await screen.findByRole("link", { name: "Install Freighter" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Approve deposit transaction" })).toBeNull();
+  });
+});
+
+describe("USDC trustline step (#1316)", () => {
+  afterEach(() => { cleanup(); });
+
+  function mockMissingTrustline() {
+    walletMocks.fetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ sequence: "123", balances: [] }) });
+  }
+
+  it("replaces Approve with a keyboard reachable trustline action and announces the reserve", async () => {
+    mockMissingTrustline();
+    renderDepositModal();
+    const button = await screen.findByRole("button", { name: "Add USDC trustline" });
+    expect(screen.queryByRole("button", { name: "Approve deposit transaction" })).toBeNull();
+    const status = document.getElementById("usdc-trustline-status");
+    expect(status).toHaveAttribute("role", "status");
+    expect(status).toHaveTextContent("0.5 XLM base reserve");
+    expect(button).toHaveAttribute("aria-describedby", "usdc-trustline-status");
+    const user = userEvent.setup();
+    for (let tabs = 0; tabs < 40 && document.activeElement !== button; tabs++) await user.tab();
+    expect(button).toHaveFocus();
+    expect(walletMocks.submitVaultDeposit).not.toHaveBeenCalled();
+  });
+
+  it("allows Approve with a warning when the Horizon check fails", async () => {
+    walletMocks.fetch.mockRejectedValue(new TypeError("Failed to fetch"));
+    renderDepositModal();
+    expect(await screen.findByRole("button", { name: "Approve deposit transaction" })).toBeEnabled();
+    expect(screen.getByText(/Could not check your USDC trustline through Horizon/)).toBeVisible();
+  });
+
+  it.each(["testnet", "mainnet"])("shows Friendbot only on testnet (%s configuration)", async (network) => {
+    walletMocks.network = network;
+    walletMocks.fetch.mockResolvedValue({ ok: false, status: 404 });
+    renderDepositModal();
+    await screen.findByText(/This Stellar account is not funded/);
+    const friendbot = screen.queryByRole("link", { name: /Fund testnet account with Friendbot/ });
+    if (network === "testnet") expect(friendbot).toHaveAttribute("href", "https://friendbot.stellar.org/?addr=GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF");
+    else expect(friendbot).toBeNull();
+    expect(screen.queryByRole("button", { name: "Approve deposit transaction" })).toBeNull();
+    mockMissingTrustline();
+    fireEvent.click(screen.getByRole("button", { name: "Check USDC trustline again" }));
+    expect(await screen.findByRole("button", { name: "Add USDC trustline" })).toBeEnabled();
+  });
+
+  it("adds a trustline, waits for confirmation, rechecks, then permits a deposit", async () => {
+    let confirmed = false;
+    walletMocks.fetch.mockImplementation(async (_url: string, options?: RequestInit) => {
+      if (options?.method === "POST") {
+        confirmed = true;
+        return { ok: true, json: async () => ({ successful: true }) };
+      }
+      return { ok: true, json: async () => ({ sequence: "123", balances: confirmed ? [
+        { asset_code: "USDC", asset_issuer: "GDXDZNSTNORCX4373EGGYS4Q3U3XVZMBSIMMRHG5S5GCCF7JHC7QZWAZ" },
+      ] : [] }) };
+    });
+    renderDepositModal();
+    const add = await screen.findByRole("button", { name: "Add USDC trustline" });
+    const user = userEvent.setup();
+    add.focus();
+    await user.keyboard("{Enter}");
+    const approve = await screen.findByRole("button", { name: "Approve deposit transaction" });
+    expect(approve).toBeEnabled();
+    expect(screen.getByText(/USDC trustline ready/)).toBeVisible();
+    expect(walletMocks.signTransaction).toHaveBeenCalledOnce();
+    walletMocks.submitVaultDeposit.mockResolvedValue({ hash: "A".repeat(64) });
+    fireEvent.click(approve);
+    await screen.findByText("Your updated vault balance is 334.62 USDC and ready for usage.");
+  });
+
+  it("returns to the trustline step without an error when a signature is rejected", async () => {
+    mockMissingTrustline();
+    walletMocks.signTransaction.mockResolvedValue({ error: { code: 4001, message: "User rejected signature" } });
+    renderDepositModal();
+    fireEvent.click(await screen.findByRole("button", { name: "Add USDC trustline" }));
+    await screen.findByText(/Trustline signature cancelled/);
+    expect(screen.getByRole("button", { name: "Add USDC trustline" })).toBeEnabled();
+    expect(screen.queryByText("Transaction failed")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("keeps the modal busy until Horizon responds and supports retry after a submission failure", async () => {
+    mockMissingTrustline();
+    let reject!: (error: Error) => void;
+    const accountResponse = { ok: true, json: async () => ({ sequence: "123", balances: [] }) };
+    walletMocks.fetch.mockImplementation(async (_url: string, options?: RequestInit) => options?.method === "POST"
+      ? new Promise((_resolve, rejectPromise) => { reject = rejectPromise; }) : accountResponse);
+    renderDepositModal();
+    fireEvent.click(await screen.findByRole("button", { name: "Add USDC trustline" }));
+    await waitFor(() => expect(reject).toBeDefined());
+    expect(screen.getByRole("button", { name: "Adding USDC trustline..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    await act(async () => { reject(new Error("connection lost")); });
+    expect(screen.getByRole("button", { name: "Add USDC trustline" })).toBeEnabled();
+    expect(screen.getByText(/Could not confirm the USDC trustline/)).toBeVisible();
+  });
+
+  it("returns to the appropriate step if the wallet changes before deposit simulation", async () => {
+    const { WalletServiceError } = await import("./services/walletService");
+    walletMocks.submitVaultDeposit.mockRejectedValue(new WalletServiceError("TRUSTLINE_MISSING", "Add trustline"));
+    renderDepositModal();
+    const approve = await screen.findByRole("button", { name: "Approve deposit transaction" });
+    mockMissingTrustline();
+    fireEvent.click(approve);
+    expect(await screen.findByRole("button", { name: "Add USDC trustline" })).toBeEnabled();
+    expect(screen.queryByText("Transaction failed")).toBeNull();
+  });
+
+  it("offers reconnection without an error when wallet access is cancelled", async () => {
+    walletMocks.getWalletAddress.mockRejectedValueOnce({ code: "SIGNATURE_REJECTED" });
+    renderDepositModal();
+    fireEvent.click(await screen.findByRole("button", { name: "Connect Freighter" }));
+    expect(await screen.findByRole("button", { name: "Approve deposit transaction" })).toBeEnabled();
   });
 });

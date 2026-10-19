@@ -7,8 +7,8 @@ import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut, normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
 import { useNetworkFee } from "./components/DepositPreview";
-import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl } from "./config/constants";
-import type { WalletServiceErrorCode } from "./services/walletService";
+import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR } from "./config/constants";
+import type { WalletServiceErrorCode, UsdcTrustlineStatus } from "./services/walletService";
 import CompareDrawer from "./components/CompareDrawer";
 import CompareTray from "./components/CompareTray";
 import ExternalLink from "./components/ExternalLink";
@@ -404,6 +404,11 @@ function App() {
   const [depositStage, setDepositStage] = useState<DepositStage>("input");
   const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
   const [walletAvailability, setWalletAvailability] = useState<"checking" | "available" | "missing">("checking");
+  const [trustlineStatus, setTrustlineStatus] = useState<UsdcTrustlineStatus | "checking" | "connect" | "error">("checking");
+  const [trustlineMessage, setTrustlineMessage] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [isAddingTrustline, setIsAddingTrustline] = useState(false);
+  const [trustlineCheckVersion, setTrustlineCheckVersion] = useState(0);
   const [depositFailureCode, setDepositFailureCode] = useState<WalletServiceErrorCode | null>(null);
   const [depositRequiresReconciliation, setDepositRequiresReconciliation] = useState(false);
   const [txHash, setTxHash] = useState("");
@@ -418,7 +423,7 @@ function App() {
   const activeAmount = submittedAmount ?? (hasAmount ? parsedAmount : 0);
   const previewCurrentBalance = submittedStartingBalance ?? vaultBalance;
   const projectedBalance = previewCurrentBalance + activeAmount;
-  const isBusy = depositStage === "approving" || depositStage === "pending";
+  const isBusy = isAddingTrustline || depositStage === "approving" || depositStage === "pending";
   const hasUnconfirmedDeposit = depositRequiresReconciliation;
   const { networkFee, isEstimated: isNetworkFeeEstimated } = useNetworkFee(NETWORK_FEE, isDepositOpen);
   const balanceDelta = formatUsdc(submittedAmount ?? (hasAmount ? parsedAmount : 0));
@@ -444,19 +449,31 @@ function App() {
 
     let isCurrent = true;
     setWalletAvailability("checking");
+    setTrustlineStatus("checking");
+    setTrustlineMessage("");
     import("./services/walletService")
-      .then(({ isWalletAvailable }) => isWalletAvailable())
-      .then((available) => {
-        if (isCurrent) setWalletAvailability(available ? "available" : "missing");
+      .then(async ({ isWalletAvailable, getWalletAddress, hasUsdcTrustline }) => {
+        const available = await isWalletAvailable();
+        if (!isCurrent) return;
+        setWalletAvailability(available ? "available" : "missing");
+        if (!available) return;
+        if (STELLAR_USDC_CONFIGURATION_ERROR) throw new Error(STELLAR_USDC_CONFIGURATION_ERROR);
+        const address = await getWalletAddress();
+        if (!isCurrent) return;
+        setWalletAddress(address);
+        const status = await hasUsdcTrustline(address);
+        if (isCurrent) setTrustlineStatus(status);
       })
-      .catch(() => {
-        if (isCurrent) setWalletAvailability("missing");
+      .catch((error) => {
+        if (!isCurrent) return;
+        setTrustlineStatus(error.code === "SIGNATURE_REJECTED" ? "connect" : "error");
+        setTrustlineMessage(error.code === "SIGNATURE_REJECTED" ? "Wallet connection cancelled. Connect Freighter when you are ready." : error.message);
       });
 
     return () => {
       isCurrent = false;
     };
-  }, [isDepositOpen]);
+  }, [isDepositOpen, trustlineCheckVersion]);
 
   useEffect(() => {
     if (location.pathname !== APP_ROUTES.billing && isDepositOpen) {
@@ -546,7 +563,7 @@ function App() {
   };
 
   const handleApproveTransaction = async () => {
-    if (!hasValidAmount || isBusy || hasUnconfirmedDeposit || walletAvailability !== "available") return;
+    if (!hasValidAmount || isBusy || hasUnconfirmedDeposit || walletAvailability !== "available" || (trustlineStatus !== "present" && trustlineStatus !== "unknown")) return;
 
     const approvedAmount = parsedAmount;
     const startingBalance = vaultBalance;
@@ -581,6 +598,15 @@ function App() {
     } catch (error) {
       const walletError = isWalletServiceError?.(error) ? error : null;
       const failureCode = walletError?.code ?? "NETWORK_ERROR";
+      if (failureCode === "TRUSTLINE_MISSING" || failureCode === "UNFUNDED_ACCOUNT") {
+        setTrustlineStatus(failureCode === "TRUSTLINE_MISSING" ? "missing" : "unfunded-account");
+        setTrustlineCheckVersion((version) => version + 1);
+        setDepositStage("input");
+        setSubmittedAmount(null);
+        setSubmittedStartingBalance(null);
+        setStatusMessage("Complete the wallet setup below before depositing.");
+        return;
+      }
       setDepositFailureCode(failureCode);
       setDepositRequiresReconciliation(walletError?.requiresReconciliation ?? false);
       setDepositStage("failed");
@@ -589,6 +615,28 @@ function App() {
           ? walletError.message
           : "Could not submit the deposit. Check your wallet and Stellar network, then try again.",
       );
+    }
+  };
+
+  const handleAddTrustline = async () => {
+    if (isBusy || trustlineStatus !== "missing") return;
+    setIsAddingTrustline(true);
+    setTrustlineMessage("Approve the USDC trustline in Freighter. Waiting for Stellar confirmation.");
+    try {
+      const { addUsdcTrustline } = await import("./services/walletService");
+      const result = await addUsdcTrustline();
+      if (result === "cancelled") {
+        setTrustlineMessage("Trustline signature cancelled. You can add the USDC trustline when you are ready.");
+      } else {
+        // Reconnect and recheck in case the selected wallet changed while signing.
+        setTrustlineCheckVersion((version) => version + 1);
+      }
+    } catch (error) {
+      const failure = error as WalletServiceFailure;
+      if (failure.code === "UNFUNDED_ACCOUNT") setTrustlineCheckVersion((version) => version + 1);
+      setTrustlineMessage(failure.message || "Could not add the USDC trustline. Check your wallet and try again.");
+    } finally {
+      setIsAddingTrustline(false);
     }
   };
 
@@ -894,6 +942,31 @@ function App() {
                   <span className={`status-chip ${depositStage}`}>{STAGE_LABELS[depositStage]}</span>
                 </div>
 
+                {walletAvailability === "available" && depositStage === "input" && (
+                  <div id="usdc-trustline-status" className="security-note" role="status" aria-live="polite" aria-atomic="true">
+                    {trustlineStatus === "checking" && <p>Checking your USDC trustline...</p>}
+                    {trustlineStatus === "present" && <p>USDC trustline ready. Review your deposit and approve when ready.</p>}
+                    {trustlineStatus === "missing" && (
+                      <>
+                        <strong>Add a USDC trustline before depositing</strong>
+                        <p>A trustline lets your wallet hold and send this vault’s USDC asset. Adding it increases your minimum balance by a 0.5 XLM base reserve, plus a small transaction fee. This step only adds the trustline; it does not deposit or supply USDC.</p>
+                      </>
+                    )}
+                    {trustlineStatus === "unfunded-account" && (
+                      <>
+                        <p>This Stellar account is not funded. Fund it with XLM, then check again before adding the USDC trustline.</p>
+                        {STELLAR_NETWORK === "testnet" && (
+                          <ExternalLink href={`https://friendbot.stellar.org/?addr=${encodeURIComponent(walletAddress)}`} ariaLabel="Fund testnet account with Friendbot">
+                            Fund testnet account with Friendbot
+                          </ExternalLink>
+                        )}
+                      </>
+                    )}
+                    {trustlineStatus === "unknown" && <p>Could not check your USDC trustline through Horizon. You can still approve, but a missing trustline may cause the deposit to fail.</p>}
+                    {trustlineMessage && <p>{trustlineMessage}</p>}
+                  </div>
+                )}
+
                 <div className="modal-grid">
                   <div className="form-panel">
                     <div className="balance-row">
@@ -1059,9 +1132,25 @@ function App() {
                   <button className="primary-button" onClick={handleDepositAnother}>
                     Deposit another amount
                   </button>
+                ) : trustlineStatus === "checking" ? (
+                  <button className="primary-button" disabled>Checking USDC trustline...</button>
+                ) : trustlineStatus === "missing" ? (
+                  <button className="primary-button" onClick={handleAddTrustline} disabled={isBusy} aria-describedby="usdc-trustline-status">
+                    {isAddingTrustline ? "Adding USDC trustline..." : "Add USDC trustline"}
+                  </button>
+                ) : trustlineStatus === "unfunded-account" || trustlineStatus === "error" || trustlineStatus === "connect" ? (
+                  <button className="primary-button" onClick={() => setTrustlineCheckVersion((version) => version + 1)} aria-describedby="usdc-trustline-status">
+                    {trustlineStatus === "connect" ? "Connect Freighter" : "Check USDC trustline again"}
+                  </button>
                 ) : (
                   <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
                     {depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
+                  </button>
+                )}
+
+                {trustlineStatus === "missing" && trustlineMessage && !isBusy && depositStage === "input" && (
+                  <button className="secondary-button" onClick={() => setTrustlineCheckVersion((version) => version + 1)}>
+                    Check USDC trustline again
                   </button>
                 )}
 

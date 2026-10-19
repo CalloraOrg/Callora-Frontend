@@ -1,3 +1,5 @@
+import { StrKey } from "@stellar/stellar-sdk";
+
 /**
  * Shared application constants.
  *
@@ -91,8 +93,7 @@ type RuntimeEnv = Record<string, string | boolean | undefined> & {
   DEV?: boolean;
 };
 
-const runtimeEnv: RuntimeEnv =
-  (import.meta as { env?: RuntimeEnv }).env ?? {};
+const runtimeEnv: RuntimeEnv = import.meta.env;
 
 /** Trim whitespace and any trailing slashes from a configured origin. */
 export function normalizeBaseUrl(value: string | undefined): string {
@@ -169,6 +170,31 @@ export const STELLAR_VAULT_CONTRACT_ID = String(
 ).trim();
 
 export const STELLAR_USDC_DECIMALS = 7;
+
+/** Classic asset backing the vault's USDC Stellar Asset Contract. */
+export const STELLAR_USDC_ASSET = {
+  code: "USDC",
+  issuer: String(
+    runtimeEnv.VITE_STELLAR_USDC_ISSUER ??
+      (STELLAR_NETWORK === "testnet"
+        ? "GDXDZNSTNORCX4373EGGYS4Q3U3XVZMBSIMMRHG5S5GCCF7JHC7QZWAZ"
+        : ""),
+  ).trim(),
+} as const;
+
+// Keep the app usable with bad configuration; wallet actions surface this
+// error before making any Horizon request or asking for a signature.
+export const STELLAR_USDC_CONFIGURATION_ERROR =
+  StrKey.isValidEd25519PublicKey(STELLAR_USDC_ASSET.issuer)
+    ? null
+    : "Configure VITE_STELLAR_USDC_ISSUER with a valid Stellar Ed25519 public key for this network.";
+
+/** Horizon must follow the same network as the wallet and Soroban RPC. */
+export const STELLAR_HORIZON_URL = {
+  testnet: "https://horizon-testnet.stellar.org",
+  mainnet: "https://horizon.stellar.org",
+  futurenet: "https://horizon-futurenet.stellar.org",
+}[STELLAR_NETWORK];
 
 /**
  * Reference deployment of the Callora contracts on Stellar testnet. Shown in

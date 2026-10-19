@@ -6,8 +6,11 @@ import {
 } from "@stellar/freighter-api";
 import {
   Address,
+  Account,
+  Asset,
   BASE_FEE,
   Contract,
+  Operation,
   Transaction,
   TransactionBuilder,
   nativeToScVal,
@@ -15,9 +18,12 @@ import {
 } from "@stellar/stellar-sdk";
 import {
   STELLAR_NETWORK,
+  STELLAR_HORIZON_URL,
   STELLAR_NETWORK_PASSPHRASE,
   STELLAR_RPC_URL,
   STELLAR_USDC_DECIMALS,
+  STELLAR_USDC_ASSET,
+  STELLAR_USDC_CONFIGURATION_ERROR,
   STELLAR_VAULT_CONTRACT_ID,
   type StellarNetwork,
 } from "../config/constants";
@@ -40,6 +46,8 @@ export type WalletServiceErrorCode =
   | "NETWORK_MISMATCH"
   | "CONFIGURATION"
   | "INVALID_AMOUNT"
+  | "TRUSTLINE_MISSING"
+  | "UNFUNDED_ACCOUNT"
   | "TRANSACTION_FAILED"
   | "WALLET_ERROR"
   | "NETWORK_ERROR";
@@ -139,6 +147,117 @@ export async function isWalletAvailable(): Promise<boolean> {
   }
 }
 
+export type UsdcTrustlineStatus = "present" | "missing" | "unfunded-account" | "unknown";
+
+function validateUsdcConfiguration(): void {
+  if (STELLAR_USDC_CONFIGURATION_ERROR) {
+    throw new WalletServiceError("CONFIGURATION", STELLAR_USDC_CONFIGURATION_ERROR);
+  }
+}
+
+async function horizonRequest(path: string, options?: RequestInit, timeoutMs = RPC_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(`${STELLAR_HORIZON_URL}${path}`, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
+}
+
+/** A failed lookup is not evidence that an account lacks a trustline. */
+export async function hasUsdcTrustline(address: string): Promise<UsdcTrustlineStatus> {
+  validateUsdcConfiguration();
+  try {
+    const response = await horizonRequest(`/accounts/${encodeURIComponent(address)}`);
+    if (response.status === 404) return "unfunded-account";
+    if (!response.ok) return "unknown";
+    const account = await response.json();
+    if (!Array.isArray(account?.balances)) return "unknown";
+    return account.balances.some((balance: { asset_code?: string; asset_issuer?: string } | null) =>
+      balance?.asset_code === STELLAR_USDC_ASSET.code &&
+      balance?.asset_issuer === STELLAR_USDC_ASSET.issuer,
+    ) ? "present" : "missing";
+  } catch {
+    return "unknown";
+  }
+}
+
+/** Connect Freighter and ensure every action targets the configured network. */
+export async function getWalletAddress(): Promise<string> {
+  if (!(await isWalletAvailable())) {
+    throw new WalletServiceError("WALLET_UNAVAILABLE", "Freighter is not installed or available in this browser.");
+  }
+  try {
+    const access = await requestAccess();
+    if (access.error) throw access.error;
+    if (!access.address) {
+      throw new WalletServiceError("WALLET_UNAVAILABLE", "Freighter did not provide an account address. Connect an account and try again.");
+    }
+    const network = await getNetwork();
+    if (network.error) throw network.error;
+    if (network.networkPassphrase !== STELLAR_NETWORK_PASSPHRASE) {
+      throw new WalletServiceError("NETWORK_MISMATCH", `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[STELLAR_NETWORK]} and try again.`);
+    }
+    return access.address;
+  } catch (error) {
+    if (error instanceof WalletServiceError) throw error;
+    throwWalletError(error);
+  }
+}
+
+/** Horizon's synchronous submission waits until the transaction reaches a ledger. */
+export async function addUsdcTrustline(): Promise<"present" | "cancelled"> {
+  validateUsdcConfiguration();
+  try {
+    const address = await getWalletAddress();
+    const response = await horizonRequest(`/accounts/${encodeURIComponent(address)}`);
+    if (response.status === 404) {
+      throw new WalletServiceError("UNFUNDED_ACCOUNT", "Fund this Stellar account with XLM before adding a USDC trustline.");
+    }
+    if (!response.ok) throw new Error("Could not load the Stellar account.");
+    const account = await response.json();
+    const transaction = new TransactionBuilder(new Account(address, account.sequence), {
+      fee: BASE_FEE,
+      networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+    })
+      .addOperation(Operation.changeTrust({
+        asset: new Asset(STELLAR_USDC_ASSET.code, STELLAR_USDC_ASSET.issuer),
+      }))
+      .setTimeout(TRANSACTION_TIMEOUT_SECONDS)
+      .build();
+
+    const signature = await signTransaction(transaction.toXDR(), {
+      networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+      address,
+    });
+    if (signature.error) throw signature.error;
+    if (!signature.signedTxXdr || signature.signerAddress !== address) {
+      throw new WalletServiceError("WALLET_ERROR", "Freighter did not sign the trustline with the connected account.");
+    }
+    const submission = await horizonRequest("/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ tx: signature.signedTxXdr }).toString(),
+    }, CONFIRMATION_TIMEOUT_MS);
+    if (!submission.ok) {
+      throw new WalletServiceError("TRANSACTION_FAILED", "Stellar could not add the USDC trustline. Check that your account has enough XLM for the 0.5 XLM reserve and transaction fee, then retry.");
+    }
+    const result = await submission.json();
+    if (result.successful !== true) {
+      throw new WalletServiceError("TRANSACTION_FAILED", "Stellar did not confirm the USDC trustline. Check your wallet activity, then check the trustline again.");
+    }
+    return "present";
+  } catch (error) {
+    if (isUserRejection(error) || (error instanceof WalletServiceError && error.code === "SIGNATURE_REJECTED")) return "cancelled";
+    if (error instanceof WalletServiceError) throw error;
+    throw new WalletServiceError("NETWORK_ERROR", "Could not confirm the USDC trustline. Check your connection and wallet activity, then check the trustline again.");
+  }
+}
+
 function createRpcServer(): rpc.Server {
   if (!STELLAR_RPC_URL) {
     throw new WalletServiceError(
@@ -210,7 +329,7 @@ async function waitForConfirmation(
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) break;
     await new Promise((resolve) =>
-      window.setTimeout(resolve, Math.min(CONFIRMATION_POLL_INTERVAL_MS, remainingMs)),
+      globalThis.setTimeout(resolve, Math.min(CONFIRMATION_POLL_INTERVAL_MS, remainingMs)),
     );
   }
 
@@ -232,52 +351,21 @@ export async function submitVaultDeposit(
   const amountStroops = toUsdcStroops(amount);
   validateConfiguration();
 
-  let connection;
-  try {
-    connection = await isConnected();
-  } catch {
-    connection = { isConnected: false };
-  }
-
-  if (!connection.isConnected) {
+  validateUsdcConfiguration();
+  const address = await getWalletAddress();
+  const trustline = await hasUsdcTrustline(address);
+  if (trustline === "missing" || trustline === "unfunded-account") {
     throw new WalletServiceError(
-      "WALLET_UNAVAILABLE",
-      "Freighter is not installed or available in this browser.",
+      trustline === "missing" ? "TRUSTLINE_MISSING" : "UNFUNDED_ACCOUNT",
+      trustline === "missing"
+        ? "Add a USDC trustline before depositing."
+        : "Fund this Stellar account with XLM before depositing.",
     );
   }
-
-  let access;
-  try {
-    access = await requestAccess();
-  } catch (error) {
-    throwWalletError(error);
-  }
-  if (access.error) throwWalletError(access.error);
-  if (!access.address) {
-    throw new WalletServiceError(
-      "WALLET_UNAVAILABLE",
-      "Freighter did not provide an account address. Connect an account and try again.",
-    );
-  }
-
-  let walletNetwork;
-  try {
-    walletNetwork = await getNetwork();
-  } catch (error) {
-    throwWalletError(error);
-  }
-  if (walletNetwork.error) throwWalletError(walletNetwork.error);
-  if (walletNetwork.networkPassphrase !== STELLAR_NETWORK_PASSPHRASE) {
-    throw new WalletServiceError(
-      "NETWORK_MISMATCH",
-      `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[STELLAR_NETWORK]} and try again.`,
-    );
-  }
-
   const server = createRpcServer();
   let sourceAccount;
   try {
-    sourceAccount = await server.getAccount(access.address);
+    sourceAccount = await server.getAccount(address);
   } catch (error) {
     throw mapRpcError(error);
   }
@@ -289,7 +377,7 @@ export async function submitVaultDeposit(
     .addOperation(
       new Contract(STELLAR_VAULT_CONTRACT_ID).call(
         "deposit",
-        new Address(access.address).toScVal(),
+        new Address(address).toScVal(),
         nativeToScVal(amountStroops, { type: "i128" }),
       ),
     )
@@ -307,13 +395,13 @@ export async function submitVaultDeposit(
   try {
     signature = await signTransaction(preparedTransaction.toXDR(), {
       networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
-      address: access.address,
+      address,
     });
   } catch (error) {
     throwWalletError(error);
   }
   if (signature.error) throwWalletError(signature.error);
-  if (!signature.signedTxXdr || signature.signerAddress !== access.address) {
+  if (!signature.signedTxXdr || signature.signerAddress !== address) {
     throw new WalletServiceError(
       "WALLET_ERROR",
       "Freighter did not sign the deposit with the connected account.",

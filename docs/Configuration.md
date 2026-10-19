@@ -63,6 +63,25 @@ in development, because a silently wrong network is worse than a loud warning.
 Resolve it through `resolveStellarNetwork()` rather than reading the raw
 variable.
 
+### `VITE_STELLAR_USDC_ISSUER`
+
+Classic issuer public key for the `USDC` asset backing the configured vault's
+Stellar Asset Contract. On testnet, the default is
+`GDXDZNSTNORCX4373EGGYS4Q3U3XVZMBSIMMRHG5S5GCCF7JHC7QZWAZ`, backing token
+`CAC7CFZ42L3LTTZCI4C3XI6UF7AHS2PYTNJ5QEG2PSLRGDGMWRQOZOT5`.
+Override it only with the issuer used by the vault on the selected network.
+Mainnet and futurenet require an explicit issuer; they do not inherit the
+testnet issuer. Surrounding whitespace is trimmed. An invalid or explicitly
+empty key produces a configuration error before a trustline lookup or signature
+request. Validation uses `StrKey.isValidEd25519PublicKey`.
+
+`STELLAR_USDC_ASSET` exports `{ code: "USDC", issuer }`.
+`STELLAR_USDC_CONFIGURATION_ERROR` exposes validation failures to the modal.
+`STELLAR_HORIZON_URL` follows `STELLAR_NETWORK`: testnet uses
+`https://horizon-testnet.stellar.org`, mainnet uses `https://horizon.stellar.org`,
+and futurenet uses `https://horizon-futurenet.stellar.org`.
+See [Deposit flow](Deposit-Flow.md) for the trustline and funding steps.
+
 ### `VITE_DEV_API_PROXY_TARGET`
 
 Where the dev server forwards `/api` requests. Default:
@@ -124,6 +143,9 @@ relative is what makes that work without a rebuild per environment.
 | `STELLAR_NETWORK_PASSPHRASE` | passphrase for `STELLAR_NETWORK`, used to sign deposits |
 | `STELLAR_RPC_URL` | `VITE_STELLAR_RPC_URL`, else the network's public RPC (none for mainnet) |
 | `STELLAR_VAULT_CONTRACT_ID` | `VITE_STELLAR_VAULT_CONTRACT_ID`, empty by default |
+| `STELLAR_USDC_ASSET` | classic USDC code and validated configured issuer |
+| `STELLAR_USDC_CONFIGURATION_ERROR` | invalid/missing issuer configuration error, otherwise `null` |
+| `STELLAR_HORIZON_URL` | Horizon origin for `STELLAR_NETWORK` |
 | `ENABLE_DEMO_OUTCOME` | `VITE_ENABLE_DEMO_OUTCOME === "true"` on the dev server only |
 | `EXPLORER_BASE_URL` | stellar.expert transaction URL for `STELLAR_NETWORK` |
 
