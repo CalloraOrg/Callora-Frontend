@@ -607,3 +607,67 @@ describe('BillingHistory — column sorting', () => {
     expect(amountTh?.getAttribute('aria-sort')).toBe('descending');
   });
 });
+
+// ── Responsive layout (issue #1320) ───────────────────────────────────────────
+
+const MOBILE_QUERY = '(max-width: 639px)';
+const originalMatchMedia = window.matchMedia;
+
+/** Make window.matchMedia report a phone-width or desktop-width viewport. */
+function setViewport(mode: 'mobile' | 'desktop') {
+  window.matchMedia = ((query: string) => ({
+    matches: mode === 'mobile' && query === MOBILE_QUERY,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+describe('BillingHistory — responsive layout', () => {
+  afterEach(() => {
+    cleanup();
+    _reset();
+    window.matchMedia = originalMatchMedia;
+  });
+
+  it('mobile: renders a card list and no table', () => {
+    setViewport('mobile');
+    renderBH();
+    expect(screen.getByRole('list', { name: /billing transactions/i })).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('desktop: renders the table and no card list', () => {
+    setViewport('desktop');
+    renderBH();
+    expect(screen.getByRole('table')).toBeTruthy();
+    expect(screen.queryByRole('list', { name: /billing transactions/i })).toBeNull();
+  });
+});
+
+describe('BillingHistory — mobile cards', () => {
+  afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
+
+  function getCards() {
+    return within(screen.getByRole('list', { name: /billing transactions/i })).getAllByRole('listitem');
+  }
+
+  it('renders one card per transaction', () => {
+    setViewport('mobile');
+    renderBH();
+    expect(getCards()).toHaveLength(MOCK_TRANSACTIONS.length);
+  });
+
+  it('each card has a heading and a signed amount', () => {
+    setViewport('mobile');
+    renderBH();
+    const [credit, debit] = getCards();
+    expect(within(credit).getByRole('heading', { name: MOCK_TRANSACTIONS[0].description })).toBeTruthy();
+    expect(within(credit).getByText(/^\+/)).toBeTruthy();
+    expect(within(debit).getByText(/^\u2212/)).toBeTruthy();
+  });
+});

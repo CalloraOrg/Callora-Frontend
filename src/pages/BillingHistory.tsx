@@ -29,6 +29,8 @@ import StatusBadge, { type StatusVariant } from '../components/StatusBadge';
 import { formatUsdcAmount, formatDateShort, resolveTimeZone } from '../utils/format';
 import { useAccountContext } from '../hooks/useAccountContext';
 import './BillingHistory.css';
+import TransactionCard from '../components/TransactionCard';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -170,6 +172,9 @@ const TX_STATUS_LABELS: Record<TxStatus, string> = {
 const ALL_TYPES: TxType[] = ['Deposit', 'API Call', 'Refund', 'Settlement', 'Fee'];
 const ALL_STATUSES: TxStatus[] = ['success', 'pending', 'error', 'warning'];
 
+/** Below this width transactions render as cards instead of a table. */
+const MOBILE_QUERY = '(max-width: 639px)';
+
 // Valid URL parameter values for sort column and direction.
 export type SortColumn = 'date' | 'amount';
 export type SortDirection = 'asc' | 'desc';
@@ -215,6 +220,7 @@ function txToPreviewData(tx: BillingTransaction): PreviewCardData {
 
 export function BillingHistory() {
   const { timezone } = useAccountContext();
+  const isMobile = useMediaQuery(MOBILE_QUERY);
   const dateZone = resolveTimeZone(timezone);
   const zoneAbbreviation = new Intl.DateTimeFormat(undefined, {
     timeZone: dateZone,
@@ -424,6 +430,18 @@ export function BillingHistory() {
         <div role="status" className="bh-empty">
           No transactions match the current filters.
         </div>
+      ) : isMobile ? (
+        <ul className="bh-card-list" aria-label="Billing transactions">
+          {filteredTxs.map((tx) => (
+            <TransactionCard
+              key={tx.id}
+              tx={tx}
+              dateText={formatDateShort(tx.timestamp, undefined, dateZone)}
+              statusLabel={TX_STATUS_LABELS[tx.status]}
+              onDetails={() => undefined}
+            />
+          ))}
+        </ul>
       ) : (
         <div className="bh-table-wrap">
           <table className="bh-table" aria-label="Billing transaction history"
