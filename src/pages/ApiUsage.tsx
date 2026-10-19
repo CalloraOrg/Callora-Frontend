@@ -28,6 +28,7 @@ import {
   type HistoryEntry,
 } from "../state/testCallHistory";
 import { copySnapshotUrl, parseSnapshotUrl } from "../utils/snapshotUrl";
+import { authFetch } from "../services/authFetch";
 
 type ApiEndpoint = {
   id: string;
@@ -330,9 +331,8 @@ export default function ApiUsage() {
 
     Promise.resolve()
       .then(() =>
-        fetch("/api/usage?groupBy=day&limit=100", {
+        authFetch("/api/usage?groupBy=day&limit=100", {
           method: "GET",
-          credentials: "same-origin",
           headers: { Accept: "application/json" },
           signal: controller.signal,
         }),

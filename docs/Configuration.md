@@ -188,3 +188,109 @@ fetch(apiUrl("/marketplace")); // "/marketplace" locally, absolute when configur
 
 - [`README.md`](../README.md) — setup and scripts
 - [`.env.example`](../.env.example) — copy-paste template
+
+## Session model (wallet sign-in)
+
+Callora uses wallet-based authentication via Freighter and the backend
+`POST /api/auth/wallet` endpoint. This section explains the token lifecycle,
+storage decisions, and the automatic refresh flow.
+
+### Sign-in sequence
+
+```
+Browser                    Freighter             Callora API
+   |                           |                     |
+   | requestAccess()           |                     |
+   |-------------------------->|                     |
+   |<----- address ------------|                     |
+   |                           |                     |
+   | signMessage(challenge)    |                     |
+   |   challenge includes:     |                     |
+   |   • app origin            |                     |
+   |   • wallet address        |                     |
+   |   • ISO timestamp         |                     |
+   |   • expiry (+5 min)       |                     |
+   |   • random nonce          |                     |
+   |-------------------------->|                     |
+   |<----- signedMessage ------|                     |
+   |                           |                     |
+   | POST /api/auth/wallet     |                     |
+   |   { walletAddress,        |                     |
+   |     signature,            |                     |
+   |     message }             |                     |
+   |---------------------------------------------->  |
+   |<-- { accessToken,         |                     |
+   |       refreshToken }------|---------------------|
+   |                           |                     |
+   | store tokens (see below)  |                     |
+```
+
+The signed challenge binds the signature to:
+- **App origin** — a signature captured on `attacker.com` cannot be replayed
+  on `callora.org`.
+- **Expiry** — the backend can reject challenges older than 5 minutes.
+- **Nonce** — two sign-ins at the same second produce different messages.
+
+### Token storage
+
+| Token | Storage | Rationale |
+|---|---|---|
+| Access token | Module-level variable (in memory only) | Never written to any browser storage. Survives page navigation within the SPA; cleared on page reload. |
+| Refresh token | `sessionStorage` | Survives navigation and back/forward cache; cleared when the tab is closed. Guarded with `try/catch` so blocked storage (private browsing, full quota) degrades gracefully. |
+
+**Why not `localStorage`?** Tokens in `localStorage` persist until explicitly
+deleted and are accessible to any script running on the same origin (e.g.
+through an XSS). `sessionStorage` is scoped to the tab and cleared when it
+closes, which is a meaningful reduction in exposure.
+
+**Why not `httpOnly` cookies?** An `httpOnly` cookie is the most secure option
+because it is inaccessible to JavaScript entirely. The backend does not yet set
+one (`authController.ts` TODO). Once the backend adds `Set-Cookie:
+callora-rt=...; HttpOnly; Secure; SameSite=Strict`, the frontend should:
+
+1. Remove the `sessionStorage` write in `authService.ts`.
+2. Remove the `refreshToken` field from the JSON body sent to `/api/auth/refresh`.
+3. Drop the `clearRefreshToken()` call in `signOut` (the cookie clears via `/api/auth/revoke`).
+
+### Refresh and retry sequence
+
+```
+authFetch("/api/usage", init)
+    │
+    ├── fetch(url, { Authorization: Bearer <token> })
+    │       │
+    │   [200] ──────────────────────────────────────> return response
+    │       │
+    │   [401] ──> ensureRefresh()   ← shared across concurrent calls
+    │               │
+    │           POST /api/auth/refresh
+    │               │
+    │           [200] new accessToken ─> retry fetch
+    │               │                       │
+    │           [401/5xx] ──> signOut()     │
+    │                       signalExpiry()   │
+    │                       reject           │
+    │                                       │
+    │                             [200] ──> return response
+    │                             [401] ──> signOut() + signalExpiry() + return 401
+```
+
+Key properties:
+- **Single-flight refresh.** Three concurrent 401s share one `POST /api/auth/refresh`.
+  The second and third calls await the promise started by the first.
+- **Abort propagation.** An `AbortSignal` passed to `authFetch` is forwarded to
+  both the initial request and the retry; it is checked before starting the
+  retry as well, so a cancelled caller never triggers an unnecessary network request.
+- **Session-expired event.** When the refresh itself fails, `signalExpiry()` is
+  called, which `useSessionExpiry` subscribes to. `AppSessionExpiryBanner` in
+  `App.tsx` renders `SessionExpiryBanner` when the session is expired.
+
+### Relevant source files
+
+| File | Purpose |
+|---|---|
+| `src/services/authService.ts` | `signIn`, `signOut`, `getAccessToken`, `refreshAccessToken` |
+| `src/services/authFetch.ts` | `authFetch` with single-flight refresh |
+| `src/services/sessionExpiry.ts` | Signal bus for session expiry events |
+| `src/hooks/useSessionExpiry.ts` | React hook wrapping the signal bus |
+| `src/components/SessionExpiryBanner.tsx` | UI banner shown on expiry |
