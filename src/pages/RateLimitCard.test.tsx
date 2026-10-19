@@ -1,18 +1,22 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import RateLimitCard from "./RateLimitCard";
+import RateLimitCard, { type RateLimitCardProps } from "./RateLimitCard";
 
 /**
  * RateLimitCard tests – issue #567 (GrantFox FWC26 "Stellar Wave")
+ * and mobile responsive stacked plan cards.
  *
  * Covers:
- *  1. Page structure and accessibility
- *  2. Breadcrumb presence and middle-ellipsis truncation
- *  3. Rate-limit table content
- *  4. Color-blind safe patterns on plan badges
+ *  1. Mobile layout: four plan cards, no table
+ *  2. Desktop layout: table with four body rows
+ *  3. currentPlan prop: badge and aria-current on card or row
+ *  4. Numbers: non-breaking tabular-nums span
+ *  5. Pattern text: exposed to assistive tech
+ *  6. Style injection: no inline <style> tag rendered by component
+ *  7. Breadcrumb presence and middle-ellipsis truncation
  */
 
 /** Expected pattern class for each plan. */
@@ -23,10 +27,31 @@ const PLAN_PATTERN_CLASSES: Record<string, string> = {
   Enterprise: "enterprise",
 };
 
-function renderPage() {
+/**
+ * Forces `window.matchMedia("(max-width: 639px)")` to report a match so the
+ * component renders its mobile card layout.
+ */
+function mockViewport(isMobile: boolean) {
+  const original = window.matchMedia;
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: isMobile,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+  return () => {
+    window.matchMedia = original;
+  };
+}
+
+function renderPage(props?: RateLimitCardProps) {
   return render(
     <MemoryRouter>
-      <RateLimitCard />
+      <RateLimitCard {...props} />
     </MemoryRouter>,
   );
 }
@@ -120,11 +145,20 @@ describe("RateLimitCard", () => {
     });
   });
 
-  // ── Rate-limit table ──────────────────────────────────────────────────────
+  // ── Rate-limit table (Desktop) ────────────────────────────────────────────
 
   it("renders the rate-limit tier table", () => {
     renderPage();
     expect(screen.getByRole("table", { name: /rate limit tiers/i })).toBeTruthy();
+  });
+
+  it("renders the table with four body rows on desktop viewports", () => {
+    const { container } = renderPage();
+    const table = screen.getByRole("table", { name: /rate limit tiers/i });
+    expect(table).toBeTruthy();
+    const rows = container.querySelectorAll("tbody tr");
+    expect(rows.length).toBe(4);
+    expect(container.querySelectorAll(".rate-limit-plan-card").length).toBe(0);
   });
 
   it("shows all four plan tiers", () => {
@@ -149,7 +183,80 @@ describe("RateLimitCard", () => {
     ).toBeTruthy();
   });
 
-  // ── Color-blind safe patterns ─────────────────────────────────────────────
+  // ── Mobile Plan Cards ─────────────────────────────────────────────────────
+
+  it("renders four plan cards and no table on mobile viewports (< 640px)", () => {
+    const restore = mockViewport(true);
+    try {
+      const { container } = renderPage();
+      expect(screen.queryByRole("table")).toBeNull();
+      const cards = container.querySelectorAll(".rate-limit-plan-card");
+      expect(cards.length).toBe(4);
+      for (const plan of ["Free", "Developer", "Pro", "Enterprise"]) {
+        expect(screen.getByText(plan)).toBeTruthy();
+      }
+    } finally {
+      restore();
+    }
+  });
+
+  // ── Current Plan ──────────────────────────────────────────────────────────
+
+  it("marks the specified currentPlan row with 'Current plan' badge and aria-current on desktop", () => {
+    const { container } = renderPage({ currentPlan: "Pro" });
+    const currentRow = container.querySelector('tbody tr[aria-current="true"]');
+    expect(currentRow).not.toBeNull();
+    expect(currentRow?.textContent).toContain("Pro");
+    expect(currentRow?.textContent).toContain("Current plan");
+
+    const nonCurrentRows = container.querySelectorAll('tbody tr:not([aria-current="true"])');
+    expect(nonCurrentRows.length).toBe(3);
+    for (const row of Array.from(nonCurrentRows)) {
+      expect(row.textContent).not.toContain("Current plan");
+    }
+  });
+
+  it("marks the specified currentPlan card with 'Current plan' badge and aria-current on mobile", () => {
+    const restore = mockViewport(true);
+    try {
+      const { container } = renderPage({ currentPlan: "Pro" });
+      const currentCard = container.querySelector('.rate-limit-plan-card[aria-current="true"]');
+      expect(currentCard).not.toBeNull();
+      expect(currentCard?.textContent).toContain("Pro");
+      expect(currentCard?.textContent).toContain("Current plan");
+
+      const nonCurrentCards = container.querySelectorAll('.rate-limit-plan-card:not([aria-current="true"])');
+      expect(nonCurrentCards.length).toBe(3);
+      for (const card of Array.from(nonCurrentCards)) {
+        expect(card.textContent).not.toContain("Current plan");
+      }
+    } finally {
+      restore();
+    }
+  });
+
+  // ── Numbers ───────────────────────────────────────────────────────────────
+
+  it("renders numbers like 6,000 inside a single non-breaking tabular-nums span on desktop", () => {
+    renderPage();
+    const span = screen.getByText("6,000");
+    expect(span.tagName).toBe("SPAN");
+    expect(span.classList.contains("rate-limit-number")).toBe(true);
+  });
+
+  it("renders numbers like 6,000 inside a single non-breaking tabular-nums span on mobile dl", () => {
+    const restore = mockViewport(true);
+    try {
+      renderPage();
+      const span = screen.getByText("6,000");
+      expect(span.tagName).toBe("SPAN");
+      expect(span.classList.contains("rate-limit-number")).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
+  // ── Color-blind safe patterns & Pattern text ──────────────────────────────
 
   it.each(["Free", "Developer", "Pro", "Enterprise"])(
     `%s badge has a distinct pattern class for color-blind safety`,
@@ -168,5 +275,32 @@ describe("RateLimitCard", () => {
       const badge = screen.getByText(plan);
       expect(badge.getAttribute("data-pattern")).toBeTruthy();
     }
+  });
+
+  it("each plan exposes its pattern description to assistive tech on desktop", () => {
+    renderPage();
+    for (const desc of ["solid baseline", "dot pattern", "diagonal stripes", "crosshatch pattern"]) {
+      expect(screen.getByText(desc)).toBeTruthy();
+    }
+  });
+
+  it("each plan exposes its pattern description to assistive tech on mobile", () => {
+    const restore = mockViewport(true);
+    try {
+      renderPage();
+      for (const desc of ["solid baseline", "dot pattern", "diagonal stripes", "crosshatch pattern"]) {
+        expect(screen.getByText(desc)).toBeTruthy();
+      }
+    } finally {
+      restore();
+    }
+  });
+
+  // ── Style injection ───────────────────────────────────────────────────────
+
+  it("renders no inline <style> element directly within the rate-limit page", () => {
+    const { container } = renderPage();
+    const pageStyle = container.querySelector(".rate-limit-page > style");
+    expect(pageStyle).toBeNull();
   });
 });
