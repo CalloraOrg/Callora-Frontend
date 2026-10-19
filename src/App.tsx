@@ -16,6 +16,8 @@ import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { useAccountContext } from "./hooks/useAccountContext";
+import WalletStatus from "./components/WalletStatus";
+import { useWalletStore } from "./state/walletStore";
 
 // Route splitting: dynamic imports for all heavy page routes
 const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
@@ -326,6 +328,7 @@ function LandingPage({ onStartUsingApis, onPublishApi, onTakeTour }: { onStartUs
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  const wallet = useWalletStore();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
@@ -693,6 +696,7 @@ function App() {
               ))}
             </nav>
             <AccountSwitcher />
+            <WalletStatus />
             <ThemeToggle />
           </div>
         </header>
@@ -709,7 +713,7 @@ function App() {
 
             <Route path={APP_ROUTES.onboarding} element={<OnboardingTour onComplete={() => navigate(APP_ROUTES.dashboard)} />} />
 
-            <Route path={APP_ROUTES.dashboard} element={<DashboardPage vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
+            <Route path={APP_ROUTES.dashboard} element={<DashboardPage vaultBalance={vaultBalance} walletBalance={walletBalance} walletAddress={wallet.address} walletNetworkPassphrase={wallet.networkPassphrase} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
 
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />

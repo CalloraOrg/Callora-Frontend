@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     sendTransaction: vi.fn(),
     getTransaction: vi.fn(),
   },
+  walletSnapshot: vi.fn(() => ({ isNetworkMismatch: false })),
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -34,6 +35,9 @@ vi.mock("@stellar/stellar-sdk", async (importOriginal) => {
     }
   } } };
 });
+vi.mock("../state/walletStore", () => ({
+  walletStore: { getSnapshot: mocks.walletSnapshot },
+}));
 vi.mock("../config/constants", async (importOriginal) => ({
   ...await importOriginal<typeof import("../config/constants")>(),
   STELLAR_NETWORK: "testnet",
@@ -56,6 +60,7 @@ import {
 describe("walletService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.walletSnapshot.mockReturnValue({ isNetworkMismatch: false });
     mocks.configurationError = null;
     vi.stubGlobal("fetch", mocks.fetch);
     mocks.fetch.mockReset().mockResolvedValue({
@@ -86,6 +91,16 @@ describe("walletService", () => {
     mocks.isConnected.mockResolvedValue({ isConnected: false });
 
     await expect(isWalletAvailable()).resolves.toBe(false);
+  });
+
+  it("fails fast when the wallet store already knows the network is wrong", async () => {
+    mocks.walletSnapshot.mockReturnValue({ isNetworkMismatch: true });
+
+    await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+      code: "NETWORK_MISMATCH",
+    });
+    expect(mocks.requestAccess).not.toHaveBeenCalled();
+    expect(mocks.server.getAccount).not.toHaveBeenCalled();
   });
 
   it("signs, submits, and waits for the network hash to confirm", async () => {

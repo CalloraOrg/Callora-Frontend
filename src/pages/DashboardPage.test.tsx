@@ -88,6 +88,20 @@ describe('DashboardPage — document title, meta wiring, and prop forwarding (#1
     expect(screen.getByText('500.50 USDC')).toBeTruthy();
   });
 
+  it('shows the connected wallet network instead of a hardcoded public network', () => {
+    renderDashboardPage({
+      walletAddress: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+      walletNetworkPassphrase: 'Public Global Stellar Network ; September 2015',
+    });
+
+    const walletCard = screen.getByTestId('dashboard-card-wallet');
+    fireEvent.mouseEnter(walletCard.closest('.preview-card__wrapper')!);
+    expect(
+      screen.getByText('Freighter Stellar Wallet (Mainnet) · GAAAA…AWHF'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Freighter Stellar Wallet (Public Net)')).not.toBeInTheDocument();
+  });
+
   it('forwards openDeposit prop and invokes it from primary deposit action', () => {
     const handleDeposit = vi.fn();
     renderDashboardPage({

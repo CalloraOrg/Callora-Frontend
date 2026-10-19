@@ -27,6 +27,7 @@ import {
   STELLAR_VAULT_CONTRACT_ID,
   type StellarNetwork,
 } from "../config/constants";
+import { walletStore } from "../state/walletStore";
 
 const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
   mainnet: "Mainnet",
@@ -348,6 +349,13 @@ export async function submitVaultDeposit(
   amount: string | number,
   onSubmitted?: OnSubmitted,
 ): Promise<SubmittedDeposit> {
+  if (walletStore.getSnapshot().isNetworkMismatch) {
+    throw new WalletServiceError(
+      "NETWORK_MISMATCH",
+      `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[STELLAR_NETWORK]} and try again.`,
+    );
+  }
+
   const amountStroops = toUsdcStroops(amount);
   validateConfiguration();
 

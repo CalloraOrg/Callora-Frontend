@@ -37,6 +37,18 @@ const walletMocks = vi.hoisted(() => ({
 
 vi.mock("@stellar/freighter-api", () => ({
   isConnected: async () => ({ isConnected: true }),
+  isAllowed: async () => ({ isAllowed: true }),
+  getAddress: async () => ({ address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }),
+  getNetworkDetails: async () => ({
+    network: "TESTNET",
+    networkPassphrase: "Test SDF Network ; September 2015",
+  }),
+  WatchWalletChanges: class {
+    watch() {
+      return {};
+    }
+    stop() {}
+  },
   requestAccess: async () => ({ address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }),
   getNetwork: async () => ({ networkPassphrase: "Test SDF Network ; September 2015" }),
   signTransaction: walletMocks.signTransaction,

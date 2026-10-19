@@ -26,6 +26,7 @@ import { useAccountId } from '../hooks/useAccount';
 import { useRecentActivity } from '../hooks/useRecentActivity';
 import MOCK_APIS from '../data/mockApis';
 import '../components/Dashboard.css';
+import { getWalletNetworkLabel } from '../state/walletStore';
 
 export interface DashboardOverviewProps {
   /** Current Vault balance in USDC */
@@ -36,6 +37,9 @@ export interface DashboardOverviewProps {
   costPerCall?: number;
   /** Average daily API calls */
   callsPerDay?: number;
+  /** Connected Freighter address and network details */
+  walletAddress?: string | null;
+  walletNetworkPassphrase?: string | null;
   /** Callback fired when user triggers deposit flow */
   openDeposit?: (presetAmount?: number) => void;
   /** Optional custom class name */
@@ -50,6 +54,8 @@ export function DashboardOverview({
   walletBalance = 450.0,
   costPerCall = 0.005,
   callsPerDay = 120,
+  walletAddress = null,
+  walletNetworkPassphrase = null,
   openDeposit = () => {},
   className = '',
 }: DashboardOverviewProps) {
@@ -91,7 +97,9 @@ export function DashboardOverview({
   const walletPreviewData: PreviewCardData = {
     id: 'wallet-overview',
     title: 'Connected Wallet',
-    subtitle: 'Freighter Stellar Wallet (Public Net)',
+    subtitle: walletAddress
+      ? `Freighter Stellar Wallet (${getWalletNetworkLabel(walletNetworkPassphrase)}) · ${walletAddress.slice(0, 5)}…${walletAddress.slice(-4)}`
+      : 'Freighter Stellar Wallet (Not connected)',
     description: 'Instant deposit source for refilling Callora Vault reserve balances.',
     metrics: [
       { label: 'Wallet Balance', value: `${formatUsdc(walletBalance)} USDC` },
