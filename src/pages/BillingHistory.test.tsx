@@ -19,7 +19,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountProvider } from '../hooks/useAccountContext';
 import { addAccount, switchAccount, _reset } from '../state/accountStore';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { BillingHistory, MOCK_TRANSACTIONS } from './BillingHistory';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -733,5 +733,88 @@ describe('BillingHistory — details sheet actions', () => {
     expect(dialog).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: /copy/i }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(sheetTx.txHash));
+  });
+});
+
+// ── Mobile sort & filters (issue #1320) ───────────────────────────────────────
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="loc">{location.search}</output>;
+}
+
+const sortSelect = () =>
+  screen.queryByRole('combobox', { name: /sort/i }) as HTMLSelectElement | null;
+const cardIds = () =>
+  within(screen.getByRole('list', { name: /billing transactions/i }))
+    .getAllByRole('listitem')
+    .map((li) => li.getAttribute('data-testid'));
+
+describe('BillingHistory — mobile sort select', () => {
+  afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
+
+  it('mobile: shows one sort select', () => {
+    setViewport('mobile');
+    renderBH();
+    expect(sortSelect()).toBeTruthy();
+  });
+
+  it('desktop: has no sort select (the headers sort instead)', () => {
+    setViewport('desktop');
+    renderBH();
+    expect(sortSelect()).toBeNull();
+  });
+});
+
+describe('BillingHistory — mobile sort behaviour', () => {
+  afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
+
+  it('choosing an option reorders the cards and writes sort/dir to the URL', () => {
+    setViewport('mobile');
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <BillingHistory />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+    fireEvent.change(sortSelect() as HTMLSelectElement, { target: { value: 'amount:desc' } });
+    const expected = [...MOCK_TRANSACTIONS]
+      .sort((a, b) => b.amount - a.amount)
+      .map((t) => `bh-card-${t.id}`);
+    expect(cardIds()).toEqual(expected);
+    const params = new URLSearchParams(screen.getByTestId('loc').textContent ?? '');
+    expect(params.get('sort')).toBe('amount');
+    expect(params.get('dir')).toBe('desc');
+  });
+
+  it('the select reflects a pre-seeded URL sort', () => {
+    setViewport('mobile');
+    renderBH(['/?sort=date&dir=asc']);
+    expect((sortSelect() as HTMLSelectElement).value).toBe('date:asc');
+  });
+});
+
+describe('BillingHistory — filters on mobile', () => {
+  afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
+
+  function filteredCount(mode: 'mobile' | 'desktop') {
+    setViewport(mode);
+    const view = renderBH();
+    fireEvent.change(screen.getByRole('combobox', { name: /filter by transaction type/i }), {
+      target: { value: 'Deposit' },
+    });
+    const count =
+      mode === 'mobile'
+        ? cardIds().length
+        : within(screen.getByRole('table')).getAllByRole('row').length - 1;
+    view.unmount();
+    return count;
+  }
+
+  it('the same filter shows the same number of transactions as on desktop', () => {
+    const mobile = filteredCount('mobile');
+    const desktop = filteredCount('desktop');
+    expect(mobile).toBe(desktop);
+    expect(mobile).toBe(MOCK_TRANSACTIONS.filter((t) => t.type === 'Deposit').length);
   });
 });

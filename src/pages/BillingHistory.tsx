@@ -33,6 +33,7 @@ import TransactionCard from '../components/TransactionCard';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import BottomSheet from '../components/BottomSheet';
 import { TransactionDetails } from '../components/TransactionDetails';
+import BillingSortSelect from '../components/BillingSortSelect';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -246,21 +247,22 @@ export function BillingHistory() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { column: sortColumn, direction: sortDirection } = parseSortParams(searchParams);
 
-  /** Toggle sort: same column flips direction; new column starts asc. */
-  function handleSort(col: SortColumn) {
+  /** Write an explicit sort to the URL (shared by the column headers and the mobile select). */
+  function applySort(col: SortColumn, dir: SortDirection) {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (sortColumn === col) {
-          next.set('dir', sortDirection === 'asc' ? 'desc' : 'asc');
-        } else {
-          next.set('sort', col);
-          next.set('dir', 'asc');
-        }
+        next.set('sort', col);
+        next.set('dir', dir);
         return next;
       },
       { replace: true },
     );
+  }
+
+  /** Toggle sort: same column flips direction; new column starts asc. */
+  function handleSort(col: SortColumn) {
+    applySort(col, sortColumn === col && sortDirection === 'asc' ? 'desc' : 'asc');
   }
 
   /** aria-sort value for a given column header. */
@@ -409,6 +411,9 @@ export function BillingHistory() {
             <option value="debit">Debit</option>
           </select>
         </label>
+        {isMobile && (
+          <BillingSortSelect column={sortColumn} direction={sortDirection} onChange={applySort} />
+        )}
       </div>
 
       {/* ── Summary strip ────────────────────────────────────────────────── */}
