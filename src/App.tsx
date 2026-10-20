@@ -33,7 +33,7 @@ const RateLimitCard = lazy(() => import("./pages/RateLimitCard"));
 const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
 const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
-const InvoiceCard = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.InvoiceCard })));
+const BillingInvoiceSection = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.BillingInvoiceSection })));
 
 // Prefetch cache map to ensure modules are loaded on hover / focus without delaying critical interaction
 const routePrefetchers: Record<string, () => Promise<any>> = {
@@ -751,7 +751,7 @@ function App() {
                       </article>
                     </div>
 
-                    <InvoiceCard invoiceNumber="INV-1001" amountDue="$4,200" dueDate="Due in 7 days" />
+                    <BillingInvoiceSection onPay={() => openDeposit()} />
 
                     <div className="info-row">
                       <div className="info-card">

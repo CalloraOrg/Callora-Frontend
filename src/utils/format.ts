@@ -96,6 +96,61 @@ export function formatUsdcAmount(value: number, locale?: string): string {
 }
 
 /**
+ * Format a decimal string (e.g. Prisma `Decimal(20,7)` serialised as `"12.3456789"`)
+ * as a USDC display string without passing through `parseFloat`, keeping up to all
+ * 7 fractional digits exact and never adding a `$` sign.
+ *
+ * - Keeps at least 2 decimal places (`"42"` → `"42.00 USDC"`, `"42.5000000"` → `"42.50 USDC"`).
+ * - Preserves all significant fractional digits up to `USDC_DECIMALS` (7)
+ *   (`"12.3456789"` → `"12.3456789 USDC"`).
+ * - Formats integer grouping and decimal separator according to `locale`.
+ *
+ * @example formatUsdcDecimal("12.3456789")       // "12.3456789 USDC"
+ * @example formatUsdcDecimal("42.5000000")       // "42.50 USDC"
+ * @example formatUsdcDecimal("1234.5", "en-US")  // "1,234.50 USDC"
+ */
+export function formatUsdcDecimal(
+  decimalString: string,
+  options?: { locale?: string; includeUnit?: boolean },
+): string {
+  const raw = String(decimalString ?? "").trim();
+  const includeUnit = options?.includeUnit ?? true;
+  const suffix = includeUnit ? " USDC" : "";
+
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(raw);
+  if (!match) {
+    return `${raw}${suffix}`;
+  }
+
+  const sign = match[1] ?? "";
+  const intDigits = match[2].replace(/^0+(?=\d)/, "");
+  const rawFrac = (match[3] ?? "").slice(0, USDC_DECIMALS);
+
+  // Strip trailing zeros beyond 2 decimal places, and pad to at least 2 decimal places.
+  const trimmedFrac = rawFrac.replace(/0+$/, "");
+  const fracDigits = trimmedFrac.length < 2 ? trimmedFrac.padEnd(2, "0") : trimmedFrac;
+
+  const loc = resolveLocale(options?.locale);
+  let formattedInt = intDigits;
+  let decimalSep = ".";
+
+  try {
+    const nf = new Intl.NumberFormat(loc, { maximumFractionDigits: 0 });
+    formattedInt = nf.format(BigInt(intDigits));
+    const sepPart = new Intl.NumberFormat(loc, { minimumFractionDigits: 1 })
+      .formatToParts(1.1)
+      .find((p) => p.type === "decimal");
+    if (sepPart?.value) {
+      decimalSep = sepPart.value;
+    }
+  } catch {
+    formattedInt = intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  return `${sign}${formattedInt}${decimalSep}${fracDigits}${suffix}`;
+}
+
+/**
  * Format an integer count with locale-aware thousand separators.
  *
  * @example formatCount(1234567)      // "1,234,567"  (en-US)
