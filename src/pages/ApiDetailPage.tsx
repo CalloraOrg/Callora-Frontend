@@ -1251,6 +1251,7 @@ export default function ApiDetailPage({ onBack }: Props) {
                       <span style={{ fontSize: 14, color: "var(--muted)" }}>Status</span>
                       <StatusBadge status={apiStatusToVariant(api.status)} />
                     </div>
+                    <a href={`/marketplace/${encodeURIComponent(api.id)}/rate-limits`} style={{ fontSize: "var(--mkt-font-size-tag)" }}>View rate limits</a>
                   </div>
                 </div>
 

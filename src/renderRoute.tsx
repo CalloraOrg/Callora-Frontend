@@ -22,6 +22,7 @@ import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
 import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
 import LatencyChart from "./pages/LatencyChart";
 import StandaloneShell from "./components/StandaloneShell";
+import { isMarketplaceSubpage } from "./routeMatchers";
 
 /**
  * The slice of a React 18 root that routing needs. Keeping it structural lets
@@ -66,7 +67,7 @@ export async function renderRoute(
     return;
   }
 
-  if (pathname.startsWith("/marketplace") && !pathname.endsWith("/sla")) {
+  if (pathname.startsWith("/marketplace") && !isMarketplaceSubpage(pathname)) {
     startRouteLoading();
     root.render(wrap(<StandaloneShell><MarketplacePageSkeleton /></StandaloneShell>));
     const mod = await import("./pages/MarketplacePage");

@@ -1,92 +1,30 @@
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import Breadcrumb from "../components/Breadcrumb";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import { fetchCatalog } from "../api/catalogApi";
+import type { APIItem } from "../data/mockApis";
 
 /**
- * RateLimitCard – GrantFox FWC26 campaign "Stellar Wave" (issue #567)
+ * RateLimitCard – per-API rate limits at `/marketplace/:apiId/rate-limits`.
  *
- * Displays rate-limit configuration for a deeply nested API endpoint.
- * The breadcrumb path intentionally contains long segment names to exercise
- * the middle-ellipsis truncation feature (`maxLabelLength` prop) added to
- * the Breadcrumb component.
- *
- * The breadcrumb trail is:
- *   Marketplace → GrantFox Wave Compute API (long) → Rate Limits → Current Page
- *
- * With `maxLabelLength={28}` the two middle segments are each capped at
- * 28 characters in the visible label while the full strings remain available
- * via `title` / `aria-label` for screen readers and on hover.
+ * The API is resolved from the catalogue (`fetchCatalog`) and the table is
+ * built from `api.rateLimits`. Optional columns (burst, concurrent
+ * connections) render only when at least one tier publishes that field.
  */
 
-/** Rate-limit tier shape used in the table below. */
-type RateLimitTier = {
-  plan: string;
-  requestsPerMinute: number;
-  burstLimit: number;
-  concurrentConnections: number;
-};
+type RateLimitTier = NonNullable<APIItem["rateLimits"]>[number];
 
-const RATE_LIMIT_TIERS: RateLimitTier[] = [
-  {
-    plan: "Free",
-    requestsPerMinute: 10,
-    burstLimit: 20,
-    concurrentConnections: 2,
-  },
-  {
-    plan: "Developer",
-    requestsPerMinute: 120,
-    burstLimit: 200,
-    concurrentConnections: 10,
-  },
-  {
-    plan: "Pro",
-    requestsPerMinute: 600,
-    burstLimit: 1000,
-    concurrentConnections: 50,
-  },
-  {
-    plan: "Enterprise",
-    requestsPerMinute: 6000,
-    burstLimit: 10000,
-    concurrentConnections: 500,
-  },
-];
+type LoadState =
+  | { status: "loading" }
+  | { status: "ready"; api: APIItem }
+  | { status: "not-found" }
+  | { status: "error" };
 
-/**
- * Breadcrumb path for this page.  Segment labels are deliberately long so the
- * middle-ellipsis truncation is visible without special configuration.
- *
- * Full path (un-truncated):
- *   Marketplace
- *     → GrantFox Wave Compute API – Stellar Edition
- *     → Rate Limits & Throttling Policies
- *     → Current Plan Configuration  (current page)
- */
-const BREADCRUMB_ITEMS = [
-  { label: "Marketplace", href: "/marketplace" },
-  {
-    label: "GrantFox Wave Compute API – Stellar Edition",
-    href: "/marketplace/grantfox-wave-compute",
-  },
-  {
-    label: "Rate Limits & Throttling Policies",
-    href: "/marketplace/grantfox-wave-compute/rate-limits",
-  },
-  {
-    label: "Current Plan Configuration",
-    href: "/marketplace/grantfox-wave-compute/rate-limits/config",
-    isCurrent: true,
-  },
-] as const;
-
-/**
- * Maximum characters before a crumb label is shortened with a middle-ellipsis.
- * Chosen so the two long middle segments fit comfortably in a single breadcrumb
- * row even on narrow viewports.
- */
+/** Maximum characters before a crumb label is shortened with a middle-ellipsis. */
 const BREADCRUMB_MAX_LABEL = 28;
 
-/** Pattern class and description for each plan tier (color-blind safe). */
+/** Pattern class and description for known plan tiers (color-blind safe). */
 const PLAN_PATTERNS: Record<string, { class: string; description: string }> = {
   Free: { class: "free", description: "solid baseline" },
   Developer: { class: "developer", description: "dot pattern" },
@@ -94,11 +32,58 @@ const PLAN_PATTERNS: Record<string, { class: string; description: string }> = {
   Enterprise: { class: "enterprise", description: "crosshatch pattern" },
 };
 
+const DEFAULT_PATTERN = { class: "custom", description: "outlined" };
+
 export default function RateLimitCard() {
+  const { apiId } = useParams<{ apiId: string }>();
+  const [state, setState] = useState<LoadState>({ status: "loading" });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setState({ status: "loading" });
+    fetchCatalog(controller.signal)
+      .then((items) => {
+        if (controller.signal.aborted) return;
+        const api = items.find((item) => item.id === apiId);
+        setState(api ? { status: "ready", api } : { status: "not-found" });
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setState({ status: "error" });
+      });
+    return () => controller.abort();
+  }, [apiId]);
+
+  const api = state.status === "ready" ? state.api : null;
+
   useDocumentTitle(
-    "Rate Limit Configuration – Callora",
-    "Current rate-limit plan and throttling policies for the GrantFox Wave Compute API.",
+    api ? `${api.name} Rate Limits – Callora` : "Rate Limits – Callora",
+    api
+      ? `Published rate limits and throttling policies for ${api.name}.`
+      : "Published rate limits and throttling policies for an API.",
   );
+
+  const numberFormat = new Intl.NumberFormat();
+  const tiers: RateLimitTier[] = api?.rateLimits ?? [];
+  const showBurst = tiers.some((t) => t.burstLimit !== undefined);
+  const showConcurrent = tiers.some((t) => t.concurrentConnections !== undefined);
+  const formatValue = (value?: number) =>
+    value === undefined ? "—" : numberFormat.format(value);
+
+  const breadcrumbItems = api
+    ? [
+        { label: "Marketplace", href: "/marketplace" },
+        { label: api.name, href: `/details/${encodeURIComponent(api.id)}` },
+        {
+          label: "Rate Limits",
+          href: `/marketplace/${encodeURIComponent(api.id)}/rate-limits`,
+          isCurrent: true,
+        },
+      ]
+    : [
+        { label: "Marketplace", href: "/marketplace" },
+        { label: "Rate Limits", href: "#", isCurrent: true },
+      ];
 
   return (
     <div className="rate-limit-page">
@@ -181,61 +166,87 @@ export default function RateLimitCard() {
           color: var(--muted);
           line-height: 1.5;
         }
+        .rate-limit-table caption {
+          text-align: left;
+          padding: 0 16px 10px;
+          color: var(--muted);
+          font-size: 0.8125rem;
+        }
       `}</style>
 
-      {/*
-        Breadcrumb uses maxLabelLength={28} so each crumb label is capped at
-        28 characters.  Both long middle-segment names will be shown with a
-        "…" in the middle, preserving the start and end of the real label.
-        The full strings are always in `title` / `aria-label`.
-      */}
-      <Breadcrumb
-        items={BREADCRUMB_ITEMS}
-        maxLabelLength={BREADCRUMB_MAX_LABEL}
-      />
+      <Breadcrumb items={breadcrumbItems} maxLabelLength={BREADCRUMB_MAX_LABEL} />
 
       <div className="rate-limit-card">
         <div className="rate-limit-card-header">
           <h1 className="rate-limit-card-title">Rate Limit Configuration</h1>
-          <p className="rate-limit-card-subtitle">
-            GrantFox Wave Compute API – Stellar Edition &nbsp;·&nbsp; FWC26
-          </p>
+          {api && <p className="rate-limit-card-subtitle">{api.name}</p>}
         </div>
 
-        <table className="rate-limit-table" aria-label="Rate limit tiers">
-          <thead>
-            <tr>
-              <th scope="col">Plan</th>
-              <th scope="col">Requests / min</th>
-              <th scope="col">Burst limit</th>
-              <th scope="col">Concurrent connections</th>
-            </tr>
-          </thead>
-          <tbody>
-            {RATE_LIMIT_TIERS.map((tier) => (
-              <tr key={tier.plan}>
-                <td>
-                  <span
-                    className={`rate-limit-badge ${PLAN_PATTERNS[tier.plan].class}`}
-                    data-pattern={PLAN_PATTERNS[tier.plan].description}
-                  >
-                    {tier.plan}
-                  </span>
-                </td>
-                <td>{tier.requestsPerMinute.toLocaleString()}</td>
-                <td>{tier.burstLimit.toLocaleString()}</td>
-                <td>{tier.concurrentConnections.toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {state.status === "loading" && (
+          <p role="status" aria-live="polite">
+            Loading rate limits…
+          </p>
+        )}
 
-        <p className="rate-limit-note">
-          Limits reset on a rolling 60-second window. Burst allowance is
-          consumed first; sustained throughput is governed by the per-minute
-          quota. Enterprise plans can request custom limits via the support
-          portal.
-        </p>
+        {state.status === "error" && (
+          <div role="alert" className="rate-limit-note">
+            Could not load rate limits. Please try again later.
+          </div>
+        )}
+
+        {state.status === "not-found" && (
+          <div role="alert" className="rate-limit-note" data-testid="rate-limit-not-found">
+            <strong>API not found.</strong> We couldn't find an API with the id “{apiId}”.{" "}
+            <Link to="/marketplace">Browse the Marketplace</Link>
+          </div>
+        )}
+
+        {api && tiers.length === 0 && (
+          <p className="rate-limit-note" data-testid="rate-limit-empty">
+            This provider has not published rate limits.
+          </p>
+        )}
+
+        {api && tiers.length > 0 && (
+          <>
+            <table className="rate-limit-table">
+              <caption>Rate limit tiers for {api.name}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Plan</th>
+                  <th scope="col">Requests / min</th>
+                  {showBurst && <th scope="col">Burst limit</th>}
+                  {showConcurrent && <th scope="col">Concurrent connections</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {tiers.map((tier) => {
+                  const pattern = PLAN_PATTERNS[tier.plan] ?? DEFAULT_PATTERN;
+                  return (
+                    <tr key={tier.plan}>
+                      <td>
+                        <span
+                          className={`rate-limit-badge ${pattern.class}`}
+                          data-pattern={pattern.description}
+                        >
+                          {tier.plan}
+                        </span>
+                      </td>
+                      <td>{formatValue(tier.requestsPerMinute)}</td>
+                      {showBurst && <td>{formatValue(tier.burstLimit)}</td>}
+                      {showConcurrent && <td>{formatValue(tier.concurrentConnections)}</td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <p className="rate-limit-note">
+              Limits are published by the API provider. Contact the provider
+              for custom limits.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

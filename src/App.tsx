@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from "react";
-import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { useToast } from "./components/Toast";
 import { ThemeToggle } from "./ThemeToggle";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
@@ -47,7 +48,6 @@ const routePrefetchers: Record<string, () => Promise<any>> = {
   "/theme-playground": () => import("./pages/ThemePlayground"),
   "/design-system/docs": () => import("./pages/DesignSystemDocs"),
   "/a11y-audit": () => import("./pages/A11yAudit"),
-  "/rate-limit": () => import("./pages/RateLimitCard"),
   "/webhooks/deliveries": () => import("./pages/WebhookDeliveries"),
   "/endpoints": () => import("./pages/EndpointSummary"),
 };
@@ -163,7 +163,8 @@ const APP_ROUTES = {
   themePlayground: "/theme-playground",
   designSystem: "/design-system/docs",
   serverError: "/500",
-  rateLimitCard: "/rate-limit",
+  rateLimitCard: "/marketplace/:apiId/rate-limits",
+  legacyRateLimit: "/rate-limit",
   slaCard: "/marketplace/grantfox-wave-compute/sla",
   webhookDeliveries: "/webhooks/deliveries",
   onboarding: "/onboarding",
@@ -178,6 +179,15 @@ const PRIMARY_NAV: Array<{ to: string; label: string }> = [
   { to: APP_ROUTES.billing, label: "Billing" },
   { to: APP_ROUTES.documentation, label: "Docs" },
 ];
+
+/** `/rate-limit` no longer exists; limits are per-API. Send users to the Marketplace. */
+function LegacyRateLimitRedirect() {
+  const { showToast } = useToast();
+  useEffect(() => {
+    showToast("Rate limits are now shown per API. Pick an API to see its limits.");
+  }, [showToast]);
+  return <Navigate to={APP_ROUTES.marketplace} replace />;
+}
 
 function buildExplorerLink(hash: string) {
   return `${EXPLORER_BASE_URL}${hash}`;
@@ -853,6 +863,7 @@ function App() {
             <Route path="/a11y-audit" element={<A11yAudit />} />
 
             <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
+            <Route path={APP_ROUTES.legacyRateLimit} element={<LegacyRateLimitRedirect />} />
 
             <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
 

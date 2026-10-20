@@ -76,11 +76,6 @@ export const ROUTE_CATALOGUE: RouteCatalogueEntry[] = [
     keywords: ["design system", "design", "components", "ui kit"],
   },
   {
-    label: "Rate Limit",
-    path: "/rate-limit",
-    keywords: ["rate limit", "throttle", "limits"],
-  },
-  {
     label: "Webhook Deliveries",
     path: "/webhooks/deliveries",
     keywords: ["webhook", "webhooks", "deliveries", "callback"],
