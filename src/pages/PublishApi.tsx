@@ -1,13 +1,16 @@
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import OpenAPIImport from '../components/OpenAPIImport';
 import type { ParsedEndpoint } from '../components/OpenAPIImport';
 import FormField from '../components/FormField';
 import type { FieldStatus } from '../components/FormField';
-import useDocumentTitle from '../hooks/useDocumentTitle';
-import { useFormPersistence } from '../hooks/useFormPersistence';
-import { useSessionExpiry } from '../hooks/useSessionExpiry';
-import { useBeforeUnload } from '../hooks/useBeforeUnload';
 import SessionExpiryBanner from '../components/SessionExpiryBanner';
+import { useBeforeUnload } from '../hooks/useBeforeUnload';
+import useDocumentTitle from '../hooks/useDocumentTitle';
+import useFormPersistence from '../hooks/useFormPersistence';
+import useSessionExpiry from '../hooks/useSessionExpiry';
+import { generateIdempotencyKey } from '../services/idempotency';
+import { submitPublishApi } from '../services/publishApi';
+import type { PublishApiFieldErrors, PublishApiInput } from '../services/publishApi';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,13 +29,19 @@ type PublishFormState = {
   endpoints: EndpointEntry[];
 };
 
-type ValidatedFields = Exclude<keyof PublishFormState, 'description' | 'endpoints'>;
+type ValidatedFields = Exclude<keyof PublishFormState, 'endpoints'>;
 
 type TouchedState = Record<ValidatedFields, boolean>;
 
-type ValidationErrors = Partial<Record<ValidatedFields, string>>;
+/**
+ * `endpoints` is list-level: it covers both "no endpoints" and "duplicate
+ * METHOD + path". Which rows are duplicates is derived from the list itself
+ * (see `findDuplicateEndpointIds`), never stored, so it cannot go stale.
+ */
+type ValidationErrors = Partial<Record<ValidatedFields | 'endpoints', string>>;
 
-const PUBLISH_FORM_DRAFT_KEY = 'callora:publish-form:draft';
+/** id of the endpoint list's error node, referenced by aria-describedby. */
+const ENDPOINTS_ERROR_ID = 'pa-endpoints-error';
 
 const INITIAL_FORM: PublishFormState = {
   apiName: '',
@@ -47,8 +56,15 @@ const INITIAL_TOUCHED: TouchedState = {
   apiName: false,
   baseUrl: false,
   category: false,
+  description: false,
   pricePerCall: false,
 };
+
+/** Maximum number of characters allowed in the API description. */
+const DESCRIPTION_MAX_LENGTH = 500;
+
+/** Announce the remaining count only when this many characters (or fewer) remain. */
+const DESCRIPTION_ANNOUNCE_THRESHOLD = 50;
 
 const CATEGORIES = [
   'AI & Machine Learning',
@@ -60,6 +76,9 @@ const CATEGORIES = [
   'Security',
   'Other',
 ];
+
+/** localStorage key holding the in-progress publish draft. */
+const DRAFT_STORAGE_KEY = 'callora:publish-api:draft';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,6 +98,57 @@ function methodBadgeClass(method: string): string {
   if (m === 'delete') return 'pa-badge pa-badge-delete';
   if (m === 'patch') return 'pa-badge pa-badge-patch';
   return 'pa-badge pa-badge-default';
+}
+
+/**
+ * Identity of an endpoint for uniqueness purposes.
+ *
+ * The method is upper-cased (the OpenAPI parser already does this; a draft
+ * from an older build may not have). The path is compared exactly:
+ * `/users` and `/users/:id` are different endpoints, and rewriting paths here
+ * could merge definitions the provider meant to keep apart.
+ */
+function endpointKey(ep: Pick<EndpointEntry, 'method' | 'path'>): string {
+  return `${ep.method.toUpperCase()} ${ep.path}`;
+}
+
+/**
+ * Ids of every endpoint whose METHOD + path appears more than once.
+ *
+ * Every member of a duplicate group is returned, not just the later ones, so
+ * the provider sees all the rows involved and can choose which to remove.
+ */
+function findDuplicateEndpointIds(endpoints: EndpointEntry[]): Set<string> {
+  const groups = new Map<string, string[]>();
+  for (const ep of endpoints) {
+    const key = endpointKey(ep);
+    const ids = groups.get(key);
+    if (ids) ids.push(ep.id);
+    else groups.set(key, [ep.id]);
+  }
+
+  const duplicates = new Set<string>();
+  for (const ids of groups.values()) {
+    if (ids.length > 1) ids.forEach((id) => duplicates.add(id));
+  }
+  return duplicates;
+}
+
+function validateEndpoints(endpoints: EndpointEntry[]): string | undefined {
+  if (endpoints.length === 0) {
+    return 'Add at least one endpoint before publishing. Use "Import spec" above to add them.';
+  }
+
+  const counts = new Map<string, number>();
+  for (const ep of endpoints) {
+    const key = endpointKey(ep);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const repeated = [...counts].filter(([, count]) => count > 1);
+  if (repeated.length === 0) return undefined;
+
+  const list = repeated.map(([key, count]) => `${key} (${count}×)`).join(', ');
+  return `Each endpoint must have a unique method and path. Remove the duplicates: ${list}.`;
 }
 
 function validateForm(form: PublishFormState): ValidationErrors {
@@ -105,11 +175,20 @@ function validateForm(form: PublishFormState): ValidationErrors {
     errors.category = 'Please select a category.';
   }
 
+  if (form.description.length > DESCRIPTION_MAX_LENGTH) {
+    errors.description = `Description is over the maximum of ${DESCRIPTION_MAX_LENGTH} characters.`;
+  }
+
   if (form.pricePerCall.trim() !== '') {
     const price = Number(form.pricePerCall);
     if (!Number.isFinite(price) || price < 0) {
       errors.pricePerCall = 'Price per call must be 0 or greater.';
     }
+  }
+
+  const endpointsError = validateEndpoints(form.endpoints);
+  if (endpointsError) {
+    errors.endpoints = endpointsError;
   }
 
   return errors;
@@ -128,6 +207,128 @@ function fieldStatus(
 }
 
 // ---------------------------------------------------------------------------
+// Draft persistence
+// ---------------------------------------------------------------------------
+
+/**
+ * Shape guard for drafts restored from localStorage.
+ *
+ * A draft written by an older build may not match today's form shape, and
+ * feeding that to the inputs would crash the page on the values alone (e.g.
+ * `endpoints` no longer an array). Reject anything that does not look like a
+ * `PublishFormState` and start blank instead.
+ */
+function isPublishFormDraft(candidate: unknown): candidate is PublishFormState {
+  if (typeof candidate !== 'object' || candidate === null) return false;
+  const draft = candidate as Record<string, unknown>;
+
+  const stringFields = [
+    'apiName',
+    'baseUrl',
+    'category',
+    'description',
+    'pricePerCall',
+  ] as const;
+  for (const field of stringFields) {
+    if (typeof draft[field] !== 'string') return false;
+  }
+
+  if (!Array.isArray(draft.endpoints)) return false;
+  return draft.endpoints.every((entry) => {
+    if (typeof entry !== 'object' || entry === null) return false;
+    const ep = entry as Record<string, unknown>;
+    return typeof ep.id === 'string' && typeof ep.path === 'string' && typeof ep.method === 'string';
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Server response mapping
+// ---------------------------------------------------------------------------
+
+/** Lowercase and strip separators so `base_url` matches `baseUrl`. */
+function normalizeFieldKey(key: string): string {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Server field names -> form fields.
+ *
+ * The backend may speak snake_case while the form speaks camelCase, and it may
+ * use a domain term where the form uses a UI one. Anything not listed here is
+ * not silently dropped — see `toValidationErrors`.
+ */
+const FIELD_ALIASES: Record<string, ValidatedFields> = {
+  apiname: 'apiName',
+  name: 'apiName',
+  title: 'apiName',
+  displayname: 'apiName',
+  baseurl: 'baseUrl',
+  url: 'baseUrl',
+  endpoint: 'baseUrl',
+  homepage: 'baseUrl',
+  category: 'category',
+  pricepercall: 'pricePerCall',
+  price: 'pricePerCall',
+  pricing: 'pricePerCall',
+};
+
+/**
+ * Map server field errors onto the form's `ValidationErrors` shape.
+ *
+ * Returns the mapped per-field messages plus any messages that had no
+ * corresponding input, so the caller can surface them as a form-level error
+ * instead of losing them.
+ */
+function toValidationErrors(fields: PublishApiFieldErrors): {
+  mapped: ValidationErrors;
+  unmapped: string[];
+} {
+  const mapped: ValidationErrors = {};
+  const unmapped: string[] = [];
+
+  for (const [key, message] of Object.entries(fields)) {
+    const target = FIELD_ALIASES[normalizeFieldKey(key)];
+    if (target) {
+      // First message wins so a duplicate alias cannot overwrite itself.
+      if (!mapped[target]) mapped[target] = message;
+    } else {
+      unmapped.push(message);
+    }
+  }
+
+  return { mapped, unmapped };
+}
+
+// ---------------------------------------------------------------------------
+// Payload shaping
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the request body from form state.
+ *
+ * UI-only fields (endpoint `id`) are stripped, strings are trimmed, and a blank
+ * price becomes `null` rather than `0` so "set later" is distinguishable from
+ * "free".
+ */
+function toPublishPayload(form: PublishFormState): PublishApiInput {
+  const rawPrice = form.pricePerCall.trim();
+  const parsedPrice = rawPrice === '' ? Number.NaN : Number(rawPrice);
+
+  return {
+    apiName: form.apiName.trim(),
+    baseUrl: form.baseUrl.trim(),
+    category: form.category,
+    description: form.description,
+    pricePerCall: Number.isFinite(parsedPrice) ? parsedPrice : null,
+    endpoints: form.endpoints.map((ep) => ({
+      path: ep.path,
+      method: ep.method,
+      ...(ep.summary ? { summary: ep.summary } : {}),
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // PublishApi page
 // ---------------------------------------------------------------------------
 
@@ -137,35 +338,112 @@ function fieldStatus(
  * Provides per-field inline validation (name, base URL, category, price per
  * call) with aria-invalid / aria-describedby wired for screen readers. Errors
  * appear only after a field is blurred or the form is submitted.
+ *
+ * Submitting actually POSTs the listing: the success screen is shown only
+ * after the server accepts it, and the localStorage draft is kept until then
+ * so a rejected submission never costs the provider their work.
  */
 export default function PublishApi() {
   useDocumentTitle('Publish API');
-  const [form, setForm] = useState<PublishFormState>(INITIAL_FORM);
+  const { value: form, setValue: setForm, discard: discardDraft, isRestored } =
+    useFormPersistence(DRAFT_STORAGE_KEY, INITIAL_FORM, { isValid: isPublishFormDraft });
   const [touched, setTouched] = useState<TouchedState>(INITIAL_TOUCHED);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  /** Per-field messages returned by the server on the last attempt. */
+  const [serverErrors, setServerErrors] = useState<ValidationErrors>({});
+  /** Form-level failure that belongs to no single input. */
+  const [formError, setFormError] = useState<string | null>(null);
+  const [listingId, setListingId] = useState<string | null>(null);
   const importSectionId = useId();
 
-  // ── Session expiry & form persistence ────────────────────────────────
-  const { clearDraft, wasRestored } = useFormPersistence(
-    PUBLISH_FORM_DRAFT_KEY,
-    form as unknown as Record<string, unknown>,
-    setForm as unknown as React.Dispatch<React.SetStateAction<Record<string, unknown>>>,
-    { restoreOnMount: true },
-  );
-  const { isExpired, dismiss: dismissExpiry, countdown, signalExpiry } = useSessionExpiry();
+  const descriptionLength = form.description.length;
+  const descriptionRemaining = DESCRIPTION_MAX_LENGTH - descriptionLength;
+  const descriptionOverLimit = descriptionRemaining < 0;
+  const descriptionNearLimit =
+    !descriptionOverLimit && descriptionRemaining <= DESCRIPTION_ANNOUNCE_THRESHOLD;
 
-  const hasUnsavedChanges = useMemo(() => {
-    return form.apiName !== '' || form.baseUrl !== '' || form.category !== '' ||
-           form.description !== '' || form.pricePerCall !== '' ||
-           form.endpoints.length > 0;
-  }, [form]);
+  /**
+   * Throttled polite announcement of the remaining character count.
+   *
+   * Only updates when the field is within the near-limit threshold, and only
+   * when the remaining count actually changes, so screen readers are not
+   * spammed on every keystroke.
+   */
+  const [descriptionAnnouncement, setDescriptionAnnouncement] = useState('');
+  const lastAnnouncedRemainingRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!descriptionNearLimit) {
+      lastAnnouncedRemainingRef.current = null;
+      setDescriptionAnnouncement('');
+      return;
+    }
+    if (lastAnnouncedRemainingRef.current === descriptionRemaining) return;
+    lastAnnouncedRemainingRef.current = descriptionRemaining;
+    setDescriptionAnnouncement(
+      `${descriptionRemaining} character${descriptionRemaining === 1 ? '' : 's'} remaining`,
+    );
+  }, [descriptionNearLimit, descriptionRemaining]);
+
+  const { isExpired, dismiss: dismissExpiry } = useSessionExpiry();
+
+  /**
+   * Idempotency key for the current logical submission. Reused while the
+   * payload is byte-identical, so a retry after a timeout cannot create a
+   * second listing; regenerated as soon as the provider edits anything.
+   */
+  const idempotencyRef = useRef<{ serialized: string; key: string } | null>(null);
+
+  /**
+   * Authoritative in-flight flag.
+   *
+   * The `submitting` state below drives rendering, but state is not yet
+   * updated when a second submit arrives in the same tick — two rapid clicks
+   * would both read `false` from a stale closure and fire two POSTs. A ref
+   * flips synchronously, so the second attempt is always rejected.
+   */
+  const submittingRef = useRef(false);
+
+  // Never touch state after the page has gone away mid-request.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const clientErrors = useMemo(() => validateForm(form), [form]);
+  // Server messages take precedence so a field the backend rejected keeps
+  // showing why until the provider edits it.
+  const errors: ValidationErrors = { ...clientErrors, ...serverErrors };
+  const isFormValid = Object.keys(clientErrors).length === 0;
+  const duplicateEndpointIds = useMemo(
+    () => findDuplicateEndpointIds(form.endpoints),
+    [form.endpoints],
+  );
+  // Rendered errors follow the rest of the form: nothing until a submit.
+  const endpointsError = submitAttempted ? errors.endpoints : undefined;
+
+  /** Focus target when a submit fails on the endpoint list alone. */
+  const endpointsRef = useRef<HTMLFieldSetElement>(null);
+  /** Bumped by a failed submit that should move focus to the endpoint list. */
+  const [endpointFocusRequest, setEndpointFocusRequest] = useState(0);
+
+  const hasUnsavedChanges = useMemo(
+    () =>
+      form.apiName !== '' ||
+      form.baseUrl !== '' ||
+      form.category !== '' ||
+      form.description !== '' ||
+      form.pricePerCall !== '' ||
+      form.endpoints.length > 0,
+    [form],
+  );
 
   useBeforeUnload(hasUnsavedChanges);
-
-  const errors = validateForm(form);
-  const isFormValid = Object.keys(errors).length === 0;
 
   // ── Field change handlers ──────────────────────────────────────────────
 
@@ -173,8 +451,16 @@ export default function PublishApi() {
     (field: keyof Omit<PublishFormState, 'endpoints'>) =>
       (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
+        // A server error on this field is now stale — drop it so the message
+        // does not outlive the value it referred to.
+        setServerErrors((prev) => {
+          if (!(field in prev)) return prev;
+          const next = { ...prev };
+          delete next[field as ValidatedFields];
+          return next;
+        });
       },
-    [],
+    [setForm],
   );
 
   const handleBlur = useCallback(
@@ -186,39 +472,128 @@ export default function PublishApi() {
 
   // ── OpenAPI import handlers ────────────────────────────────────────────
 
-  const handleImport = useCallback((endpoints: ParsedEndpoint[]) => {
-    const entries: EndpointEntry[] = endpoints.map((ep) => ({
-      ...ep,
-      id: nextId(),
-    }));
-    setForm((prev) => ({
-      ...prev,
-      endpoints: [...prev.endpoints, ...entries],
-    }));
-    setImportOpen(false);
-  }, []);
+  const handleImport = useCallback(
+    (endpoints: ParsedEndpoint[]) => {
+      setForm((prev) => {
+        // Ids must stay unique: a restored draft can already hold ids that the
+        // module-level counter has not reached yet, and duplicate React keys
+        // would drop list entries.
+        const taken = new Set(prev.endpoints.map((ep) => ep.id));
+        const entries: EndpointEntry[] = endpoints.map((ep) => {
+          let id = nextId();
+          while (taken.has(id)) id = nextId();
+          taken.add(id);
+          return { ...ep, id };
+        });
+        return { ...prev, endpoints: [...prev.endpoints, ...entries] };
+      });
+      setImportOpen(false);
+    },
+    [setForm],
+  );
 
-  const handleRemoveEndpoint = useCallback((id: string) => {
-    setForm((prev) => ({
-      ...prev,
-      endpoints: prev.endpoints.filter((ep) => ep.id !== id),
-    }));
-  }, []);
+  const handleRemoveEndpoint = useCallback(
+    (id: string) => {
+      setForm((prev) => ({
+        ...prev,
+        endpoints: prev.endpoints.filter((ep) => ep.id !== id),
+      }));
+    },
+    [setForm],
+  );
 
   // ── Submit ─────────────────────────────────────────────────────────────
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent<HTMLFormElement>) => {
+    async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      // Guard against a second POST from a double click, Enter key repeat, or a
+      // submit event fired while the first is still in flight.
+      if (submittingRef.current) return;
+
       setSubmitAttempted(true);
       // Touch all validated fields so errors become visible
-      setTouched({ apiName: true, baseUrl: true, category: true, pricePerCall: true });
-      if (!isFormValid) return;
-      setSubmitted(true);
-      clearDraft();
+      setTouched({ apiName: true, baseUrl: true, category: true, description: true, pricePerCall: true });
+      setFormError(null);
+      setServerErrors({});
+      if (!isFormValid) {
+        // The detail fields come first on the page. Only take focus to the
+        // endpoint list when it is the sole problem, so a provider is never
+        // pulled past an earlier error they have not seen yet.
+        const onlyEndpointsInvalid =
+          clientErrors.endpoints !== undefined && Object.keys(clientErrors).length === 1;
+        if (onlyEndpointsInvalid) setEndpointFocusRequest((n) => n + 1);
+        return;
+      }
+
+      const payload = toPublishPayload(form);
+      const serialized = JSON.stringify(payload);
+      if (idempotencyRef.current?.serialized !== serialized) {
+        idempotencyRef.current = { serialized, key: generateIdempotencyKey() };
+      }
+
+      setSubmitting(true);
+      submittingRef.current = true;
+      try {
+        const result = await submitPublishApi(payload, {
+          idempotencyKey: idempotencyRef.current.key,
+        });
+        if (!mountedRef.current) return;
+
+        switch (result.kind) {
+          case 'success':
+            // The server owns the record now. Drop the stored copy but keep the
+            // in-memory form, since the success screen names the listing from
+            // it and a reload must start blank rather than resurrect it.
+            discardDraft();
+            setListingId(result.listingId ?? null);
+            setSubmitted(true);
+            break;
+
+          case 'fieldErrors': {
+            const { mapped, unmapped } = toValidationErrors(result.fields);
+            setServerErrors(mapped);
+            setFormError(
+              unmapped.length > 0
+                ? `Please fix the highlighted fields. ${unmapped.join(' ')}`
+                : 'Please fix the highlighted fields and submit again.',
+            );
+            break;
+          }
+
+          case 'unauthorized':
+            // The service has already raised the session-expiry signal, and
+            // the banner carries the explanation. This line is the in-form
+            // breadcrumb that survives the banner being dismissed.
+            setFormError('Sign in again to submit this listing.');
+            break;
+
+          case 'error':
+            setFormError(result.message);
+            break;
+        }
+      } finally {
+        submittingRef.current = false;
+        if (mountedRef.current) setSubmitting(false);
+      }
     },
-    [isFormValid],
+    [clientErrors, discardDraft, form, isFormValid],
   );
+
+  // Runs after the render that fills in the endpoint error, so a screen reader
+  // announces the description along with the focus move.
+  useEffect(() => {
+    if (endpointFocusRequest > 0) endpointsRef.current?.focus();
+  }, [endpointFocusRequest]);
+
+  const handleClearDraft = useCallback(() => {
+    discardDraft(INITIAL_FORM);
+    idempotencyRef.current = null;
+    setTouched(INITIAL_TOUCHED);
+    setSubmitAttempted(false);
+    setServerErrors({});
+    setFormError(null);
+  }, [discardDraft]);
 
   // ── Success screen ─────────────────────────────────────────────────────
 
@@ -235,16 +610,24 @@ export default function PublishApi() {
               pending review. You&apos;ll receive a notification once it&apos;s live on
               the marketplace.
             </p>
+            {listingId && (
+              <p className="pa-success-body">
+                Listing reference: <code className="pa-success-ref">{listingId}</code>
+              </p>
+            )}
             <button
               type="button"
               className="pa-btn-primary"
               onClick={() => {
-                setForm(INITIAL_FORM);
+                discardDraft(INITIAL_FORM);
+                idempotencyRef.current = null;
                 setTouched(INITIAL_TOUCHED);
                 setSubmitAttempted(false);
                 setSubmitted(false);
+                setServerErrors({});
+                setFormError(null);
+                setListingId(null);
                 setImportOpen(false);
-                clearDraft();
               }}
             >
               Publish another API
@@ -257,25 +640,12 @@ export default function PublishApi() {
 
   // ── Main form ──────────────────────────────────────────────────────────
 
-  // ── Simulate a 401 for demo purposes ─────────────────────────────────
-  const handleSimulateExpiry = useCallback(() => {
-    signalExpiry();
-  }, [signalExpiry]);
-
   return (
     <>
       <style>{STYLES}</style>
-      <SessionExpiryBanner
-        isVisible={isExpired}
-        countdown={countdown}
-        onDismiss={dismissExpiry}
-      />
-      {wasRestored && !isExpired && (
-        <div className="pa-draft-restored" role="status" aria-live="polite">
-          Draft restored from a previous session.
-        </div>
-      )}
       <div className="pa-shell">
+        {isExpired && <SessionExpiryBanner onDismiss={dismissExpiry} />}
+
         <header className="pa-page-header">
           <p className="pa-eyebrow">Developer tools</p>
           <h1 className="pa-title">Publish your API</h1>
@@ -320,36 +690,19 @@ export default function PublishApi() {
         </section>
 
         {/* ── Draft restored notice (with dismiss) ─────────────── */}
-        {wasRestored && !isExpired && (
+        {isRestored && (
           <div className="pa-draft-banner surface">
             <span aria-hidden="true">💾</span>
             <span>Your previous draft has been restored. Your form data is being saved automatically.</span>
             <button
               type="button"
               className="pa-btn-secondary pa-draft-dismiss"
-              onClick={() => {
-                clearDraft();
-                setForm(INITIAL_FORM);
-                setTouched(INITIAL_TOUCHED);
-                setSubmitAttempted(false);
-              }}
+              onClick={handleClearDraft}
             >
               Clear draft
             </button>
           </div>
         )}
-
-        {/* ── Session expiry simulation (demo) ──────────────────── */}
-        <div className="pa-demo-controls surface">
-          <p className="pa-demo-label">Session controls (demo)</p>
-          <button
-            type="button"
-            className="pa-btn-secondary"
-            onClick={handleSimulateExpiry}
-          >
-            Simulate session expiry
-          </button>
-        </div>
 
         {/* ── Publish form ───────────────────────────────────────── */}
         <form
@@ -443,23 +796,36 @@ export default function PublishApi() {
               />
             </FormField>
 
-            <div className="pa-field">
-              <label className="pa-label" htmlFor="pa-description">
-                Description
-              </label>
+            <FormField
+              id="pa-description"
+              label="Description"
+              error={errors.description}
+              status={fieldStatus('description', errors, touched, submitAttempted)}
+              counter={{ current: descriptionLength, max: DESCRIPTION_MAX_LENGTH }}
+            >
               <textarea
                 id="pa-description"
                 className="pa-textarea"
                 value={form.description}
                 onChange={handleField('description')}
+                onBlur={handleBlur('description')}
                 placeholder="Describe what your API does, its use cases, and any notable constraints."
                 rows={4}
               />
-            </div>
+            </FormField>
+            {/* Throttled announcement: only speaks once fewer than 50 characters remain. */}
+            <p id="pa-description-counter-live" className="sr-only" aria-live="polite" aria-atomic="true">
+              {descriptionAnnouncement}
+            </p>
           </fieldset>
 
           {/* ── Endpoint list ────────────────────────────────────── */}
-          <fieldset className="pa-fieldset">
+          <fieldset
+            ref={endpointsRef}
+            className="pa-fieldset pa-endpoints-fieldset"
+            aria-describedby={ENDPOINTS_ERROR_ID}
+            tabIndex={-1}
+          >
             <legend className="pa-legend">
               Endpoints
               {form.endpoints.length > 0 && (
@@ -479,42 +845,71 @@ export default function PublishApi() {
                 className="pa-endpoint-list"
                 aria-label={`${form.endpoints.length} imported endpoints`}
               >
-                {form.endpoints.map((ep) => (
-                  <li key={ep.id} className="pa-endpoint-item">
-                    <span
-                      className={methodBadgeClass(ep.method)}
-                      aria-label={`HTTP ${ep.method}`}
+                {form.endpoints.map((ep) => {
+                  const isDuplicate = submitAttempted && duplicateEndpointIds.has(ep.id);
+                  return (
+                    <li
+                      key={ep.id}
+                      className={
+                        isDuplicate ? 'pa-endpoint-item pa-endpoint-item-duplicate' : 'pa-endpoint-item'
+                      }
                     >
-                      {ep.method}
-                    </span>
-                    <code className="pa-endpoint-path">{ep.path}</code>
-                    {ep.summary && (
-                      <span className="pa-endpoint-summary">{ep.summary}</span>
-                    )}
-                    <button
-                      type="button"
-                      className="pa-remove-btn"
-                      onClick={() => handleRemoveEndpoint(ep.id)}
-                      aria-label={`Remove endpoint ${ep.method} ${ep.path}`}
-                    >
-                      ✕
-                    </button>
-                  </li>
-                ))}
+                      <span
+                        className={methodBadgeClass(ep.method)}
+                        aria-label={`HTTP ${ep.method}`}
+                      >
+                        {ep.method}
+                      </span>
+                      <code className="pa-endpoint-path">{ep.path}</code>
+                      {ep.summary && (
+                        <span className="pa-endpoint-summary">{ep.summary}</span>
+                      )}
+                      {isDuplicate && (
+                        <span className="pa-endpoint-duplicate">Duplicate</span>
+                      )}
+                      <button
+                        type="button"
+                        className="pa-remove-btn"
+                        onClick={() => handleRemoveEndpoint(ep.id)}
+                        aria-label={`Remove endpoint ${ep.method} ${ep.path}`}
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
+
+            {/* Always in the DOM so aria-describedby never points at nothing,
+                matching how FormField renders its error region. */}
+            <p
+              id={ENDPOINTS_ERROR_ID}
+              className="pa-endpoints-error"
+              role="alert"
+              aria-atomic="true"
+            >
+              {endpointsError}
+            </p>
           </fieldset>
 
           <div className="pa-form-footer">
+            {formError && (
+              <p className="pa-form-error" role="alert" aria-live="assertive">
+                {formError}
+              </p>
+            )}
             <button
               type="submit"
               className="pa-btn-primary"
+              disabled={submitting}
+              aria-busy={submitting}
             >
-              Publish API
+              {submitting ? 'Submitting…' : 'Publish API'}
             </button>
             <p className="pa-form-note">
-              Submission is reviewed before going live. API name, base URL, and
-              category are required.
+              Submission is reviewed before going live. API name, base URL,
+              category, and at least one endpoint are required.
             </p>
           </div>
         </form>
@@ -758,6 +1153,31 @@ const STYLES = `
     background: rgba(78,133,255,0.05);
   }
 
+  .pa-endpoints-fieldset:focus-visible {
+    outline: 2px solid var(--accent, #4e85ff);
+    outline-offset: 6px;
+    border-radius: 10px;
+  }
+
+  .pa-endpoint-item-duplicate {
+    border-color: var(--danger, #ff7d8d);
+    background: rgba(255, 125, 141, 0.06);
+  }
+
+  .pa-endpoint-duplicate {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--danger, #ff7d8d);
+  }
+
+  .pa-endpoints-error {
+    margin: 0;
+    min-height: 1.2em;
+    font-size: 0.82rem;
+    color: var(--danger, #ff7d8d);
+  }
+
   .pa-badge {
     display: inline-flex;
     align-items: center;
@@ -842,6 +1262,14 @@ const STYLES = `
     margin: 0;
     font-size: 0.82rem;
     color: var(--muted, #93a0bf);
+  }
+
+  .pa-form-error {
+    flex: 1 1 100%;
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--danger, #ff7d8d);
+    line-height: 1.5;
   }
 
   /* ── Buttons ────────────────────────────────────────────────────────── */
@@ -940,6 +1368,16 @@ const STYLES = `
     line-height: 1.6;
   }
 
+  .pa-success-ref {
+    font-family: monospace;
+    font-size: 0.88rem;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: var(--surface-soft, rgba(255,255,255,0.06));
+    border: 1px solid var(--line, rgba(169,184,255,0.16));
+    color: var(--text, #f3f5fb);
+  }
+
   /* ── Responsive ─────────────────────────────────────────────────────── */
 
   /* ── Draft restored banner ─────────────────────────────────────────── */
@@ -983,23 +1421,6 @@ const STYLES = `
   @keyframes pa-fade-out {
     0%, 70% { opacity: 1; }
     100% { opacity: 0; pointer-events: none; }
-  }
-
-  /* ── Demo controls ─────────────────────────────────────────────────── */
-
-  .pa-demo-controls {
-    padding: 14px 18px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .pa-demo-label {
-    margin: 0;
-    font-size: 0.82rem;
-    color: var(--muted, #93a0bf);
-    font-weight: 600;
   }
 
   @media (max-width: 600px) {

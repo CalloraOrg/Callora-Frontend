@@ -1,11 +1,103 @@
-import { useState } from 'react';
-import { useWebhookDeliveries } from '../hooks/useWebhookDeliveries';
-import { ToastProvider, Toast } from '../components/Toast';
+import { Fragment, useEffect, useState } from 'react';
+import {
+  useWebhookDeliveries,
+  type WebhookDeliveriesFetcher,
+  type WebhookDelivery,
+} from '../hooks/useWebhookDeliveries';
+import { useAccountId } from '../hooks/useAccount';
+import { useToast } from '../components/Toast';
+import { Pagination } from '../components/Pagination';
+import { JsonViewer } from '../components/JsonViewer';
+import { redactSensitiveData } from '../services/SecureErrorHandler';
 
-export default function WebhookDeliveries() {
-  const [accountId, setAccountId] = useState('acc_123'); // Simulate account switch
+/** Format an ISO string or Date into a human-readable local timestamp. */
+function formatTimestamp(value: string | Date | undefined): string {
+  if (!value) return '—';
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) return String(value);
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+/**
+ * Redact and normalise a requestBody / responseBody value before handing it
+ * to JsonViewer. Objects are stringified first so redactSensitiveData (which
+ * accepts only string | Error) can do its work, then the result is parsed back
+ * to an object for pretty-printing.
+ */
+function safeRedact(value: string | object | undefined): unknown {
+  if (value === undefined || value === null) return undefined;
+  const raw = typeof value === 'string' ? value : JSON.stringify(value);
+  const redacted = redactSensitiveData(raw);
+  try {
+    return JSON.parse(redacted);
+  } catch {
+    return redacted;
+  }
+}
+
+/** Expandable detail panel rendered beneath a table row when open. */
+function DeliveryDetailPanel({ delivery }: { delivery: WebhookDelivery }) {
+  const redactedRequest = safeRedact(delivery.requestBody);
+  const redactedResponse = safeRedact(delivery.responseBody);
+
+  return (
+    <tr>
+      <td
+        colSpan={7}
+        className="webhook-detail-cell"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {delivery.responseStatus !== undefined && (
+            <div>
+              <strong>Response Status:</strong>{' '}
+              <span
+                style={{
+                  fontFamily: 'monospace',
+                  color: delivery.responseStatus >= 400 ? 'var(--danger)' : 'var(--success)',
+                }}
+              >
+                {delivery.responseStatus}
+              </span>
+            </div>
+          )}
+
+          {redactedRequest !== undefined && (
+            <div>
+              <strong>Request Body:</strong>
+              <JsonViewer data={redactedRequest} />
+            </div>
+          )}
+
+          {redactedResponse !== undefined && (
+            <div>
+              <strong>Response Body:</strong>
+              <JsonViewer data={redactedResponse} />
+            </div>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+interface WebhookDeliveriesProps {
+  /** Injectable for tests; defaults to the hook's fetcher. */
+  fetcher?: WebhookDeliveriesFetcher;
+}
+
+export default function WebhookDeliveries({ fetcher }: WebhookDeliveriesProps = {}) {
+  // Without a connected account, show the bundled sample deliveries.
+  const accountId = useAccountId() ?? 'demo-account';
   const {
     deliveries,
+    totalCount,
     status,
     error,
     isStale,
@@ -13,40 +105,55 @@ export default function WebhookDeliveries() {
     setFilter,
     retryDelivery,
     retryingId,
-    refresh
-  } = useWebhookDeliveries(accountId);
+    refresh,
+  } = useWebhookDeliveries(accountId, fetcher);
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Pagination belongs to the account being viewed: switching accounts starts
+  // again from the first page.
+  useEffect(() => {
+    setFilter((f) => (f.page === 1 ? f : { ...f, page: 1 }));
+  }, [accountId, setFilter]);
+
+  const { showToast } = useToast();
+
+  // Track which row ids are expanded.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const handleRetry = async (id: string) => {
     try {
       await retryDelivery(id);
-      setToastMessage('Retry triggered successfully');
+      showToast('Retry triggered successfully');
     } catch (err: any) {
-      setToastMessage(`Retry failed: ${err.message}`);
+      showToast({ message: `Retry failed: ${err.message}`, variant: 'error', persistent: true });
     }
   };
 
   return (
-    <div className="webhook-deliveries" style={{ padding: '24px' }}>
+    <div className="webhook-deliveries">
+      <p className="eyebrow">Developer tools</p>
       <h1>Webhook Deliveries</h1>
-      
-      <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
-        <button onClick={() => setAccountId(accountId === 'acc_123' ? 'acc_456' : 'acc_123')}>
-          Switch Account (Current: {accountId})
-        </button>
-        <button onClick={() => setAccountId('error-account')}>
-          Simulate Error Account
-        </button>
-        <button onClick={refresh}>Refresh</button>
-      </div>
+      <p className="webhook-deliveries-intro">
+        Every event Callora sends to your endpoints, with the request and response bodies. Failed deliveries can be retried.
+      </p>
 
-      <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
-        <label>
-          Filter Status:
-          <select 
-            value={filter.status} 
-            onChange={(e) => setFilter(f => ({ ...f, status: e.target.value as any, page: 1 }))}
+      <div className="webhook-deliveries-toolbar">
+        <label className="webhook-deliveries-filter">
+          Status
+          <select
+            value={filter.status}
+            onChange={(e) => setFilter((f) => ({ ...f, status: e.target.value as any, page: 1 }))}
           >
             <option value="all">All</option>
             <option value="delivered">Delivered</option>
@@ -54,73 +161,102 @@ export default function WebhookDeliveries() {
             <option value="pending">Pending</option>
           </select>
         </label>
-        
-        <label>
-          Page:
-          <button onClick={() => setFilter(f => ({ ...f, page: Math.max(1, f.page - 1) }))}>Prev</button>
-          <span style={{ margin: '0 8px' }}>{filter.page}</span>
-          <button onClick={() => setFilter(f => ({ ...f, page: f.page + 1 }))}>Next</button>
-        </label>
+        <button type="button" className="secondary-button" onClick={refresh}>Refresh</button>
       </div>
 
-      {status === 'loading' && <p>Loading deliveries...</p>}
+      <Pagination
+        mode="cursor"
+        currentPageIndex={filter.page - 1}
+        hasNextPage={filter.page * 2 < totalCount}
+        hasPreviousPage={filter.page > 1}
+        totalItemCount={totalCount}
+        pageSize={2}
+        onGoNext={() => setFilter(f => ({ ...f, page: f.page + 1 }))}
+        onGoPrevious={() => setFilter(f => ({ ...f, page: Math.max(1, f.page - 1) }))}
+        onPageSizeChange={() => {}}
+      />
+
+      {status === 'loading' && <p role="status">Loading deliveries...</p>}
       {status === 'error' && (
-        <div style={{ color: 'red', border: '1px solid red', padding: '16px' }}>
+        <div role="alert" className="webhook-deliveries-error">
           <strong>Error:</strong> {error}
-          <br/>
-          <button onClick={refresh}>Retry Load</button>
+          <br />
+          <button type="button" className="secondary-button" onClick={refresh}>Retry Load</button>
         </div>
       )}
 
       {(status === 'success' || isStale) && (
-        <div style={{ opacity: isStale ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-          {isStale && <p style={{ color: 'orange' }}>Updating data...</p>}
-          
+        <div
+          className={`webhook-deliveries-data${isStale ? ' webhook-deliveries-data--stale' : ''}`}
+          aria-busy={isStale}
+        >
+          {isStale && (
+            <p className="webhook-deliveries-stale-note" role="status">
+              Updating data...
+            </p>
+          )}
+
           {deliveries.length === 0 ? (
-            <div className="empty-state">No deliveries found.</div>
+            <div className="empty-state surface webhook-deliveries-empty">No deliveries match this filter.</div>
           ) : (
-            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+            <div className="webhook-deliveries-table-wrap surface">
+            <table className="webhook-deliveries-table">
               <thead>
                 <tr>
-                  <th style={{ borderBottom: '1px solid #ccc', padding: '8px' }}>ID</th>
-                  <th style={{ borderBottom: '1px solid #ccc', padding: '8px' }}>URL</th>
-                  <th style={{ borderBottom: '1px solid #ccc', padding: '8px' }}>Status</th>
-                  <th style={{ borderBottom: '1px solid #ccc', padding: '8px' }}>Attempts</th>
-                  <th style={{ borderBottom: '1px solid #ccc', padding: '8px' }}>Actions</th>
+                  <th aria-label="Expand row" />
+                  <th>ID</th>
+                  <th>URL</th>
+                  <th>Status</th>
+                  <th>Attempts</th>
+                  <th>Timestamp</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {deliveries.map(d => (
-                  <tr key={d.id}>
-                    <td style={{ borderBottom: '1px solid #eee', padding: '8px' }}>{d.id}</td>
-                    <td style={{ borderBottom: '1px solid #eee', padding: '8px' }}>{d.url}</td>
-                    <td style={{ borderBottom: '1px solid #eee', padding: '8px' }}>{d.status}</td>
-                    <td style={{ borderBottom: '1px solid #eee', padding: '8px' }}>{d.attempts}</td>
-                    <td style={{ borderBottom: '1px solid #eee', padding: '8px' }}>
-                      {d.status === 'failed' && (
-                        <button 
-                          onClick={() => handleRetry(d.id)}
-                          disabled={retryingId === d.id}
-                        >
-                          {retryingId === d.id ? 'Retrying...' : 'Retry'}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {deliveries.map((d) => {
+                  const isExpanded = expandedIds.has(d.id);
+                  return (
+                    <Fragment key={d.id}>
+                      <tr>
+                        <td>
+                          <button
+                            aria-expanded={isExpanded}
+                            aria-label={isExpanded ? `Collapse details for ${d.id}` : `Expand details for ${d.id}`}
+                            onClick={() => toggleExpanded(d.id)}
+                            className="webhook-expand-button"
+                          >
+                            {isExpanded ? '▲' : '▼'}
+                          </button>
+                        </td>
+                        <td>{d.id}</td>
+                        <td>{d.url}</td>
+                        <td><span className={`webhook-status webhook-status--${d.status}`}>{d.status}</span></td>
+                        <td>{d.attempts}</td>
+                        <td>
+                          {formatTimestamp(d.createdAt)}
+                        </td>
+                        <td>
+                          {d.status === 'failed' && (
+                            <button
+                              type="button"
+                              className="ghost-button"
+                              onClick={() => handleRetry(d.id)}
+                              disabled={retryingId === d.id}
+                            >
+                              {retryingId === d.id ? 'Retrying...' : 'Retry'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {isExpanded && <DeliveryDetailPanel delivery={d} />}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
-      )}
-      
-      <ToastProvider />
-      {toastMessage && (
-        <Toast 
-          message={toastMessage} 
-          onDismiss={() => setToastMessage(null)} 
-          type="info"
-        />
       )}
     </div>
   );

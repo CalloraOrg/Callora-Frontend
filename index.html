@@ -5,16 +5,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Callora — Programmable API Access</title>
+    <meta name="description" content="Callora is a pay-per-call API marketplace on Stellar: fund a USDC vault, call APIs, pay per request." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script>
       // Pre-paint theme resolution to prevent flash of incorrect theme
       (function() {
         try {
-          const savedTheme = localStorage.getItem('callora-theme');
-          let theme = 'dark'; // default
+          let savedTheme = localStorage.getItem('callora-theme');
+          try { savedTheme = JSON.parse(localStorage.getItem('callora.prefs') || '{}').theme || savedTheme; } catch (_) {}
+          let theme = 'dark'; // default (matches userPrefs)
           
           if (savedTheme === 'light' || savedTheme === 'dark') {
             theme = savedTheme;
-          } else if (savedTheme === 'system' || !savedTheme) {
+          } else if (savedTheme === 'system') {
             // Check system preference
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             theme = prefersDark ? 'dark' : 'light';

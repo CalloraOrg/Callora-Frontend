@@ -25,7 +25,10 @@
 
   /* ── Market / detail typography tokens ────────────────────────────
      Tight, readable defaults consumed by marketplace + detail pages. */
+  --mkt-font-size-xs: 0.6875rem;     /* 11px */
   --mkt-font-size-micro: 0.75rem;    /* 12px */
+  --mkt-font-size-popover: 0.8125rem;
+  --mkt-font-size-popover-label: 0.6875rem;
   --mkt-font-size-sm: 0.8125rem;     /* 13px */
   --mkt-font-size-tag: 0.875rem;     /* 14px */
   --mkt-font-size-base: 1rem;        /* 16px */

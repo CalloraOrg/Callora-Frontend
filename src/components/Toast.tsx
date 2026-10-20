@@ -28,7 +28,7 @@ type ToastItem = {
 };
 
 type ToastContextValue = {
-  showToast: (message: string, variant?: ToastVariant) => void;
+  showToast: (messageOrOptions: string | ToastOptions, variant?: ToastVariant) => void;
 };
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -86,14 +86,31 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const showToast = useCallback(
-    (message: string, variant: ToastVariant = "success") => {
+    (messageOrOptions: string | ToastOptions, variant?: ToastVariant) => {
       const id = nextId++;
+      let message: string;
+      let finalVariant: ToastVariant;
+      let persistent: boolean;
+      let duration: number;
+
+      if (typeof messageOrOptions === "string") {
+        message = messageOrOptions;
+        finalVariant = variant || "success";
+        persistent = false;
+        duration = finalVariant === "error" ? 10000 : DEFAULT_DURATION;
+      } else {
+        message = messageOrOptions.message;
+        finalVariant = messageOrOptions.variant || variant || "success";
+        persistent = messageOrOptions.persistent ?? false;
+        duration = messageOrOptions.duration ?? (finalVariant === "error" ? 10000 : DEFAULT_DURATION);
+      }
+
       const toast: ToastItem = {
         id,
         message,
-        variant,
-        persistent: false,
-        duration: DEFAULT_DURATION,
+        variant: finalVariant,
+        persistent,
+        duration,
         createdAt: Date.now(),
         exiting: false,
       };
@@ -111,7 +128,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
 
-      startTimer(id, DEFAULT_DURATION);
+      if (!persistent) {
+        startTimer(id, duration);
+      }
     },
     [startTimer],
   );

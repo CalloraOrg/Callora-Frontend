@@ -64,7 +64,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return tid;
     };
 
-    let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
+    let cleanupTimer: number | undefined;
 
     if (theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

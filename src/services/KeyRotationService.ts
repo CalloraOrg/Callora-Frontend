@@ -60,29 +60,30 @@ export enum RotationErrorCode {
   ROTATION_FAILED = "ROTATION_FAILED",
 }
 
+function generateSecureNonce(): string {
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi?.getRandomValues) {
+    throw new Error("Web Crypto is required to generate a rotation nonce.");
+  }
+
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
+}
+
 /**
- * Generates a confirmation token tied to a specific rotation context.
- * This token should be generated server-side after authorization checks.
- *
- * In a real implementation, this would:
- * 1. Generate a cryptographically secure random token
- * 2. Bind it to the user/tenant/session context
- * 3. Store it server-side with an expiration time
- * 4. Return it to the client for the next request
- *
- * For this frontend implementation, we provide the interface that the
- * parent component should use when calling the backend.
+ * Encodes the rotation context with a 128-bit random nonce for this frontend
+ * placeholder. Base64 does not authenticate the token; the server must still
+ * authorize the request and should issue/store its own confirmation token.
  */
 export function generateConfirmationToken(context: RotationContext): string {
-  // In production, this token is generated server-side and returned to the client.
-  // The frontend stores it temporarily and includes it in the rotation request.
-  // This is a placeholder that demonstrates the token structure.
   const payload = {
     userId: context.userId,
     tenantId: context.tenantId,
     sessionId: context.sessionId,
     timestamp: context.timestamp,
-    nonce: Math.random().toString(36).substring(2),
+    nonce: generateSecureNonce(),
   };
   return btoa(JSON.stringify(payload));
 }
@@ -118,7 +119,11 @@ export function validateRotationRequest(
     };
   }
 
-  if (!request.keyId || typeof request.keyId !== "string" || request.keyId.trim() === "") {
+  if (
+    !request.keyId ||
+    typeof request.keyId !== "string" ||
+    request.keyId.trim() === ""
+  ) {
     return {
       valid: false,
       error: {
@@ -128,7 +133,10 @@ export function validateRotationRequest(
     };
   }
 
-  if (!request.confirmationToken || typeof request.confirmationToken !== "string") {
+  if (
+    !request.confirmationToken ||
+    typeof request.confirmationToken !== "string"
+  ) {
     return {
       valid: false,
       error: {
@@ -257,19 +265,24 @@ export function sanitizeRotationError(
   }
 
   // If we have a structured error code from the backend, use it
-  if (errorCode && Object.values(RotationErrorCode).includes(errorCode as RotationErrorCode)) {
+  if (
+    errorCode &&
+    Object.values(RotationErrorCode).includes(errorCode as RotationErrorCode)
+  ) {
     // Map the error code to a safe user message
     const safeMessages: Record<string, string> = {
       [RotationErrorCode.AUTHORIZATION_FAILED]:
         "You are not authorized to rotate this key.",
-      [RotationErrorCode.INVALID_INPUT]: "Invalid rotation request. Please try again.",
+      [RotationErrorCode.INVALID_INPUT]:
+        "Invalid rotation request. Please try again.",
       [RotationErrorCode.TOKEN_EXPIRED]:
         "Confirmation token has expired. Please start a new rotation.",
       [RotationErrorCode.TOKEN_INVALID]:
         "Confirmation token is invalid. Please start a new rotation.",
       [RotationErrorCode.CROSS_TENANT_VIOLATION]:
         "You are not authorized to rotate this key.",
-      [RotationErrorCode.KEY_NOT_FOUND]: "Key not found. Please refresh and try again.",
+      [RotationErrorCode.KEY_NOT_FOUND]:
+        "Key not found. Please refresh and try again.",
       [RotationErrorCode.ROTATION_FAILED]:
         "Failed to rotate API key. Please try again.",
     };
@@ -317,13 +330,22 @@ export function stripSensitiveData(text: string): string {
   }
 
   // Strip API key patterns (e.g., ck_live_*, sk_*, pk_*)
-  let sanitized = text.replace(/\b(ck_live_|sk_|pk_)[a-zA-Z0-9_]{20,}\b/g, "[REDACTED_KEY]");
+  let sanitized = text.replace(
+    /\b(ck_live_|sk_|pk_)[a-zA-Z0-9_]{20,}\b/g,
+    "[REDACTED_KEY]",
+  );
 
   // Strip bearer tokens
-  sanitized = sanitized.replace(/Bearer\s+[a-zA-Z0-9\-_.~+/]+=*/gi, "Bearer [REDACTED_TOKEN]");
+  sanitized = sanitized.replace(
+    /Bearer\s+[a-zA-Z0-9\-_.~+/]+=*/gi,
+    "Bearer [REDACTED_TOKEN]",
+  );
 
   // Strip common secret patterns
-  sanitized = sanitized.replace(/(?:password|secret|token)[\s:=]+([^\s,;)]*)/gi, "$1 = [REDACTED]");
+  sanitized = sanitized.replace(
+    /(?:password|secret|token)[\s:=]+([^\s,;)]*)/gi,
+    "$1 = [REDACTED]",
+  );
 
   return sanitized;
 }

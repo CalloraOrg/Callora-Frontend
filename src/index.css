@@ -60,6 +60,17 @@
   --modal-bg: linear-gradient(180deg, rgba(20, 27, 50, 0.98), rgba(12, 18, 34, 0.98));
   --visited: #a78bfa;
 
+  /* ── Theme-agnostic display / glyph tokens ─────────────────────────────
+     These carry foreground colours that must remain legible in BOTH themes.
+     They are defined per-theme (light + dark) so dynamic theme switching
+     never leaves a hardcoded light-on-dark colour behind on a light surface.
+     Each value is tuned to clear WCAG 2.1 AA (>= 4.5:1) against its
+     intended background token.                                            */
+  --display-404: #dbe5ff;       /* .not-found-code — on --page-bg */
+  --glyph-error: #ffd0d6;       /* .error-illustration span — on --page-bg */
+  --status-pending-fg: #ffe08a; /* .status-chip.pending — on --surface */
+  --status-approving-fg: #cbd9ff; /* .status-chip.approving — on --surface */
+
   /* HTTP Method Badge Tokens - Dark Theme (High Contrast / Accessible) */
   --method-get-bg: rgba(59, 130, 246, 0.16);
   --method-get-color: #60a5fa;
@@ -103,6 +114,13 @@
   --backdrop: rgba(255, 255, 255, 0.8);
   --modal-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 255, 0.98));
   --visited: #7c3aed;
+
+  /* ── Theme-agnostic display / glyph tokens (Light Theme) ───────────────
+     Dark foregrounds so they clear WCAG 2.1 AA against light surfaces. */
+  --display-404: #1e3a8a;
+  --glyph-error: #b91c1c;
+  --status-pending-fg: #854d0e;
+  --status-approving-fg: #1e40af;
 
   /* HTTP Method Badge Tokens - Light Theme (High Contrast / Accessible) */
   --method-get-bg: rgba(37, 99, 235, 0.1);
@@ -265,6 +283,37 @@ input {
   max-width: 640px;
   color: var(--muted);
   line-height: 1.6;
+}
+
+/* Clipboard-export failure status (Issue #1066). Token-based so the message
+   is legible in both light and dark themes. */
+.theme-playground__export-error {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.theme-playground__download-btn {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.theme-playground__download-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .theme-playground__actions,
@@ -960,8 +1009,8 @@ code,
 }
 
 .primary-button {
-  background: linear-gradient(135deg, #4e85ff, #6da6ff);
-  color: white;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 84%, #000000), var(--accent));
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -1091,7 +1140,7 @@ code,
 .error-illustration span {
   font-size: 2rem;
   font-weight: 700;
-  color: #ffd0d6;
+  color: var(--glyph-error);
 }
 
 .not-found-code {
@@ -1099,7 +1148,7 @@ code,
   font-size: clamp(4rem, 16vw, 8rem);
   line-height: 0.9;
   font-weight: 700;
-  color: #dbe5ff;
+  color: var(--display-404);
   letter-spacing: 0.04em;
 }
 
@@ -1142,6 +1191,44 @@ code,
 
 .not-found-search input::placeholder {
   color: var(--muted);
+}
+
+.not-found-search-results {
+  display: grid;
+  gap: 8px;
+}
+
+.not-found-search-results p {
+  margin: 0;
+}
+
+.not-found-search-results ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.not-found-search-results a {
+  display: inline-block;
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.92rem;
+  transition:
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.not-found-search-results a:hover,
+.not-found-search-results a:focus-visible {
+  background: rgba(78, 133, 255, 0.12);
+  transform: translateY(-1px);
 }
 
 .not-found-links {
@@ -1281,6 +1368,19 @@ code,
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), var(--modal-bg) 80%);
 }
 
+.wallet-install-prompt {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.wallet-install-prompt p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .modal-header,
 .preview-header {
   display: flex;
@@ -1367,7 +1467,7 @@ code,
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='1.2' fill='currentColor' fill-opacity='0.25'/%3E%3C/svg%3E") repeat,
     rgba(250, 204, 21, 0.12);
-  color: #ffe08a;
+  color: var(--status-pending-fg);
 }
 
 .status-chip.confirmed {
@@ -1390,7 +1490,7 @@ code,
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cline x1='0' y1='8' x2='8' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='4' y1='8' x2='8' y2='4' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3Cline x1='0' y1='4' x2='4' y2='0' stroke='currentColor' stroke-width='1' stroke-opacity='0.2'/%3E%3C/svg%3E") repeat,
     rgba(78, 133, 255, 0.14);
-  color: #cbd9ff;
+  color: var(--status-approving-fg);
 }
 
 .status-chip.input {
@@ -2031,6 +2131,19 @@ code,
   color: var(--text);
   font-size: var(--mkt-font-size-sm);
   font-weight: 600;
+}
+
+/* Shown when the catalogue request failed but a cached copy is being rendered.
+   The warning wording carries the meaning; the colour is subordinate to it
+   (WCAG 1.4.1). */
+.marketplace-stale-notice {
+  margin: 0 0 var(--mkt-space-lg);
+  padding: var(--mkt-space-sm) var(--mkt-space-md);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--text);
+  font-size: var(--mkt-font-size-sm);
 }
 
 .marketplace-actions {
@@ -3655,17 +3768,27 @@ code,
 }
 
 .call-history-table {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 8px;
-  overflow: hidden;
+  /* Internal scroll container: bounds the table height so the virtualized
+     window stays small and stable no matter how many calls exist. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  max-height: min(60vh, 640px);
 }
 
 .table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr;
   gap: 16px;
   padding: 16px;
   background: var(--surface);
+  backdrop-filter: blur(22px);
   font-weight: 500;
   font-size: 0.875rem;
   border-bottom: 1px solid var(--line);
@@ -3680,7 +3803,31 @@ code,
   align-items: center;
 }
 
-.table-row:last-child {
+.call-history-table__viewport {
+  position: relative;
+}
+
+/* Windowed rows are absolutely positioned at their measured offsets; the
+   viewport's explicit height acts as the full-list spacer. */
+.call-history-table__item {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+/* The pinned row stays mounted (and focusable) when the keyboard-focused
+   row is scrolled outside the window. */
+.call-history-table__item--pinned {
+  z-index: 0;
+}
+
+/* Virtualized rows: drop the divider on the final rendered row. */
+.call-history-table__item:last-child .table-row {
+  border-bottom: none;
+}
+
+/* Loading skeletons are still direct children of the table shell. */
+.call-history-table > .table-row:last-child {
   border-bottom: none;
 }
 
@@ -4412,59 +4559,59 @@ code,
   .close-button {
     min-height: 48px;
   }
-}
 
-.input-shell input {
-  grid-area: input;
-  font-size: 1.75rem;
-}
+  .input-shell input {
+    grid-area: input;
+    font-size: 1.75rem;
+  }
 
-.input-shell span {
-  grid-area: unit;
-  justify-self: end;
-}
+  .input-shell span {
+    grid-area: unit;
+    justify-self: end;
+  }
 
-.input-shell .ghost-button {
-  grid-area: max;
-  justify-self: end;
-}
+  .input-shell .ghost-button {
+    grid-area: max;
+    justify-self: end;
+  }
 
-.preset-row {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
+  .preset-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
-.not-found-search-row {
-  grid-template-columns: 1fr;
-}
+  .not-found-search-row {
+    grid-template-columns: 1fr;
+  }
 
-.not-found-search .secondary-button {
-  width: 100%;
-}
+  .not-found-search .secondary-button {
+    width: 100%;
+  }
 
-.not-found-links a {
-  width: 100%;
-  justify-content: center;
-  display: inline-flex;
-}
+  .not-found-links a {
+    width: 100%;
+    justify-content: center;
+    display: inline-flex;
+  }
 
-.error-link-pill {
-  width: 100%;
-  justify-content: center;
-  display: inline-flex;
-}
+  .error-link-pill {
+    width: 100%;
+    justify-content: center;
+    display: inline-flex;
+  }
 
-.modal-actions,
-.hero-actions,
-.hash-actions {
-  flex-direction: column;
-}
+  .modal-actions,
+  .hero-actions,
+  .hash-actions {
+    flex-direction: column;
+  }
 
-.primary-button,
-.secondary-button,
-.close-button,
-.hash-actions button,
-.hash-actions a {
-  width: 100%;
+  .primary-button,
+  .secondary-button,
+  .close-button,
+  .hash-actions button,
+  .hash-actions a {
+    width: 100%;
+  }
 }
 
 .launch-home {
@@ -4559,13 +4706,18 @@ code,
   display: grid;
   place-content: center;
   gap: 8px;
+  padding: 24px 28px;
+  text-align: center;
   color: var(--text);
   background:
     radial-gradient(circle at top left, var(--ambient-a), transparent 38%), radial-gradient(circle at bottom right, var(--ambient-b), transparent 36%),
     var(--surface-strong);
 }
 
+.lp-visual span { color: var(--muted); line-height: 1.5; }
+
 .lp-visual p {
+  margin: 0;
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--text);
@@ -4714,6 +4866,13 @@ code,
   }
 }
 
+/* With reduced motion the bar appears/disappears instantly instead of fading. */
+@media (prefers-reduced-motion: reduce) {
+  .route-progress-bar {
+    transition: none;
+  }
+}
+
 /* Skeleton Loading */
 @keyframes shimmer {
   0% {
@@ -4753,6 +4912,27 @@ code,
     linear-gradient(90deg, var(--surface-soft) 25%, color-mix(in srgb, var(--accent) 16%, var(--surface-soft)) 50%, var(--surface-soft) 75%);
   background-size: 200% 100%;
 }
+
+/* Global reduced-motion fallback (Issue #1005):
+   Skeleton shimmer and spinner rotation are purely decorative. When the
+   user prefers reduced motion, freeze them to static, non-animated
+   surfaces so loading state is still conveyed without animating. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .skeleton--stellar,
+  .api-card-skeleton,
+  [data-theme="light"] .skeleton,
+  [data-theme="light"] .skeleton--stellar {
+    animation: none;
+    background: var(--surface-soft);
+  }
+
+  .button-spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.3);
+  }
+}
+
 /* Filters Sidebar accessibility styles */
 .filter-group {
   margin-bottom: 1rem;
@@ -4808,6 +4988,37 @@ code,
 
 .primary-button.button-loading {
   cursor: not-allowed;
+}
+
+/* ── Webhook Deliveries ──────────────────────────────────────────────
+   Status, error, and stale-data states use the semantic --danger /
+   --warning design tokens (theme-aware contrast) instead of hardcoded
+   colors. The stale fade respects prefers-reduced-motion. */
+.webhook-deliveries-error {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  padding: 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.webhook-deliveries-data {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.webhook-deliveries-data--stale {
+  opacity: 0.6;
+}
+
+.webhook-deliveries-stale-note {
+  color: var(--warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webhook-deliveries-data {
+    transition: none;
+  }
 }
 
 /* Response JSON Skeleton Container */
@@ -5585,6 +5796,37 @@ code,
 .filter-input--invalid:focus-visible {
   outline: 2px solid var(--danger) !important;
   box-shadow: 0 0 0 3px rgba(255, 125, 141, 0.4) !important;
+}
+
+/* Inline hint shown when the price range is inverted (min > max). */
+.filters-price-error {
+  display: grid;
+  gap: var(--mkt-space-sm, 4px);
+  justify-items: start;
+}
+
+.filters-price-swap {
+  font-size: 0.8125rem;
+  padding: 4px 10px;
+  min-height: 32px;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.filters-price-swap:hover {
+  background: rgba(255, 125, 141, 0.12);
+}
+
+/* Active-filter chip for a value that is set but not narrowing results
+   (inverted price range). Kept visible, visibly de-emphasised. */
+.filter-chip--inactive {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+.filter-chip__inactive-note {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 /* ─── Calls Heatmap ───────────────────────────────────────────────────────── */
@@ -6944,6 +7186,10 @@ code,
     --line-strong: rgba(0, 0, 0, 0.12) !important;
     --text: #1a2332 !important;
     --muted: #64748b !important;
+    --display-404: #1e3a8a !important;
+    --glyph-error: #b91c1c !important;
+    --status-pending-fg: #854d0e !important;
+    --status-approving-fg: #1e40af !important;
     --accent: #2563eb !important;
     --accent-strong: #059669 !important;
     --danger: #dc2626 !important;
@@ -7484,3 +7730,174 @@ code,
     gap: var(--mkt-space-xl);
   }
 }
+
+/* ---- Standalone shell (marketplace / publish / details) ---- */
+.standalone-topbar { margin: 0 auto; max-width: 1400px; padding: 14px 24px; align-items: center; }
+.standalone-brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; color: inherit; text-decoration: none; }
+.standalone-logo { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, #4f86ff, #2dd4a7); color: #fff; font-weight: 800; }
+.standalone-main { max-width: 1400px; margin: 0 auto; padding: 8px 24px 64px; position: relative; z-index: 1; }
+.standalone-topbar .nav { flex-wrap: wrap; }
+@media (max-width: 720px) { .standalone-topbar, .standalone-main { padding-left: 14px; padding-right: 14px; } }
+
+/* ---- Token aliases for components that reference legacy names ---- */
+:root {
+  --text-main: var(--text);
+  --text-muted: var(--muted);
+  --text-secondary: var(--muted);
+  --text-primary: var(--text);
+  --text-code: var(--text);
+  --tooltip-text: var(--text);
+  --accent-primary: var(--accent);
+  --accent-hover: var(--accent);
+  --accent-muted: color-mix(in srgb, var(--accent) 16%, transparent);
+  --bg-card: var(--surface);
+  --bg-chip: var(--surface-soft);
+  --bg-soft: var(--surface-soft);
+  --bg-code: var(--surface-soft);
+  --bg-selected: color-mix(in srgb, var(--accent) 14%, var(--surface-soft));
+  --bg-elevated: var(--surface-strong, var(--surface));
+  --surface-raised: var(--surface-strong, var(--surface));
+  --border-color: var(--line);
+  --border: var(--line);
+  --border-subtle: var(--line);
+  --bg-highlight: var(--surface-soft);
+  --bg-main: var(--page-bg);
+  --card-bg: var(--surface);
+  --color-surface: var(--surface);
+  --theme-surface: var(--surface);
+  --theme-accent: var(--accent);
+  --theme-primary: var(--accent);
+  --color-divider: var(--line);
+  --line-weak: var(--line-soft);
+  --border-radius: 12px;
+  --spacing-lg: 24px;
+  --spacing-md: 16px;
+  --spacing-sm: 8px;
+  --spacing-12: 12px;
+  --spacing-24: 24px;
+  --tooltip-bg: #0f172a;
+  --tooltip-fg: #f8fafc;
+}
+.api-marketplace-card { position: relative; }
+.recently-active-rail button { background: var(--surface-soft) !important; }
+:root { --mkt-grid-min: 300px; }
+.api-marketplace-card .api-marketplace-card-header { padding-top: 26px; }
+
+/* ---- Documentation page ---- */
+.docs-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); margin-top: 16px; }
+.docs-card { padding: 22px; border-radius: var(--radius-lg); }
+.docs-card h2 { margin: 0 0 8px; font-size: 1.15rem; }
+.docs-card p { color: var(--muted); line-height: 1.6; margin: 0 0 12px; }
+.docs-links { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ── Testnet deployment links (footer + docs) ─────────────────────────────── */
+.footer-chain-link { color: var(--accent-strong, #2dd4a7); text-decoration: none; font-weight: 600; }
+.footer-chain-link::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-right: 8px; vertical-align: middle; }
+.footer-chain-link:hover, .footer-chain-link:focus-visible { text-decoration: underline; }
+.standalone-footer { max-width: 1400px; margin: 0 auto; padding: 20px 24px 32px; display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; align-items: center; color: var(--text-muted, #9aa4bf); font-size: 0.9rem; border-top: 1px solid var(--border, rgba(255,255,255,0.08)); position: relative; z-index: 1; }
+.docs-contract-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+.docs-contract-list li { display: grid; gap: 2px; }
+.docs-contract-label { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted, #9aa4bf); }
+.docs-contract-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; overflow-wrap: anywhere; color: var(--accent, #4f86ff); }
+.vault-facts { margin: 16px 0; display: grid; gap: 12px; }
+.vault-facts div { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.vault-facts dt { color: var(--muted); font-size: 0.9rem; }
+.vault-facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.vault-facts a, .prototype-panel .helper-text a { color: var(--accent); }
+.vault-facts a { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+.docs-links .link-nav { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-soft); color: var(--accent); font-size: 0.85rem; font-weight: 600; text-decoration: none; }
+.docs-links .link-nav:hover, .docs-links .link-nav:focus-visible { border-color: var(--accent); }
+.docs-contracts { grid-column: 1 / -1; }
+.status-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+.status-list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.status-list .status-ok { color: var(--success, #2dd4a7); font-weight: 600; }
+
+/* ── Webhook deliveries ───────────────────────────────────────────────────── */
+.webhook-deliveries { padding: 24px 0; display: grid; gap: 16px; }
+.webhook-deliveries h1 { margin: 0; }
+.webhook-deliveries .eyebrow { margin: 0; }
+.webhook-deliveries-intro { margin: 0; color: var(--muted); max-width: 640px; line-height: 1.6; }
+.webhook-deliveries-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.webhook-deliveries-filter { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.9rem; }
+.webhook-deliveries-filter select { background: var(--surface-soft); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font: inherit; }
+.webhook-deliveries-table-wrap { overflow-x: auto; border-radius: var(--radius-lg, 16px); padding: 0; }
+.webhook-deliveries-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+.webhook-deliveries-table th { padding: 12px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.webhook-deliveries-table td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.webhook-deliveries-table tr:last-child td { border-bottom: 0; }
+.webhook-expand-button { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 4px 6px; font-size: 12px; line-height: 1; }
+.webhook-status { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; text-transform: capitalize; border: 1px solid currentColor; }
+.webhook-status--delivered { color: var(--success, #2dd4a7); }
+.webhook-status--failed { color: var(--danger, #ff6b7f); }
+.webhook-status--pending { color: var(--warning, #f5b84d); }
+.webhook-detail-cell { background: var(--surface-soft); }
+.webhook-deliveries-empty { padding: 32px; text-align: center; color: var(--muted); }
+
+/* App shell uses the same top bar as the standalone pages; keep the gap the old header had. */
+.app-shell:not(.standalone-shell) > .standalone-topbar { margin-bottom: 24px; padding-left: 0; padding-right: 0; max-width: 1180px; }
+
+/* ── Accessibility audit board ────────────────────────────────────────────── */
+.a11y-components-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.a11y-card { padding: 16px 18px; border-radius: var(--radius-lg, 16px); }
+.a11y-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.a11y-card-header h3 { margin: 0; font-size: 1rem; }
+.a11y-card .component-link { color: var(--text); }
+.a11y-audit-page .status-pill { padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; border: 1px solid currentColor; white-space: nowrap; }
+.a11y-audit-page .status-audited { color: var(--success, #2dd4a7); }
+.a11y-audit-page .status-needs-work { color: var(--warning, #f5b84d); }
+.a11y-audit-page .status-n-a { color: var(--muted); }
+
+/* ── Responsive top bar: brand + actions on one row, nav scrolls below ───── */
+.standalone-topbar .nav a { white-space: nowrap; }
+@media (max-width: 960px) {
+  .standalone-topbar { flex-wrap: wrap; align-items: center; gap: 12px; }
+  .standalone-topbar .topbar-actions { display: contents; }
+  .standalone-topbar .standalone-brand { margin-right: auto; }
+  .standalone-topbar .topbar-actions > :not(.nav) { order: 1; }
+  .standalone-topbar .nav {
+    order: 2; width: 100%; display: flex; flex-wrap: nowrap; overflow-x: auto;
+    justify-content: flex-start; gap: 4px; padding: 6px; border-radius: 16px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .standalone-topbar .nav::-webkit-scrollbar { display: none; }
+  .standalone-topbar .nav a { flex: 0 0 auto; padding: 8px 14px; }
+}
+
+/* Grid containers must not grow to their widest child (tables, nowrap rows) on small screens. */
+main.page { grid-template-columns: minmax(0, 1fr); }
+main.page > *, .standalone-main > * { min-width: 0; max-width: 100%; }
+@media (max-width: 1024px) {
+  .api-detail-content-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .api-detail-content-grid > * { min-width: 0; }
+}
+@media (max-width: 720px) {
+  .billing-history table, .rate-limit-page table, .sla-card table, .my-apis-page table, .endpoint-summary table {
+    display: block; overflow-x: auto; max-width: 100%;
+  }
+}
+/* Grid items with `margin: 0 auto` shrink-wrap to max-content; pin them to the column on phones. */
+@media (max-width: 720px) {
+  main.page > *, .standalone-main > * { width: 100%; }
+}
+.webhook-deliveries { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 720px) {
+  .api-detail-tabs nav { overflow-x: auto; scrollbar-width: none; }
+  .api-detail-tabs nav::-webkit-scrollbar { display: none; }
+}
+@media (max-width: 600px) {
+  .my-apis-header { display: none !important; }
+  .my-apis-row { flex-wrap: wrap; row-gap: 10px !important; padding: 14px 16px !important; }
+  .my-apis-row__name { flex: 1 1 calc(100% - 80px) !important; }
+}
+.webhook-deliveries-toolbar .secondary-button, .webhook-deliveries-error .secondary-button { width: auto; min-height: 0; padding: 8px 16px; }
+/* Code inside a block is part of the block, not its own chip. */
+pre code, .code-block code { border: 0; background: transparent; padding: 0; }
+.theme-playground [data-theme] { color: var(--text); }
+/* Phones: the favourite/compare/bookmark/pin controls are absolutely positioned
+   in the card's top band, so keep the header clear of them. */
+@media (max-width: 480px) {
+  .api-marketplace-card { padding-top: 52px !important; }
+  .api-marketplace-card .api-marketplace-card-header { padding-right: 36px; }
+  .api-marketplace-card .api-card__compare-btn { left: 48px !important; min-height: 32px; }
+}
+.billing-panel .section-heading .primary-button { white-space: nowrap; }

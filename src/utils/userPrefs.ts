@@ -5,12 +5,14 @@ export interface UserPrefs {
   theme: Theme;
   density: DensityPreference;
   pageSize: number;
+  analyticsConsent: boolean;
 }
 
 export const DEFAULT_PREFS: UserPrefs = {
   theme: 'dark',
   density: 'comfortable',
   pageSize: 12,
+  analyticsConsent: false,
 };
 
 export const PREFS_STORAGE_KEY = 'callora.prefs';

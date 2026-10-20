@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { CheckIcon } from "./icons";
 import type { Shortcut } from "../hooks/useGlobalShortcuts";
 import KbdHint from "./KbdHint";
@@ -24,6 +24,14 @@ export interface PricingTier {
 interface PricingTierTableProps {
   tiers: PricingTier[];
   onSelectTier?: (tier: PricingTier) => void;
+  /**
+   * Tier the caller wants labelled "Recommended".
+   *
+   * Takes precedence over `tier.isRecommended` so a page can compute the
+   * cheapest tier for a projected usage volume and hand it down (issue #1091).
+   * Pass `undefined` / `null` to fall back to the `isRecommended` flags.
+   */
+  recommended?: PricingTier | null;
 }
 
 const XIcon = ({ style }: { style?: React.CSSProperties }) => (
@@ -86,8 +94,30 @@ function PrimaryActionHint() {
   );
 }
 
-export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTableProps) {
+export default function PricingTierTable({
+  tiers,
+  onSelectTier,
+  recommended,
+}: PricingTierTableProps) {
   const [isMobile, setIsMobile] = useState(false);
+
+  // Resolve the recommended tier once per render. An explicit `recommended`
+  // prop wins; otherwise the tier flagged with `isRecommended` is used.
+  //
+  // The result is always a member of `tiers` (or null), so the badge, the
+  // `aria-keyshortcuts` attribute, and the "s" handler can never point at a
+  // tier that is not actually rendered. Matching by name as well as identity
+  // lets callers pass an equivalent object to one in the list.
+  const recommendedTier = useMemo(() => {
+    if (recommended) {
+      return (
+        tiers.find((tier) => tier === recommended || tier.name === recommended.name) ?? null
+      );
+    }
+    return tiers.find((tier) => tier.isRecommended) ?? null;
+  }, [recommended, tiers]);
+
+  const isRecommended = (tier: PricingTier) => tier === recommendedTier;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 768px)");
@@ -113,16 +143,15 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       if (e.key.toLowerCase() === "s") {
-        const recommended = tiers.find((t) => t.isRecommended);
-        if (recommended) {
+        if (recommendedTier) {
           e.preventDefault();
-          onSelectTier?.(recommended);
+          onSelectTier?.(recommendedTier);
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [tiers, onSelectTier]);
+  }, [recommendedTier, onSelectTier]);
 
   if (isMobile) {
     return (
@@ -136,15 +165,15 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
             style={{
               padding: 24,
               borderRadius: 16,
-              background: tier.isRecommended ? "var(--bg-subtle)" : "var(--surface-strong)",
-              border: tier.isRecommended ? "2px solid var(--accent)" : "1px solid var(--border-subtle)",
+              background: isRecommended(tier) ? "var(--bg-subtle)" : "var(--surface-strong)",
+              border: isRecommended(tier) ? "2px solid var(--accent)" : "1px solid var(--border-subtle)",
               position: "relative",
               display: "flex",
               flexDirection: "column",
               gap: 16,
             }}
           >
-            {tier.isRecommended && (
+            {isRecommended(tier) && (
               <div
                 style={{
                   position: "absolute",
@@ -172,7 +201,15 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
 
             <div style={{ textAlign: "center" }}>
               {!badgeTier && <h3 style={{ margin: 0, fontSize: 20 }}>{tier.name}</h3>}
-              <div style={{ fontSize: 28, fontWeight: 800, marginTop: 8 }}>{tier.price}</div>
+              {/* `api-detail-plan-price` keeps the plan price consistent with
+                  the ApiDetailPage pricing panel; `tabular-nums` avoids
+                  digit-width jitter (issue #466). */}
+              <div
+                className="tabular-nums api-detail-plan-price"
+                style={{ fontSize: 28, fontWeight: 800, marginTop: 8 }}
+              >
+                {tier.price}
+              </div>
               <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 4 }}>{tier.description}</p>
             </div>
 
@@ -195,11 +232,11 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
               onClick={() => onSelectTier?.(tier)}
               // Exposes the shortcut programmatically; only the recommended
               // tier's action is reachable via the "s" key.
-              aria-keyshortcuts={tier.isRecommended ? PRIMARY_SHORTCUT_KEY : undefined}
+              aria-keyshortcuts={isRecommended(tier) ? PRIMARY_SHORTCUT_KEY : undefined}
             >
               {tier.ctaLabel}
             </button>
-            {tier.isRecommended && <PrimaryActionHint />}
+            {isRecommended(tier) && <PrimaryActionHint />}
           </div>
           );
         })}
@@ -218,14 +255,14 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
           style={{
             padding: 24,
             borderRadius: 16,
-            background: tier.isRecommended ? "var(--bg-subtle)" : "var(--surface-strong)",
-            border: tier.isRecommended ? "2px solid var(--accent)" : "1px solid var(--border-subtle)",
+            background: isRecommended(tier) ? "var(--bg-subtle)" : "var(--surface-strong)",
+            border: isRecommended(tier) ? "2px solid var(--accent)" : "1px solid var(--border-subtle)",
             position: "relative",
             display: "flex",
             flexDirection: "column",
           }}
         >
-          {tier.isRecommended && (
+          {isRecommended(tier) && (
             <div
               style={{
                 position: "absolute",
@@ -253,7 +290,12 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
 
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             {!badgeTier && <h3 style={{ margin: 0, fontSize: 20 }}>{tier.name}</h3>}
-            <div style={{ fontSize: 28, fontWeight: 800, marginTop: 8 }}>{tier.price}</div>
+            <div
+              className="tabular-nums api-detail-plan-price"
+              style={{ fontSize: 28, fontWeight: 800, marginTop: 8 }}
+            >
+              {tier.price}
+            </div>
             <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 4 }}>{tier.description}</p>
           </div>
 
@@ -286,12 +328,12 @@ export default function PricingTierTable({ tiers, onSelectTier }: PricingTierTab
             onClick={() => onSelectTier?.(tier)}
             // Exposes the shortcut programmatically; only the recommended
             // tier's action is reachable via the "s" key.
-            aria-keyshortcuts={tier.isRecommended ? PRIMARY_SHORTCUT_KEY : undefined}
+            aria-keyshortcuts={isRecommended(tier) ? PRIMARY_SHORTCUT_KEY : undefined}
           >
             {tier.ctaLabel}
           </button>
 
-          {tier.isRecommended && <PrimaryActionHint />}
+          {isRecommended(tier) && <PrimaryActionHint />}
         </div>
         );
       })}

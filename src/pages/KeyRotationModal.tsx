@@ -186,6 +186,8 @@ export default function KeyRotationModal({
     };
 
     // Step 2: Generate a confirmation token
+    // TODO(Security): generateConfirmationToken is a client-side placeholder.
+    // In production, this token must be issued server-side. See docs/Key-Rotation.md.
     const confirmationToken = generateConfirmationToken(context);
 
     // Step 3: Validate authorization BEFORE any state changes (fail closed)

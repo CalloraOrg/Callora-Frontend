@@ -2,7 +2,82 @@
 // Uses semantic HTML and ARIA labels for accessibility.
 // No external dependencies are added; it relies on existing utils for formatting.
 
+import { useEffect, useState } from 'react';
+import { HORIZON_FEE_STATS_URL, NETWORK_FEE_CACHE_TTL_MS } from '../config/constants';
 import { formatUsdc } from '../utils/format';
+
+type FeeStats = {
+  fee_charged?: { mode?: string | number };
+  max_fee?: { mode?: string | number };
+};
+
+let cachedFee: { value: string; expiresAt: number } | null = null;
+let feeRequest: Promise<string | null> | null = null;
+
+function formatStroops(stroops: string | number) {
+  const value = Number(stroops);
+  if (!Number.isFinite(value) || value < 0) return null;
+
+  const xlm = (value / 10_000_000).toFixed(7).replace(/0+$/, '').replace(/\.$/, '');
+  return `${xlm} XLM`;
+}
+
+async function fetchNetworkFee() {
+  if (cachedFee && cachedFee.expiresAt > Date.now()) return cachedFee.value;
+  if (feeRequest) return feeRequest;
+
+  feeRequest = fetch(HORIZON_FEE_STATS_URL)
+    .then(async (response) => {
+      if (!response.ok) throw new Error(`Horizon fee request failed: ${response.status}`);
+      const stats = (await response.json()) as FeeStats;
+      const recommended = stats.fee_charged?.mode ?? stats.max_fee?.mode;
+      const fee = recommended === undefined ? null : formatStroops(recommended);
+      if (!fee) throw new Error('Horizon response did not include a valid fee');
+
+      cachedFee = { value: fee, expiresAt: Date.now() + NETWORK_FEE_CACHE_TTL_MS };
+      return fee;
+    })
+    .catch(() => null)
+    .finally(() => {
+      feeRequest = null;
+    });
+
+  return feeRequest;
+}
+
+export function clearNetworkFeeCache() {
+  cachedFee = null;
+  feeRequest = null;
+}
+
+export function useNetworkFee(fallbackFee: string, enabled = true) {
+  const [networkFee, setNetworkFee] = useState(fallbackFee);
+  const [isEstimated, setIsEstimated] = useState(true);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    let isCurrent = true;
+    setNetworkFee(fallbackFee);
+    setIsEstimated(true);
+    fetchNetworkFee().then((fee) => {
+      if (!isCurrent) return;
+      if (fee) {
+        setNetworkFee(fee);
+        setIsEstimated(false);
+      } else {
+        setNetworkFee(fallbackFee);
+        setIsEstimated(true);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [enabled, fallbackFee]);
+
+  return { networkFee, isEstimated };
+}
 
 interface DepositPreviewProps {
   /** Current vault balance before the deposit */
@@ -34,6 +109,7 @@ export default function DepositPreview({
   walletBalance,
   ariaLabel = 'Deposit transaction preview',
 }: DepositPreviewProps) {
+  const { networkFee: displayedNetworkFee, isEstimated } = useNetworkFee(networkFee);
   const newWalletBalance = hasAmount ? walletBalance - amount : walletBalance;
 
   return (
@@ -65,14 +141,17 @@ export default function DepositPreview({
           </li>
           <li className="network-fee">
             <span>Network fee</span>
-            <strong>{networkFee}</strong>
+            <strong>
+              <span>{displayedNetworkFee}</span>
+              {isEstimated && <span> (estimated)</span>}
+            </strong>
           </li>
           <li className="total">
             <span>Total cost</span>
             <strong>
               {hasAmount
-                ? `${formatUsdc(amount)} USDC + ${networkFee}`
-                : `0 USDC + ${networkFee}`}
+                ? `${formatUsdc(amount)} USDC + ${displayedNetworkFee}`
+                : `0 USDC + ${displayedNetworkFee}`}
             </strong>
           </li>
         </ul>

@@ -1,4 +1,6 @@
 import React, { useState, useRef, KeyboardEvent } from "react";
+import { useAccountContext } from "../hooks/useAccountContext";
+import { resolveTimeZone } from "../utils/format";
 
 export type HealthStatus = "operational" | "degraded" | "down";
 
@@ -26,6 +28,12 @@ const statusLabels = {
 };
 
 export default function HealthTimeline({ data = [] }: HealthTimelineProps) {
+  const { timezone } = useAccountContext();
+  const dateZone = resolveTimeZone(timezone);
+  const zoneAbbreviation = new Intl.DateTimeFormat(undefined, {
+    timeZone: dateZone,
+    timeZoneName: "short",
+  }).formatToParts(new Date()).find((part) => part.type === "timeZoneName")?.value;
   // Ensure we have exactly 24 items, default to operational if not provided
   const timelineData = Array(24).fill("operational").map((def, i) => data[i] || def);
   
@@ -54,9 +62,12 @@ export default function HealthTimeline({ data = [] }: HealthTimelineProps) {
 
   const getHourLabel = (index: number) => {
     // Current time minus (23 - index) hours
-    const date = new Date();
-    date.setHours(date.getHours() - (23 - index));
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const date = new Date(Date.now() - (23 - index) * 60 * 60 * 1000);
+    return new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: dateZone,
+    }).format(date);
   };
 
   return (
@@ -65,7 +76,7 @@ export default function HealthTimeline({ data = [] }: HealthTimelineProps) {
         style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}
       >
         <span style={{ fontSize: 12, color: "var(--muted)" }}>24 hours ago</span>
-        <span style={{ fontSize: 12, color: "var(--muted)" }}>Now</span>
+        <span style={{ fontSize: 12, color: "var(--muted)" }}>Now ({zoneAbbreviation ?? dateZone})</span>
       </div>
       <div 
         ref={containerRef}

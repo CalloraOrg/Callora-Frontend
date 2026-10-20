@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import TestInBrowser from "../components/TestInBrowser";
@@ -6,6 +7,7 @@ import { ApiDetailPageSkeleton } from "../components/Skeleton";
 import EmbedPreview from "../components/EmbedPreview";
 import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 import { formatPrice, formatEstimatedCost, formatCount, formatDateShort } from "../utils/format";
@@ -16,7 +18,8 @@ import EndpointPreview from "../components/EndpointPreview";
 import RatingHistogram from "../components/RatingHistogram";
 import { ApiDetailStickyTOC, type TocSection } from "../components/ApiDetailStickyTOC";
 import { StickyTocErrorBoundary } from "../components/StickyTocErrorBoundary";
-import { CheckIcon } from "../components/icons";
+import PricingTierTable, { type PricingTier } from "../components/PricingTierTable";
+import { PRICING_PLANS, cheapestPlan, type PricingPlanId } from "../utils/pricingTiers";
 import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
 import SubscribeButton from "../components/SubscribeButton";
 import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
@@ -26,8 +29,8 @@ import RelatedApisRail from "../components/RelatedApisRail";
 import MOCK_APIS from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
-import PlanBadge from "../components/PlanBadge";
 import LiveRegion from "../components/LiveRegion";
+import { toCurl, type CurlRequest } from "../utils/toCurl";
 
 /**
  * ApiDetailPage
@@ -64,6 +67,96 @@ type ApiEndpoint = {
   group?: string;
 };
 
+const BODILESS_METHODS = new Set(["GET", "HEAD"]);
+
+function exampleValueForType(type: string): unknown {
+  switch ((type || "string").trim().toLowerCase()) {
+    case "number":
+    case "integer":
+      return 1;
+    case "boolean":
+      return true;
+    case "array":
+      return ["example"];
+    case "object":
+      return { example: "value" };
+    default:
+      return "example";
+  }
+}
+
+function buildExampleRequest(endpoint: ApiEndpoint): CurlRequest {
+  const method = (endpoint.method || "GET").toUpperCase();
+  const params = Object.fromEntries(
+    (endpoint.params ?? [])
+      .filter((param) => param.name.trim())
+      .map((param) => [param.name.trim(), exampleValueForType(param.type)]),
+  );
+  const hasParams = Object.keys(params).length > 0;
+  const query = new URLSearchParams();
+
+  if (BODILESS_METHODS.has(method)) {
+    for (const [name, value] of Object.entries(params)) {
+      query.set(name, typeof value === "string" ? value : JSON.stringify(value));
+    }
+  }
+
+  const baseUrl = `${API_BASE_URL}${endpoint.url}`;
+  const url = query.toString() ? `${baseUrl}?${query.toString()}` : baseUrl;
+
+  return {
+    method,
+    url,
+    headers: {
+      Authorization: "Bearer YOUR_API_KEY",
+      "Content-Type": "application/json",
+    },
+    ...(hasParams && !BODILESS_METHODS.has(method) ? { body: params } : {}),
+  };
+}
+
+function toJavaScriptExample(request: CurlRequest): string {
+  const body = request.body === undefined ? undefined : JSON.stringify(request.body);
+  const bodyLine = body ? `\n    body: '${body.replace(/'/g, "\\'")}',` : "";
+
+  return `import fetch from 'node-fetch';
+
+const getApiData = async () => {
+  const response = await fetch('${request.url}', {
+    method: '${request.method}',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },${bodyLine}
+  });
+
+  if (!response.ok) throw new Error('API request failed');
+
+  const data = await response.json();
+  return data;
+};
+
+getApiData().then(console.log).catch(console.error);`;
+}
+
+function toPythonExample(request: CurlRequest): string {
+  const body = request.body === undefined ? undefined : JSON.stringify(request.body);
+  const requestCall = body
+    ? `requests.${(request.method ?? "GET").toLowerCase()}(url, headers=headers, json=${body})`
+    : `requests.${(request.method ?? "GET").toLowerCase()}(url, headers=headers)`;
+
+  return `import requests
+
+url = "${request.url}"
+headers = {
+    "Authorization": "Bearer YOUR_API_KEY",
+    "Content-Type": "application/json"
+}
+
+response = ${requestCall}
+print(response.json())`;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const GENERIC_ENDPOINT_VERBS = new Set(["get", "list", "create", "update", "delete", "remove", "fetch"]);
@@ -90,6 +183,61 @@ function deriveEndpointGroupLabel(endpoint: ApiEndpoint): string {
 
   if (!firstMeaningfulSegment) return "General";
   return toTitleCase(firstMeaningfulSegment.replace(/[-_]+/g, " "));
+}
+
+// ── Pricing plans (issue #1091) ──────────────────────────────────────────────
+
+/**
+ * Presentation metadata for each plan in {@link PRICING_PLANS}.
+ *
+ * `tier` ids line up with `PlanBadge`'s supported tiers so every card shows
+ * its badge (and the rate-limit tooltip that comes with it).
+ */
+const PRICING_TIER_META: Record<
+  PricingPlanId,
+  { name: string; ctaLabel: string; description: string; features: string[] }
+> = {
+  free: {
+    name: "Free",
+    ctaLabel: "Get Started",
+    description: "Prototype and evaluate without a commitment.",
+    features: ["Up to 10,000 requests / month", "Community support"],
+  },
+  pro: {
+    name: "Pro",
+    ctaLabel: "Upgrade Now",
+    description: "For production workloads that need headroom.",
+    features: [
+      "500,000 requests included / month",
+      "Overage billed at the API's list per-call price",
+      "99.9% uptime SLA",
+    ],
+  },
+  enterprise: {
+    name: "Enterprise",
+    ctaLabel: "Contact Sales",
+    description: "Dedicated capacity and volume discounts.",
+    features: [
+      "5,000,000 requests included / month",
+      "50% off the list price beyond that",
+      "24/7 support and custom rate limits",
+    ],
+  },
+};
+
+/** Build the rendered pricing tiers for an API from the shared plan catalogue. */
+function buildPricingTiers(): PricingTier[] {
+  return PRICING_PLANS.map((plan) => {
+    const meta = PRICING_TIER_META[plan.id];
+    return {
+      name: meta.name,
+      tier: plan.id,
+      price: plan.monthlyBaseUsd === 0 ? "$0" : `$${plan.monthlyBaseUsd} / mo`,
+      description: meta.description,
+      features: meta.features.map((label) => ({ label, included: true })),
+      ctaLabel: meta.ctaLabel,
+    };
+  });
 }
 
 // ── TOC sections (ids must match heading elements in the doc tab) ─────────────
@@ -401,20 +549,16 @@ export default function ApiDetailPage({ onBack }: Props) {
   const [assertiveAnnouncement, setAssertiveAnnouncement] = useState("");
   const { showToast } = useToast();
 
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
   const handleTabChange = useCallback((newTab: TabType) => {
     setTab(newTab);
     const tabLabel = TAB_ITEMS.find((t) => t.id === newTab)?.label ?? newTab;
     setAnnouncement(`Showing ${tabLabel} tab`);
   }, []);
 
-  const prefersReducedMotion = useMemo(() => {
-    return typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }, []);
-
-  // Extract ID from URL path: /details/[id]
-  const id = typeof window !== "undefined" ? window.location.pathname.split("/").filter(Boolean).pop() : undefined;
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const api = useMemo(() => findApiById(id), [id]);
   useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
@@ -503,12 +647,43 @@ export default function ApiDetailPage({ onBack }: Props) {
     return dist;
   }, [rawReviews]);
 
+  // ── Pricing recommendation (issue #1091) ───────────────────────────────────
+  //
+  // Computed before any early return so the hook order stays stable across the
+  // loading / not-found / ready renders. The cheapest tier for the projected
+  // request volume drives the "Recommended" badge and the "s" shortcut inside
+  // PricingTierTable.
+
+  const pricingTiers = useMemo(() => buildPricingTiers(), []);
+
+  const recommendedTier = useMemo(() => {
+    const plan = cheapestPlan(requests, api?.pricePerRequest ?? 0);
+    if (!plan) return null;
+    return pricingTiers.find((tier) => tier.tier === plan.id) ?? null;
+  }, [pricingTiers, requests, api?.pricePerRequest]);
+
+  const handleSelectTier = useCallback(
+    (tier: PricingTier) => {
+      setAnnouncement(
+        `${tier.name} plan selected${tier === recommendedTier ? " (recommended)" : ""}.`,
+      );
+    },
+    [recommendedTier],
+  );
+
   // Simulate 1.5 s initial data load (consistent with MarketplacePage)
   useEffect(() => {
     const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
     const timer = setTimeout(() => setIsLoading(false), delay);
     return () => clearTimeout(timer);
   }, [prefersReducedMotion]);
+
+  // Reset tab state and loading when the id param changes so switching
+  // related APIs does not show stale content.
+  useEffect(() => {
+    setTab("overview");
+    setIsLoading(true);
+  }, [id]);
 
   useEffect(() => {
     if (!isLoading && api) {
@@ -532,7 +707,7 @@ export default function ApiDetailPage({ onBack }: Props) {
             variant="api-detail"
             action={{
               label: "Back to marketplace",
-              onClick: () => (window.location.href = "/marketplace"),
+              onClick: () => navigate("/marketplace"),
             }}
           />
         </div>
@@ -553,40 +728,11 @@ export default function ApiDetailPage({ onBack }: Props) {
 
   const firstEndpoint = api.endpoints?.[0] ?? { url: "/v1/data", method: "GET" };
 
-  const curlExample = `curl -X ${firstEndpoint.method} "${API_BASE_URL}${firstEndpoint.url}?lat=37.78&lon=-122.41" \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
-  -H "Content-Type: application/json"`;
+  const exampleRequest = buildExampleRequest(firstEndpoint as ApiEndpoint);
+  const curlExample = toCurl(exampleRequest);
 
-  const jsExample = `import fetch from 'node-fetch';
-
-const getApiData = async () => {
-  const response = await fetch(\`${API_BASE_URL}${firstEndpoint.url}\`, {
-    method: \`${firstEndpoint.method}\`,
-    headers: {
-      'Authorization': 'Bearer YOUR_API_KEY',
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (!response.ok) throw new Error('API request failed');
-
-  const data = await response.json();
-  return data;
-};
-
-getApiData().then(console.log).catch(console.error);`;
-
-  const pyExample = `import requests
-
-url = "${API_BASE_URL}${firstEndpoint.url}"
-headers = {
-    "Authorization": "Bearer YOUR_API_KEY",
-    "Content-Type": "application/json"
-}
-params = { "lat": 37.78, "lon": -122.41 }
-
-response = requests.get(url, headers=headers, params=params)
-print(response.json())`;
+  const jsExample = toJavaScriptExample(exampleRequest);
+  const pyExample = toPythonExample(exampleRequest);
 
   const allSnippets = { bash: curlExample, javascript: jsExample, python: pyExample };
 
@@ -612,7 +758,7 @@ print(response.json())`;
                 Back
               </button>
               <div className="api-detail-brand">
-                <div className="api-detail-logo">W</div>
+                <div className="api-detail-logo" aria-hidden="true">{api.name.charAt(0).toUpperCase()}</div>
                 <div className="api-detail-title">
                   <h1>{api.name}</h1>
                   <div className="api-detail-meta">
@@ -860,41 +1006,15 @@ print(response.json())`;
                 {tab === "pricing" && (
                   <section id="panel-pricing" role="tabpanel" aria-labelledby="tab-pricing" tabIndex={0}>
                     <h2>Pricing Plans</h2>
-                    <div className="api-detail-pricing-grid">
-                      {/* Standard plan */}
-                      <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", border: "2px solid var(--accent)" }}>
-                        <PlanBadge tier="pro" />
-                        {/* tabular-nums prevents digit-width jitter on formatted prices (#466) */}
-                        <div className="api-detail-plan-price tabular-nums">
-                          {`$${formatPrice(api.pricePerRequest ?? 0)}`} <span style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>/ call</span>
-                        </div>
-                        <p style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>Perfect for startups and scaling applications. Pay only for what you use.</p>
-                        <ul style={{ padding: 0, listStyle: "none", fontSize: "var(--mkt-font-size-tag)", marginTop: "var(--mkt-space-2xl)" }}>
-                          {["Unlimited Throughput", "99.9% Uptime SLA", "Community Support"].map((feat) => (
-                            <li key={feat} style={{ marginBottom: "var(--mkt-space-lg)", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                              <CheckIcon size={16} aria-hidden="true" /> {feat}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {/* Enterprise plan */}
-                      <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)" }}>
-                        <PlanBadge tier="enterprise" />
-                        <div className="api-detail-plan-price">Custom</div>
-                        <p style={{ fontSize: "var(--mkt-font-size-tag)", color: "var(--muted)" }}>For high-volume needs requiring dedicated infrastructure and support.</p>
-                        <ul style={{ padding: 0, listStyle: "none", fontSize: "var(--mkt-font-size-tag)", marginTop: "var(--mkt-space-2xl)" }}>
-                          {["Dedicated Node", "24/7 Phone Support", "Custom Rate Limits"].map((feat) => (
-                            <li key={feat} style={{ marginBottom: "var(--mkt-space-lg)", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                              <CheckIcon size={16} aria-hidden="true" /> {feat}
-                            </li>
-                          ))}
-                        </ul>
-                        <button className="secondary-button" style={{ width: "100%", marginTop: "var(--mkt-space-lg)" }}>
-                          Contact Sales
-                        </button>
-                      </div>
-                    </div>
+                    <p style={{ color: "var(--muted)", marginTop: 0 }}>
+                      The plan with the Recommended badge is the cheapest option for the{' '}
+                      {formatCount(requests)} requests projected in the calculator below.
+                    </p>
+                    <PricingTierTable
+                      tiers={pricingTiers}
+                      recommended={recommendedTier}
+                      onSelectTier={handleSelectTier}
+                    />
 
                     {/* Cost calculator */}
                     <div className="preview-card" style={{ padding: "var(--mkt-space-5xl)" }}>
@@ -1082,7 +1202,6 @@ print(response.json())`;
                             </div>
                           ))}
                         </div>
-                      </div>
                       </>
                     )}
                   </section>
@@ -1168,7 +1287,7 @@ print(response.json())`;
                   currentApi={api}
                   allApis={MOCK_APIS}
                   onSelect={(related) => {
-                    window.location.href = `/details/${related.id}`;
+                    navigate(`/details/${related.id}`);
                   }}
                 />
               </div>

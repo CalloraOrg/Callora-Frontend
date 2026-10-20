@@ -1,0 +1,88 @@
+# localStorage Inventory
+
+This document covers production-code `localStorage` access found by searching
+`src` (test files are excluded). It includes keys that are read, written, or
+removed by the application, plus transient keys used for capability probes and
+cross-tab signaling.
+
+## Key Inventory
+
+| Key or pattern                                                                 | Owner                                                                                           | Stored data                                                                                                                                                   | Sensitivity                                                                                                         | Retention and cleanup                                                                                                                                               |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `callora-theme`                                                                | `index.html` pre-paint theme resolver; legacy migration in `src/utils/userPrefs.ts`             | Theme string: `light`, `dark`, or `system`                                                                                                                    | Low: display preference                                                                                             | Legacy key. Removed by preference migration when it is valid or present and `callora.prefs` does not already provide a theme. Otherwise it can remain indefinitely. |
+| `callora.favorites`                                                            | `src/hooks/useFavorites.ts` via `useLocalStorage`                                               | JSON array of API ID strings                                                                                                                                  | Low: user preference                                                                                                | Persists until the favorite is toggled off or the user clears site data.                                                                                            |
+| `callora.density`                                                              | `src/utils/density.ts` and `src/state/uiPrefs.ts`; legacy migration in `src/utils/userPrefs.ts` | Density string: `comfortable` or `compact`                                                                                                                    | Low: display preference                                                                                             | Legacy/direct key. Persists until changed. Migration removes it when it is valid or present and `callora.prefs` does not already provide density.                   |
+| `callora.prefs`                                                                | `src/utils/userPrefs.ts`, used by `ThemeContext`                                                | JSON `UserPrefs`: `theme`, `density`, `pageSize`, and `analyticsConsent`                                                                                      | Low, except the consent choice is a privacy-related preference                                                      | Persists until changed or site data is cleared. `readAllPrefs` also writes a normalized object during load or migration.                                            |
+| `callora.filters.{categories\|price\|popularity\|favorites\|status}.collapsed` | `src/components/FiltersSidebar.tsx` via `usePersistedState`                                     | JSON boolean                                                                                                                                                  | Low: UI preference                                                                                                  | Persists until changed or site data is cleared. One key is created per rendered filter group.                                                                       |
+| `callora.filters.collapsed`                                                    | `src/state/uiPrefs.ts`                                                                          | JSON array of filter names: `categories`, `price`, or `popularity`                                                                                            | Low: UI preference                                                                                                  | Persists until changed or site data is cleared. This is a separate legacy/alternate filter-state format from the per-group keys above.                              |
+| `callora:codeExample:language`                                                 | `src/state/userPrefs.ts`, used by `CodeExample`                                                 | JSON string containing the selected code language                                                                                                             | Low: display preference                                                                                             | Persists until changed or site data is cleared.                                                                                                                     |
+| `callora_compare_state`                                                        | `src/state/compareStore.ts`                                                                     | JSON object `{ apis: APIItem[], isOpen: boolean }`                                                                                                            | Low, but API metadata can reveal browsing interests                                                                 | Persists until compare state changes or site data is cleared.                                                                                                       |
+| `callora_collections`                                                          | `src/state/collectionsStore.tsx`                                                                | JSON object `{ collections: Collection[] }`; each collection has `id`, `name`, and `endpointIds`                                                              | Moderate: user-created organization and API selections                                                              | Persists until edited or site data is cleared.                                                                                                                      |
+| `callora_pinned_apis`                                                          | `src/state/pinnedApis.ts`                                                                       | JSON array of API ID strings                                                                                                                                  | Low, but reveals user interests                                                                                     | Persists until pins change or site data is cleared.                                                                                                                 |
+| `callora_known_accounts`                                                       | `src/state/accountStore.ts`                                                                     | JSON array of `Account` objects: `id`, `label`, `apiKey`, and optional `timezone`                                                                             | **Sensitive**: stores API keys in plaintext in browser storage; account labels and timezone may also be identifying | Persists until accounts are changed or site data is cleared. There is no expiry.                                                                                    |
+| `callora_current_account`                                                      | `src/state/accountStore.ts`                                                                     | Current account ID string                                                                                                                                     | Moderate: account association                                                                                       | Persists until the account changes or is removed. Removed when no current account exists.                                                                           |
+| `callora_test_call_history`                                                    | `src/state/testCallHistory.ts`                                                                  | JSON array of at most 50 `HistoryEntry` objects, including endpoint details, request parameters, response payload, status, response time, cost, and timestamp | **Potentially sensitive**: request parameters and response data may contain user or API data                        | Keeps the newest 50 entries indefinitely until explicitly cleared or site data is cleared.                                                                          |
+| `callora:publish-form:draft`                                                   | `src/pages/PublishApi.tsx` via `src/hooks/useFormPersistence.ts`                                | JSON `PublishFormState`, including API name, base URL, category, description, price, and endpoint definitions                                                 | Moderate: unsaved API metadata and possibly private endpoint configuration                                          | Saved after changes with a 300 ms debounce. Removed after successful submission through `clearDraft`; otherwise persists indefinitely.                              |
+| `callora_onboarding_checkpoint` (or a caller-supplied `persistKey`)            | `src/pages/OnboardingTour.tsx`                                                                  | JSON number for the current tour step                                                                                                                         | Low: onboarding progress                                                                                            | Removed when the tour completes or is skipped. A custom `persistKey` can create additional application keys.                                                        |
+| `callora-plan-nudge-dismissed-at`                                              | `src/hooks/useQuota.ts`                                                                         | Decimal timestamp string from `Date.now()`                                                                                                                    | Low: UI interaction timing                                                                                          | Intended retention is 24 hours. Expired values are removed on mount; valid values remain until expiry or another dismissal.                                         |
+| `callora:session:lastActivity`                                                 | `src/hooks/useSessionExpiry.ts`                                                                 | Decimal timestamp string                                                                                                                                      | Moderate: activity timing                                                                                           | Overwritten at most every 30 seconds while activity occurs. No explicit expiry cleanup; it remains until overwritten or site data is cleared.                       |
+| `callora:session:expired`                                                      | `src/hooks/useSessionExpiry.ts`                                                                 | Decimal timestamp string used as a cross-tab event marker                                                                                                     | Moderate: session lifecycle signal                                                                                  | Overwritten when `signalExpiry()` runs. It is not removed after the event.                                                                                          |
+| `callora_api_cache_{accountId}_{cacheKey}`                                     | `src/utils/offlineApiCache.ts` and single-key invalidation in `src/hooks/useApiCache.ts`        | JSON `CacheEntry`: `data`, `timestamp`, `accountId`, and `ttl`                                                                                                | Depends on cached API response; treat as potentially sensitive                                                      | Entries are removed when read after TTL expiry or during account invalidation. Default TTL is 5 minutes, but callers can provide another TTL.                       |
+| `callora_api_cache_meta_{accountId}`                                           | `src/utils/offlineApiCache.ts`                                                                  | JSON `CacheMeta`: `accountId`, `version`, and `invalidatedAt`                                                                                                 | Low to moderate: account ID and cache timing                                                                        | Written during account invalidation and not currently given an expiry or explicit removal path.                                                                     |
+| `callora-quota` (or a caller-supplied channel name)                            | `src/state/quotaStore.ts` storage-event fallback for `createQuotaChannel`                       | JSON `QuotaSyncMessage`: type, tab ID, account ID, quota value, version, and update timestamp                                                                 | Moderate: account and quota information; transient cross-tab message                                                | Only used when `BroadcastChannel` is unavailable. Written and immediately removed after dispatching the storage event.                                              |
+| `__storage_test__`                                                             | `src/utils/offlineApiCache.ts` capability check                                                 | The literal string `__storage_test__`                                                                                                                         | None                                                                                                                | Written and immediately removed on every storage-availability check. It is a temporary probe, not application state.                                                |
+
+## Generic Persistence APIs
+
+The following production helpers write whatever key their caller supplies, so
+the concrete keys above must be kept in sync with their call sites:
+
+- `src/hooks/useLocalStorage.ts` reads and writes its `key` argument as JSON.
+  The current production call site is `callora.favorites`.
+- `src/hooks/usePersistedState.ts` reads and writes its `key` argument as JSON.
+  `FiltersSidebar` supplies the five `callora.filters.*.collapsed` keys.
+- `src/hooks/useFormPersistence.ts` reads, debounces writes, and removes its
+  `key` argument. `PublishApi` supplies `callora:publish-form:draft`, while
+  `OnboardingTour` has its own persistence implementation and configurable key.
+
+## Naming Convention
+
+Use the following convention for new keys:
+
+```text
+callora:<domain>:<resource>[:<variant>]
+```
+
+Examples:
+
+- `callora:account:known`
+- `callora:account:current`
+- `callora:ui:preferences`
+- `callora:cache:api:<accountId>:<cacheKey>`
+
+Rules:
+
+1. Every new key starts with the exact `callora:` prefix and uses lowercase
+   kebab-case segments.
+2. Use colons as separators; do not introduce underscore or dot separators.
+3. Keep account-scoped data visibly account-scoped in the key, and never store
+   secrets such as API keys in `localStorage` unless the security review
+   explicitly approves it. Prefer an in-memory or platform-protected store for
+   credentials.
+4. Document the JSON schema, sensitivity, owner, TTL, and deletion path beside
+   the key definition or in this inventory.
+5. Event and probe keys must be clearly marked as transient and removed after
+   use. They should not be mistaken for durable user data.
+
+Existing legacy keys should be migrated deliberately rather than renamed
+silently. A migration should preserve valid user preferences, remove the old
+key after successful persistence, and document the compatibility window.
+
+## Privacy and Clear-Data Implications
+
+A clear-data feature should remove all fixed keys listed above and all dynamic
+keys beginning with `callora_api_cache_`. It should also clear configurable
+keys registered by callers of the generic persistence hooks. Because
+`callora_known_accounts`, test-call history, publish drafts, and cached API
+responses can contain sensitive or user-generated data, they should be called
+out explicitly in privacy documentation and deletion tests.

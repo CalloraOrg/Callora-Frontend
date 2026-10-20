@@ -3,7 +3,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import Dashboard from './Dashboard';
+import Dashboard, { describeActivityAnnouncement } from './Dashboard';
 import { LOADING_DELAY_MS } from '../config/constants';
 import { pinnedApisStore } from '../state/pinnedApis';
 
@@ -61,5 +61,117 @@ describe('Dashboard', () => {
 
     expect(screen.getByText('Pinned APIs')).toBeTruthy();
     expect(screen.getByText('Pin APIs from the marketplace to keep them handy on your dashboard.')).toBeTruthy();
+  });
+});
+
+describe('Dashboard reduced-motion & announcements', () => {
+  let originalMatchMedia: typeof window.matchMedia;
+
+  beforeEach(() => {
+    originalMatchMedia = window.matchMedia;
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+  });
+
+  function mockReducedMotion(reduce: boolean) {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: reduce && (query === '(prefers-reduced-motion: reduce)' || query.includes('reduce')),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+  }
+
+  it('bypasses the activity loading delay when prefers-reduced-motion is active', async () => {
+    vi.useFakeTimers();
+    mockReducedMotion(true);
+
+    render(
+      <MemoryRouter>
+        <Dashboard vaultBalance={50} walletBalance={10} openDeposit={() => {}} />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    expect(document.querySelector('.activity-list')).toBeTruthy();
+    expect(screen.queryByText(/Loading recent activity/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the normal activity loading delay when motion is not reduced', async () => {
+    vi.useFakeTimers();
+    mockReducedMotion(false);
+
+    render(
+      <MemoryRouter>
+        <Dashboard vaultBalance={50} walletBalance={10} openDeposit={() => {}} />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    expect(screen.queryByText(/Deposit:/)).not.toBeInTheDocument();
+    expect(document.querySelector('.activity-skeletons')).toBeTruthy();
+  });
+
+  it('announces loading, then loaded activity state via a polite live region', async () => {
+    vi.useFakeTimers();
+    mockReducedMotion(false);
+
+    render(
+      <MemoryRouter>
+        <Dashboard vaultBalance={50} walletBalance={10} openDeposit={() => {}} />
+      </MemoryRouter>,
+    );
+
+    const liveRegion = screen.getByTestId('live-region-dashboard-activity');
+    expect(liveRegion.getAttribute('aria-live')).toBe('polite');
+    expect(liveRegion.textContent).toContain('Loading recent activity.');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOADING_DELAY_MS);
+    });
+
+    expect(liveRegion.textContent).toContain('Recent activity loaded.');
+  });
+
+  it('marks the activity region busy while loading and clears it once loaded', async () => {
+    vi.useFakeTimers();
+    mockReducedMotion(false);
+
+    render(
+      <MemoryRouter>
+        <Dashboard vaultBalance={50} walletBalance={10} openDeposit={() => {}} />
+      </MemoryRouter>,
+    );
+
+    const activityRegion = document.querySelector('.dashboard-activity');
+    expect(activityRegion?.getAttribute('aria-busy')).toBe('true');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LOADING_DELAY_MS);
+    });
+
+    expect(activityRegion?.getAttribute('aria-busy')).toBe('false');
+  });
+
+  it('exports an announcement helper covering loading, loaded, and empty states', () => {
+    const activity = [
+      { type: 'deposit' as const, amount: 50, date: new Date().toISOString() },
+    ];
+    expect(describeActivityAnnouncement(true, null)).toBe('Loading recent activity.');
+    expect(describeActivityAnnouncement(false, activity)).toBe('Recent activity loaded.');
+    expect(describeActivityAnnouncement(false, [])).toBe('No recent activity yet.');
+    expect(describeActivityAnnouncement(false, null)).toBeUndefined();
   });
 });

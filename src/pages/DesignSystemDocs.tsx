@@ -707,6 +707,8 @@ function ComponentSection({ doc, isOpen, onToggle }: ComponentSectionProps) {
           width: "100%",
           padding: "1rem 1.25rem",
           background: "transparent",
+          color: "var(--text)",
+          font: "inherit",
           border: "none",
           cursor: "pointer",
           textAlign: "left",
@@ -1300,7 +1302,7 @@ export default function DesignSystemDocs(): JSX.Element {
             type="button"
             className="secondary-button"
             onClick={expandAll}
-            style={{ flexShrink: 0 }}
+            style={{ flexShrink: 0, width: "auto", minHeight: 0, padding: "0.5rem 1rem" }}
           >
             Expand all
           </button>
@@ -1308,7 +1310,7 @@ export default function DesignSystemDocs(): JSX.Element {
             type="button"
             className="secondary-button"
             onClick={collapseAll}
-            style={{ flexShrink: 0 }}
+            style={{ flexShrink: 0, width: "auto", minHeight: 0, padding: "0.5rem 1rem" }}
           >
             Collapse all
           </button>

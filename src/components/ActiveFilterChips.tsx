@@ -27,7 +27,17 @@ export default function ActiveFilterChips({
   onRemoveFavoritesOnly,
   onClearAll,
 }: ActiveFilterChipsProps) {
-  const chips: { key: string; label: string; onRemove: () => void }[] = [];
+  const chips: {
+    key: string;
+    label: string;
+    onRemove: () => void;
+    inactive?: boolean;
+  }[] = [];
+
+  // An inverted range makes the page skip price filtering entirely, so the
+  // price chips stay visible (the values are still set) but are flagged as not
+  // actually narrowing the results.
+  const priceInactive = minPrice !== null && maxPrice !== null && minPrice > maxPrice;
 
   categories.forEach((c) => {
     chips.push({
@@ -42,6 +52,7 @@ export default function ActiveFilterChips({
       key: 'minPrice',
       label: `Min price: $${minPrice}`,
       onRemove: onRemoveMinPrice,
+      inactive: priceInactive,
     });
   }
 
@@ -50,6 +61,7 @@ export default function ActiveFilterChips({
       key: 'maxPrice',
       label: `Max price: $${maxPrice}`,
       onRemove: onRemoveMaxPrice,
+      inactive: priceInactive,
     });
   }
 
@@ -78,7 +90,9 @@ export default function ActiveFilterChips({
       {chips.map((chip) => (
         <div
           key={chip.key}
-          className="filter-chip"
+          className={`filter-chip${chip.inactive ? ' filter-chip--inactive' : ''}`}
+          data-testid={`filter-chip-${chip.key}`}
+          data-inactive={chip.inactive ? 'true' : 'false'}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -90,9 +104,17 @@ export default function ActiveFilterChips({
             fontSize: '0.875rem',
             color: 'var(--text)',
             height: '32px',
+            ...(chip.inactive
+              ? { opacity: 0.7, borderStyle: 'dashed' as const }
+              : null),
           }}
         >
-          <span>{chip.label}</span>
+          <span>
+            {chip.label}
+            {chip.inactive && (
+              <span className="filter-chip__inactive-note"> (not applied)</span>
+            )}
+          </span>
           <button
             type="button"
             onClick={chip.onRemove}

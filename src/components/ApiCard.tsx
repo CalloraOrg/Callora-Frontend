@@ -14,6 +14,7 @@ import EmptyState from "./EmptyState";
 import { formatPrice } from "../utils/format";
 import { useCollections } from "../state/collectionsStore";
 import { useFavorites } from "../hooks/useFavorites";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import type { APIItem } from "../data/mockApis";
 import RatingHistogram from "./RatingHistogram";
 import { useCompareStore, compareStore } from "../state/compareStore";
@@ -24,6 +25,7 @@ import KbdHint from "./KbdHint";
 import WhyApi from "./WhyApi";
 import { colorFromId } from "../utils/colorFromId";
 import { ClockIcon, BoltIcon } from "./icons";
+import { useToast } from "./Toast";
 
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -652,16 +654,13 @@ export default function ApiCard({
     setLiveMessage(msg);
   }, []);
 
-  const prefersReducedMotion = useMemo(() => {
-    return typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)")?.matches;
-  }, []);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const { isFavorite, toggleFavorite } = useFavorites();
   const { apis: comparedApis } = useCompareStore();
   const isCompared = comparedApis.some((item) => item.id === api.id);
   const canCompare = isCompared || comparedApis.length < 3;
+  const { showToast } = useToast();
 
   const sparklineValues = useMemo(() => {
     if (api.sparklineValues && api.sparklineValues.length > 0) {
@@ -684,9 +683,15 @@ export default function ApiCard({
     if (isCompared) {
       compareStore.removeApi(api.id);
       announce(`Removed ${api.name} from comparison`);
-    } else if (canCompare) {
-      compareStore.addApi(api);
-      announce(`Added ${api.name} to comparison`);
+    } else {
+      const result = compareStore.addApi(api);
+      if (result === 'full') {
+        const msg = 'Comparison is limited to 3 APIs';
+        showToast(msg, 'error');
+        announce(msg);
+      } else if (result === 'added') {
+        announce(`Added ${api.name} to comparison`);
+      }
     }
   };
 
@@ -827,6 +832,7 @@ export default function ApiCard({
          onFocus={() => setIsCompareHovered(true)}
          onBlur={() => setIsCompareHovered(false)}
          disabled={!canCompare}
+         title={!canCompare ? "Comparison is limited to 3 APIs" : undefined}
          className="api-card__compare-btn"
          style={{
            position: "absolute",
@@ -902,7 +908,7 @@ export default function ApiCard({
            style={{ textAlign: "right", paddingRight: "var(--mkt-card-price-padding-right)", flexShrink: 0 }}
          >
            <div style={{ color: "var(--muted)", fontSize: "var(--mkt-font-size-micro)" }}>
-             {`$${formatPrice(pricePerCall)}`} / call
+             {api.pricingOnRequest ? "Pricing on request" : `${`$${formatPrice(pricePerCall)}`} / call`}
            </div>
            {api.rating !== undefined && (
              <div style={{ color: "var(--muted)", marginTop: "var(--mkt-card-margin-top-sm)" }}>
@@ -959,7 +965,13 @@ export default function ApiCard({
         <div className="api-card__stats" aria-label="API stats">
           <div className="api-card__stat">
             <span className="api-card__stat-label">Price / call</span>
-            {renderStatValue(pricePerCall !== undefined ? `$${formatPrice(pricePerCall)}` : undefined)}
+            {renderStatValue(
+              api.pricingOnRequest
+                ? "Pricing on request"
+                : pricePerCall !== undefined
+                  ? `$${formatPrice(pricePerCall)}`
+                  : undefined
+            )}
           </div>
 
           <div className="api-card__stat">

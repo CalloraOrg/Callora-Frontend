@@ -36,6 +36,7 @@ type Action =
   | { type: "DELETE_COLLECTION"; id: string }
   | { type: "ADD_ENDPOINT"; collectionId: string; endpointId: string }
   | { type: "REMOVE_ENDPOINT"; collectionId: string; endpointId: string }
+  | { type: "IMPORT_COLLECTIONS"; collections: Collection[] }
   | { type: "REORDER_COLLECTIONS"; fromIndex: number; toIndex: number }
   | {
       type: "REORDER_ENDPOINTS";
@@ -80,7 +81,8 @@ function loadFromStorage(): CollectionsState {
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
 
-function reducer(state: CollectionsState, action: Action): CollectionsState {
+/** Exported for unit testing. Prefer the context helpers in application code. */
+export function reducer(state: CollectionsState, action: Action): CollectionsState {
   switch (action.type) {
     case "CREATE_COLLECTION": {
       const newCol: Collection = {
@@ -131,6 +133,18 @@ function reducer(state: CollectionsState, action: Action): CollectionsState {
             : c
         ),
       };
+
+    case "IMPORT_COLLECTIONS": {
+      const existingIds = new Set(state.collections.map((c) => c.id));
+      const incoming = action.collections.filter(
+        (c) => !existingIds.has(c.id)
+      );
+      if (incoming.length === 0) return state;
+      return {
+        ...state,
+        collections: [...state.collections, ...incoming],
+      };
+    }
 
     case "REORDER_COLLECTIONS":
       return {
@@ -184,6 +198,7 @@ interface CollectionsContextType extends CollectionsState {
     collectionId: string,
     endpointId: string
   ) => void;
+  importCollections: (collections: Collection[]) => void;
   reorderCollections: (fromIndex: number, toIndex: number) => void;
   reorderEndpointsInCollection: (
     collectionId: string,
@@ -248,6 +263,9 @@ export function CollectionsProvider({
     endpointId: string
   ) => dispatch({ type: "REMOVE_ENDPOINT", collectionId, endpointId });
 
+  const importCollections = (collections: Collection[]) =>
+    dispatch({ type: "IMPORT_COLLECTIONS", collections });
+
   const reorderCollections = (fromIndex: number, toIndex: number) =>
     dispatch({ type: "REORDER_COLLECTIONS", fromIndex, toIndex });
 
@@ -286,6 +304,7 @@ export function CollectionsProvider({
         deleteCollection,
         addEndpointToCollection,
         removeEndpointFromCollection,
+        importCollections,
         reorderCollections,
         reorderEndpointsInCollection,
         isEndpointSaved,

@@ -33,7 +33,7 @@ export default function CopyKeyButton({
   className,
 }: CopyKeyButtonProps): JSX.Element {
   const { copied, handleCopy } = useCopy();
-  const status: CopyStatus = copied ? "copied" : "idle";
+  const status = (copied ? "copied" : "idle") as CopyStatus;
 
   const statusClass =
     status === "copied"

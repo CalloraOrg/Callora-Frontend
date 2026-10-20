@@ -518,10 +518,12 @@ function MessageWithCopy({
 
   const containerStyle: React.CSSProperties = {
     display: "flex",
+    flexDirection: "column",
     gap: isCompact ? "6px" : "8px",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "center",
-    maxWidth: isCompact ? "240px" : "320px",
+    maxWidth: isCompact ? "240px" : "420px",
+    marginBottom: isCompact ? 0 : "16px",
   };
 
   const messageStyle: React.CSSProperties = isCompact
@@ -532,7 +534,7 @@ function MessageWithCopy({
         lineHeight: 1.4,
       }
     : {
-        margin: "0 0 24px 0",
+        margin: 0,
         color: "var(--muted)",
         fontSize: "0.9375rem",
         lineHeight: 1.5,
@@ -654,7 +656,7 @@ export default function EmptyState({
 }: EmptyStateProps) {
   const resolvedMessage = message ?? description;
   const resolvedAction = action;
-  const { copy: handleCopy, copied } = useCopy();
+  const { handleCopy, copied } = useCopy();
 
   if (loading) {
     return (
@@ -797,7 +799,7 @@ export default function EmptyState({
         maxWidth: "240px",
       }
     : {
-        margin: "0 0 24px 0",
+        margin: 0,
         color: "var(--muted)",
         fontSize: "0.9375rem",
         lineHeight: 1.5,

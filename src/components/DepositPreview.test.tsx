@@ -1,12 +1,18 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import DepositPreview from "./DepositPreview";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import DepositPreview, { clearNetworkFeeCache } from "./DepositPreview";
 
 describe("DepositPreview", () => {
   afterEach(() => {
     cleanup();
+    clearNetworkFeeCache();
+    vi.unstubAllGlobals();
+  });
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network unavailable")));
   });
 
   it("renders before and projected after balances correctly", () => {
@@ -74,5 +80,55 @@ describe("DepositPreview", () => {
     );
 
     expect(screen.getByLabelText("Custom preview label")).toBeTruthy();
+  });
+
+  it("shows the recommended Horizon fee when the quote succeeds", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ fee_charged: { mode: "200" } }),
+    } as Response);
+
+    const view = render(
+      <DepositPreview
+        previewCurrentBalance={50}
+        projectedBalance={150}
+        networkFee="0.00001 XLM"
+        amount={100}
+        hasAmount={true}
+        walletBalance={200}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByText("0.00002 XLM")).toBeTruthy());
+    view.rerender(
+      <DepositPreview
+        previewCurrentBalance={50}
+        projectedBalance={160}
+        networkFee="0.00001 XLM"
+        amount={110}
+        hasAmount={true}
+        walletBalance={200}
+      />
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("(estimated)")).toBeNull();
+  });
+
+  it("falls back to the configured fee with an estimated label when Horizon fails", async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error("network unavailable"));
+
+    render(
+      <DepositPreview
+        previewCurrentBalance={50}
+        projectedBalance={150}
+        networkFee="0.00001 XLM"
+        amount={100}
+        hasAmount={true}
+        walletBalance={200}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByText("(estimated)")).toBeTruthy());
+    expect(screen.getByText("0.00001 XLM")).toBeTruthy();
   });
 });

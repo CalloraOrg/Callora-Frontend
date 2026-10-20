@@ -1,0 +1,110 @@
+.quota-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  max-width: 420px;
+}
+
+.quota-manager__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.quota-manager__title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.quota-manager__account-switch select {
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.quota-manager__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.quota-manager__field input {
+  padding: 0.5rem 0.625rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  font-size: 0.95rem;
+}
+
+.quota-manager__field input:disabled {
+  opacity: 0.6;
+}
+
+.quota-manager__status-row {
+  min-height: 1.25rem;
+  font-size: 0.85rem;
+}
+
+.quota-manager__status--loading {
+  color: var(--text-muted, #6b7280);
+}
+
+.quota-manager__status--saving {
+  color: var(--accent, #2563eb);
+}
+
+.quota-manager__status--ready {
+  color: var(--success, #16a34a);
+}
+
+.quota-manager__status--stale {
+  color: var(--warning, #b45309);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quota-manager__status--error,
+.quota-manager__error {
+  color: var(--danger, #dc2626);
+}
+
+.quota-manager__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.quota-manager__save,
+.quota-manager__retry,
+.quota-manager__link {
+  cursor: pointer;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  background: var(--surface, #fff);
+}
+
+.quota-manager__save {
+  background: var(--accent, #2563eb);
+  color: #fff;
+  border-color: transparent;
+}
+
+.quota-manager__save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.quota-manager__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

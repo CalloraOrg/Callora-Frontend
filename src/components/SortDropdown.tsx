@@ -4,7 +4,24 @@ import Dropdown from "./Dropdown";
  * Sort option values used by the marketplace sort dropdown.
  * These values are persisted in the URL query param ?sort=
  */
-export type SortValue = "popularity" | "price-asc" | "latency-asc" | "newest";
+export type SortValue =
+  | "relevance"
+  | "popularity"
+  | "price-asc"
+  | "price-desc"
+  | "latency-asc"
+  | "newest";
+
+/** All valid SortValue strings — used by useMarketplaceUrlState to reject
+ *  unknown ?sort= query params and fall back to the default. */
+export const VALID_SORT_VALUES = new Set<SortValue>([
+  "relevance",
+  "popularity",
+  "price-asc",
+  "price-desc",
+  "latency-asc",
+  "newest",
+]);
 
 export interface SortDropdownProps {
   /** Current selected sort value */
@@ -15,8 +32,10 @@ export interface SortDropdownProps {
 
 /** Ordered set of sort options displayed in the dropdown */
 const SORT_OPTIONS: { value: SortValue; label: string }[] = [
+  { value: "relevance", label: "Relevance" },
   { value: "popularity", label: "Popularity" },
-  { value: "price-asc", label: "Price ascending" },
+  { value: "price-asc", label: "Price: low → high" },
+  { value: "price-desc", label: "Price: high → low" },
   { value: "latency-asc", label: "Latency ascending" },
   { value: "newest", label: "Newest" },
 ];

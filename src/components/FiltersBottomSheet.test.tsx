@@ -168,4 +168,45 @@ describe("FiltersBottomSheet", () => {
     // FiltersSidebar renders a 'Categories' fieldset legend
     expect(screen.getByText(/Categories/i)).toBeTruthy();
   });
+
+  describe("inverted price range", () => {
+    it("shows the inline error inside the sheet", () => {
+      render(
+        <FiltersBottomSheet {...baseProps} minPrice={100} maxPrice={50} />,
+      );
+      expect(screen.getByTestId("filters-price-error")).toBeTruthy();
+      expect(screen.getByTestId("filters-price-swap")).toBeTruthy();
+    });
+
+    it("marks both price inputs aria-invalid inside the sheet", () => {
+      render(
+        <FiltersBottomSheet {...baseProps} minPrice={100} maxPrice={50} />,
+      );
+      expect(
+        screen.getByLabelText("Minimum price").getAttribute("aria-invalid"),
+      ).toBe("true");
+      expect(
+        screen.getByLabelText("Maximum price").getAttribute("aria-invalid"),
+      ).toBe("true");
+    });
+
+    it("swaps the values from inside the sheet", () => {
+      const setMinPrice = vi.fn();
+      const setMaxPrice = vi.fn();
+      render(
+        <FiltersBottomSheet
+          {...baseProps}
+          minPrice={100}
+          maxPrice={50}
+          setMinPrice={setMinPrice}
+          setMaxPrice={setMaxPrice}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId("filters-price-swap"));
+
+      expect(setMinPrice).toHaveBeenCalledWith(50);
+      expect(setMaxPrice).toHaveBeenCalledWith(100);
+    });
+  });
 });

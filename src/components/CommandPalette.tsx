@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../ThemeContext';
 import MOCK_APIS from '../data/mockApis';
@@ -12,6 +12,49 @@ interface Command {
   icon?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Recent-commands persistence
+// ---------------------------------------------------------------------------
+
+const RECENT_STORAGE_KEY = 'callora_cmd_recent';
+const RECENT_MAX = 8;
+
+function readRecentIds(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRecentIds(ids: string[]): void {
+  try {
+    localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(ids));
+  } catch {
+    // storage quota / security errors – silently ignore
+  }
+}
+
+function pushRecentId(id: string): string[] {
+  const prev = readRecentIds().filter((x) => x !== id);
+  const next = [id, ...prev].slice(0, RECENT_MAX);
+  writeRecentIds(next);
+  return next;
+}
+
+function useRecentIds() {
+  const [recentIds, setRecentIds] = useState<string[]>(readRecentIds);
+
+  const recordId = useCallback((id: string) => {
+    setRecentIds(pushRecentId(id));
+  }, []);
+
+  return { recentIds, recordId };
+}
+
 const navigateTo = (path: string) => {
   window.history.pushState({}, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
@@ -23,6 +66,7 @@ export default function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const { theme, setTheme } = useTheme();
+  const { recentIds, recordId } = useRecentIds();
 
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +192,77 @@ export default function CommandPalette() {
     );
   });
 
+  // ---------------------------------------------------------------------------
+  // Recent-aware display lists
+  // ---------------------------------------------------------------------------
+
+  // Empty query → show Recent group first, then everything else.
+  // Non-empty query → filtered results, but recently-used items float to top.
+  const { displayGroups, flatList } = React.useMemo(() => {
+    if (searchQuery === '') {
+      const recentCmds = recentIds
+        .map((id) => allCommands.find((c) => c.id === id))
+        .filter((c): c is Command => c !== undefined);
+
+      const recentSet = new Set(recentIds);
+      const rest = allCommands.filter((c) => !recentSet.has(c.id));
+
+      const groups: { label: string; commands: Command[] }[] = [];
+      if (recentCmds.length > 0) {
+        groups.push({ label: 'Recent', commands: recentCmds });
+      }
+
+      // Group the remainder by category
+      const byCategory = new Map<string, Command[]>();
+      for (const cmd of rest) {
+        const bucket = byCategory.get(cmd.category) ?? [];
+        bucket.push(cmd);
+        byCategory.set(cmd.category, bucket);
+      }
+      for (const [label, commands] of byCategory) {
+        groups.push({ label, commands });
+      }
+
+      const flat = groups.flatMap((g) => g.commands);
+      return { displayGroups: groups, flatList: flat };
+    } else {
+      // Filter first, then sort recent ids to the top as a tie-breaker
+      const matched = filteredCommands.slice().sort((a, b) => {
+        const aIdx = recentIds.indexOf(a.id);
+        const bIdx = recentIds.indexOf(b.id);
+        const aRecent = aIdx === -1 ? Infinity : aIdx;
+        const bRecent = bIdx === -1 ? Infinity : bIdx;
+        return aRecent - bRecent;
+      });
+
+      // Group by category (keeping recent-sorted order within each category
+      // would feel odd – so we just use a single implicit grouping by category
+      // while preserving the sorted order across the full list)
+      const byCategory = new Map<string, Command[]>();
+      for (const cmd of matched) {
+        const bucket = byCategory.get(cmd.category) ?? [];
+        bucket.push(cmd);
+        byCategory.set(cmd.category, bucket);
+      }
+      const groups = [...byCategory.entries()].map(([label, commands]) => ({
+        label,
+        commands,
+      }));
+      const flat = groups.flatMap((g) => g.commands);
+      return { displayGroups: groups, flatList: flat };
+    }
+  }, [searchQuery, allCommands, filteredCommands, recentIds]);
+
+  // Helper: run a command, record it, then close
+  const executeCommand = useCallback(
+    (cmd: Command) => {
+      recordId(cmd.id);
+      cmd.action();
+      setIsOpen(false);
+    },
+    [recordId]
+  );
+
   // Reset selection index when search query changes
   useEffect(() => {
     setSelectedIndex(0);
@@ -189,24 +304,23 @@ export default function CommandPalette() {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex((prev) =>
-          filteredCommands.length > 0 ? (prev + 1) % filteredCommands.length : 0
+          flatList.length > 0 ? (prev + 1) % flatList.length : 0
         );
       }
 
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIndex((prev) =>
-          filteredCommands.length > 0
-            ? (prev - 1 + filteredCommands.length) % filteredCommands.length
+          flatList.length > 0
+            ? (prev - 1 + flatList.length) % flatList.length
             : 0
         );
       }
 
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (filteredCommands.length > 0 && filteredCommands[selectedIndex]) {
-          filteredCommands[selectedIndex].action();
-          setIsOpen(false);
+        if (flatList.length > 0 && flatList[selectedIndex]) {
+          executeCommand(flatList[selectedIndex]);
         }
       }
 
@@ -245,7 +359,7 @@ export default function CommandPalette() {
       }, 50);
       clearTimeout(restoreTimer);
     };
-  }, [isOpen, filteredCommands, selectedIndex]);
+  }, [isOpen, flatList, selectedIndex, executeCommand]);
 
   // Scroll active item into view
   useEffect(() => {
@@ -328,49 +442,39 @@ export default function CommandPalette() {
           role="listbox"
           aria-label="Commands"
         >
-          {filteredCommands.length === 0 ? (
+          {flatList.length === 0 ? (
             <div className="command-palette-empty">No results found</div>
           ) : (
-            filteredCommands.reduce((acc: React.ReactNode[], cmd, index) => {
-              const prevCmd = index > 0 ? filteredCommands[index - 1] : null;
-              const showCategoryHeader = !prevCmd || prevCmd.category !== cmd.category;
-
-              if (showCategoryHeader) {
-                acc.push(
-                  <div key={`header-${cmd.category}`} className="command-palette-group-header">
-                    {cmd.category}
-                  </div>
-                );
-              }
-
-              const isSelected = index === selectedIndex;
-              acc.push(
-                <div
-                  key={cmd.id}
-                  id={`cmd-opt-${cmd.id}`}
-                  role="option"
-                  aria-selected={isSelected}
-                  className={`command-palette-item ${
-                    isSelected ? 'command-palette-item--selected' : ''
-                  }`}
-                  onClick={() => {
-                    cmd.action();
-                    setIsOpen(false);
-                  }}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                >
-                  <span className="command-palette-item-icon" aria-hidden="true">
-                    {cmd.icon || '⚡'}
-                  </span>
-                  <span className="command-palette-item-name">{cmd.name}</span>
-                  {isSelected && (
-                    <span className="command-palette-item-hint">Enter</span>
-                  )}
-                </div>
-              );
-
-              return acc;
-            }, [])
+            displayGroups.map((group) => (
+              <React.Fragment key={group.label}>
+                <div className="command-palette-group-header">{group.label}</div>
+                {group.commands.map((cmd) => {
+                  const index = flatList.indexOf(cmd);
+                  const isSelected = index === selectedIndex;
+                  return (
+                    <div
+                      key={cmd.id}
+                      id={`cmd-opt-${cmd.id}`}
+                      role="option"
+                      aria-selected={isSelected}
+                      className={`command-palette-item ${
+                        isSelected ? 'command-palette-item--selected' : ''
+                      }`}
+                      onClick={() => executeCommand(cmd)}
+                      onMouseEnter={() => setSelectedIndex(index)}
+                    >
+                      <span className="command-palette-item-icon" aria-hidden="true">
+                        {cmd.icon || '⚡'}
+                      </span>
+                      <span className="command-palette-item-name">{cmd.name}</span>
+                      {isSelected && (
+                        <span className="command-palette-item-hint">Enter</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </React.Fragment>
+            ))
           )}
         </main>
 

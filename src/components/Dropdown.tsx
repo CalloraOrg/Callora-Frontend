@@ -281,6 +281,12 @@ export function Dropdown<T extends string = string>({
           gap: 6,
           appearance: "none",
           background: "var(--surface-soft)",
+          color: "var(--text)",
+          font: "inherit",
+          fontSize: 14,
+          borderRadius: 10,
+          minHeight: 40,
+          cursor: disabled ? "default" : "pointer",
            border: open
              ? "2px solid var(--accent, #2563eb)"
              : "1px solid var(--line)",

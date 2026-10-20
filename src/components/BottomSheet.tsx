@@ -38,6 +38,7 @@
  */
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -140,12 +141,10 @@ export default function BottomSheet({
   // Generate a stable ID for the aria-labelledby association.
   const titleId = useId();
 
-  // Detect reduced-motion preference once; stable for the component lifetime.
-  // Guard against environments (jsdom, SSR) where matchMedia may be absent.
-  const prefersReducedMotion =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Reactively detect the reduced-motion preference (single source of truth,
+  // shared via usePrefersReducedMotion). Guarded internally against SSR/jsdom
+  // environments where matchMedia may be absent.
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Reset to the configured default snap whenever the sheet opens.
   useEffect(() => {

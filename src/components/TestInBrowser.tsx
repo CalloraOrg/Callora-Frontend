@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { isSensitiveKey } from "../utils/snapshotUrl";
 
 /**
@@ -40,6 +40,26 @@ interface RunResult {
   body: string;
 }
 
+/**
+ * Build a deterministic cache key from the HTTP method, base URL, and current
+ * parameter values.  Query params are sorted alphabetically so that
+ * `{a:"1",b:"2"}` and `{b:"2",a:"1"}` produce the same key.
+ */
+function buildCacheKey(
+  method: string,
+  endpointUrl: string,
+  values: Record<string, string>,
+): string {
+  const filled: [string, string][] = Object.entries(values)
+    .filter(([, v]) => v !== "")
+    .sort(([a], [b]) => a.localeCompare(b));
+  const qs = new URLSearchParams(filled).toString();
+  const fullUrl = qs
+    ? endpointUrl + (endpointUrl.includes("?") ? "&" : "?") + qs
+    : endpointUrl;
+  return `${method}:${fullUrl}`;
+}
+
 export default function TestInBrowser({
   endpointUrl,
   method,
@@ -50,24 +70,40 @@ export default function TestInBrowser({
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [bypassCache, setBypassCache] = useState(false);
   const { get, set } = useApiCache<RunResult>();
+
+  // Ref to the current AbortController so we can cancel in-flight requests
+  // when the user re-runs or the component unmounts.
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Abort any in-flight request on unmount.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const panelId = `tib-panel-${endpointUrl.replace(/[^a-z0-9]/gi, "-")}`;
   const triggerId = `tib-trigger-${endpointUrl.replace(/[^a-z0-9]/gi, "-")}`;
-  const cacheKey = `${method}:${endpointUrl}`;
 
   function handleChange(name: string, value: string) {
     setValues((prev) => ({ ...prev, [name]: value }));
   }
 
-  async function handleRun() {
+  const handleRun = useCallback(async () => {
+    // Abort any previous in-flight request before starting a new one.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setRunning(true);
     setResult(null);
     setError(null);
 
     try {
       let url = endpointUrl;
-      let fetchInit: RequestInit = { method };
+      let fetchInit: RequestInit = { method, signal: controller.signal };
 
       if (method.toUpperCase() === "GET" || method.toUpperCase() === "DELETE") {
         const qs = new URLSearchParams(
@@ -82,10 +118,15 @@ export default function TestInBrowser({
       }
 
       const isCacheable = method.toUpperCase() === "GET";
-      const cached = isCacheable ? get(cacheKey) : null;
-      if (cached) {
-        setResult(cached);
-        return;
+      const cacheKey = buildCacheKey(method, endpointUrl, values);
+
+      // Serve from cache unless the user explicitly opted to bypass it.
+      if (isCacheable && !bypassCache) {
+        const cached = get(cacheKey);
+        if (cached) {
+          setResult(cached);
+          return;
+        }
       }
 
       const response = await fetch(url, fetchInit);
@@ -102,11 +143,15 @@ export default function TestInBrowser({
         set(cacheKey, runResult);
       }
     } catch (err) {
+      // Silently swallow AbortError — the user intentionally cancelled.
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setRunning(false);
     }
-  }
+  }, [endpointUrl, method, values, bypassCache, get, set]);
 
   return (
     <div className="tib-root" style={{ marginTop: 12 }}>
@@ -248,17 +293,44 @@ export default function TestInBrowser({
             </p>
           )}
 
-          {/* Run button */}
-          <button
-            type="button"
-            className="primary-button tib-run"
-            onClick={handleRun}
-            disabled={running}
-            style={{ fontSize: 13 }}
-            aria-busy={running}
+          {/* Bypass cache toggle + Run button */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}
           >
-            {running ? "Running…" : "Run"}
-          </button>
+            <button
+              type="button"
+              className="primary-button tib-run"
+              onClick={handleRun}
+              disabled={running}
+              style={{ fontSize: 13 }}
+              aria-busy={running}
+            >
+              {running ? "Running…" : "Run"}
+            </button>
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 12,
+                color: "var(--muted)",
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={bypassCache}
+                onChange={(e) => setBypassCache(e.target.checked)}
+                aria-label="Bypass cache"
+              />
+              Bypass cache
+            </label>
+          </div>
 
           {/* Error */}
           {error && (

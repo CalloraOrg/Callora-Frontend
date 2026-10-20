@@ -1,37 +1,73 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
-import ApiUsage from "./pages/ApiUsage";
-import DashboardPage from "./pages/DashboardPage";
-import MyApis from "./pages/MyApis";
-import PlanBadgePage from "./pages/PlanBadge";
-import RouteProgressBar from "./components/RouteProgressBar";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
-import PublishApi from "./pages/PublishApi";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
-import { formatUsdc, formatUsdShortcut } from "./utils/format";
-import DepositPreview from "./components/DepositPreview";
-import { EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS } from "./config/constants";
+import { formatUsdc, formatUsdShortcut, normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
+import { useNetworkFee } from "./components/DepositPreview";
+import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR } from "./config/constants";
+import type { WalletServiceErrorCode, UsdcTrustlineStatus } from "./services/walletService";
 import CompareDrawer from "./components/CompareDrawer";
 import CompareTray from "./components/CompareTray";
+import ExternalLink from "./components/ExternalLink";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
-import MarketplacePage from "./pages/MarketplacePage";
-import ThemePlayground from "./pages/ThemePlayground";
-import DesignSystemDocs from "./pages/DesignSystemDocs";
-import A11yAudit from "./pages/A11yAudit";
-import RateLimitCard from "./pages/RateLimitCard";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
-import { ToastProvider } from "./components/Toast";
-import { InvoiceCard } from "./pages/InvoiceCard";
-import BillingHistory from "./pages/BillingHistory";
- import WebhookDeliveries from "./pages/WebhookDeliveries";
- import { useAccountContext } from "./hooks/useAccountContext";
+import { useAccountContext } from "./hooks/useAccountContext";
+
+// Route splitting: dynamic imports for all heavy page routes
+const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
+const PublishApi = lazy(() => import("./pages/PublishApi"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const ApiUsage = lazy(() => import("./pages/ApiUsage"));
+const MyApis = lazy(() => import("./pages/MyApis"));
+const PlanBadgePage = lazy(() => import("./pages/PlanBadge"));
+const ThemePlayground = lazy(() => import("./pages/ThemePlayground"));
+const SlaCard = lazy(() => import("./pages/SlaCard"));
+const Documentation = lazy(() => import("./pages/Documentation"));
+const DesignSystemDocs = lazy(() => import("./pages/DesignSystemDocs"));
+const A11yAudit = lazy(() => import("./pages/A11yAudit"));
+const RateLimitCard = lazy(() => import("./pages/RateLimitCard"));
+const BillingHistory = lazy(() => import("./pages/BillingHistory"));
+const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
+const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
+const InvoiceCard = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.InvoiceCard })));
+
+// Prefetch cache map to ensure modules are loaded on hover / focus without delaying critical interaction
+const routePrefetchers: Record<string, () => Promise<any>> = {
+  "/marketplace": () => import("./pages/MarketplacePage"),
+  "/publish": () => import("./pages/PublishApi"),
+  "/dashboard": () => import("./pages/DashboardPage"),
+  "/api-usage": () => import("./pages/ApiUsage"),
+  "/apis/my-apis": () => import("./pages/MyApis"),
+  "/apis/plan-badge": () => import("./pages/PlanBadge"),
+  "/billing/history": () => import("./pages/BillingHistory"),
+  "/theme-playground": () => import("./pages/ThemePlayground"),
+  "/design-system/docs": () => import("./pages/DesignSystemDocs"),
+  "/a11y-audit": () => import("./pages/A11yAudit"),
+  "/rate-limit": () => import("./pages/RateLimitCard"),
+  "/webhooks/deliveries": () => import("./pages/WebhookDeliveries"),
+  "/endpoints": () => import("./pages/EndpointSummary"),
+};
+
+export function prefetchRoute(path: string) {
+  const prefetcher = routePrefetchers[path];
+  if (prefetcher) {
+    prefetcher().catch(() => {
+      // Ignore prefetch failures gracefully
+    });
+  }
+}
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
+
+type WalletServiceFailure = Error & {
+  code: WalletServiceErrorCode;
+  requiresReconciliation: boolean;
+};
 
 const STAGE_LABELS: Record<DepositStage, string> = {
   input: "Enter Amount",
@@ -130,12 +166,18 @@ const APP_ROUTES = {
   rateLimitCard: "/rate-limit",
   slaCard: "/marketplace/grantfox-wave-compute/sla",
   webhookDeliveries: "/webhooks/deliveries",
+  onboarding: "/onboarding",
+  endpointSummary: "/endpoints",
 } as const;
 
-function createMockHash() {
-  const seed = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
-  return seed.toUpperCase().padEnd(64, "A").slice(0, 64);
-}
+const PRIMARY_NAV: Array<{ to: string; label: string }> = [
+  { to: APP_ROUTES.dashboard, label: "Dashboard" },
+  { to: APP_ROUTES.marketplace, label: "Marketplace" },
+  { to: APP_ROUTES.publish, label: "Publish" },
+  { to: APP_ROUTES.myApis, label: "My APIs" },
+  { to: APP_ROUTES.billing, label: "Billing" },
+  { to: APP_ROUTES.documentation, label: "Docs" },
+];
 
 function buildExplorerLink(hash: string) {
   return `${EXPLORER_BASE_URL}${hash}`;
@@ -150,7 +192,7 @@ function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
   return hasValidAmount ? "Review transaction preview" : "Enter a deposit amount";
 }
 
-function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () => void; onPublishApi: () => void }) {
+function LandingPage({ onStartUsingApis, onPublishApi, onTakeTour }: { onStartUsingApis: () => void; onPublishApi: () => void; onTakeTour?: () => void }) {
   return (
     <div className="lp-shell">
       <header className="lp-section lp-hero" aria-labelledby="hero-title">
@@ -169,6 +211,11 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
             <button className="lp-btn lp-btn-secondary" onClick={onPublishApi}>
               Publish Your API
             </button>
+            {onTakeTour && (
+              <button className="lp-btn lp-btn-secondary" onClick={onTakeTour} style={{ marginLeft: "12px" }}>
+                Take the tour
+              </button>
+            )}
           </div>
         </div>
 
@@ -254,21 +301,21 @@ function LandingPage({ onStartUsingApis, onPublishApi }: { onStartUsingApis: () 
 
       <footer className="lp-section lp-footer">
         <nav aria-label="Footer links">
-          <a href="#" className="link-nav">
+          <ExternalLink href={EXTERNAL_LINKS.about} className="link-nav">
             About
-          </a>
-          <a href="#" className="link-nav">
+          </ExternalLink>
+          <NavLink to={APP_ROUTES.documentation} className="link-nav">
             Documentation
-          </a>
-          <a href="#" className="link-nav">
+          </NavLink>
+          <ExternalLink href={EXTERNAL_LINKS.support} className="link-nav">
             Support
-          </a>
-          <a href="#" className="link-nav">
+          </ExternalLink>
+          <ExternalLink href={EXTERNAL_LINKS.terms} className="link-nav">
             Terms
-          </a>
-          <a href="#" className="link-nav">
+          </ExternalLink>
+          <ExternalLink href={EXTERNAL_LINKS.privacy} className="link-nav">
             Privacy
-          </a>
+          </ExternalLink>
         </nav>
         <p>© {new Date().getFullYear()} Callora. All rights reserved.</p>
       </footer>
@@ -356,20 +403,29 @@ function App() {
   useGlobalShortcuts(handleGlobalKeyDown);
   const [depositStage, setDepositStage] = useState<DepositStage>("input");
   const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
+  const [walletAvailability, setWalletAvailability] = useState<"checking" | "available" | "missing">("checking");
+  const [trustlineStatus, setTrustlineStatus] = useState<UsdcTrustlineStatus | "checking" | "connect" | "error">("checking");
+  const [trustlineMessage, setTrustlineMessage] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [isAddingTrustline, setIsAddingTrustline] = useState(false);
+  const [trustlineCheckVersion, setTrustlineCheckVersion] = useState(0);
+  const [depositFailureCode, setDepositFailureCode] = useState<WalletServiceErrorCode | null>(null);
+  const [depositRequiresReconciliation, setDepositRequiresReconciliation] = useState(false);
   const [txHash, setTxHash] = useState("");
   const [copied, setCopied] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   const [submittedAmount, setSubmittedAmount] = useState<number | null>(null);
   const [submittedStartingBalance, setSubmittedStartingBalance] = useState<number | null>(null);
-
-  const timersRef = useRef<number[]>([]);
+  const [amountHint, setAmountHint] = useState<string | null>(null);
 
   const parsedAmount = Number(amountInput);
   const hasAmount = amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
   const activeAmount = submittedAmount ?? (hasAmount ? parsedAmount : 0);
   const previewCurrentBalance = submittedStartingBalance ?? vaultBalance;
   const projectedBalance = previewCurrentBalance + activeAmount;
-  const isBusy = depositStage === "approving" || depositStage === "pending";
+  const isBusy = isAddingTrustline || depositStage === "approving" || depositStage === "pending";
+  const hasUnconfirmedDeposit = depositRequiresReconciliation;
+  const { networkFee, isEstimated: isNetworkFeeEstimated } = useNetworkFee(NETWORK_FEE, isDepositOpen);
   const balanceDelta = formatUsdc(submittedAmount ?? (hasAmount ? parsedAmount : 0));
 
   let validationMessage = "";
@@ -389,10 +445,35 @@ function App() {
   const pendingHashLabel = txHash ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : null;
 
   useEffect(() => {
+    if (!isDepositOpen) return;
+
+    let isCurrent = true;
+    setWalletAvailability("checking");
+    setTrustlineStatus("checking");
+    setTrustlineMessage("");
+    import("./services/walletService")
+      .then(async ({ isWalletAvailable, getWalletAddress, hasUsdcTrustline }) => {
+        const available = await isWalletAvailable();
+        if (!isCurrent) return;
+        setWalletAvailability(available ? "available" : "missing");
+        if (!available) return;
+        if (STELLAR_USDC_CONFIGURATION_ERROR) throw new Error(STELLAR_USDC_CONFIGURATION_ERROR);
+        const address = await getWalletAddress();
+        if (!isCurrent) return;
+        setWalletAddress(address);
+        const status = await hasUsdcTrustline(address);
+        if (isCurrent) setTrustlineStatus(status);
+      })
+      .catch((error) => {
+        if (!isCurrent) return;
+        setTrustlineStatus(error.code === "SIGNATURE_REJECTED" ? "connect" : "error");
+        setTrustlineMessage(error.code === "SIGNATURE_REJECTED" ? "Wallet connection cancelled. Connect Freighter when you are ready." : error.message);
+      });
+
     return () => {
-      timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
+      isCurrent = false;
     };
-  }, []);
+  }, [isDepositOpen, trustlineCheckVersion]);
 
   useEffect(() => {
     if (location.pathname !== APP_ROUTES.billing && isDepositOpen) {
@@ -406,13 +487,7 @@ function App() {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
-  const clearTimers = () => {
-    timersRef.current.forEach((timer: number) => window.clearTimeout(timer));
-    timersRef.current = [];
-  };
-
   const resetFlow = (nextAmount = amountInput, nextPreset = selectedPreset) => {
-    clearTimers();
     setAmountInput(nextAmount);
     setSelectedPreset(nextPreset);
     setDepositStage("input");
@@ -420,6 +495,9 @@ function App() {
     setCopied(false);
     setSubmittedAmount(null);
     setSubmittedStartingBalance(null);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
+    setAmountHint(null);
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
@@ -427,7 +505,7 @@ function App() {
     navigate(APP_ROUTES.billing);
     const nextAmount = presetAmount !== undefined ? String(presetAmount) : amountInput;
     const nextPreset: number | "custom" = presetAmount !== undefined ? presetAmount : selectedPreset;
-    resetFlow(nextAmount, nextPreset);
+    if (!hasUnconfirmedDeposit) resetFlow(nextAmount, nextPreset);
     setIsDepositOpen(true);
   };
 
@@ -453,10 +531,15 @@ function App() {
   };
 
   const handleAmountChange = (value: string, preset: number | "custom" = "custom") => {
-    if (isBusy) return;
+    if (isBusy || hasUnconfirmedDeposit) return;
 
-    const sanitized = value.replace(/[^\d.]/g, "");
-    resetFlow(sanitized, preset);
+    const { value: normalized, truncated } = normalizeUsdcAmountInput(value);
+    resetFlow(normalized, preset);
+    setAmountHint(
+      truncated
+        ? `USDC on Stellar supports ${USDC_DECIMALS} decimal places, so the amount was rounded down to ${normalized}.`
+        : null,
+    );
   };
 
   const handlePresetClick = (value: number) => {
@@ -479,49 +562,96 @@ function App() {
     }
   };
 
-  const handleApproveTransaction = () => {
-    if (!hasValidAmount || isBusy) return;
+  const handleApproveTransaction = async () => {
+    if (!hasValidAmount || isBusy || hasUnconfirmedDeposit || walletAvailability !== "available" || (trustlineStatus !== "present" && trustlineStatus !== "unknown")) return;
 
     const approvedAmount = parsedAmount;
     const startingBalance = vaultBalance;
-    const nextHash = createMockHash();
-
-    clearTimers();
     setSubmittedAmount(approvedAmount);
     setSubmittedStartingBalance(startingBalance);
-    setTxHash(nextHash);
+    setTxHash("");
     setCopied(false);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
     setDepositStage("approving");
     setStatusMessage("Approve this USDC deposit in your wallet to continue.");
 
-    timersRef.current.push(
-      window.setTimeout(() => {
-        setDepositStage("pending");
-        setStatusMessage("Transaction submitted to Stellar. Waiting for confirmation.");
-      }, 1400),
-    );
+    let isWalletServiceError:
+      | ((error: unknown) => error is WalletServiceFailure)
+      | undefined;
 
-    timersRef.current.push(
-      window.setTimeout(() => {
-        if (demoOutcome === "confirmed") {
-          setDepositStage("confirmed");
-          setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
-          setStatusMessage(`${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`);
-        } else {
-          setDepositStage("failed");
-          setStatusMessage("The deposit was not confirmed. Review the details, then retry when your wallet is ready.");
-        }
-      }, 3600),
-    );
+    try {
+      const walletService = await import("./services/walletService");
+      isWalletServiceError = (error): error is WalletServiceFailure =>
+        error instanceof walletService.WalletServiceError;
+
+      const submittedDeposit = await walletService.submitVaultDeposit(amountInput, (hash) => {
+        setTxHash(hash);
+        setDepositStage("pending");
+        setStatusMessage("Transaction submitted to Stellar. Waiting for ledger confirmation.");
+      });
+
+      setTxHash(submittedDeposit.hash);
+      setVaultBalance(Number((startingBalance + approvedAmount).toFixed(2)));
+      setDepositStage("confirmed");
+      setStatusMessage(`${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`);
+    } catch (error) {
+      const walletError = isWalletServiceError?.(error) ? error : null;
+      const failureCode = walletError?.code ?? "NETWORK_ERROR";
+      if (failureCode === "TRUSTLINE_MISSING" || failureCode === "UNFUNDED_ACCOUNT") {
+        setTrustlineStatus(failureCode === "TRUSTLINE_MISSING" ? "missing" : "unfunded-account");
+        setTrustlineCheckVersion((version) => version + 1);
+        setDepositStage("input");
+        setSubmittedAmount(null);
+        setSubmittedStartingBalance(null);
+        setStatusMessage("Complete the wallet setup below before depositing.");
+        return;
+      }
+      setDepositFailureCode(failureCode);
+      setDepositRequiresReconciliation(walletError?.requiresReconciliation ?? false);
+      setDepositStage("failed");
+      setStatusMessage(
+        walletError
+          ? walletError.message
+          : "Could not submit the deposit. Check your wallet and Stellar network, then try again.",
+      );
+    }
+  };
+
+  const handleAddTrustline = async () => {
+    if (isBusy || trustlineStatus !== "missing") return;
+    setIsAddingTrustline(true);
+    setTrustlineMessage("Approve the USDC trustline in Freighter. Waiting for Stellar confirmation.");
+    try {
+      const { addUsdcTrustline } = await import("./services/walletService");
+      const result = await addUsdcTrustline();
+      if (result === "cancelled") {
+        setTrustlineMessage("Trustline signature cancelled. You can add the USDC trustline when you are ready.");
+      } else {
+        // Reconnect and recheck in case the selected wallet changed while signing.
+        setTrustlineCheckVersion((version) => version + 1);
+      }
+    } catch (error) {
+      const failure = error as WalletServiceFailure;
+      if (failure.code === "UNFUNDED_ACCOUNT") setTrustlineCheckVersion((version) => version + 1);
+      setTrustlineMessage(failure.message || "Could not add the USDC trustline. Check your wallet and try again.");
+    } finally {
+      setIsAddingTrustline(false);
+    }
   };
 
   const handleRetry = () => {
+    if (hasUnconfirmedDeposit) return;
     if (submittedAmount !== null) {
       setAmountInput(String(submittedAmount));
     }
 
     setSelectedPreset("custom");
     setDepositStage("input");
+    setTxHash("");
+    setCopied(false);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
     setStatusMessage("Review the transaction details and approve again.");
   };
 
@@ -534,44 +664,33 @@ function App() {
   };
 
   return (
-    <ToastProvider>
       <div className="app-shell">
-        <RouteProgressBar />
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
         <div className="ambient ambient-a" aria-hidden="true" />
         <div className="ambient ambient-b" aria-hidden="true" />
 
-        <header className="topbar no-print" role="banner">
-          <div>
-            <p className="eyebrow">Callora Vault</p>
-            <p className="brand">Secure USDC funding for premium API usage</p>
-          </div>
+        <header className="topbar standalone-topbar no-print" role="banner">
+          <a href="/" className="standalone-brand" aria-label="Callora home">
+            <span className="standalone-logo" aria-hidden="true">C</span>
+            Callora
+          </a>
 
           <div className="topbar-actions">
             <nav className="nav" aria-label="Primary navigation">
-              <NavLink to={APP_ROUTES.dashboard} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
-                Dashboard
-              </NavLink>
-              <NavLink to={APP_ROUTES.marketplace} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
-                Marketplace
-              </NavLink>
-              <NavLink to={APP_ROUTES.myApis} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
-                My APIs
-              </NavLink>
-              <NavLink to={APP_ROUTES.billing} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
-                Billing
-              </NavLink>
-              <NavLink to={APP_ROUTES.billingHistory} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
-                Billing History
-              </NavLink>
-              <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
-                Theme Playground
-              </NavLink>
-              <NavLink to={APP_ROUTES.designSystem} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
-                Design System
-              </NavLink>
+              {PRIMARY_NAV.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === APP_ROUTES.billing}
+                  className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}
+                  onMouseEnter={() => prefetchRoute(item.to)}
+                  onFocus={() => prefetchRoute(item.to)}
+                >
+                  {item.label}
+                </NavLink>
+              ))}
             </nav>
             <AccountSwitcher />
             <ThemeToggle />
@@ -579,13 +698,16 @@ function App() {
         </header>
 
         <main id="main-content" role="main" className="page">
-          <Routes>
+          <Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
+            <Routes>
             <Route
               path={APP_ROUTES.landing}
-              element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} />}
+              element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} onTakeTour={() => navigate(APP_ROUTES.onboarding)} />}
             />
 
             <Route path={APP_ROUTES.publish} element={<PublishApi />} />
+
+            <Route path={APP_ROUTES.onboarding} element={<OnboardingTour onComplete={() => navigate(APP_ROUTES.dashboard)} />} />
 
             <Route path={APP_ROUTES.dashboard} element={<DashboardPage vaultBalance={vaultBalance} walletBalance={walletBalance} costPerCall={0.08} callsPerDay={120} openDeposit={openDeposit} />} />
             <Route path={APP_ROUTES.marketplace} element={<MarketplacePage />} />
@@ -610,7 +732,7 @@ function App() {
                         <p className="eyebrow">Deposit USDC to Vault</p>
                         <h1>Review every number before you approve.</h1>
                       </div>
-                      <button className="primary-button no-print" onClick={openDeposit}>
+                      <button className="primary-button no-print" onClick={() => openDeposit()}>
                         Open deposit modal
                       </button>
                     </div>
@@ -648,36 +770,60 @@ function App() {
                   </div>
 
                   <aside className="surface prototype-panel">
-                    <p className="eyebrow">Prototype state preview</p>
-                    <h2>Review both success and failure flows.</h2>
-                    <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
-                      <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
-                        Confirmed path
-                      </button>
-                      <button role="radio" aria-checked={demoOutcome === "failed"} className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
-                        Failed path
-                      </button>
-                    </div>
+                    <p className="eyebrow">Vault details</p>
+                    <h2>Where your USDC goes.</h2>
+                    <dl className="vault-facts">
+                      <div>
+                        <dt>Network</dt>
+                        <dd>Stellar testnet</dd>
+                      </div>
+                      <div>
+                        <dt>Vault contract</dt>
+                        <dd>
+                          <a href={testnetContractUrl(TESTNET_DEPLOYMENT.vault)} target="_blank" rel="noopener noreferrer">
+                            {TESTNET_DEPLOYMENT.vault.slice(0, 6)}…{TESTNET_DEPLOYMENT.vault.slice(-6)}
+                          </a>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Settlement contract</dt>
+                        <dd>
+                          <a href={testnetContractUrl(TESTNET_DEPLOYMENT.settlement)} target="_blank" rel="noopener noreferrer">
+                            {TESTNET_DEPLOYMENT.settlement.slice(0, 6)}…{TESTNET_DEPLOYMENT.settlement.slice(-6)}
+                          </a>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Minimum deposit</dt>
+                        <dd>{MIN_DEPOSIT} USDC</dd>
+                      </div>
+                    </dl>
                     <p className="helper-text">
-                      The modal follows the real sequence. Use this toggle to preview the end-state a reviewer should see after wallet approval.
+                      Every deposit and per-call debit is recorded on-chain. See past activity in{" "}
+                      <NavLink to={APP_ROUTES.billingHistory}>Billing History</NavLink>.
                     </p>
+                    {ENABLE_DEMO_OUTCOME && (
+                      <>
+                        <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
+                          <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
+                            Confirmed path
+                          </button>
+                          <button role="radio" aria-checked={demoOutcome === "failed"} className={demoOutcome === "failed" ? "active" : ""} onClick={() => setDemoOutcome("failed")}>
+                            Failed path
+                          </button>
+                        </div>
+                        <p className="helper-text">
+                          Demo control for previewing the success and failure layouts.
+                        </p>
+                      </>
+                    )}
                   </aside>
                 </section>
               }
             />
 
-            <Route
-              path={APP_ROUTES.documentation}
-              element={
-                <section className="surface placeholder-card">
-                  <p className="eyebrow">Documentation</p>
-                  <h1>Everything you need to ship with the Callora vault.</h1>
-                  <p>
-                    Implementation guides, transaction lifecycle notes, and troubleshooting references live here so teams can move from prototype to production quickly.
-                  </p>
-                </section>
-              }
-            />
+            <Route path={APP_ROUTES.documentation} element={<Documentation />} />
+            <Route path={APP_ROUTES.slaCard} element={<SlaCard />} />
 
             <Route
               path={APP_ROUTES.status}
@@ -686,6 +832,14 @@ function App() {
                   <p className="eyebrow">Status</p>
                   <h1>System status updates in one place.</h1>
                   <p>All core services are operational. If you are still seeing issues, please contact support and include what action you were trying to complete.</p>
+                  <ul className="status-list" aria-label="Service status">
+                    {["Marketplace API", "Billing & vault deposits", "Usage metering", "Stellar testnet settlement", "Webhooks"].map((svc) => (
+                      <li key={svc}>
+                        <span>{svc}</span>
+                        <span className="status-ok">● Operational</span>
+                      </li>
+                    ))}
+                  </ul>
                 </section>
               }
             />
@@ -700,17 +854,25 @@ function App() {
 
             <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
 
+            <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
+
             {/* ── Billing History (FWC26) ──────────────────────────────── */}
             <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
-          </Routes>
+            </Routes>
+          </Suspense>
         </main>
 
         <footer className="surface app-footer no-print" role="contentinfo">
           <div>
             <p className="eyebrow">Callora</p>
             <p className="footer-copy">Reliable USDC funding and API operations for modern product teams.</p>
+            <p className="footer-copy">
+              <a className="footer-chain-link" href={testnetContractUrl(TESTNET_DEPLOYMENT.vault)} target="_blank" rel="noopener noreferrer">
+                Deployed on Stellar testnet
+              </a>
+            </p>
           </div>
 
           <nav className="footer-nav" aria-label="Footer navigation">
@@ -728,6 +890,9 @@ function App() {
             </NavLink>
             <NavLink to={APP_ROUTES.themePlayground} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
               Theme Playground
+            </NavLink>
+            <NavLink to={APP_ROUTES.designSystem} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
+              Design System
             </NavLink>
             <NavLink to={APP_ROUTES.status} className={({ isActive }) => (isActive ? "link-nav active" : "link-nav")}>
               Status
@@ -758,7 +923,7 @@ function App() {
 
               <div className="modal-body">
                 <div className="stage-strip" aria-label="Transaction flow status">
-                  {(["input", "approving", "pending", demoOutcome === "confirmed" ? "confirmed" : "failed"] as const).map((item) => {
+                  {(["input", "approving", "pending", depositStage === "failed" ? "failed" : "confirmed"] as const).map((item) => {
                     const isActive = item === depositStage || (item === "input" && depositStage === "input" && hasValidAmount);
 
                     return (
@@ -776,6 +941,31 @@ function App() {
                   </div>
                   <span className={`status-chip ${depositStage}`}>{STAGE_LABELS[depositStage]}</span>
                 </div>
+
+                {walletAvailability === "available" && depositStage === "input" && (
+                  <div id="usdc-trustline-status" className="security-note" role="status" aria-live="polite" aria-atomic="true">
+                    {trustlineStatus === "checking" && <p>Checking your USDC trustline...</p>}
+                    {trustlineStatus === "present" && <p>USDC trustline ready. Review your deposit and approve when ready.</p>}
+                    {trustlineStatus === "missing" && (
+                      <>
+                        <strong>Add a USDC trustline before depositing</strong>
+                        <p>A trustline lets your wallet hold and send this vault’s USDC asset. Adding it increases your minimum balance by a 0.5 XLM base reserve, plus a small transaction fee. This step only adds the trustline; it does not deposit or supply USDC.</p>
+                      </>
+                    )}
+                    {trustlineStatus === "unfunded-account" && (
+                      <>
+                        <p>This Stellar account is not funded. Fund it with XLM, then check again before adding the USDC trustline.</p>
+                        {STELLAR_NETWORK === "testnet" && (
+                          <ExternalLink href={`https://friendbot.stellar.org/?addr=${encodeURIComponent(walletAddress)}`} ariaLabel="Fund testnet account with Friendbot">
+                            Fund testnet account with Friendbot
+                          </ExternalLink>
+                        )}
+                      </>
+                    )}
+                    {trustlineStatus === "unknown" && <p>Could not check your USDC trustline through Horizon. You can still approve, but a missing trustline may cause the deposit to fail.</p>}
+                    {trustlineMessage && <p>{trustlineMessage}</p>}
+                  </div>
+                )}
 
                 <div className="modal-grid">
                   <div className="form-panel">
@@ -801,13 +991,13 @@ function App() {
                         inputMode="decimal"
                         value={amountInput}
                         onChange={(event) => handleAmountChange(event.target.value)}
-                        disabled={isBusy}
+                        disabled={isBusy || hasUnconfirmedDeposit}
                         placeholder="0.00"
-                        aria-describedby="deposit-help"
+                        aria-describedby={amountHint ? "deposit-help deposit-amount-hint" : "deposit-help"}
                         aria-invalid={validationMessage.length > 0 && depositStage === "input"}
                       />
                       <span>USDC</span>
-                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy} aria-label={`Set maximum amount: ${formatUsdShortcut(walletBalance)}`}>
+                      <button type="button" className="ghost-button" onClick={handleMax} disabled={isBusy || hasUnconfirmedDeposit} aria-label={`Set maximum amount: ${formatUsdShortcut(walletBalance)}`}>
                         Max
                       </button>
                     </div>
@@ -816,15 +1006,21 @@ function App() {
                       Minimum deposit is {formatUsdShortcut(MIN_DEPOSIT)}. Custom deposits settle into your vault after wallet approval.
                     </p>
 
+                    {amountHint && (
+                      <p id="deposit-amount-hint" className="helper-text" role="status">
+                        {amountHint}
+                      </p>
+                    )}
+
                     {validationMessage && depositStage === "input" && <p className="error-text">{validationMessage}</p>}
 
                     <div className="preset-row" role="radiogroup" aria-label="Deposit amount preset">
                       {PRESET_AMOUNTS.map((preset) => (
-                        <button key={preset} role="radio" aria-checked={selectedPreset === preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy}>
+                        <button key={preset} role="radio" aria-checked={selectedPreset === preset} className={selectedPreset === preset ? "active" : ""} onClick={() => handlePresetClick(preset)} disabled={isBusy || hasUnconfirmedDeposit}>
                           ${preset}
                         </button>
                       ))}
-                      <button role="radio" aria-checked={selectedPreset === "custom"} className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy}>
+                      <button role="radio" aria-checked={selectedPreset === "custom"} className={selectedPreset === "custom" ? "active" : ""} onClick={() => setSelectedPreset("custom")} disabled={isBusy || hasUnconfirmedDeposit}>
                         Custom
                       </button>
                     </div>
@@ -865,12 +1061,15 @@ function App() {
 
                       <div className="preview-row">
                         <span>Network fee</span>
-                        <strong>{NETWORK_FEE}</strong>
+                        <strong>
+                          <span>{networkFee}</span>
+                          {isNetworkFeeEstimated && <span> (estimated)</span>}
+                        </strong>
                       </div>
 
                       <div className="preview-row total">
                         <span>Total cost</span>
-                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${NETWORK_FEE}` : `0.00 USDC + ${NETWORK_FEE}`}</strong>
+                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${networkFee}` : `0.00 USDC + ${networkFee}`}</strong>
                       </div>
                     </article>
 
@@ -892,8 +1091,8 @@ function App() {
 
                     {depositStage === "failed" && (
                       <article className="error-card">
-                        <strong>Approval not confirmed</strong>
-                        <p>No funds were added to the vault. Retry after confirming the wallet prompt or checking your network status.</p>
+                        <strong>{depositFailureCode === "SIGNATURE_REJECTED" ? "Signature rejected" : "Deposit failed"}</strong>
+                        <p>{statusMessage}</p>
                       </article>
                     )}
 
@@ -908,17 +1107,50 @@ function App() {
               </div>
 
               <div className="modal-actions">
-                {depositStage === "failed" ? (
-                  <button className="primary-button" onClick={handleRetry}>
-                    Retry deposit
+                {walletAvailability === "missing" ? (
+                  <div className="wallet-install-prompt" role="status">
+                    <p>Install Freighter to sign this Stellar deposit.</p>
+                    <a className="primary-button" href="https://www.freighter.app/" target="_blank" rel="noreferrer">
+                      Install Freighter
+                    </a>
+                  </div>
+                ) : walletAvailability === "checking" ? (
+                  <button className="primary-button" disabled>
+                    Checking for Freighter...
                   </button>
+                ) : depositStage === "failed" ? (
+                  hasUnconfirmedDeposit ? (
+                    <button className="primary-button" disabled title="Check the submitted transaction before creating another deposit.">
+                      Check transaction status before retrying
+                    </button>
+                  ) : (
+                    <button className="primary-button" onClick={handleRetry}>
+                      Retry deposit
+                    </button>
+                  )
                 ) : depositStage === "confirmed" ? (
                   <button className="primary-button" onClick={handleDepositAnother}>
                     Deposit another amount
                   </button>
+                ) : trustlineStatus === "checking" ? (
+                  <button className="primary-button" disabled>Checking USDC trustline...</button>
+                ) : trustlineStatus === "missing" ? (
+                  <button className="primary-button" onClick={handleAddTrustline} disabled={isBusy} aria-describedby="usdc-trustline-status">
+                    {isAddingTrustline ? "Adding USDC trustline..." : "Add USDC trustline"}
+                  </button>
+                ) : trustlineStatus === "unfunded-account" || trustlineStatus === "error" || trustlineStatus === "connect" ? (
+                  <button className="primary-button" onClick={() => setTrustlineCheckVersion((version) => version + 1)} aria-describedby="usdc-trustline-status">
+                    {trustlineStatus === "connect" ? "Connect Freighter" : "Check USDC trustline again"}
+                  </button>
                 ) : (
                   <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
                     {depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
+                  </button>
+                )}
+
+                {trustlineStatus === "missing" && trustlineMessage && !isBusy && depositStage === "input" && (
+                  <button className="secondary-button" onClick={() => setTrustlineCheckVersion((version) => version + 1)}>
+                    Check USDC trustline again
                   </button>
                 )}
 
@@ -930,15 +1162,66 @@ function App() {
           </div>
         )}
       </div>
-    </ToastProvider>
   );
 }
 
 function AccountSwitcher() {
-  const { account, accounts, switchAccount } = useAccountContext();
+  const { account, accounts, switchAccount, addAccount, removeAccount, renameAccount } = useAccountContext();
   const [open, setOpen] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [addError, setAddError] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameLabel, setRenameLabel] = useState("");
+  const [renameError, setRenameError] = useState("");
 
   if (accounts.length === 0) return null;
+
+  const handleAdd = () => {
+    setAddError("");
+    const trimmed = newLabel.trim();
+    if (!trimmed) {
+      setAddError("Label cannot be empty.");
+      return;
+    }
+    if (accounts.some((a) => a.label === trimmed)) {
+      setAddError("Label must be unique.");
+      return;
+    }
+    addAccount(trimmed);
+    setNewLabel("");
+    setShowAdd(false);
+    setOpen(false);
+  };
+
+  const handleRemoveCurrent = () => {
+    if (account) {
+      removeAccount(account.id);
+    }
+    setOpen(false);
+  };
+
+  const startRename = (acc: { id: string; label: string }) => {
+    setRenamingId(acc.id);
+    setRenameLabel(acc.label);
+    setRenameError("");
+  };
+
+  const handleRename = (accId: string) => {
+    setRenameError("");
+    const trimmed = renameLabel.trim();
+    if (!trimmed) {
+      setRenameError("Label cannot be empty.");
+      return;
+    }
+    if (accounts.some((a) => a.id !== accId && a.label === trimmed)) {
+      setRenameError("Label must be unique.");
+      return;
+    }
+    renameAccount(accId, trimmed);
+    setRenamingId(null);
+    setRenameLabel("");
+  };
 
   return (
     <div style={{ position: "relative" }}>
@@ -971,26 +1254,96 @@ function AccountSwitcher() {
           }}
         >
           {accounts.map((acc) => (
-            <li
-              key={acc.id}
-              role="option"
-              aria-selected={account?.id === acc.id}
-              onClick={() => {
-                switchAccount(acc.id);
-                setOpen(false);
-              }}
-              style={{
-                padding: "8px 12px",
-                cursor: "pointer",
-                borderRadius: 4,
-                background: account?.id === acc.id ? "var(--accent)" : "transparent",
-                color: account?.id === acc.id ? "#fff" : "var(--text)",
-                fontSize: 13,
-              }}
-            >
-              {acc.label}
+            <li key={acc.id} style={{ marginBottom: 2 }}>
+              {renamingId === acc.id ? (
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input
+                    type="text"
+                    value={renameLabel}
+                    onChange={(e) => setRenameLabel(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleRename(acc.id); }}
+                    style={{ flex: 1, fontSize: 13, padding: "4px 6px" }}
+                    autoFocus
+                    aria-label="Rename account"
+                  />
+                  <button type="button" onClick={() => handleRename(acc.id)} style={{ fontSize: 12 }}>OK</button>
+                  <button type="button" onClick={() => { setRenamingId(null); setRenameLabel(""); }} style={{ fontSize: 12 }}>Cancel</button>
+                  {renameError && <span style={{ color: "red", fontSize: 11 }}>{renameError}</span>}
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span
+                    role="option"
+                    aria-selected={account?.id === acc.id}
+                    onClick={() => {
+                      switchAccount(acc.id);
+                      setOpen(false);
+                    }}
+                    style={{
+                      padding: "8px 12px",
+                      cursor: "pointer",
+                      borderRadius: 4,
+                      background: account?.id === acc.id ? "var(--accent)" : "transparent",
+                      color: account?.id === acc.id ? "#fff" : "var(--text)",
+                      fontSize: 13,
+                      flex: 1,
+                    }}
+                  >
+                    {acc.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => startRename(acc)}
+                    style={{ fontSize: 11, padding: "2px 6px", marginLeft: 4 }}
+                    aria-label={`Rename ${acc.label}`}
+                  >
+                    Rename
+                  </button>
+                </div>
+              )}
             </li>
           ))}
+          {showAdd ? (
+            <li style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <input
+                  type="text"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+                  placeholder="Account label"
+                  style={{ fontSize: 13, padding: "4px 6px" }}
+                  autoFocus
+                  aria-label="New account label"
+                />
+                <button type="button" onClick={handleAdd} style={{ fontSize: 12 }}>Add</button>
+                {addError && <span style={{ color: "red", fontSize: 11 }}>{addError}</span>}
+              </div>
+            </li>
+          ) : (
+            <li
+              style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}
+            >
+              <button
+                type="button"
+                onClick={() => { setShowAdd(true); setAddError(""); }}
+                style={{ fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--accent)" }}
+              >
+                + Add account
+              </button>
+            </li>
+          )}
+          {account && (
+            <li style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={handleRemoveCurrent}
+                style={{ fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--accent)" }}
+              >
+                Remove {account.label}
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

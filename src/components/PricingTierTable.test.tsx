@@ -228,3 +228,77 @@ describe("PricingTierTable — shortcut hint chip", () => {
     expect(screen.getByRole("heading", { name: "Pro" })).toBeTruthy();
   });
 });
+
+// ─── Caller-supplied recommendation (issue #1091) ───────────────────────────
+//
+// ApiDetailPage computes the cheapest tier for the projected request volume
+// and passes it down as `recommended`. These tests pin that contract.
+
+describe("PricingTierTable — recommended prop", () => {
+  const tiers: PricingTier[] = [
+    { name: "Free", price: "$0", description: "", features: [], ctaLabel: "Get Started" },
+    { name: "Pro", price: "$49", description: "", features: [], ctaLabel: "Upgrade Now" },
+    { name: "Enterprise", price: "$499", description: "", features: [], ctaLabel: "Contact Sales" },
+  ];
+
+  const cardFor = (cta: string) =>
+    screen.getByText(cta).closest(".pricing-tier-card") as HTMLElement;
+
+  it("labels the tier passed via `recommended` when no isRecommended flag is set", () => {
+    render(<PricingTierTable tiers={tiers} recommended={tiers[2]} />);
+
+    expect(screen.getAllByText("Recommended")).toHaveLength(1);
+    expect(cardFor("Contact Sales").textContent).toContain("Recommended");
+  });
+
+  it("overrides an isRecommended flag on another tier", () => {
+    const flagged = tiers.map((tier, index) =>
+      index === 0 ? { ...tier, isRecommended: true } : tier,
+    );
+
+    render(<PricingTierTable tiers={flagged} recommended={flagged[1]} />);
+
+    expect(screen.getAllByText("Recommended")).toHaveLength(1);
+    expect(cardFor("Upgrade Now").textContent).toContain("Recommended");
+  });
+
+  it("moves the badge, aria-keyshortcuts, and the 's' action to the new tier", () => {
+    const onSelectTier = vi.fn();
+    const { rerender } = render(
+      <PricingTierTable tiers={tiers} recommended={tiers[0]} onSelectTier={onSelectTier} />,
+    );
+
+    expect(screen.getByText("Get Started").getAttribute("aria-keyshortcuts")).toBe("s");
+
+    rerender(
+      <PricingTierTable tiers={tiers} recommended={tiers[2]} onSelectTier={onSelectTier} />,
+    );
+
+    expect(screen.getByText("Get Started").getAttribute("aria-keyshortcuts")).toBeNull();
+    expect(screen.getByText("Contact Sales").getAttribute("aria-keyshortcuts")).toBe("s");
+
+    fireEvent.keyDown(window, { key: "s" });
+    expect(onSelectTier).toHaveBeenCalledWith(tiers[2]);
+  });
+
+  it("ignores a recommended tier that is not in the list", () => {
+    const onSelectTier = vi.fn();
+    const stranger: PricingTier = { ...tiers[0], name: "Ghost" };
+
+    render(
+      <PricingTierTable tiers={tiers} recommended={stranger} onSelectTier={onSelectTier} />,
+    );
+
+    expect(screen.queryByText("Recommended")).toBeNull();
+    expect(screen.getByText("Get Started").getAttribute("aria-keyshortcuts")).toBeNull();
+
+    fireEvent.keyDown(window, { key: "s" });
+    expect(onSelectTier).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the isRecommended flag when `recommended` is null", () => {
+    render(<PricingTierTable tiers={mockTiers} recommended={null} />);
+
+    expect(cardFor("Upgrade Now").textContent).toContain("Recommended");
+  });
+});

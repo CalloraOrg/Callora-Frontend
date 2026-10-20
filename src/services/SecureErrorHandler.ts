@@ -20,6 +20,8 @@
 
 import { RotationErrorCode } from './KeyRotationService';
 
+export const MAX_REDACTION_DEPTH = 5;
+
 /**
  * Safe error messages that can be shown to end users.
  * Each message is generic enough to not leak implementation details.
@@ -72,14 +74,29 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
  * These patterns are used to sanitize error messages before display or logging.
  */
 const SENSITIVE_PATTERNS = [
+  // JSON-shaped credentials, e.g. in serialized request/response bodies:
+  // "password": "value" / "api_key":"value". The key is preserved so the
+  // surrounding JSON stays valid after redaction. Runs before the generic
+  // patterns below so quoted secret values are claimed first.
+  {
+    pattern: /(\"(?:password|passwd|pwd|secret|token|api_?key|access_?token|refresh_?token|client_?secret|authorization|private_?key)\"\s*:\s*)\"[^\"]*\"/gi,
+    replacement: '$1"[REDACTED]"',
+  },
   // API keys
   { pattern: /\b(ck_live_|sk_|pk_)[a-zA-Z0-9_]{20,}\b/g, replacement: '[REDACTED_KEY]' },
   // Bearer tokens
   { pattern: /Bearer\s+[a-zA-Z0-9\-_.~+/]+=*/gi, replacement: 'Bearer [REDACTED_TOKEN]' },
-  // Session/JWT tokens
-  { pattern: /[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*/g, replacement: '[REDACTED_TOKEN]' },
+  // JWT tokens: three base64url segments, the first of which is a realistic
+  // base64url-encoded JSON header starting with 'eyJ' (e.g. eyJhbGci...).
+  // This avoids matching semver strings (1.2.3), hostnames (api.callora.com),
+  // and dotted method names (v1.users.list).
+  {
+    pattern:
+      /\beyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_\-+]+\.[a-zA-Z0-9_\-+]+\b/g,
+    replacement: '[REDACTED_TOKEN]',
+  },
   // Email addresses
-  { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: '[REDACTED_EMAIL]' },
+  { pattern: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: '[REDACTED_EMAIL]' },
   // URLs with credentials
   { pattern: /https?:\/\/[^:]+:[^@]+@[^\s]/gi, replacement: 'https://[REDACTED_CREDENTIALS]' },
   // Passwords
@@ -172,6 +189,66 @@ export function getSafeErrorMessage(
 }
 
 /**
+ * Ensures a value is never logged or exposed if it looks like a secret.
+ * Used as a guard in monitoring/telemetry code.
+ */
+export function isSensitiveValue(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+
+  const str = value.toLowerCase();
+
+  // Check for common patterns that indicate sensitive data
+  const sensitiveIndicators = [
+    'key',
+    'token',
+    'secret',
+    'password',
+    'credential',
+    'auth',
+    'apikey',
+    'api_key',
+  ];
+
+  return sensitiveIndicators.some(indicator => str.includes(indicator));
+}
+
+/**
+ * Deeply redacts sensitive arrays and nested objects using a depth cap.
+ * Drops values under sensitive keys completely and passes strings to redactSensitiveData.
+ */
+export function redactDeeply(payload: unknown, depth: number = 0): any {
+  if (depth >= MAX_REDACTION_DEPTH) {
+    return '[TRUNCATED]';
+  }
+
+  if (payload === null || payload === undefined) {
+    return payload;
+  }
+
+  if (Array.isArray(payload)) {
+    return payload.map(item => redactDeeply(item, depth + 1));
+  }
+
+  if (typeof payload === 'object') {
+    const redactedObj: Record<string, any> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      if (isSensitiveValue(key)) {
+        redactedObj[key] = '[REDACTED]';
+      } else {
+        redactedObj[key] = redactDeeply(value, depth + 1);
+      }
+    }
+    return redactedObj;
+  }
+
+  if (typeof payload === 'string') {
+    return redactSensitiveData(payload);
+  }
+
+  return payload;
+}
+
+/**
  * Safely logs an error for debugging/monitoring without exposing secrets.
  * Use this instead of console.error for sensitive operations.
  */
@@ -181,14 +258,7 @@ export function logError(
   metadata?: Record<string, unknown>,
 ): void {
   const redacted = redactSensitiveData(error as any);
-  const safeMetadata = metadata
-    ? Object.fromEntries(
-        Object.entries(metadata).map(([key, value]) => [
-          key,
-          typeof value === 'string' ? redactSensitiveData(value) : value,
-        ])
-      )
-    : undefined;
+  const safeMetadata = metadata ? redactDeeply(metadata) : undefined;
 
   // In production, this would be sent to error tracking (Sentry, etc.)
   // For now, log with redacted content only
@@ -281,30 +351,6 @@ export function formatErrorForUI(
 }
 
 /**
- * Ensures a value is never logged or exposed if it looks like a secret.
- * Used as a guard in monitoring/telemetry code.
- */
-export function isSensitiveValue(value: unknown): boolean {
-  if (typeof value !== 'string') return false;
-
-  const str = value.toLowerCase();
-
-  // Check for common patterns that indicate sensitive data
-  const sensitiveIndicators = [
-    'key',
-    'token',
-    'secret',
-    'password',
-    'credential',
-    'auth',
-    'apikey',
-    'api_key',
-  ];
-
-  return sensitiveIndicators.some(indicator => str.includes(indicator));
-}
-
-/**
  * Creates an error object that's safe for telemetry systems.
  * Strips all sensitive information before sending to error tracking.
  */
@@ -335,16 +381,7 @@ export function createTelemetryError(
     message: redactSensitiveData(message),
     context: redactSensitiveData(context),
     code,
-    metadata: metadata
-      ? Object.fromEntries(
-          Object.entries(metadata).map(([key, value]) => [
-            key,
-            typeof value === 'string'
-              ? redactSensitiveData(value)
-              : value,
-          ])
-        )
-      : undefined,
+    metadata: metadata ? redactDeeply(metadata) : undefined,
   };
 }
 

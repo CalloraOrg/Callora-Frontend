@@ -1,25 +1,23 @@
 import { useEffect, useState, type MouseEvent } from "react";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import "./ApiDetailStickyTOC.css";
 
 export interface TocSection { id: string; label: string; }
 interface ApiDetailStickyTOCProps { sections: TocSection[]; }
-const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
 const compactTocQuery = "(max-width: 1023px)";
 
 /** Accessible, responsive in-page navigation for API detail sections. */
 export function ApiDetailStickyTOC({ sections }: ApiDetailStickyTOCProps) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? null);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [isCompact, setIsCompact] = useState(false);
 
   useEffect(() => {
-    const reducedMotion = window.matchMedia(reducedMotionQuery);
     const compactToc = window.matchMedia(compactTocQuery);
-    const syncPreferences = () => { setPrefersReducedMotion(reducedMotion.matches); setIsCompact(compactToc.matches); };
-    syncPreferences();
-    reducedMotion.addEventListener("change", syncPreferences);
-    compactToc.addEventListener("change", syncPreferences);
-    return () => { reducedMotion.removeEventListener("change", syncPreferences); compactToc.removeEventListener("change", syncPreferences); };
+    const syncCompact = () => setIsCompact(compactToc.matches);
+    syncCompact();
+    compactToc.addEventListener("change", syncCompact);
+    return () => compactToc.removeEventListener("change", syncCompact);
   }, []);
 
   useEffect(() => {

@@ -17,6 +17,7 @@
  */
 
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import type { APIItem } from "../data/mockApis";
 import { formatPrice } from "../utils/format";
 
@@ -121,6 +122,7 @@ export default function RelatedApisRail({
   limit = 5,
   onSelect,
 }: RelatedApisRailProps): JSX.Element | null {
+  const navigate = useNavigate();
   const items = useMemo(
     () => getRelatedApis(currentApi, allApis, limit),
     [currentApi, allApis, limit],
@@ -164,11 +166,11 @@ export default function RelatedApisRail({
             <button
               type="button"
               onClick={() => {
-                onSelect?.(api);
-                // Default navigation to the detail page for this API.
-                if (!onSelect) {
-                  window.location.href = `/details/${api.id}`;
+                if (onSelect) {
+                  onSelect(api);
+                  return;
                 }
+                navigate(`/details/${api.id}`);
               }}
               aria-label={`View details for ${api.name} by ${api.provider?.name ?? "Unknown"}`}
               style={{
@@ -299,18 +301,23 @@ export default function RelatedApisRail({
 
       {/* ── Footer link ──────────────────────────────────────────────────── */}
       <div style={{ marginTop: 14, textAlign: "center" }}>
-        <a
-          href="/marketplace"
+        <button
+          type="button"
+          onClick={() => navigate("/marketplace")}
           style={{
             fontSize: "0.78rem",
             color: "var(--accent)",
             textDecoration: "none",
             fontWeight: 600,
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
           }}
           aria-label="Browse all APIs in the marketplace"
         >
           Browse all APIs →
-        </a>
+        </button>
       </div>
     </section>
   );
