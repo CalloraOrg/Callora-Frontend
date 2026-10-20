@@ -27,7 +27,7 @@ export function TransactionCard({ tx, dateText, statusLabel, onDetails }: Transa
         <button
           type="button"
           className="bh-card__details"
-          aria-label={`Details for ${tx.description}`}
+          aria-label={`Details for ${tx.description}, ${dateText}`}
           onClick={(e) => onDetails(tx, e.currentTarget)}
         >
           Details
