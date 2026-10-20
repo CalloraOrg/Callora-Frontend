@@ -35,6 +35,21 @@ const walletMocks = vi.hoisted(() => ({
   network: "testnet",
 }));
 
+// Mock the vault balances hook to return predictable values matching the old
+// hardcoded balances (284.62 vault / 1260.5 wallet) so existing tests pass.
+// 284.62 USDC = 2,846,200,000 stroops (10^7 scale)
+// 1260.5 USDC = 12,605,000,000 stroops
+const vaultBalancesMock = vi.hoisted(() => ({
+  vault: 2846200000n,       // 284.62 USDC in stroops
+  wallet: 12605000000n,     // 1260.5 USDC in stroops
+  status: "ready" as const,
+  error: null,
+  configured: true,
+  refresh: vi.fn().mockResolvedValue(undefined),
+  updatedAt: Date.now(),
+  revision: 1,
+}));
+
 vi.mock("@stellar/freighter-api", () => ({
   isConnected: async () => ({ isConnected: true }),
   requestAccess: async () => ({ address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }),
@@ -69,6 +84,12 @@ vi.mock("./services/walletService", async (importOriginal) => {
     getWalletAddress: walletMocks.getWalletAddress,
   };
 });
+
+vi.mock("./hooks/useVaultBalances", () => ({
+  useVaultBalances: () => vaultBalancesMock,
+  BalanceReadStatus: "idle" | "loading" | "ready" | "error",
+  VaultBalanceStatus: "idle" | "loading" | "ready" | "error",
+}));
 
 beforeEach(() => {
   // Node's TextEncoder returns a Node-realm Uint8Array. The SDK validates
@@ -348,7 +369,8 @@ describe("App deposit modal timed transitions", () => {
     expect(preset100.getAttribute("aria-checked")).toBe("true");
 
     fireEvent.click(screen.getByRole("button", { name: /Max/i }));
-    expect(amountInput.value).toBe("1260.50");
+    // Max now uses the exact wallet balance from Soroban (no trailing zeros)
+    expect(amountInput.value).toBe("1260.5");
   });
 
   it("drives approving to pending to confirmed and updates the vault balance", async () => {
