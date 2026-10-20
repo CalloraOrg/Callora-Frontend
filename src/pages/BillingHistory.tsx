@@ -333,9 +333,15 @@ export function BillingHistory() {
           Billing History
         </h1>
         <p className="bh-subtitle">
-          Hover or focus any transaction row to preview on-chain details. Press{' '}
-          <kbd className="bh-kbd">Esc</kbd>{' '}
-          to dismiss the preview.
+          {isMobile ? (
+            'Tap Details on any transaction to see its on-chain details.'
+          ) : (
+            <>
+              Hover or focus any transaction row to preview on-chain details. Press{' '}
+              <kbd className="bh-kbd">Esc</kbd>{' '}
+              to dismiss the preview.
+            </>
+          )}
         </p>
       </header>
 
@@ -584,12 +590,14 @@ export function BillingHistory() {
       )}
 
       {/* ── Accessible keyboard tip ──────────────────────────────────────── */}
-      <p className="bh-tip">
-        <strong>Keyboard tip:</strong> Tab to a transaction description to open its preview.
-        Press{' '}
-        <kbd className="bh-kbd">Esc</kbd>{' '}
-        to close it and return focus to that row.
-      </p>
+      {!isMobile && (
+        <p className="bh-tip">
+          <strong>Keyboard tip:</strong> Tab to a transaction description to open its preview.
+          Press{' '}
+          <kbd className="bh-kbd">Esc</kbd>{' '}
+          to close it and return focus to that row.
+        </p>
+      )}
       <BottomSheet
         open={isMobile && selectedTx !== null}
         onClose={() => setSelectedTx(null)}

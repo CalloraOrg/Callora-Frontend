@@ -818,3 +818,27 @@ describe('BillingHistory — filters on mobile', () => {
     expect(mobile).toBe(MOCK_TRANSACTIONS.filter((t) => t.type === 'Deposit').length);
   });
 });
+
+describe('BillingHistory — touch-friendly wording', () => {
+  afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
+
+  it('mobile: tells users to tap Details instead of hovering', () => {
+    setViewport('mobile');
+    renderBH();
+    expect(screen.getByText(/tap details/i)).toBeTruthy();
+    expect(screen.queryByText(/hover/i)).toBeNull();
+  });
+
+  it('mobile: hides the keyboard tip', () => {
+    setViewport('mobile');
+    renderBH();
+    expect(screen.queryByText(/keyboard tip/i)).toBeNull();
+  });
+
+  it('desktop: keeps the hover wording and the keyboard tip', () => {
+    setViewport('desktop');
+    renderBH();
+    expect(screen.getByText(/hover or focus any transaction row/i)).toBeTruthy();
+    expect(screen.getByText(/keyboard tip/i)).toBeTruthy();
+  });
+});
