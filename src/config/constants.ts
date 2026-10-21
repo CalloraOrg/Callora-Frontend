@@ -44,6 +44,16 @@ export const NETWORK_FEE_CACHE_TTL_MS = 30_000;
 export const PRESET_AMOUNTS = [10, 50, 100, 500] as const;
 
 /**
+ * sessionStorage key for pending deposit reconciliation.
+ * Stores `{ hash, amount, submittedAt, network, contractId }` when reconciliation
+ * is required, keeping the pending deposit across reloads until verified.
+ */
+export const PENDING_DEPOSIT_STORAGE_KEY = "callora:deposit:pending";
+
+/** Stellar transaction validity window in seconds. */
+export const TRANSACTION_TIMEOUT_SECONDS = 120;
+
+/**
  * Simulated loading delay (ms) used by MarketplacePage, ApiDetailPage,
  * and Dashboard to mimic an async data fetch.
  */

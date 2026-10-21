@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     sendTransaction: vi.fn(),
     getTransaction: vi.fn(),
   },
+  walletSnapshot: vi.fn(() => ({ isNetworkMismatch: false })),
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -34,6 +35,9 @@ vi.mock("@stellar/stellar-sdk", async (importOriginal) => {
     }
   } } };
 });
+vi.mock("../state/walletStore", () => ({
+  walletStore: { getSnapshot: mocks.walletSnapshot },
+}));
 vi.mock("../config/constants", async (importOriginal) => ({
   ...await importOriginal<typeof import("../config/constants")>(),
   STELLAR_NETWORK: "testnet",
@@ -51,11 +55,13 @@ import {
   hasUsdcTrustline, addUsdcTrustline, getWalletAddress,
   isWalletAvailable,
   submitVaultDeposit,
+  checkDepositStatus,
 } from "./walletService";
 
 describe("walletService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.walletSnapshot.mockReturnValue({ isNetworkMismatch: false });
     mocks.configurationError = null;
     vi.stubGlobal("fetch", mocks.fetch);
     mocks.fetch.mockReset().mockResolvedValue({
@@ -86,6 +92,16 @@ describe("walletService", () => {
     mocks.isConnected.mockResolvedValue({ isConnected: false });
 
     await expect(isWalletAvailable()).resolves.toBe(false);
+  });
+
+  it("fails fast when the wallet store already knows the network is wrong", async () => {
+    mocks.walletSnapshot.mockReturnValue({ isNetworkMismatch: true });
+
+    await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+      code: "NETWORK_MISMATCH",
+    });
+    expect(mocks.requestAccess).not.toHaveBeenCalled();
+    expect(mocks.server.getAccount).not.toHaveBeenCalled();
   });
 
   it("signs, submits, and waits for the network hash to confirm", async () => {
@@ -338,5 +354,38 @@ describe("walletService", () => {
   it("reports a definitive failed deposit without requiring reconciliation", async () => {
     mocks.server.getTransaction.mockResolvedValueOnce({ status: "FAILED" });
     await expect(submitVaultDeposit("50")).rejects.toMatchObject({ code: "TRANSACTION_FAILED", requiresReconciliation: false });
+  });
+
+  describe("checkDepositStatus", () => {
+    it("returns SUCCESS when getTransaction reports SUCCESS", async () => {
+      mocks.server.getTransaction.mockResolvedValueOnce({ status: "SUCCESS" });
+      const status = await checkDepositStatus("test-hash");
+      expect(status).toBe("SUCCESS");
+      expect(mocks.server.getTransaction).toHaveBeenCalledWith("test-hash");
+    });
+
+    it("returns FAILED when getTransaction reports FAILED", async () => {
+      mocks.server.getTransaction.mockResolvedValueOnce({ status: "FAILED" });
+      const status = await checkDepositStatus("test-hash");
+      expect(status).toBe("FAILED");
+    });
+
+    it("returns NOT_FOUND when getTransaction reports NOT_FOUND", async () => {
+      mocks.server.getTransaction.mockResolvedValueOnce({ status: "NOT_FOUND" });
+      const status = await checkDepositStatus("test-hash");
+      expect(status).toBe("NOT_FOUND");
+    });
+
+    it("returns UNKNOWN when getTransaction throws an RPC error", async () => {
+      mocks.server.getTransaction.mockRejectedValueOnce(new Error("RPC network down"));
+      const status = await checkDepositStatus("test-hash");
+      expect(status).toBe("UNKNOWN");
+    });
+
+    it("returns UNKNOWN when getTransaction returns an unexpected status", async () => {
+      mocks.server.getTransaction.mockResolvedValueOnce({ status: "SOME_OTHER_STATUS" });
+      const status = await checkDepositStatus("test-hash");
+      expect(status).toBe("UNKNOWN");
+    });
   });
 });

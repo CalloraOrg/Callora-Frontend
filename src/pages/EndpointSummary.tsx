@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { MOCK_APIS } from "../data/mockApis";
-import { API_BASE_URL } from "../config/constants";
 import LiveRegion from "../components/LiveRegion";
+import "./EndpointSummary.css";
 
 export default function EndpointSummary(): JSX.Element {
   useDocumentTitle(
@@ -64,33 +64,15 @@ export default function EndpointSummary(): JSX.Element {
 
   return (
     <div className="endpoint-summary-page" style={{ padding: "24px 0" }}>
-      <header className="no-print" style={{ marginBottom: "32px", padding: "0 4px" }}>
+      <header className="no-print endpoint-summary-header">
         <p className="eyebrow">API Documentation</p>
-        <h1
-          style={{
-            margin: "0 0 12px",
-            fontSize: "clamp(1.8rem, 3vw, 2.4rem)",
-            fontWeight: "700",
-            color: "var(--text)",
-          }}
-        >
-          Endpoint Summary
-        </h1>
-        <p
-          style={{
-            margin: 0,
-            fontSize: "1rem",
-            color: "var(--muted)",
-            lineHeight: "1.65",
-            maxWidth: "600px",
-          }}
-        >
+        <h1 className="endpoint-summary-title">Endpoint Summary</h1>
+        <p className="endpoint-summary-description">
           Quick reference list of all API endpoints. Click any card to view parameters and details.
         </p>
         <button
           type="button"
-          className="primary-button no-print"
-          style={{ marginTop: "16px" }}
+          className="primary-button no-print endpoint-summary-print-btn"
           onClick={() => window.print()}
         >
           Print Summary
@@ -101,106 +83,109 @@ export default function EndpointSummary(): JSX.Element {
         />
       </header>
 
-      <section style={{ display: "grid", gap: "16px" }}>
+      <section className="endpoint-summary-list">
         {allEndpoints.map((ep) => {
           const isExpanded = expandedIds.has(ep.id);
+          const panelId = `endpoint-panel-${ep.id}`;
+          const triggerId = `endpoint-trigger-${ep.id}`;
+
           return (
             <div
               key={ep.id}
               className="preview-card endpoint-summary-card"
-              style={{ padding: 0, overflow: "hidden" }}
             >
               <button
+                id={triggerId}
                 type="button"
                 className="endpoint-summary-trigger"
                 onClick={() => toggleExpand(ep.id)}
                 aria-expanded={isExpanded}
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  background: "var(--surface-soft)",
-                  border: "none",
-                  padding: "16px 24px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  cursor: "pointer",
-                  color: "var(--text)",
-                }}
+                aria-controls={panelId}
               >
-                <div>
-                  <span className="eyebrow" style={{ display: "block", marginBottom: "4px" }}>
+                <div className="endpoint-summary-trigger-content">
+                  <span className="eyebrow endpoint-summary-trigger-eyebrow">
                     {ep.apiName}
                   </span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <div className="endpoint-summary-badge-row">
                     <span className={`method-badge method-badge--${(ep.method || "get").toLowerCase()}`}>
                       {ep.method}
                     </span>
-                    <strong style={{ fontSize: "16px" }}>{ep.title}</strong>
-                    <code style={{ fontSize: "13px", color: "var(--muted)" }}>{ep.url}</code>
+                    <strong className="endpoint-summary-card-title">{ep.title}</strong>
+                    <code className="endpoint-summary-url">{ep.url}</code>
                   </div>
                 </div>
-                <span
-                  className="chevron-icon"
-                  style={{
-                    transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s",
-                    display: "inline-block",
-                  }}
-                >
-                  ▼
+                <span className="endpoint-summary-chevron-wrap" aria-hidden="true">
+                  <span
+                    className={`chevron-icon endpoint-summary-chevron ${
+                      isExpanded ? "endpoint-summary-chevron--expanded" : ""
+                    }`}
+                  >
+                    ▼
+                  </span>
                 </span>
               </button>
 
               <div
+                id={panelId}
+                role="region"
+                aria-labelledby={triggerId}
+                hidden={!isExpanded}
+                {...(!isExpanded ? ({ inert: "" } as Record<string, string>) : {})}
                 className={`endpoint-summary-content ${
                   isExpanded ? "endpoint-summary-content--expanded" : "endpoint-summary-content--collapsed"
                 }`}
-                style={{
-                  padding: "24px",
-                  borderTop: "1px solid var(--line)",
-                }}
               >
-                <h4 style={{ margin: "0 0 12px 0", fontSize: "14px" }}>Request Parameters</h4>
+                <h4 className="endpoint-summary-params-heading">Request Parameters</h4>
                 {ep.params && ep.params.length > 0 ? (
-                  <div className="endpoint-table-wrap">
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                      <thead>
-                        <tr
-                          style={{
-                            textAlign: "left",
-                            color: "var(--muted)",
-                            borderBottom: "1px solid var(--line)",
-                          }}
-                        >
-                          <th style={{ padding: "8px 0" }}>Parameter</th>
-                          <th>Type</th>
-                          <th>Required</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {ep.params.map((p: any) => (
-                          <tr key={p.name} style={{ borderBottom: "1px solid var(--line)" }}>
-                            <td
-                              style={{
-                                padding: "12px 0",
-                                fontFamily: "monospace",
-                                color: "var(--accent)",
-                              }}
-                            >
-                              {p.name}
-                            </td>
-                            <td>
-                              <span className="type-tag">{p.type}</span>
-                            </td>
-                            <td>{p.required ? "Yes" : "Optional"}</td>
+                  <>
+                    {/* Desktop table view */}
+                    <div className="endpoint-table-wrap">
+                      <table className="endpoint-params-table">
+                        <caption className="sr-only">{ep.title} parameters</caption>
+                        <thead>
+                          <tr className="endpoint-params-table-header-row">
+                            <th scope="col">Parameter</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Required</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {ep.params.map((p: any) => (
+                            <tr key={p.name}>
+                              <td className="endpoint-param-name">{p.name}</td>
+                              <td>
+                                <span className="type-tag">{p.type}</span>
+                              </td>
+                              <td>{p.required ? "Required" : "Optional"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile definition list view */}
+                    <dl className="endpoint-params-dl">
+                      {ep.params.map((p: any) => (
+                        <div key={p.name} className="endpoint-params-dl-item">
+                          <dt className="endpoint-params-dl-name">{p.name}</dt>
+                          <dd className="endpoint-params-dl-meta">
+                            <span className="type-tag">{p.type}</span>
+                            <span
+                              className={`endpoint-param-chip ${
+                                p.required
+                                  ? "endpoint-param-chip--required"
+                                  : "endpoint-param-chip--optional"
+                              }`}
+                            >
+                              {p.required ? "Required" : "Optional"}
+                            </span>
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </>
                 ) : (
-                  <p style={{ color: "var(--muted)", fontSize: "13px" }}>No parameters required.</p>
+                  <p className="endpoint-summary-empty">No parameters required.</p>
                 )}
               </div>
             </div>

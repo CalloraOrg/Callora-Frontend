@@ -7,7 +7,7 @@ import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut, formatUsdcStroops, normalizeUsdcAmountInput, stroopsToUsdcAmount, usdcAmountToStroops, USDC_DECIMALS } from "./utils/format";
 import { useNetworkFee } from "./components/DepositPreview";
-import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR } from "./config/constants";
+import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR, STELLAR_VAULT_CONTRACT_ID, PENDING_DEPOSIT_STORAGE_KEY, TRANSACTION_TIMEOUT_SECONDS, type StellarNetwork } from "./config/constants";
 import type { WalletServiceErrorCode, UsdcTrustlineStatus } from "./services/walletService";
 import { useVaultBalances } from "./hooks/useVaultBalances";
 import BalanceReadout from "./components/BalanceReadout";
@@ -19,6 +19,8 @@ import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { useAccountContext } from "./hooks/useAccountContext";
+import WalletStatus from "./components/WalletStatus";
+import { useWalletStore } from "./state/walletStore";
 
 // Route splitting: dynamic imports for all heavy page routes
 const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
@@ -36,8 +38,8 @@ const RateLimitCard = lazy(() => import("./pages/RateLimitCard"));
 const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
 const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
-const InvoiceCard = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.InvoiceCard })));
-
+const BillingInvoiceSection = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.BillingInvoiceSection })));
+ 
 // Prefetch cache map to ensure modules are loaded on hover / focus without delaying critical interaction
 const routePrefetchers: Record<string, () => Promise<any>> = {
   "/marketplace": () => import("./pages/MarketplacePage"),
@@ -66,6 +68,51 @@ export function prefetchRoute(path: string) {
 
 type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
+
+export interface PendingDepositRecord {
+  hash: string;
+  amount: number;
+  submittedAt: number;
+  network: StellarNetwork;
+  contractId: string;
+}
+
+export function readPendingDeposit(): PendingDepositRecord | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_DEPOSIT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed.hash === "string" &&
+      typeof parsed.amount === "number" &&
+      typeof parsed.submittedAt === "number" &&
+      parsed.network === STELLAR_NETWORK &&
+      parsed.contractId === STELLAR_VAULT_CONTRACT_ID
+    ) {
+      return parsed as PendingDepositRecord;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function writePendingDeposit(record: PendingDepositRecord): void {
+  try {
+    sessionStorage.setItem(PENDING_DEPOSIT_STORAGE_KEY, JSON.stringify(record));
+  } catch {
+    // Gracefully handle storage quota or private mode restrictions
+  }
+}
+
+export function clearPendingDeposit(): void {
+  try {
+    sessionStorage.removeItem(PENDING_DEPOSIT_STORAGE_KEY);
+  } catch {
+    // Gracefully handle storage restrictions
+  }
+}
 
 type WalletServiceFailure = Error & {
   code: WalletServiceErrorCode;
@@ -329,6 +376,7 @@ function LandingPage({ onStartUsingApis, onPublishApi, onTakeTour }: { onStartUs
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  const wallet = useWalletStore();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
@@ -417,6 +465,10 @@ function App() {
   const [statusMessage, setStatusMessage] = useState("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   const [submittedAmount, setSubmittedAmount] = useState<number | null>(null);
   const [submittedStartingBalance, setSubmittedStartingBalance] = useState<bigint | null>(null);
+  const [pendingDeposit, setPendingDeposit] = useState<PendingDepositRecord | null>(() => readPendingDeposit());
+  const [isCheckingDepositStatus, setIsCheckingDepositStatus] = useState(false);
+  const [checkDepositStatusMessage, setCheckDepositStatusMessage] = useState("");
+  const [validityTimeRemaining, setValidityTimeRemaining] = useState<number | null>(null);
   const [amountHint, setAmountHint] = useState<string | null>(null);
 
   const {
@@ -430,7 +482,7 @@ function App() {
   } = useVaultBalances({ address: walletAddress || undefined });
 
   // Shown between a confirmed deposit and the chain re-read; never a
-  // fabricated balance — it is the vault's real pre-deposit value plus the
+  // fabricated balance. It is the vault's real pre-deposit value plus the
   // amount just deposited, cleared as soon as the refresh reports back.
   const [optimisticVault, setOptimisticVault] = useState<bigint | null>(null);
   const optimisticRevisionRef = useRef(0);
@@ -582,9 +634,21 @@ function App() {
 
   const openDeposit = (presetAmount?: number) => {
     navigate(APP_ROUTES.billing);
-    const nextAmount = presetAmount !== undefined ? String(presetAmount) : amountInput;
-    const nextPreset: number | "custom" = presetAmount !== undefined ? presetAmount : selectedPreset;
-    if (!hasUnconfirmedDeposit) resetFlow(nextAmount, nextPreset);
+    const storedPending = readPendingDeposit();
+    if (storedPending) {
+      setPendingDeposit(storedPending);
+      setTxHash(storedPending.hash);
+      setSubmittedAmount(storedPending.amount);
+      setAmountInput(String(storedPending.amount));
+      setDepositRequiresReconciliation(true);
+      setDepositStage("failed");
+      setStatusMessage("You have an unconfirmed deposit. Check transaction status before retrying.");
+      handleCheckDepositStatus();
+    } else {
+      const nextAmount = presetAmount !== undefined ? String(presetAmount) : amountInput;
+      const nextPreset: number | "custom" = presetAmount !== undefined ? presetAmount : selectedPreset;
+      if (!hasUnconfirmedDeposit) resetFlow(nextAmount, nextPreset);
+    }
     setIsDepositOpen(true);
   };
 
@@ -660,18 +724,23 @@ function App() {
       | ((error: unknown) => error is WalletServiceFailure)
       | undefined;
 
+    let capturedHash = "";
     try {
       const walletService = await import("./services/walletService");
       isWalletServiceError = (error): error is WalletServiceFailure =>
         error instanceof walletService.WalletServiceError;
 
       const submittedDeposit = await walletService.submitVaultDeposit(amountInput, (hash) => {
+        capturedHash = hash;
         setTxHash(hash);
         setDepositStage("pending");
         setStatusMessage("Transaction submitted to Stellar. Waiting for ledger confirmation.");
       });
 
-      setTxHash(submittedDeposit.hash);
+      const confirmedHash = submittedDeposit.hash || capturedHash;
+      clearPendingDeposit();
+      setPendingDeposit(null);
+      setTxHash(confirmedHash);
       // Optimistic value until the re-read lands; the revision guard clears it.
       const approvedStroops = usdcAmountToStroops(amountInput);
       if (startingBalance !== null && approvedStroops !== null) {
@@ -694,7 +763,21 @@ function App() {
         return;
       }
       setDepositFailureCode(failureCode);
-      setDepositRequiresReconciliation(walletError?.requiresReconciliation ?? false);
+      const reqReconciliation = walletError?.requiresReconciliation ?? false;
+      setDepositRequiresReconciliation(reqReconciliation);
+      const finalHash = capturedHash || txHash;
+      if (reqReconciliation && finalHash) {
+        const record: PendingDepositRecord = {
+          hash: finalHash,
+          amount: approvedAmount,
+          submittedAt: Date.now(),
+          network: STELLAR_NETWORK,
+          contractId: STELLAR_VAULT_CONTRACT_ID,
+        };
+        writePendingDeposit(record);
+        setPendingDeposit(record);
+        setTxHash(finalHash);
+      }
       setDepositStage("failed");
       setStatusMessage(
         walletError
@@ -741,6 +824,106 @@ function App() {
     setStatusMessage("Review the transaction details and approve again.");
   };
 
+  const handleCheckDepositStatus = async (auto = false) => {
+    const record = pendingDeposit ?? readPendingDeposit();
+    const hashToCheck = record?.hash || txHash;
+    if (!hashToCheck || isCheckingDepositStatus) return;
+
+    setIsCheckingDepositStatus(true);
+    setCheckDepositStatusMessage("Checking transaction status...");
+    try {
+      const { checkDepositStatus } = await import("./services/walletService");
+      const status = await checkDepositStatus(hashToCheck);
+
+      if (status === "SUCCESS") {
+        clearPendingDeposit();
+        setPendingDeposit(null);
+        setDepositRequiresReconciliation(false);
+        setValidityTimeRemaining(null);
+        setDepositStage("confirmed");
+        const msg = "Deposit confirmed on Stellar! Your vault balance has been updated.";
+        setStatusMessage(msg);
+        setCheckDepositStatusMessage(msg);
+        // Plain re-read from chain. No optimistic add here: this path often
+        // runs after a page reload, where the chain read may already include
+        // the deposit, so adding the amount again would double count.
+        void refreshBalances();
+      } else if (status === "FAILED") {
+        clearPendingDeposit();
+        setPendingDeposit(null);
+        setDepositRequiresReconciliation(false);
+        setValidityTimeRemaining(null);
+        setDepositStage("failed");
+        const msg = "Transaction failed on Stellar. You may retry your deposit.";
+        setStatusMessage(msg);
+        setCheckDepositStatusMessage(msg);
+      } else if (status === "NOT_FOUND") {
+        const submittedAt = record?.submittedAt ?? Date.now();
+        const elapsedSeconds = (Date.now() - submittedAt) / 1000;
+        if (elapsedSeconds > TRANSACTION_TIMEOUT_SECONDS) {
+          clearPendingDeposit();
+          setPendingDeposit(null);
+          setDepositRequiresReconciliation(false);
+          setValidityTimeRemaining(0);
+          setDepositStage("failed");
+          const msg = "Transaction not found and its validity window has expired. You may retry your deposit.";
+          setStatusMessage(msg);
+          setCheckDepositStatusMessage(msg);
+        } else {
+          const remaining = Math.max(1, Math.ceil(TRANSACTION_TIMEOUT_SECONDS - elapsedSeconds));
+          setValidityTimeRemaining(remaining);
+          setDepositRequiresReconciliation(true);
+          setDepositStage("failed");
+          const msg = `Transaction not found on ledger yet. Still within 120s validity window (${remaining}s remaining).`;
+          setStatusMessage(msg);
+          setCheckDepositStatusMessage(msg);
+        }
+      } else {
+        // UNKNOWN
+        setDepositRequiresReconciliation(true);
+        setDepositStage("failed");
+        const msg = "Could not verify transaction status. Please check Stellar Explorer or try again.";
+        setStatusMessage(msg);
+        setCheckDepositStatusMessage(msg);
+      }
+    } catch {
+      setDepositRequiresReconciliation(true);
+      setDepositStage("failed");
+      const msg = "Could not check transaction status. Please check Stellar Explorer or try again.";
+      setStatusMessage(msg);
+      setCheckDepositStatusMessage(msg);
+    } finally {
+      setIsCheckingDepositStatus(false);
+    }
+  };
+
+  useEffect(() => {
+    const record = readPendingDeposit();
+    if (record) {
+      setPendingDeposit(record);
+      setTxHash(record.hash);
+      setSubmittedAmount(record.amount);
+      setAmountInput(String(record.amount));
+      setDepositRequiresReconciliation(true);
+      setDepositStage("failed");
+      setStatusMessage("You have an unconfirmed deposit. Check transaction status before retrying.");
+      handleCheckDepositStatus(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasUnconfirmedDeposit || !pendingDeposit) return;
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - pendingDeposit.submittedAt) / 1000;
+      if (elapsed > TRANSACTION_TIMEOUT_SECONDS) {
+        setValidityTimeRemaining(0);
+      } else {
+        setValidityTimeRemaining(Math.max(1, Math.ceil(TRANSACTION_TIMEOUT_SECONDS - elapsed)));
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [hasUnconfirmedDeposit, pendingDeposit]);
+
   const handleDepositAnother = () => {
     resetFlow("50", 50);
   };
@@ -779,6 +962,7 @@ function App() {
               ))}
             </nav>
             <AccountSwitcher />
+            <WalletStatus />
             <ThemeToggle />
           </div>
         </header>
@@ -802,6 +986,8 @@ function App() {
                 <DashboardPage
                   vaultBalance={vaultNumber ?? undefined}
                   walletBalance={walletNumber ?? undefined}
+                  walletAddress={wallet.address}
+                  walletNetworkPassphrase={wallet.networkPassphrase}
                   balances={{
                     vaultText,
                     walletText,
@@ -835,6 +1021,17 @@ function App() {
               element={
                 <section className="billing-layout">
                   <div className="surface billing-panel">
+                    {hasUnconfirmedDeposit && !isDepositOpen && (
+                      <div className="status-banner" role="status" style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <strong>You have an unconfirmed deposit</strong>
+                          <p>A submitted transaction is awaiting verification. Check its status before depositing again.</p>
+                        </div>
+                        <button className="primary-button" onClick={() => openDeposit()}>
+                          Check status
+                        </button>
+                      </div>
+                    )}
                     <div className="section-heading">
                       <div>
                         <p className="eyebrow">Deposit USDC to Vault</p>
@@ -875,7 +1072,7 @@ function App() {
                       </article>
                     </div>
 
-                    <InvoiceCard invoiceNumber="INV-1001" amountDue="$4,200" dueDate="Due in 7 days" />
+                    <BillingInvoiceSection onPay={() => openDeposit()} />
 
                     <div className="info-row">
                       <div className="info-card">
@@ -1239,6 +1436,11 @@ function App() {
                       <article className="error-card">
                         <strong>{depositFailureCode === "SIGNATURE_REJECTED" ? "Signature rejected" : "Deposit failed"}</strong>
                         <p>{statusMessage}</p>
+                        {hasUnconfirmedDeposit && validityTimeRemaining !== null && validityTimeRemaining > 0 && (
+                          <p className="helper-text" style={{ marginTop: "0.5rem" }}>
+                            Validity window: {validityTimeRemaining}s remaining
+                          </p>
+                        )}
                       </article>
                     )}
 
@@ -1255,6 +1457,9 @@ function App() {
               </div>
 
               <div className="modal-actions">
+                <div role="status" aria-live="polite" className="sr-only">
+                  {checkDepositStatusMessage}
+                </div>
                 {walletAvailability === "missing" ? (
                   <div className="wallet-install-prompt" role="status">
                     <p>Install Freighter to sign this Stellar deposit.</p>
@@ -1268,8 +1473,12 @@ function App() {
                   </button>
                 ) : depositStage === "failed" ? (
                   hasUnconfirmedDeposit ? (
-                    <button className="primary-button" disabled title="Check the submitted transaction before creating another deposit.">
-                      Check transaction status before retrying
+                    <button
+                      className="primary-button"
+                      onClick={() => handleCheckDepositStatus()}
+                      disabled={isCheckingDepositStatus}
+                    >
+                      {isCheckingDepositStatus ? "Checking status..." : "Check status"}
                     </button>
                   ) : (
                     <button className="primary-button" onClick={handleRetry}>

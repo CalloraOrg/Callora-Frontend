@@ -141,7 +141,7 @@ function formatUsdcAmount(value: number): string {
  * Format an ISO 8601 timestamp into a human-readable string.
  * Falls back to the raw string if parsing fails.
  */
-function formatTimestamp(iso: string): string {
+export function formatTimestamp(iso: string): string {
   try {
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',

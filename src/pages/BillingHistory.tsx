@@ -22,12 +22,18 @@
  *   Blur / Tab away   Closes the preview when focus leaves the row.
  */
 
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
 import StatusBadge, { type StatusVariant } from '../components/StatusBadge';
 import { formatUsdcAmount, formatDateShort, resolveTimeZone } from '../utils/format';
 import { useAccountContext } from '../hooks/useAccountContext';
+import './BillingHistory.css';
+import TransactionCard from '../components/TransactionCard';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import BottomSheet from '../components/BottomSheet';
+import { TransactionDetails } from '../components/TransactionDetails';
+import BillingSortSelect from '../components/BillingSortSelect';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -169,6 +175,9 @@ const TX_STATUS_LABELS: Record<TxStatus, string> = {
 const ALL_TYPES: TxType[] = ['Deposit', 'API Call', 'Refund', 'Settlement', 'Fee'];
 const ALL_STATUSES: TxStatus[] = ['success', 'pending', 'error', 'warning'];
 
+/** Below this width transactions render as cards instead of a table. */
+const MOBILE_QUERY = '(max-width: 639px)';
+
 // Valid URL parameter values for sort column and direction.
 export type SortColumn = 'date' | 'amount';
 export type SortDirection = 'asc' | 'desc';
@@ -214,6 +223,13 @@ function txToPreviewData(tx: BillingTransaction): PreviewCardData {
 
 export function BillingHistory() {
   const { timezone } = useAccountContext();
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const [selectedTx, setSelectedTx] = useState<BillingTransaction | null>(null);
+  const detailsTriggerRef = useRef<HTMLElement | null>(null);
+  const openDetails = (tx: BillingTransaction, trigger: HTMLButtonElement) => {
+    detailsTriggerRef.current = trigger;
+    setSelectedTx(tx);
+  };
   const dateZone = resolveTimeZone(timezone);
   const zoneAbbreviation = new Intl.DateTimeFormat(undefined, {
     timeZone: dateZone,
@@ -231,21 +247,22 @@ export function BillingHistory() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { column: sortColumn, direction: sortDirection } = parseSortParams(searchParams);
 
-  /** Toggle sort: same column flips direction; new column starts asc. */
-  function handleSort(col: SortColumn) {
+  /** Write an explicit sort to the URL (shared by the column headers and the mobile select). */
+  function applySort(col: SortColumn, dir: SortDirection) {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (sortColumn === col) {
-          next.set('dir', sortDirection === 'asc' ? 'desc' : 'asc');
-        } else {
-          next.set('sort', col);
-          next.set('dir', 'asc');
-        }
+        next.set('sort', col);
+        next.set('dir', dir);
         return next;
       },
       { replace: true },
     );
+  }
+
+  /** Toggle sort: same column flips direction; new column starts asc. */
+  function handleSort(col: SortColumn) {
+    applySort(col, sortColumn === col && sortDirection === 'asc' ? 'desc' : 'asc');
   }
 
   /** aria-sort value for a given column header. */
@@ -308,45 +325,23 @@ export function BillingHistory() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <section
-      className="billing-history"
-      aria-labelledby="bh-page-title"
-      style={{
-        padding: '24px',
-        maxWidth: '1000px',
-        margin: '0 auto',
-      }}
-    >
+    <section className="billing-history bh-page" aria-labelledby="bh-page-title">
       {/* Page heading */}
-      <header style={{ marginBottom: '20px' }}>
-        <p className="eyebrow" style={{ marginBottom: '4px' }}>
-          Billing
-        </p>
-        <h1
-          id="bh-page-title"
-          style={{
-            fontSize: 'clamp(1.35rem, 3vw, 1.75rem)',
-            fontWeight: 700,
-            margin: '0 0 6px',
-            color: 'var(--text-primary, var(--text, #f9fafb))',
-          }}
-        >
+      <header className="bh-header">
+        <p className="eyebrow">Billing</p>
+        <h1 id="bh-page-title" className="bh-title">
           Billing History
         </h1>
-        <p style={{ color: 'var(--text-secondary, #9ca3af)', fontSize: '0.875rem', margin: 0 }}>
-          Hover or focus any transaction row to preview on-chain details. Press{' '}
-          <kbd
-            style={{
-              fontFamily: 'monospace',
-              fontSize: '0.75rem',
-              padding: '1px 4px',
-              borderRadius: '3px',
-              border: '1px solid var(--line, rgba(255,255,255,0.15))',
-            }}
-          >
-            Esc
-          </kbd>{' '}
-          to dismiss the preview.
+        <p className="bh-subtitle">
+          {isMobile ? (
+            'Tap Details on any transaction to see its on-chain details.'
+          ) : (
+            <>
+              Hover or focus any transaction row to preview on-chain details. Press{' '}
+              <kbd className="bh-kbd">Esc</kbd>{' '}
+              to dismiss the preview.
+            </>
+          )}
         </p>
       </header>
 
@@ -356,74 +351,34 @@ export function BillingHistory() {
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        style={{
-          position: 'absolute',
-          width: '1px',
-          height: '1px',
-          overflow: 'hidden',
-          clip: 'rect(0 0 0 0)',
-          whiteSpace: 'nowrap',
-        }}
+        className="bh-visually-hidden"
       >
         {filterSummary}
       </div>
 
       {/* ── Filters bar ─────────────────────────────────────────────────── */}
-      <div
-        className="bh-filters"
-        role="group"
-        aria-label="Transaction filters"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '10px',
-          marginBottom: '16px',
-          alignItems: 'center',
-        }}
-      >
+      <div className="bh-filters" role="group" aria-label="Transaction filters">
         {/* Search */}
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: '1 1 180px' }}>
-          <span
-            style={{ fontSize: '0.7rem', color: 'var(--text-secondary, #9ca3af)', fontWeight: 600 }}
-          >
-            Search
-          </span>
+        <label className="bh-field bh-field--grow">
+          <span className="bh-field__label">Search</span>
           <input
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Description or hash…"
             aria-label="Search transactions by description or hash"
-            style={{
-              padding: '5px 8px',
-              borderRadius: '6px',
-              border: '1px solid var(--line, rgba(255,255,255,0.15))',
-              background: 'var(--bg-chip, rgba(255,255,255,0.04))',
-              color: 'var(--text-primary, #f9fafb)',
-              fontSize: '0.8125rem',
-            }}
+            className="bh-field__control"
           />
         </label>
 
         {/* Type filter */}
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span
-            style={{ fontSize: '0.7rem', color: 'var(--text-secondary, #9ca3af)', fontWeight: 600 }}
-          >
-            Type
-          </span>
+        <label className="bh-field">
+          <span className="bh-field__label">Type</span>
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as TxType | 'All')}
             aria-label="Filter by transaction type"
-            style={{
-              padding: '5px 8px',
-              borderRadius: '6px',
-              border: '1px solid var(--line, rgba(255,255,255,0.15))',
-              background: 'var(--bg-chip, rgba(255,255,255,0.04))',
-              color: 'var(--text-primary, #f9fafb)',
-              fontSize: '0.8125rem',
-            }}
+            className="bh-field__control"
           >
             <option value="All">All types</option>
             {ALL_TYPES.map((t) => (
@@ -433,24 +388,13 @@ export function BillingHistory() {
         </label>
 
         {/* Status filter */}
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span
-            style={{ fontSize: '0.7rem', color: 'var(--text-secondary, #9ca3af)', fontWeight: 600 }}
-          >
-            Status
-          </span>
+        <label className="bh-field">
+          <span className="bh-field__label">Status</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as TxStatus | 'All')}
             aria-label="Filter by transaction status"
-            style={{
-              padding: '5px 8px',
-              borderRadius: '6px',
-              border: '1px solid var(--line, rgba(255,255,255,0.15))',
-              background: 'var(--bg-chip, rgba(255,255,255,0.04))',
-              color: 'var(--text-primary, #f9fafb)',
-              fontSize: '0.8125rem',
-            }}
+            className="bh-field__control"
           >
             <option value="All">All statuses</option>
             {ALL_STATUSES.map((s) => (
@@ -460,58 +404,39 @@ export function BillingHistory() {
         </label>
 
         {/* Direction filter */}
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span
-            style={{ fontSize: '0.7rem', color: 'var(--text-secondary, #9ca3af)', fontWeight: 600 }}
-          >
-            Direction
-          </span>
+        <label className="bh-field">
+          <span className="bh-field__label">Direction</span>
           <select
             value={directionFilter}
             onChange={(e) => setDirectionFilter(e.target.value as TxDirection | 'All')}
             aria-label="Filter by transaction direction"
-            style={{
-              padding: '5px 8px',
-              borderRadius: '6px',
-              border: '1px solid var(--line, rgba(255,255,255,0.15))',
-              background: 'var(--bg-chip, rgba(255,255,255,0.04))',
-              color: 'var(--text-primary, #f9fafb)',
-              fontSize: '0.8125rem',
-            }}
+            className="bh-field__control"
           >
             <option value="All">All directions</option>
             <option value="credit">Credit</option>
             <option value="debit">Debit</option>
           </select>
         </label>
+        {isMobile && (
+          <BillingSortSelect column={sortColumn} direction={sortDirection} onChange={applySort} />
+        )}
       </div>
 
       {/* ── Summary strip ────────────────────────────────────────────────── */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '12px',
-          fontSize: '0.8125rem',
-          color: 'var(--text-secondary, #9ca3af)',
-        }}
-      >
+      <div className="bh-summary">
         <span>
           {filteredTxs.length} transaction{filteredTxs.length !== 1 ? 's' : ''}
         </span>
         <span>
           Net:{' '}
           <strong
-            className="tabular-nums"
-            style={{
-              color:
-                netBalance > 0
-                  ? 'var(--success, #10b981)'
-                  : netBalance < 0
-                    ? 'var(--danger, #ef4444)'
-                    : 'var(--text-primary, #f9fafb)',
-            }}
+            className={`tabular-nums ${
+              netBalance > 0
+                ? 'bh-net--positive'
+                : netBalance < 0
+                  ? 'bh-net--negative'
+                  : 'bh-net--zero'
+            }`}
           >
             {netBalance >= 0 ? '+' : '−'}
             {formatUsdcAmount(Math.abs(netBalance))} USDC
@@ -521,54 +446,31 @@ export function BillingHistory() {
 
       {/* ── Transaction table ─────────────────────────────────────────────── */}
       {filteredTxs.length === 0 ? (
-        <div
-          role="status"
-          style={{
-            padding: '40px 24px',
-            textAlign: 'center',
-            color: 'var(--text-secondary, #9ca3af)',
-            borderRadius: '10px',
-            border: '1px dashed var(--line, rgba(255,255,255,0.1))',
-          }}
-        >
+        <div role="status" className="bh-empty">
           No transactions match the current filters.
         </div>
+      ) : isMobile ? (
+        <ul className="bh-card-list" aria-label="Billing transactions">
+          {filteredTxs.map((tx) => (
+            <TransactionCard
+              key={tx.id}
+              tx={tx}
+              dateText={formatDateShort(tx.timestamp, undefined, dateZone)}
+              statusLabel={TX_STATUS_LABELS[tx.status]}
+              onDetails={openDetails}
+            />
+          ))}
+        </ul>
       ) : (
-        <div
-          style={{
-            overflowX: 'auto',
-            borderRadius: '10px',
-            border: '1px solid var(--line, rgba(255,255,255,0.08))',
-          }}
-        >
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              fontSize: '0.8125rem',
-            }}
-            aria-label="Billing transaction history"
+        <div className="bh-table-wrap">
+          <table className="bh-table" aria-label="Billing transaction history"
           >
             <thead>
-              <tr
-                style={{
-                  background: 'var(--bg-chip, rgba(255,255,255,0.03))',
-                  borderBottom: '1px solid var(--line, rgba(255,255,255,0.08))',
-                }}
-              >
+              <tr className="bh-table__head-row">
                 {/* Date — sortable */}
                 <th
                   scope="col"
-                  aria-sort={ariaSortFor('date')}
-                  style={{
-                    padding: '10px 12px',
-                    textAlign: 'left',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary, #9ca3af)',
-                    whiteSpace: 'nowrap',
-                    width: '160px',
-                  }}
-                >
+                  aria-sort={ariaSortFor('date')} className="bh-th bh-th--date">
                   <button
                     type="button"
                     onClick={() => handleSort('date')}
@@ -576,24 +478,10 @@ export function BillingHistory() {
                       sortColumn === 'date'
                         ? `Date (${dateZoneLabel}), sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}. Activate to reverse.`
                         : `Date (${dateZoneLabel}). Activate to sort ascending.`
-                    }
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      font: 'inherit',
-                      fontWeight: 600,
-                      color: sortColumn === 'date'
-                        ? 'var(--accent, #6366f1)'
-                        : 'var(--text-secondary, #9ca3af)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
+                    } className={'bh-sort-btn' + (sortColumn === 'date' ? ' bh-sort-btn--active' : '')}
                   >
                     Date ({dateZoneLabel})
-                    <span aria-hidden="true" style={{ fontSize: '0.65rem', lineHeight: 1 }}>
+                    <span aria-hidden="true" className="bh-sort-icon">
                       {sortColumn === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇅'}
                     </span>
                   </button>
@@ -601,62 +489,26 @@ export function BillingHistory() {
 
                 {/* Description — not sortable */}
                 <th
-                  scope="col"
-                  style={{
-                    padding: '10px 12px',
-                    textAlign: 'left',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary, #9ca3af)',
-                    whiteSpace: 'nowrap',
-                    width: 'auto',
-                  }}
-                >
+                  scope="col" className="bh-th bh-th--description">
                   Description
                 </th>
 
                 {/* Type — not sortable */}
                 <th
-                  scope="col"
-                  style={{
-                    padding: '10px 12px',
-                    textAlign: 'left',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary, #9ca3af)',
-                    whiteSpace: 'nowrap',
-                    width: '110px',
-                  }}
-                >
+                  scope="col" className="bh-th bh-th--narrow">
                   Type
                 </th>
 
                 {/* Status — not sortable */}
                 <th
-                  scope="col"
-                  style={{
-                    padding: '10px 12px',
-                    textAlign: 'left',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary, #9ca3af)',
-                    whiteSpace: 'nowrap',
-                    width: '110px',
-                  }}
-                >
+                  scope="col" className="bh-th bh-th--narrow">
                   Status
                 </th>
 
                 {/* Amount — sortable */}
                 <th
                   scope="col"
-                  aria-sort={ariaSortFor('amount')}
-                  style={{
-                    padding: '10px 12px',
-                    textAlign: 'right',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary, #9ca3af)',
-                    whiteSpace: 'nowrap',
-                    width: '130px',
-                  }}
-                >
+                  aria-sort={ariaSortFor('amount')} className="bh-th bh-th--amount">
                   <button
                     type="button"
                     onClick={() => handleSort('amount')}
@@ -664,24 +516,10 @@ export function BillingHistory() {
                       sortColumn === 'amount'
                         ? `Amount, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}. Activate to reverse.`
                         : 'Amount. Activate to sort ascending.'
-                    }
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      font: 'inherit',
-                      fontWeight: 600,
-                      color: sortColumn === 'amount'
-                        ? 'var(--accent, #6366f1)'
-                        : 'var(--text-secondary, #9ca3af)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
+                    } className={'bh-sort-btn' + (sortColumn === 'amount' ? ' bh-sort-btn--active' : '')}
                   >
                     Amount (USDC)
-                    <span aria-hidden="true" style={{ fontSize: '0.65rem', lineHeight: 1 }}>
+                    <span aria-hidden="true" className="bh-sort-icon">
                       {sortColumn === 'amount' ? (sortDirection === 'asc' ? '▲' : '▼') : '⇅'}
                     </span>
                   </button>
@@ -689,71 +527,32 @@ export function BillingHistory() {
 
                 {/* Tx Hash — not sortable */}
                 <th
-                  scope="col"
-                  style={{
-                    padding: '10px 12px',
-                    textAlign: 'left',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary, #9ca3af)',
-                    whiteSpace: 'nowrap',
-                    width: '110px',
-                  }}
-                >
+                  scope="col" className="bh-th bh-th--narrow">
                   Tx Hash
                 </th>
               </tr>
             </thead>
 
             <tbody>
-              {filteredTxs.map((tx, idx) => (
+              {filteredTxs.map((tx) => (
                 <tr
                   key={tx.id}
                   data-testid={`bh-row-${tx.id}`}
-                  style={{
-                    borderBottom:
-                      idx < filteredTxs.length - 1
-                        ? '1px solid var(--line, rgba(255,255,255,0.05))'
-                        : 'none',
-                  }}
                 >
                   {/* Date cell */}
-                  <td
-                    style={{
-                      padding: '10px 12px',
-                      whiteSpace: 'nowrap',
-                      color: 'var(--text-secondary, #9ca3af)',
-                      fontSize: '0.75rem',
-                    }}
-                  >
+                  <td className="bh-td bh-td--date">
                     <time dateTime={tx.timestamp}>{formatDateShort(tx.timestamp, undefined, dateZone)}</time>
                   </td>
 
                   {/* Description cell — wraps the PreviewCard trigger */}
-                  <td style={{ padding: '10px 12px' }}>
+                  <td className="bh-td">
                     <PreviewCard
                       data={txToPreviewData(tx)}
                       position="bottom"
                     >
-                      <span
-                        style={{
-                          color: 'var(--text-primary, #f9fafb)',
-                          fontWeight: 500,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                        }}
-                      >
+                      <span className="bh-description">
                         {/* Direction indicator */}
-                        <span
-                          aria-hidden="true"
-                          style={{
-                            fontSize: '0.75rem',
-                            color:
-                              tx.direction === 'credit'
-                                ? 'var(--success, #10b981)'
-                                : 'var(--danger, #ef4444)',
-                          }}
-                        >
+                        <span aria-hidden="true" className={"bh-direction-icon bh-tone--" + tx.direction}>
                           {tx.direction === 'credit' ? '↑' : '↓'}
                         </span>
                         {tx.description}
@@ -762,52 +561,25 @@ export function BillingHistory() {
                   </td>
 
                   {/* Type cell */}
-                  <td
-                    style={{
-                      padding: '10px 12px',
-                      color: 'var(--text-secondary, #9ca3af)',
-                    }}
-                  >
+                  <td className="bh-td bh-td--type">
                     {tx.type}
                   </td>
 
                   {/* Status cell */}
-                  <td style={{ padding: '10px 12px' }}>
+                  <td className="bh-td">
                     <StatusBadge status={tx.status} label={TX_STATUS_LABELS[tx.status]} />
                   </td>
 
                   {/* Amount cell */}
-                  <td
-                    style={{
-                      padding: '10px 12px',
-                      textAlign: 'right',
-                      fontWeight: 600,
-                      whiteSpace: 'nowrap',
-                    }}
-                    className="tabular-nums"
-                  >
-                    <span
-                      style={{
-                        color:
-                          tx.direction === 'credit'
-                            ? 'var(--success, #10b981)'
-                            : 'var(--danger, #ef4444)',
-                      }}
-                    >
+                  <td className="bh-td bh-td--amount tabular-nums">
+                    <span className={"bh-tone--" + tx.direction}>
                       {tx.direction === 'credit' ? '+' : '−'}
                       {formatUsdcAmount(tx.amount)}
                     </span>
                   </td>
 
                   {/* Tx hash cell */}
-                  <td
-                    style={{
-                      padding: '10px 12px',
-                      fontFamily: 'monospace',
-                      fontSize: '0.7rem',
-                      color: 'var(--accent, #6366f1)',
-                    }}
-                  >
+                  <td className="bh-td bh-td--hash">
                     <code title={tx.txHash}>{truncateTxHash(tx.txHash)}</code>
                   </td>
                 </tr>
@@ -818,28 +590,22 @@ export function BillingHistory() {
       )}
 
       {/* ── Accessible keyboard tip ──────────────────────────────────────── */}
-      <p
-        style={{
-          marginTop: '14px',
-          fontSize: '0.75rem',
-          color: 'var(--text-secondary, #6b7280)',
-        }}
+      {!isMobile && (
+        <p className="bh-tip">
+          <strong>Keyboard tip:</strong> Tab to a transaction description to open its preview.
+          Press{' '}
+          <kbd className="bh-kbd">Esc</kbd>{' '}
+          to close it and return focus to that row.
+        </p>
+      )}
+      <BottomSheet
+        open={isMobile && selectedTx !== null}
+        onClose={() => setSelectedTx(null)}
+        title={selectedTx ? `${selectedTx.description} details` : 'Transaction details'}
+        triggerRef={detailsTriggerRef}
       >
-        <strong>Keyboard tip:</strong> Tab to a transaction description to open its preview.
-        Press{' '}
-        <kbd
-          style={{
-            fontFamily: 'monospace',
-            fontSize: '0.75rem',
-            padding: '1px 4px',
-            borderRadius: '3px',
-            border: '1px solid var(--line, rgba(255,255,255,0.15))',
-          }}
-        >
-          Esc
-        </kbd>{' '}
-        to close it and return focus to that row.
-      </p>
+        {selectedTx && <TransactionDetails data={txToPreviewData(selectedTx)} />}
+      </BottomSheet>
     </section>
   );
 }

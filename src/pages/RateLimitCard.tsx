@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import Breadcrumb from "../components/Breadcrumb";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import "./RateLimitCard.css";
 
 /**
  * RateLimitCard – GrantFox FWC26 campaign "Stellar Wave" (issue #567)
@@ -18,14 +20,14 @@ import useDocumentTitle from "../hooks/useDocumentTitle";
  */
 
 /** Rate-limit tier shape used in the table below. */
-type RateLimitTier = {
+export type RateLimitTier = {
   plan: string;
   requestsPerMinute: number;
   burstLimit: number;
   concurrentConnections: number;
 };
 
-const RATE_LIMIT_TIERS: RateLimitTier[] = [
+export const RATE_LIMIT_TIERS: RateLimitTier[] = [
   {
     plan: "Free",
     requestsPerMinute: 10,
@@ -87,102 +89,87 @@ const BREADCRUMB_ITEMS = [
 const BREADCRUMB_MAX_LABEL = 28;
 
 /** Pattern class and description for each plan tier (color-blind safe). */
-const PLAN_PATTERNS: Record<string, { class: string; description: string }> = {
+export const PLAN_PATTERNS: Record<string, { class: string; description: string }> = {
   Free: { class: "free", description: "solid baseline" },
   Developer: { class: "developer", description: "dot pattern" },
   Pro: { class: "pro", description: "diagonal stripes" },
   Enterprise: { class: "enterprise", description: "crosshatch pattern" },
 };
 
-export default function RateLimitCard() {
+export type RateLimitCardProps = {
+  /** Currently active plan tier (e.g. "Pro" or "Developer"). */
+  currentPlan?: string;
+  /** Force mobile card view (defaults to window viewport query < 640px). */
+  isMobile?: boolean;
+};
+
+function useMediaQuery(query: string, maxPixelThreshold?: number): boolean {
+  const evaluate = () => {
+    if (typeof window === "undefined") return false;
+    if (typeof window.matchMedia === "function") {
+      const mql = window.matchMedia(query);
+      if (mql.matches) return true;
+    }
+    if (maxPixelThreshold !== undefined && typeof window.innerWidth === "number") {
+      if (window.innerWidth > 0 && window.innerWidth < maxPixelThreshold) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const [matches, setMatches] = useState<boolean>(evaluate);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const update = () => setMatches(evaluate());
+    update();
+
+    let mql: MediaQueryList | null = null;
+    if (typeof window.matchMedia === "function") {
+      mql = window.matchMedia(query);
+      if (mql.addEventListener) {
+        mql.addEventListener("change", update);
+      } else if ((mql as any).addListener) {
+        (mql as any).addListener(update);
+      }
+    }
+
+    window.addEventListener("resize", update);
+
+    return () => {
+      if (mql) {
+        if (mql.removeEventListener) {
+          mql.removeEventListener("change", update);
+        } else if ((mql as any).removeListener) {
+          (mql as any).removeListener(update);
+        }
+      }
+      window.removeEventListener("resize", update);
+    };
+  }, [query, maxPixelThreshold]);
+
+  return matches;
+}
+
+export default function RateLimitCard({
+  currentPlan,
+  isMobile: isMobileProp,
+}: RateLimitCardProps = {}) {
   useDocumentTitle(
     "Rate Limit Configuration – Callora",
     "Current rate-limit plan and throttling policies for the GrantFox Wave Compute API.",
   );
 
+  const isViewportMobile = useMediaQuery("(max-width: 639px)", 640);
+  const isMobile = isMobileProp !== undefined ? isMobileProp : isViewportMobile;
+
+  const isCurrentPlan = (plan: string) =>
+    Boolean(currentPlan && plan.toLowerCase() === currentPlan.toLowerCase());
+
   return (
     <div className="rate-limit-page">
-      <style>{`
-        .rate-limit-page {
-          padding: 0 32px 48px;
-          max-width: 900px;
-          margin: 0 auto;
-        }
-
-        .rate-limit-card {
-          background: var(--surface);
-          border: 1px solid var(--border, rgba(0, 0, 0, 0.10));
-          border-radius: 12px;
-          padding: 32px;
-        }
-
-        .rate-limit-card-header {
-          margin-bottom: 24px;
-        }
-
-        .rate-limit-card-title {
-          font-size: 1.375rem;
-          font-weight: 700;
-          color: var(--text);
-          margin: 0 0 6px;
-        }
-
-        .rate-limit-card-subtitle {
-          font-size: 0.875rem;
-          color: var(--muted);
-          margin: 0;
-        }
-
-        .rate-limit-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 0.875rem;
-        }
-
-        .rate-limit-table thead th {
-          text-align: left;
-          padding: 10px 16px;
-          color: var(--muted);
-          font-weight: 600;
-          border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.10));
-          white-space: nowrap;
-        }
-
-        .rate-limit-table tbody td {
-          padding: 12px 16px;
-          color: var(--text);
-          border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.06));
-        }
-
-        .rate-limit-table tbody tr:last-child td {
-          border-bottom: none;
-        }
-
-        .rate-limit-table tbody tr:hover td {
-          background: var(--surface-raised, rgba(0, 0, 0, 0.025));
-        }
-
-        .rate-limit-badge {
-          display: inline-block;
-          padding: 2px 8px;
-          border-radius: 99px;
-          font-size: 0.75rem;
-          font-weight: 600;
-          background: var(--accent-muted, rgba(78, 133, 255, 0.12));
-          color: var(--accent);
-        }
-
-        .rate-limit-note {
-          margin-top: 20px;
-          padding: 12px 16px;
-          background: var(--surface-raised, rgba(0, 0, 0, 0.025));
-          border-radius: 8px;
-          font-size: 0.8125rem;
-          color: var(--muted);
-          line-height: 1.5;
-        }
-      `}</style>
-
       {/*
         Breadcrumb uses maxLabelLength={28} so each crumb label is capped at
         28 characters.  Both long middle-segment names will be shown with a
@@ -202,33 +189,122 @@ export default function RateLimitCard() {
           </p>
         </div>
 
-        <table className="rate-limit-table" aria-label="Rate limit tiers">
-          <thead>
-            <tr>
-              <th scope="col">Plan</th>
-              <th scope="col">Requests / min</th>
-              <th scope="col">Burst limit</th>
-              <th scope="col">Concurrent connections</th>
-            </tr>
-          </thead>
-          <tbody>
-            {RATE_LIMIT_TIERS.map((tier) => (
-              <tr key={tier.plan}>
-                <td>
-                  <span
-                    className={`rate-limit-badge ${PLAN_PATTERNS[tier.plan].class}`}
-                    data-pattern={PLAN_PATTERNS[tier.plan].description}
-                  >
-                    {tier.plan}
-                  </span>
-                </td>
-                <td>{tier.requestsPerMinute.toLocaleString()}</td>
-                <td>{tier.burstLimit.toLocaleString()}</td>
-                <td>{tier.concurrentConnections.toLocaleString()}</td>
+        {isMobile ? (
+          <div className="rate-limit-cards" aria-label="Rate limit tiers">
+            {RATE_LIMIT_TIERS.map((tier) => {
+              const isCurrent = isCurrentPlan(tier.plan);
+              return (
+                <div
+                  key={tier.plan}
+                  className={`rate-limit-plan-card ${isCurrent ? "rate-limit-plan-card--current" : ""}`}
+                  {...(isCurrent ? { "aria-current": "true" } : {})}
+                >
+                  <div className="rate-limit-plan-card-header">
+                    <div className="rate-limit-plan-title-group">
+                      <span
+                        className={`rate-limit-badge ${PLAN_PATTERNS[tier.plan].class}`}
+                        data-pattern={PLAN_PATTERNS[tier.plan].description}
+                      >
+                        {tier.plan}
+                      </span>
+                      <span className="rate-limit-pattern-desc">
+                        {PLAN_PATTERNS[tier.plan].description}
+                      </span>
+                    </div>
+                    {isCurrent && (
+                      <span className="rate-limit-current-badge">
+                        Current plan
+                      </span>
+                    )}
+                  </div>
+
+                  <dl className="rate-limit-plan-dl">
+                    <div className="rate-limit-dl-row">
+                      <dt title="Requests per minute">Requests/min</dt>
+                      <dd>
+                        <span className="rate-limit-number">
+                          {tier.requestsPerMinute.toLocaleString()}
+                        </span>
+                      </dd>
+                    </div>
+                    <div className="rate-limit-dl-row">
+                      <dt title="Burst limit">Burst</dt>
+                      <dd>
+                        <span className="rate-limit-number">
+                          {tier.burstLimit.toLocaleString()}
+                        </span>
+                      </dd>
+                    </div>
+                    <div className="rate-limit-dl-row">
+                      <dt title="Concurrent connections">Concurrent</dt>
+                      <dd>
+                        <span className="rate-limit-number">
+                          {tier.concurrentConnections.toLocaleString()}
+                        </span>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <table className="rate-limit-table" aria-label="Rate limit tiers">
+            <thead>
+              <tr>
+                <th scope="col">Plan</th>
+                <th scope="col">Requests / min</th>
+                <th scope="col">Burst limit</th>
+                <th scope="col">Concurrent connections</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {RATE_LIMIT_TIERS.map((tier) => {
+                const isCurrent = isCurrentPlan(tier.plan);
+                return (
+                  <tr
+                    key={tier.plan}
+                    {...(isCurrent ? { "aria-current": "true" } : {})}
+                  >
+                    <td>
+                      <div className="rate-limit-plan-cell">
+                        <span
+                          className={`rate-limit-badge ${PLAN_PATTERNS[tier.plan].class}`}
+                          data-pattern={PLAN_PATTERNS[tier.plan].description}
+                        >
+                          {tier.plan}
+                        </span>
+                        <span className="rate-limit-pattern-desc">
+                          {PLAN_PATTERNS[tier.plan].description}
+                        </span>
+                        {isCurrent && (
+                          <span className="rate-limit-current-badge">
+                            Current plan
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="rate-limit-number">
+                        {tier.requestsPerMinute.toLocaleString()}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="rate-limit-number">
+                        {tier.burstLimit.toLocaleString()}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="rate-limit-number">
+                        {tier.concurrentConnections.toLocaleString()}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
 
         <p className="rate-limit-note">
           Limits reset on a rolling 60-second window. Burst allowance is

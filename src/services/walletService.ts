@@ -27,6 +27,7 @@ import {
   STELLAR_VAULT_CONTRACT_ID,
   type StellarNetwork,
 } from "../config/constants";
+import { walletStore } from "../state/walletStore";
 
 const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
   mainnet: "Mainnet",
@@ -348,6 +349,13 @@ export async function submitVaultDeposit(
   amount: string | number,
   onSubmitted?: OnSubmitted,
 ): Promise<SubmittedDeposit> {
+  if (walletStore.getSnapshot().isNetworkMismatch) {
+    throw new WalletServiceError(
+      "NETWORK_MISMATCH",
+      `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[STELLAR_NETWORK]} and try again.`,
+    );
+  }
+
   const amountStroops = toUsdcStroops(amount);
   validateConfiguration();
 
@@ -443,4 +451,30 @@ export async function submitVaultDeposit(
   await waitForConfirmation(server, submission.hash);
 
   return { hash: submission.hash };
+}
+
+export type DepositStatus = "SUCCESS" | "FAILED" | "NOT_FOUND" | "UNKNOWN";
+
+/**
+ * Checks the status of a submitted deposit transaction via Stellar Soroban RPC.
+ * Uses the configured RPC endpoint with the standard RPC_TIMEOUT_MS.
+ */
+export async function checkDepositStatus(hash: string): Promise<DepositStatus> {
+  try {
+    const server = createRpcServer();
+    const transaction = await server.getTransaction(hash);
+
+    if (transaction.status === rpc.Api.GetTransactionStatus.SUCCESS) {
+      return "SUCCESS";
+    }
+    if (transaction.status === rpc.Api.GetTransactionStatus.FAILED) {
+      return "FAILED";
+    }
+    if (transaction.status === rpc.Api.GetTransactionStatus.NOT_FOUND) {
+      return "NOT_FOUND";
+    }
+    return "UNKNOWN";
+  } catch {
+    return "UNKNOWN";
+  }
 }

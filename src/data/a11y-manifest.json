@@ -1,6 +1,7 @@
 {
   "components": [
     { "id": "ApiCard", "name": "ApiCard", "status": "audited" },
+    { "id": "BillingSortSelect", "name": "BillingSortSelect", "status": "audited" },
     { "id": "Breadcrumb", "name": "Breadcrumb", "status": "needs-work" },
     { "id": "CodeExample", "name": "CodeExample", "status": "audited" },
     { "id": "Dashboard", "name": "Dashboard", "status": "n/a" },
@@ -14,6 +15,8 @@
     { "id": "SearchBar", "name": "SearchBar", "status": "audited" },
     { "id": "ServerError", "name": "ServerError", "status": "n/a" },
     { "id": "ServerErrorDemo", "name": "ServerErrorDemo", "status": "n/a" },
-    { "id": "Skeleton", "name": "Skeleton", "status": "audited" }
+    { "id": "Skeleton", "name": "Skeleton", "status": "audited" },
+    { "id": "TransactionCard", "name": "TransactionCard", "status": "audited" },
+    { "id": "TransactionDetails", "name": "TransactionDetails", "status": "audited" }
   ]
 }

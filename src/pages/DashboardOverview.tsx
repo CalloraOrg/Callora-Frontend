@@ -25,10 +25,10 @@ import { formatUsdc, formatPrice, formatTimeString, formatUsdcStroops } from '..
 import { usePinnedApis, pinnedApisStore } from '../state/pinnedApis';
 import { useAccountId } from '../hooks/useAccount';
 import { useRecentActivity } from '../hooks/useRecentActivity';
-import { STELLAR_NETWORK_LABEL } from '../config/constants';
 import MOCK_APIS from '../data/mockApis';
 import '../components/Dashboard.css';
 import type { BalanceReadStatus } from '../hooks/useVaultBalances';
+import { getWalletNetworkLabel } from '../state/walletStore';
 
 export interface DashboardBalancesView {
   vaultText: string | null;
@@ -50,6 +50,9 @@ export interface DashboardOverviewProps {
   costPerCall?: number;
   /** Average daily API calls */
   callsPerDay?: number;
+  /** Connected Freighter address and network details */
+  walletAddress?: string | null;
+  walletNetworkPassphrase?: string | null;
   /** Callback fired when user triggers deposit flow */
   openDeposit?: (presetAmount?: number) => void;
   /** Optional custom class name */
@@ -66,6 +69,8 @@ export function DashboardOverview({
   walletBalance = 450.0,
   costPerCall = 0.005,
   callsPerDay = 120,
+  walletAddress = null,
+  walletNetworkPassphrase = null,
   openDeposit = () => {},
   className = '',
   balances,
@@ -116,7 +121,9 @@ export function DashboardOverview({
   const walletPreviewData: PreviewCardData = {
     id: 'wallet-overview',
     title: 'Connected Wallet',
-    subtitle: `Freighter Stellar Wallet (${STELLAR_NETWORK_LABEL})`,
+    subtitle: walletAddress
+      ? `Freighter Stellar Wallet (${getWalletNetworkLabel(walletNetworkPassphrase)}) · ${walletAddress.slice(0, 5)}…${walletAddress.slice(-4)}`
+      : 'Freighter Stellar Wallet (Not connected)',
     description: 'Instant deposit source for refilling Callora Vault reserve balances.',
     metrics: [
       { label: 'Wallet Balance', value: balances ? (balances.walletText ? `${balances.walletText} USDC` : (balances.walletConnected ? '—' : 'Connect wallet')) : `${formatUsdc(walletBalance)} USDC` },
