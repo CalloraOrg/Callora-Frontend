@@ -601,6 +601,95 @@ code,
   min-width: 0;
 }
 
+.wallet-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wallet-status-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wallet-status-control:hover,
+.wallet-status-control:focus-visible {
+  border-color: var(--line-strong);
+  color: var(--accent-strong);
+}
+
+.wallet-status-control:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.wallet-status-control:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.wallet-copy-icon {
+  display: inline-flex;
+  color: var(--muted);
+}
+
+.wallet-network-chip,
+.wallet-network-warning {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.25;
+}
+
+.wallet-network-warning {
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface-soft));
+  color: var(--warning);
+}
+
+.wallet-status-message {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .wallet-status-control {
+    width: 36px;
+    min-width: 36px;
+    padding: 0;
+  }
+
+  .wallet-status-label,
+  .wallet-copy-icon {
+    display: none;
+  }
+}
+
 .eyebrow {
   margin: 0 0 10px;
   font-size: 0.72rem;
@@ -7813,24 +7902,134 @@ code,
 .status-list .status-ok { color: var(--success, #2dd4a7); font-weight: 600; }
 
 /* ── Webhook deliveries ───────────────────────────────────────────────────── */
-.webhook-deliveries { padding: 24px 0; display: grid; gap: 16px; }
+.webhook-deliveries { padding: 24px 0; display: grid; gap: 16px; min-width: 0; max-width: 100%; }
 .webhook-deliveries h1 { margin: 0; }
 .webhook-deliveries .eyebrow { margin: 0; }
 .webhook-deliveries-intro { margin: 0; color: var(--muted); max-width: 640px; line-height: 1.6; }
-.webhook-deliveries-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.webhook-deliveries-filter { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.9rem; }
-.webhook-deliveries-filter select { background: var(--surface-soft); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font: inherit; }
+.webhook-deliveries-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; max-width: 100%; }
+.webhook-deliveries-filter { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.9rem; max-width: 100%; }
+.webhook-deliveries-filter select { background: var(--surface-soft); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font: inherit; max-width: 100%; }
+.webhook-deliveries-data { min-width: 0; max-width: 100%; }
 .webhook-deliveries-table-wrap { overflow-x: auto; border-radius: var(--radius-lg, 16px); padding: 0; }
 .webhook-deliveries-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
 .webhook-deliveries-table th { padding: 12px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .webhook-deliveries-table td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .webhook-deliveries-table tr:last-child td { border-bottom: 0; }
+.webhook-deliveries-url-cell { overflow-wrap: anywhere; word-break: break-word; }
+.webhook-delivery-url { overflow-wrap: anywhere; }
 .webhook-expand-button { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 4px 6px; font-size: 12px; line-height: 1; }
-.webhook-status { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; text-transform: capitalize; border: 1px solid currentColor; }
+.webhook-status { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; text-transform: capitalize; border: 1px solid currentColor; }
+.webhook-status__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .webhook-status--delivered { color: var(--success, #2dd4a7); }
 .webhook-status--failed { color: var(--danger, #ff6b7f); }
 .webhook-status--pending { color: var(--warning, #f5b84d); }
 .webhook-detail-cell { background: var(--surface-soft); }
+.webhook-detail-stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; max-width: 100%; }
+.webhook-detail-section { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-width: 100%; }
+.webhook-json-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 10px 12px;
+}
+.webhook-json-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.webhook-json-scroll .json-viewer,
+.webhook-json-scroll pre {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.webhook-deliveries-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+.webhook-delivery-card {
+  padding: 16px;
+  border-radius: var(--radius-lg, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+.webhook-delivery-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.webhook-delivery-card__id-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.webhook-delivery-card__id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+.webhook-delivery-card__copy {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+.webhook-delivery-card__url-row {
+  min-width: 0;
+  max-width: 100%;
+}
+.webhook-delivery-card__url {
+  display: inline-block;
+  max-width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.84rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.webhook-delivery-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.webhook-delivery-card__time {
+  color: var(--muted);
+}
+.webhook-delivery-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.webhook-delivery-card__details-btn,
+.webhook-delivery-card__retry-btn {
+  min-height: 36px;
+  padding: 6px 14px;
+  width: auto;
+}
+.webhook-delivery-card__detail {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+  max-width: 100%;
+}
 .webhook-deliveries-empty { padding: 32px; text-align: center; color: var(--muted); }
 
 /* App shell uses the same top bar as the standalone pages; keep the gap the old header had. */
@@ -7880,6 +8079,12 @@ main.page > *, .standalone-main > * { min-width: 0; max-width: 100%; }
   main.page > *, .standalone-main > * { width: 100%; }
 }
 .webhook-deliveries { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 639px) {
+  .webhook-deliveries .pagination-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
 @media (max-width: 720px) {
   .api-detail-tabs nav { overflow-x: auto; scrollbar-width: none; }
   .api-detail-tabs nav::-webkit-scrollbar { display: none; }

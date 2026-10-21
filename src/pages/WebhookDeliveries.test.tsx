@@ -173,4 +173,222 @@ describe('WebhookDeliveries Page', () => {
 
     expect(dataRegion?.className).not.toContain('webhook-deliveries-data--stale');
   });
+
+  describe('Responsive card layout below 640px (#1322)', () => {
+    let originalMatchMedia: typeof window.matchMedia;
+
+    const mockViewport = (isMobile: boolean) => {
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('max-width: 639px') ? isMobile : false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+    };
+
+    beforeEach(() => {
+      originalMatchMedia = window.matchMedia;
+    });
+
+    afterEach(() => {
+      window.matchMedia = originalMatchMedia;
+      vi.restoreAllMocks();
+    });
+
+    // Scenario 1: Mobile media query -> articles rendered, no table
+    it('renders expandable article cards and no table when below 640px', async () => {
+      mockViewport(true);
+      renderPage();
+
+      await waitFor(() => {
+        expect(screen.getAllByRole('article')).toHaveLength(2);
+      });
+
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+      // Verify relative timestamp inside a <time> element with absolute title
+      const timeEls = document.querySelectorAll('article time');
+      expect(timeEls.length).toBe(2);
+      expect(timeEls[0].getAttribute('title')).toBeTruthy();
+      expect(timeEls[0].getAttribute('datetime')).toBeTruthy();
+    });
+
+    // Scenario 2: Desktop -> table rendered with th[scope=col] x 7
+    it('renders a table with 7 th[scope="col"] headers on desktop and no articles', async () => {
+      mockViewport(false);
+      const { container } = renderPage();
+
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
+      });
+
+      expect(screen.queryAllByRole('article')).toHaveLength(0);
+      const scopedHeaders = container.querySelectorAll('table thead th[scope="col"]');
+      expect(scopedHeaders).toHaveLength(7);
+    });
+
+    // Scenario 3: Details toggle -> aria-expanded flips; panel content visible
+    it('toggles card Details disclosure and reveals stacked payload content', async () => {
+      mockViewport(true);
+      renderPage();
+
+      await waitFor(() => {
+        expect(screen.getAllByRole('article')).toHaveLength(2);
+      });
+
+      const detailsButtons = screen.getAllByRole('button', { name: 'Details' });
+      const firstToggle = detailsButtons[0];
+
+      expect(firstToggle).toHaveAttribute('aria-expanded', 'false');
+      const controlsId = firstToggle.getAttribute('aria-controls');
+      expect(controlsId).toBe('webhook-detail-dlv_1_1');
+      expect(document.getElementById(controlsId!)).toBeNull();
+
+      fireEvent.click(firstToggle);
+
+      expect(firstToggle).toHaveAttribute('aria-expanded', 'true');
+      const detailPanel = document.getElementById(controlsId!);
+      expect(detailPanel).toBeInTheDocument();
+      expect(screen.getByText(/Response Status:/i)).toBeInTheDocument();
+      expect(screen.getByText(/payment\.succeeded/i)).toBeInTheDocument();
+
+      fireEvent.click(firstToggle);
+      expect(firstToggle).toHaveAttribute('aria-expanded', 'false');
+      expect(document.getElementById(controlsId!)).toBeNull();
+    });
+
+    // Scenario 4: Retry on a failed card -> retryDelivery called once; button disabled while retrying
+    it('disables Retry while retrying on a failed card and prevents double retry', async () => {
+      mockViewport(true);
+      const hooksModule = await import('../hooks/useWebhookDeliveries');
+      const realUseWebhookDeliveries = hooksModule.useWebhookDeliveries;
+      const retryCalls: string[] = [];
+
+      vi.spyOn(hooksModule, 'useWebhookDeliveries').mockImplementation((accountId, fetcher) => {
+        const result = realUseWebhookDeliveries(accountId, fetcher);
+        return {
+          ...result,
+          retryDelivery: async (id: string) => {
+            retryCalls.push(id);
+            return result.retryDelivery(id);
+          },
+        };
+      });
+
+      renderPage();
+
+      await waitFor(() => {
+        expect(screen.getAllByRole('article')).toHaveLength(2);
+      });
+
+      const retryButton = screen.getByRole('button', { name: 'Retry' });
+      expect(retryButton).not.toBeDisabled();
+
+      // Trigger retry and verify the button becomes disabled while in-flight
+      fireEvent.click(retryButton);
+
+      const retryingButton = screen.getByRole('button', { name: 'Retrying...' });
+      expect(retryingButton).toBeDisabled();
+
+      // A second click while retrying must not trigger a duplicate retry
+      fireEvent.click(retryingButton);
+      expect(retryCalls).toEqual(['dlv_2_1']);
+
+      await waitFor(() => {
+        expect(screen.getByText('Retry triggered successfully')).toBeInTheDocument();
+      });
+    });
+
+    // Scenario 5: Delivered card -> no Retry button
+    it('does not render a Retry button on delivered cards', async () => {
+      mockViewport(true);
+      renderPage();
+
+      await waitFor(() => {
+        expect(screen.getAllByRole('article')).toHaveLength(2);
+      });
+
+      const deliveredCard = screen.getByRole('article', { name: 'Delivery dlv_1_1' });
+      const failedCard = screen.getByRole('article', { name: 'Delivery dlv_2_1' });
+
+      expect(deliveredCard.querySelector('.webhook-delivery-card__retry-btn')).toBeNull();
+      expect(failedCard.querySelector('.webhook-delivery-card__retry-btn')).toBeInTheDocument();
+    });
+
+    // Scenario 6: Long URL (300 chars) -> accessible name contains the full URL; visible text truncated
+    it('truncates visible text for a 300-character URL while preserving the full URL in title and accessible name', async () => {
+      mockViewport(true);
+      const longPath = '/webhooks/' + 'a'.repeat(270);
+      const longUrl = `https://hooks.acme-labs.dev${longPath}`;
+      expect(longUrl.length).toBeGreaterThanOrEqual(300);
+
+      const longUrlFetcher: WebhookDeliveriesFetcher = vi.fn(async () => ({
+        data: [
+          {
+            id: 'dlv_long_1',
+            url: longUrl,
+            status: 'delivered',
+            attempts: 1,
+            lastAttemptAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+          },
+        ],
+        totalCount: 1,
+      }));
+
+      renderPage(longUrlFetcher);
+
+      await waitFor(() => {
+        expect(screen.getByRole('article', { name: 'Delivery dlv_long_1' })).toBeInTheDocument();
+      });
+
+      const urlEl = screen.getByLabelText(longUrl);
+      expect(urlEl).toBeInTheDocument();
+      expect(urlEl.getAttribute('title')).toBe(longUrl);
+      expect(urlEl.textContent).toContain('hooks.acme-labs.dev/webhooks/');
+      expect(urlEl.textContent).toContain('…');
+      expect((urlEl.textContent ?? '').length).toBeLessThan(longUrl.length);
+    });
+
+    // Scenario 7: JSON block -> focusable with an accessible label
+    it('renders JSON payload blocks inside focusable containers with accessible labels', async () => {
+      mockViewport(true);
+      renderPage();
+
+      await waitFor(() => {
+        expect(screen.getAllByRole('article')).toHaveLength(2);
+      });
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'Details' })[0]);
+
+      const requestRegion = screen.getByRole('region', { name: 'Request body JSON for dlv_1_1' });
+      const responseRegion = screen.getByRole('region', { name: 'Response body JSON for dlv_1_1' });
+
+      expect(requestRegion).toHaveAttribute('tabindex', '0');
+      expect(responseRegion).toHaveAttribute('tabindex', '0');
+    });
+
+    // Scenario 8: Status filter at mobile -> filters cards as on desktop
+    it('filters cards by status on mobile just like on desktop', async () => {
+      mockViewport(true);
+      renderPage();
+
+      await waitFor(() => {
+        expect(screen.getAllByRole('article')).toHaveLength(2);
+      });
+
+      const statusSelect = screen.getByLabelText(/Status/i);
+      fireEvent.change(statusSelect, { target: { value: 'failed' } });
+
+      await waitFor(() => {
+        const cards = screen.getAllByRole('article');
+        expect(cards).toHaveLength(1);
+        expect(cards[0]).toHaveAttribute('aria-label', 'Delivery dlv_2_1');
+      });
+    });
+  });
 });

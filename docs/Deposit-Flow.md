@@ -65,8 +65,11 @@ stateDiagram-v2
     approving --> pending: Stellar RPC accepts transaction and returns hash
     pending --> confirmed: RPC confirms success
     approving --> failed: Rejection or submission failure
-    pending --> failed: Failure or confirmation timeout
-    failed --> input: Retry after definitive failure
+    pending --> locked: Confirmation timeout or lost RPC response (requires reconciliation)
+    locked --> confirmed: Check status returns SUCCESS (balance updated)
+    locked --> failed: Check status returns FAILED (or NOT_FOUND after 120s validity window)
+    locked --> locked: Check status returns UNKNOWN / NOT_FOUND inside 120s window
+    failed --> input: Retry deposit after definitive failure
     confirmed --> input: Deposit another amount
 ```
 
@@ -87,8 +90,21 @@ confirmed deposits update the displayed vault balance.
 
 Approving, pending, and trustline submission disable amount/preset/Max/Close/Cancel
 controls. A definitive deposit failure permits **Retry deposit**, preserving the
-amount. Ambiguous submission/confirmation failures require checking the transaction
-before another deposit is allowed. **Deposit another amount** resets to 50 USDC.
+amount.
+
+When submission or confirmation polling times out or encounters ambiguous errors,
+the deposit enters a locked reconciliation state (`depositRequiresReconciliation`).
+The pending deposit record `{ hash, amount, submittedAt, network, contractId }` is
+persisted in `sessionStorage` under `callora:deposit:pending` (guarded with try/catch).
+An enabled **Check status** action calls `checkDepositStatus(hash)`. If `SUCCESS`,
+the vault balance is credited, the pending record is cleared, and the flow reaches
+confirmed. If `FAILED`, or if `NOT_FOUND` after the 120-second transaction validity
+window (`TRANSACTION_TIMEOUT_SECONDS`), the modal transitions to failed with **Retry deposit**
+unlocked. If `NOT_FOUND` inside 120 seconds or `UNKNOWN`, the modal remains locked
+and displays the countdown timer. If closed, a banner outside the modal on the Billing
+page alerts the user to check their unconfirmed deposit.
+
+**Deposit another amount** resets to 50 USDC.
 
 ## Verification and PR recording (#1316)
 

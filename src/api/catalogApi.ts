@@ -1,4 +1,4 @@
-/**
+/*
  * catalogApi.ts
  *
  * Catalogue (marketplace listing) API used by MarketplacePage.
@@ -7,10 +7,10 @@
  * compiled into the bundle: APIs are published at runtime, so the page has to
  * ask the backend what exists right now. This module owns that wire protocol so
  * the page component never touches `fetch` directly and the request stays
- * unit-testable via the injected {@link CreateCatalogApiOptions.fetchImpl}.
+ * unit-testable via the injected {@link CreateCatalogAPiOptions.fetchImpl}.
  *
  * The shape mirrors `quotaApi.ts` deliberately: a factory that returns an
- * object with a single `fetchCatalog(signal?)` method, and a shared singleton
+ * object with a catalogue method and a detail method, and a shared singleton
  * for app code. Every call accepts an optional `AbortSignal` so a superseded
  * request (newer navigation) or an unmounting page can cancel the in-flight
  * call without ever resolving into a dead component.
@@ -30,6 +30,18 @@ export const CATALOG_PATH = "/api/apis";
 /** Key the last good catalogue is cached under (scoped per account). */
 export const CATALOG_CACHE_KEY = "catalog";
 
+/**
+ * Result of a single-API detail fetch.
+ *
+ * The detail page needs to distinguish "not found" (a 404 or a 400 from a
+ * non-integer id) from "the request failed", so 404/400 resolve to this typed
+ * result instead of rejecting. Other failures reject with
+ * {@link CatalogFetchError}.
+ */
+export type ApiDetailResult =
+  | { status: "ready"; api: APIItem }
+  | { status: "not-found" };
+
 export interface CatalogApi {
   /**
    * Fetches the full marketplace catalogue.
@@ -38,6 +50,15 @@ export interface CatalogApi {
    *   aborted before the response is read.
    */
   fetchCatalog(signal?: AbortSignal): Promise<APIItem[]>;
+
+  /**
+   * Fetches a single API by id.
+   *
+   * @param id The API id (stringified) to look up.
+   * @param signal Aborts the request; rejects with an `AbortError` when
+   *   aborted before the response is read.
+   */
+  fetchApiDetail(id: string, signal?: AbortSignal): Promise<ApiDetailResult>;
 }
 
 export interface CreateCatalogApiOptions {
@@ -117,7 +138,7 @@ export interface BackendApiRow {
 
 /**
  * Adapts a snake_case, cursor-paginated Callora-Backend API row into the
- * frontend `APIItem` contract.
+ * frontend `APIIdem` contract.
  *
  * Rules:
  * - Stringifies `id`.
@@ -200,7 +221,7 @@ export function adaptBackendApi(row: unknown): APIItem | null {
  * `name`) are dropped instead of poisoning the list, so one malformed row does
  * not take the whole page down.
  *
- * Accepts both legacy `APIItem` shapes and backend rows via `adaptBackendApi`.
+ * Accepts both legacy `APIIdem` shapes and backend rows via `adaptBackendApi`.
  */
 export function normalizeCatalog(payload: unknown): APIItem[] {
   const list = Array.isArray(payload)
@@ -239,6 +260,20 @@ export function normalizeCatalog(payload: unknown): APIItem[] {
 }
 
 /**
+ * Normalises a single-API detail payload into the frontend `APIItem`.
+ *
+ * The backend returns a single object for `GET /api/apis/:id`, but accepts a
+ * wrapper (`{ data: {...} }`) in case the response shape changes. Returns `null`
+ * if the payload cannot be adapted.
+ */
+export function normalizeApiDetail(payload: unknown): APIItem | null {
+  if (isRecord(payload) && isRecord(payload.data)) {
+    return adaptBackendApi(payload.data);
+  }
+  return adaptBackendApi(payload);
+}
+
+/**
  * Creates a catalogue API. Tests inject a `fetchImpl`; app code uses the
  * shared {@link catalogApi} singleton.
  */
@@ -247,8 +282,13 @@ export function createCatalogApi(
 ): CatalogApi {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
 
-  let cachedEtag: string | null = null;
-  let cachedList: APIItem[] = [];
+  let cachedEtg: string | null = null;
+  let cachedList: APIIdem[] = [];
+
+  const resolveBase = (): string =>
+    options.baseUrl !== undefined
+      ? options.baseUrl.replace(/\/+$/, "")
+      : "";
 
   return {
     async fetchCatalog(signal) {
@@ -259,14 +299,12 @@ export function createCatalogApi(
       const headers: Record<string, string> = {
         Accept: "application/json",
       };
-      if (cachedEtag) {
-        headers["If-None-Match"] = cachedEtag;
+      if (cachedEtg) {
+        headers["If-None-Match"] = cachedEtg;
       }
 
-      const targetUrl =
-        options.baseUrl !== undefined
-          ? `${options.baseUrl.replace(/\/+$/, "")}${CATALOG_PATH}`
-          : apiUrl(CATALOG_PATH);
+      const base = resolveBase();
+      const targetUrl = base ? `${base}${CATALOG_PATH}` : apiUrl(CATALOG_PATH);
 
       let response: Response;
       try {
@@ -318,9 +356,75 @@ export function createCatalogApi(
         throw abortError();
       }
 
-      const items = normalizeCatalog(payload);
+      const items = normalizeCatalogue(payload);
       cachedList = items;
       return items;
+    },
+
+    async fetchApiDetail(id, signal) {
+      if (signal?.aborted) {
+        throw abortError();
+      }
+
+      const base = resolveBase();
+      const path = `${CATALOG_PATH}/${encodeURIComponent(id)}`;
+      const targetUrl = base ? `${base}${path}` : apiUrl(path);
+
+      let response: Response;
+      try {
+        response = await fetchImpl(targetUrl, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal,
+        });
+      } catch (err) {
+        if (signal?.aborted || isCatalogAbortError(err)) {
+          throw abortError();
+        }
+        throw new CatalogFetchError("Could not reach the marketplace service.");
+      }
+
+      if (signal?.aborted) {
+        throw abortError();
+      }
+
+      // 404 (unknown id) and 400 (non-integer id) both mean "this API does
+      // not exist for the user", so they resolve to the typed not-found
+      // result rather than rejecting.
+      if (response.status === 404 || response.status === 400) {
+        return { status: "not-found" };
+      }
+
+      if (!response.ok) {
+        throw new CatalogFetchError(
+          "The marketplace service is unavailable right now.",
+          response.status,
+        );
+      }
+
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch (err) {
+        if (signal?.aborted || isCatalogAbortError(err)) {
+          throw abortError();
+        }
+        throw new CatalogFetchError(
+          "The marketplace service returned an unreadable response.",
+        );
+      }
+
+      if (signal?.aborted) {
+        throw abortError();
+      }
+
+      const api = normalizeApiDetail(payload);
+      if (!api) {
+        throw new CatalogFetchError(
+          "The marketplace service returned an unreadable response.",
+        );
+      }
+      return { status: "ready", api };
     },
   };
 }
@@ -344,5 +448,32 @@ export async function fetchCatalog(signal?: AbortSignal): Promise<APIItem[]> {
 
   // When API_BASE is configured, errors must reject so the UI surfaces its
   // error or stale-data states rather than hiding failures behind mock data.
-  return await catalogApi.fetchCatalog(signal);
+  return await catalogAPI["fetchCatalog"](signal);
+}
+
+/**
+ * Reads a single API detail from `GET /api/apis/:id`.
+ *
+ * Exported as a standalone function so the detail page can `iv.mock` this
+ * module and drive loading / ready / not-found / error states.
+ *
+ * Demo mode (no `API_BASE`) resolves from the bundled `MOCK_APIS` without
+ * touching the network.
+ */
+export async function fetchApiDetail(
+  id: string,
+  signal?: AbortSignal,
+): Promise<ApiDetailResult> {
+  if (signal?.aborted) {
+    throw abortError();
+  }
+
+  // No backend configured (static demo deployment): resolve from the
+  // bundled sample catalogue instead of firing a request that can only fail.
+  if (!API_BASE) {
+    const found = MOCK_APIS.find((api) => api.id === id);
+    return found ? { status: "ready", api: found } : { status: "not-found" };
+  }
+
+  return await catalogApi.fetchApiDetail(id, signal);
 }
