@@ -44,6 +44,16 @@ export const NETWORK_FEE_CACHE_TTL_MS = 30_000;
 export const PRESET_AMOUNTS = [10, 50, 100, 500] as const;
 
 /**
+ * sessionStorage key for pending deposit reconciliation.
+ * Stores `{ hash, amount, submittedAt, network, contractId }` when reconciliation
+ * is required, keeping the pending deposit across reloads until verified.
+ */
+export const PENDING_DEPOSIT_STORAGE_KEY = "callora:deposit:pending";
+
+/** Stellar transaction validity window in seconds. */
+export const TRANSACTION_TIMEOUT_SECONDS = 120;
+
+/**
  * Simulated loading delay (ms) used by MarketplacePage, ApiDetailPage,
  * and Dashboard to mimic an async data fetch.
  */
@@ -134,10 +144,21 @@ export const API_BASE = normalizeBaseUrl(
   runtimeEnv.VITE_API_BASE_URL as string | undefined,
 );
 
+/** Human-readable labels for each supported Stellar network. */
+export const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
+  mainnet: "Mainnet",
+  testnet: "Testnet",
+  futurenet: "Futurenet",
+};
+
 /** Stellar network the UI is currently pointed at. */
 export const STELLAR_NETWORK: StellarNetwork = resolveStellarNetwork(
   runtimeEnv.VITE_STELLAR_NETWORK as string | undefined,
 );
+
+/** Human-readable label for the configured network (e.g. "Testnet"). */
+export const STELLAR_NETWORK_LABEL =
+  STELLAR_NETWORK_LABELS[STELLAR_NETWORK];
 
 // ─── Stellar wallet deposits ─────────────────────────────────────────────────
 // Declared after `STELLAR_NETWORK` because they derive from it.

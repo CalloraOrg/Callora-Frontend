@@ -3,6 +3,8 @@
 The `/billing` deposit modal signs transactions with Freighter and submits vault
 deposits through Stellar RPC. Shared configuration lives in
 `src/config/constants.ts`; wallet operations live in `src/services/walletService.ts`.
+On-chain balance reads use `src/services/vaultReads.ts` and the `useVaultBalances`
+hook in `src/hooks/useVaultBalances.ts`.
 
 ## Asset and network configuration
 
@@ -19,7 +21,43 @@ Freighter must use `STELLAR_NETWORK_PASSPHRASE`. `STELLAR_HORIZON_URL` selects t
 same network for classic account lookups and trustline submission. Vault deposits
 require `VITE_STELLAR_VAULT_CONTRACT_ID` and the configured Soroban RPC endpoint.
 
+## On-chain balance reads
+
+Balances are read via read-only Soroban simulation (no signatures, no ledger
+writes):
+
+- **Vault balance**: `vault.balance()` simulated against `STELLAR_VAULT_CONTRACT_ID`
+- **USDC token**: `vault.get_usdc_token()` simulated once per session, cached
+- **Wallet balance**: `balance(address)` simulated on the USDC Stellar Asset Contract
+
+All three use `scValToNative` and keep stroops as `bigint` until formatting via
+`formatUsdcStroops` (exact decimal, no `Number` conversion for values > 2^53).
+
+The `useVaultBalances({ address })` hook returns:
+- `vault` / `wallet` — stroops (`bigint | null`)
+- `status` — `"idle" | "loading" | "ready" | "error"`
+- `error` — human-readable failure reason
+- `configured` — false when no vault contract is configured
+- `refresh()` — debounced re-read (300 ms, in-flight dedupe)
+- `updatedAt` — epoch ms of last successful read
+- `revision` — increments on each successful read
+
+Wallet read only runs once a Freighter address is known. Superseded responses are
+ignored via a version counter. Loading shows fixed-size skeletons (`aria-busy`);
+errors show an inline message with **Retry** and never render `0` as a balance.
+A live region announces balance changes politely.
+
+When no vault contract is configured (`STELLAR_VAULT_CONTRACT_ID` missing or
+invalid), no RPC calls are made and the UI shows "Vault not configured".
+
+Simulation source account: the connected address when available; otherwise the
+fixed valid account `GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF`
+(safe because simulation never checks sequence or signatures and nothing is
+submitted).
+
 ## Trustline step
+
+... (rest unchanged)
 
 Opening the modal checks Freighter, connects the selected account, verifies its
 network, then calls `hasUsdcTrustline(address)`. It fetches Horizon
@@ -65,8 +103,11 @@ stateDiagram-v2
     approving --> pending: Stellar RPC accepts transaction and returns hash
     pending --> confirmed: RPC confirms success
     approving --> failed: Rejection or submission failure
-    pending --> failed: Failure or confirmation timeout
-    failed --> input: Retry after definitive failure
+    pending --> locked: Confirmation timeout or lost RPC response (requires reconciliation)
+    locked --> confirmed: Check status returns SUCCESS (balance updated)
+    locked --> failed: Check status returns FAILED (or NOT_FOUND after 120s validity window)
+    locked --> locked: Check status returns UNKNOWN / NOT_FOUND inside 120s window
+    failed --> input: Retry deposit after definitive failure
     confirmed --> input: Deposit another amount
 ```
 
@@ -74,21 +115,40 @@ The amount starts at 50 USDC. `MIN_DEPOSIT` is 10 and presets are 10, 50, 100, a
 500. Input normalizes separators and limits USDC precision to seven decimal places.
 Validation rejects blank, nonnumeric, below-minimum, and above-displayed-wallet
 amounts. The service independently validates positive amounts and precision.
-The displayed wallet and vault balances remain in-memory UI values; this issue
-does not add an authoritative balance lookup.
+Wallet and vault balances are read from Soroban via `useVaultBalances`; the Max
+button fills the real wallet balance (truncated to 7 decimals), and validation
+uses the chain-sourced wallet balance.
 
 Approval reconnects the wallet and checks its current trustline again before
 Soroban simulation, protecting against account changes since the initial check.
 A newly missing line or unfunded account returns to the corresponding prerequisite
 step. An unknown lookup permits simulation. The service prepares the vault's
 `deposit(caller, amount)` invocation, signs via Freighter, submits to RPC, and
-polls confirmation. The explorer link uses the hash returned by RPC. Only
-confirmed deposits update the displayed vault balance.
+polls confirmation. The explorer link uses the hash returned by RPC.
+
+**Balance read-back after deposit**: on confirmation, the modal sets an optimistic
+vault balance (pre-deposit vault + deposit amount) labelled "pending refresh" and
+calls `refresh()`. Once the debounced re-read completes, the optimistic value is
+replaced with the fresh chain value. The revision counter ensures stale responses
+are ignored.
 
 Approving, pending, and trustline submission disable amount/preset/Max/Close/Cancel
 controls. A definitive deposit failure permits **Retry deposit**, preserving the
-amount. Ambiguous submission/confirmation failures require checking the transaction
-before another deposit is allowed. **Deposit another amount** resets to 50 USDC.
+amount.
+
+When submission or confirmation polling times out or encounters ambiguous errors,
+the deposit enters a locked reconciliation state (`depositRequiresReconciliation`).
+The pending deposit record `{ hash, amount, submittedAt, network, contractId }` is
+persisted in `sessionStorage` under `callora:deposit:pending` (guarded with try/catch).
+An enabled **Check status** action calls `checkDepositStatus(hash)`. If `SUCCESS`,
+the vault balance is credited, the pending record is cleared, and the flow reaches
+confirmed. If `FAILED`, or if `NOT_FOUND` after the 120-second transaction validity
+window (`TRANSACTION_TIMEOUT_SECONDS`), the modal transitions to failed with **Retry deposit**
+unlocked. If `NOT_FOUND` inside 120 seconds or `UNKNOWN`, the modal remains locked
+and displays the countdown timer. If closed, a banner outside the modal on the Billing
+page alerts the user to check their unconfirmed deposit.
+
+**Deposit another amount** resets to 50 USDC.
 
 ## Verification and PR recording (#1316)
 

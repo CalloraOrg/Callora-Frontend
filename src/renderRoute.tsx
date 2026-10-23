@@ -66,7 +66,8 @@ export async function renderRoute(
     return;
   }
 
-  if (pathname.startsWith("/marketplace") && !pathname.endsWith("/sla")) {
+  const isSlaRoute = pathname.split("?")[0].replace(/\/+$/, "").endsWith("/sla");
+  if (pathname.startsWith("/marketplace") && !isSlaRoute) {
     startRouteLoading();
     root.render(wrap(<StandaloneShell><MarketplacePageSkeleton /></StandaloneShell>));
     const mod = await import("./pages/MarketplacePage");

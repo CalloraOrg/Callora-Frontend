@@ -15,11 +15,11 @@
  *   - Tx hash truncation in the table
  */
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountProvider } from '../hooks/useAccountContext';
 import { addAccount, switchAccount, _reset } from '../state/accountStore';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { BillingHistory, MOCK_TRANSACTIONS } from './BillingHistory';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -605,5 +605,240 @@ describe('BillingHistory — column sorting', () => {
       .getAllByRole('columnheader')
       .find((th) => th.textContent?.includes('Amount'));
     expect(amountTh?.getAttribute('aria-sort')).toBe('descending');
+  });
+});
+
+// ── Responsive layout (issue #1320) ───────────────────────────────────────────
+
+const MOBILE_QUERY = '(max-width: 639px)';
+const originalMatchMedia = window.matchMedia;
+
+/** Make window.matchMedia report a phone-width or desktop-width viewport. */
+function setViewport(mode: 'mobile' | 'desktop') {
+  window.matchMedia = ((query: string) => ({
+    matches: mode === 'mobile' && query === MOBILE_QUERY,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+describe('BillingHistory — responsive layout', () => {
+  afterEach(() => {
+    cleanup();
+    _reset();
+    window.matchMedia = originalMatchMedia;
+  });
+
+  it('mobile: renders a card list and no table', () => {
+    setViewport('mobile');
+    renderBH();
+    expect(screen.getByRole('list', { name: /billing transactions/i })).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('desktop: renders the table and no card list', () => {
+    setViewport('desktop');
+    renderBH();
+    expect(screen.getByRole('table')).toBeTruthy();
+    expect(screen.queryByRole('list', { name: /billing transactions/i })).toBeNull();
+  });
+});
+
+describe('BillingHistory — mobile cards', () => {
+  afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
+
+  function getCards() {
+    return within(screen.getByRole('list', { name: /billing transactions/i })).getAllByRole('listitem');
+  }
+
+  it('renders one card per transaction', () => {
+    setViewport('mobile');
+    renderBH();
+    expect(getCards()).toHaveLength(MOCK_TRANSACTIONS.length);
+  });
+
+  it('each card has a heading and a signed amount', () => {
+    setViewport('mobile');
+    renderBH();
+    const [credit, debit] = getCards();
+    expect(within(credit).getByRole('heading', { name: MOCK_TRANSACTIONS[0].description })).toBeTruthy();
+    expect(within(credit).getByText(/^\+/)).toBeTruthy();
+    expect(within(debit).getByText(/^\u2212/)).toBeTruthy();
+  });
+});
+
+// ── Details sheet (issue #1320) ───────────────────────────────────────────────
+
+const sheetTx = MOCK_TRANSACTIONS[0];
+
+/** Render the mobile layout, focus and tap the first card's Details button. */
+function openSheet() {
+  setViewport('mobile');
+  renderBH();
+  const card = screen.getByTestId(`bh-card-${sheetTx.id}`);
+  const trigger = within(card).getByRole('button', { name: /^details/i });
+  trigger.focus();
+  fireEvent.click(trigger);
+  return { trigger, dialog: screen.queryByRole('dialog') as HTMLElement };
+}
+
+describe('BillingHistory — details sheet', () => {
+  afterEach(() => {
+    cleanup();
+    _reset();
+    window.matchMedia = originalMatchMedia;
+  });
+
+  it('Details opens a dialog with hash, network and confirmations', () => {
+    const { dialog } = openSheet();
+    expect(dialog).toBeTruthy();
+    expect(within(dialog).getByText(sheetTx.txHash)).toBeTruthy();
+    expect(within(dialog).getByText(sheetTx.network)).toBeTruthy();
+    expect(within(dialog).getByText(String(sheetTx.confirmations))).toBeTruthy();
+  });
+
+  it('Escape closes the sheet and returns focus to the Details button', async () => {
+    const { trigger, dialog } = openSheet();
+    expect(dialog).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+});
+
+describe('BillingHistory — details sheet actions', () => {
+  afterEach(() => {
+    cleanup();
+    _reset();
+    window.matchMedia = originalMatchMedia;
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+  });
+
+  it('the close button closes the sheet', () => {
+    const { dialog } = openSheet();
+    expect(dialog).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: /^close/i }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Copy puts the full hash on the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { dialog } = openSheet();
+    expect(dialog).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: /copy/i }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(sheetTx.txHash));
+  });
+});
+
+// ── Mobile sort & filters (issue #1320) ───────────────────────────────────────
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="loc">{location.search}</output>;
+}
+
+const sortSelect = () =>
+  screen.queryByRole('combobox', { name: /sort/i }) as HTMLSelectElement | null;
+const cardIds = () =>
+  within(screen.getByRole('list', { name: /billing transactions/i }))
+    .getAllByRole('listitem')
+    .map((li) => li.getAttribute('data-testid'));
+
+describe('BillingHistory — mobile sort select', () => {
+  afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
+
+  it('mobile: shows one sort select', () => {
+    setViewport('mobile');
+    renderBH();
+    expect(sortSelect()).toBeTruthy();
+  });
+
+  it('desktop: has no sort select (the headers sort instead)', () => {
+    setViewport('desktop');
+    renderBH();
+    expect(sortSelect()).toBeNull();
+  });
+});
+
+describe('BillingHistory — mobile sort behaviour', () => {
+  afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
+
+  it('choosing an option reorders the cards and writes sort/dir to the URL', () => {
+    setViewport('mobile');
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <BillingHistory />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+    fireEvent.change(sortSelect() as HTMLSelectElement, { target: { value: 'amount:desc' } });
+    const expected = [...MOCK_TRANSACTIONS]
+      .sort((a, b) => b.amount - a.amount)
+      .map((t) => `bh-card-${t.id}`);
+    expect(cardIds()).toEqual(expected);
+    const params = new URLSearchParams(screen.getByTestId('loc').textContent ?? '');
+    expect(params.get('sort')).toBe('amount');
+    expect(params.get('dir')).toBe('desc');
+  });
+
+  it('the select reflects a pre-seeded URL sort', () => {
+    setViewport('mobile');
+    renderBH(['/?sort=date&dir=asc']);
+    expect((sortSelect() as HTMLSelectElement).value).toBe('date:asc');
+  });
+});
+
+describe('BillingHistory — filters on mobile', () => {
+  afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
+
+  function filteredCount(mode: 'mobile' | 'desktop') {
+    setViewport(mode);
+    const view = renderBH();
+    fireEvent.change(screen.getByRole('combobox', { name: /filter by transaction type/i }), {
+      target: { value: 'Deposit' },
+    });
+    const count =
+      mode === 'mobile'
+        ? cardIds().length
+        : within(screen.getByRole('table')).getAllByRole('row').length - 1;
+    view.unmount();
+    return count;
+  }
+
+  it('the same filter shows the same number of transactions as on desktop', () => {
+    const mobile = filteredCount('mobile');
+    const desktop = filteredCount('desktop');
+    expect(mobile).toBe(desktop);
+    expect(mobile).toBe(MOCK_TRANSACTIONS.filter((t) => t.type === 'Deposit').length);
+  });
+});
+
+describe('BillingHistory — touch-friendly wording', () => {
+  afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
+
+  it('mobile: tells users to tap Details instead of hovering', () => {
+    setViewport('mobile');
+    renderBH();
+    expect(screen.getByText(/tap details/i)).toBeTruthy();
+    expect(screen.queryByText(/hover/i)).toBeNull();
+  });
+
+  it('mobile: hides the keyboard tip', () => {
+    setViewport('mobile');
+    renderBH();
+    expect(screen.queryByText(/keyboard tip/i)).toBeNull();
+  });
+
+  it('desktop: keeps the hover wording and the keyboard tip', () => {
+    setViewport('desktop');
+    renderBH();
+    expect(screen.getByText(/hover or focus any transaction row/i)).toBeTruthy();
+    expect(screen.getByText(/keyboard tip/i)).toBeTruthy();
   });
 });

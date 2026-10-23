@@ -1,0 +1,298 @@
+/* BillingHistory.css — class-based styles extracted 1:1 from the former
+   inline styles. Every selector is scoped under .billing-history (0,2,0)
+   so it keeps beating global rules in index.css, as inline styles did. */
+
+/* Two classes so this beats the legacy `.billing-history { max-width: 960px }`
+   in index.css regardless of stylesheet order (inline 1000px used to win). */
+.billing-history.bh-page { padding: 24px; max-width: 1000px; margin: 0 auto; }
+
+.billing-history .bh-header { margin-bottom: 20px; }
+.billing-history .bh-header .eyebrow { margin-bottom: 4px; }
+
+.billing-history .bh-title {
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--text-primary, var(--text, #f9fafb));
+}
+
+.billing-history .bh-subtitle {
+  color: var(--text-secondary, #9ca3af);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.billing-history .bh-kbd {
+  font-family: monospace;
+  font-size: 0.75rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.15));
+}
+
+/* Visually hidden, still announced by screen readers (live region). */
+.billing-history .bh-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── Filters ── */
+.billing-history .bh-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+.billing-history .bh-field { display: flex; flex-direction: column; gap: 2px; }
+.billing-history .bh-field--grow { flex: 1 1 180px; }
+.billing-history .bh-field__label {
+  font-size: 0.7rem;
+  color: var(--text-secondary, #9ca3af);
+  font-weight: 600;
+}
+.billing-history .bh-field__control {
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.15));
+  background: var(--bg-chip, rgba(255, 255, 255, 0.04));
+  color: var(--text-primary, #f9fafb);
+  font-size: 0.8125rem;
+}
+
+/* ── Summary strip ── */
+.billing-history .bh-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #9ca3af);
+}
+.billing-history .bh-net--positive { color: var(--success, #10b981); }
+.billing-history .bh-net--negative { color: var(--danger, #ef4444); }
+.billing-history .bh-net--zero { color: var(--text-primary, #f9fafb); }
+
+/* ── Empty state ── */
+.billing-history .bh-empty {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text-secondary, #9ca3af);
+  border-radius: 10px;
+  border: 1px dashed var(--line, rgba(255, 255, 255, 0.1));
+}
+
+/* ── Table ── */
+.billing-history .bh-table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+}
+.billing-history .bh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.billing-history .bh-table__head-row {
+  background: var(--bg-chip, rgba(255, 255, 255, 0.03));
+  border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+}
+.billing-history .bh-table tbody tr:not(:last-child) {
+  border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.05));
+}
+
+.billing-history .bh-th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary, #9ca3af);
+  white-space: nowrap;
+}
+.billing-history .bh-th--date { width: 160px; }
+.billing-history .bh-th--description { width: auto; }
+.billing-history .bh-th--narrow { width: 110px; }
+.billing-history .bh-th--amount { text-align: right; width: 130px; }
+
+.billing-history .bh-sort-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-secondary, #9ca3af);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.billing-history .bh-sort-btn--active { color: var(--accent, #6366f1); }
+.billing-history .bh-sort-icon { font-size: 0.65rem; line-height: 1; }
+
+.billing-history .bh-td { padding: 10px 12px; }
+.billing-history .bh-td--date {
+  white-space: nowrap;
+  color: var(--text-secondary, #9ca3af);
+  font-size: 0.75rem;
+}
+.billing-history .bh-td--type { color: var(--text-secondary, #9ca3af); }
+.billing-history .bh-td--amount { text-align: right; font-weight: 600; white-space: nowrap; }
+.billing-history .bh-td--hash {
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: var(--accent, #6366f1);
+}
+
+.billing-history .bh-description {
+  color: var(--text-primary, #f9fafb);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.billing-history .bh-direction-icon { font-size: 0.75rem; }
+
+/* Credit / debit colouring shared by the direction arrow and the amount. */
+.billing-history .bh-tone--credit { color: var(--success, #10b981); }
+.billing-history .bh-tone--debit { color: var(--danger, #ef4444); }
+
+/* ── Keyboard tip ── */
+.billing-history .bh-tip {
+  margin-top: 14px;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* ── Transaction cards (rendered only below 640px) ──────────────────────── */
+
+.billing-history .bh-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.billing-history .bh-card {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+  background: var(--bg-chip, rgba(255, 255, 255, 0.03));
+}
+
+.billing-history .bh-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.billing-history .bh-card__top > :last-child {
+  flex-shrink: 0;
+}
+
+.billing-history .bh-card__title {
+  min-width: 0;
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary, #f9fafb);
+  overflow-wrap: anywhere;
+}
+
+.billing-history .bh-card__amount {
+  margin: 8px 0 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.billing-history .bh-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #9ca3af);
+}
+
+/* Shared look for the tappable buttons (44 x 44px minimum touch target). */
+.billing-history .bh-card__details,
+.billing-history .bh-details__copy {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.15));
+  background: none;
+  color: var(--accent, #6366f1);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Details sheet content ──────────────────────────────────────────────── */
+
+.billing-history .bh-details {
+  margin: 0;
+}
+
+.billing-history .bh-details dt {
+  margin-top: 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.billing-history .bh-details dd {
+  margin: 4px 0 0;
+  color: var(--text-primary, #f9fafb);
+  overflow-wrap: anywhere;
+}
+
+.billing-history .bh-details__hash {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.billing-history .bh-details__hash code {
+  font-family: monospace;
+  font-size: 0.8125rem;
+  word-break: break-all;
+}
+
+/* ── Small screens: stacked controls, no sideways scrolling ─────────────── */
+
+@media (max-width: 639px) {
+  .billing-history.bh-page {
+    padding: 16px;
+  }
+
+  .billing-history .bh-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* The 180px flex-basis would become a height in a column layout. */
+  .billing-history .bh-field--grow {
+    flex: 0 0 auto;
+  }
+
+  /* 16px text stops iOS Safari from zooming the page when a control is focused. */
+  .billing-history .bh-field__control {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .billing-history .bh-summary {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+}

@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import TestInBrowser from "../components/TestInBrowser";
@@ -8,7 +8,6 @@ import EmbedPreview from "../components/EmbedPreview";
 import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
-import { findApiById } from "../data/mockApis";
 import EmptyState from "../components/EmptyState";
 import { formatPrice, formatEstimatedCost, formatCount, formatDateShort } from "../utils/format";
 import { Icons } from "../utils/icons";
@@ -31,6 +30,7 @@ import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import LiveRegion from "../components/LiveRegion";
 import { toCurl, type CurlRequest } from "../utils/toCurl";
+import { fetchApiDetail, type ApiDetail } from "../api/catalogApi";
 
 /**
  * ApiDetailPage
@@ -38,7 +38,7 @@ import { toCurl, type CurlRequest } from "../utils/toCurl";
  * Comprehensive view of a single API listing:
  * - Tabbed layout: Overview, Documentation (with sticky TOC), Pricing,
  *   Examples, Reviews, Embed
- * - 1.5 s token-driven skeleton loading (consistent with MarketplacePage)
+ * - Fetches the API by id from GET /api/apis/:id with proper loading states
  * - Sticky right-rail TOC on the Documentation tab (>= 1100 px viewports)
  * - WCAG 2.1 AA accessible throughout
  */
@@ -50,6 +50,8 @@ type Props = {
 type TabType = "overview" | "documentation" | "pricing" | "examples" | "reviews" | "embed";
 
 type ReviewSort = "newest" | "highest" | "lowest";
+
+type LoadStatus = "loading" | "ready" | "not-found" | "error";
 
 type EndpointParameter = {
   name: string;
@@ -543,7 +545,6 @@ function EndpointSaveButton({
 export default function ApiDetailPage({ onBack }: Props) {
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
-  const [isLoading, setIsLoading] = useState(true);
   const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
   const [announcement, setAnnouncement] = useState("");
   const [assertiveAnnouncement, setAssertiveAnnouncement] = useState("");
@@ -560,7 +561,9 @@ export default function ApiDetailPage({ onBack }: Props) {
 
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  const api = useMemo(() => findApiById(id), [id]);
+  const [api, setApi] = useState<ApiDetail | null>(null);
+  const [status, setStatus] = useState<LoadStatus>("loading");
+  const [reloadToken, setReloadToken] = useState(0);
   useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
 
   const rawReviews = api?.reviews || [];
@@ -671,29 +674,55 @@ export default function ApiDetailPage({ onBack }: Props) {
     [recommendedTier],
   );
 
-  // Simulate 1.5 s initial data load (consistent with MarketplacePage)
-  useEffect(() => {
-    const delay = prefersReducedMotion ? 0 : LOADING_DELAY_MS;
-    const timer = setTimeout(() => setIsLoading(false), delay);
-    return () => clearTimeout(timer);
-  }, [prefersReducedMotion]);
-
   // Reset tab state and loading when the id param changes so switching
   // related APIs does not show stale content.
   useEffect(() => {
     setTab("overview");
-    setIsLoading(true);
   }, [id]);
 
+  // Fetch the API detail for the current id. Aborts the previous request
+  // whenever the id changes or the component unmounts, and guards against
+  // late responses writing state for a stale id.
   useEffect(() => {
-    if (!isLoading && api) {
-      setAnnouncement(`${api.name} detail page loaded`);
+    if (!id) {
+      setApi(null);
+      setStatus("not-found");
+      return;
     }
-  }, [isLoading, api]);
+
+    const controller = new AbortController();
+    let active = true;
+    setStatus("loading");
+    setApi(null);
+
+    fetchApiDetail(id, controller.signal)
+      .then((result) => {
+        if (!active) return;
+        if (result.kind === "not-found") {
+          setApi(null);
+          setStatus("not-found");
+          return;
+        }
+        setApi(result.api);
+        setStatus("ready");
+        setAnnouncement(`${result.api.name} detail page loaded`);
+      })
+      .catch((err) => {
+        if (!active || controller.signal.aborted) return;
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setApi(null);
+        setStatus("error");
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [id, reloadToken]);
 
   // ── Not found (post-load) ─────────────────────────────────────────────────
 
-  if (!isLoading && !api) {
+  if (status === "not-found") {
     return (
       <div className="api-detail-page">
         <div className="api-detail-container">
@@ -715,9 +744,37 @@ export default function ApiDetailPage({ onBack }: Props) {
     );
   }
 
+  // ── Error state ───────────────────────────────────────────────────────────
+
+  if (status === "error") {
+    return (
+      <div className="api-detail-page">
+        <div className="api-detail-container">
+          <Breadcrumb
+            items={[
+              { label: "Marketplace", href: "/marketplace" },
+              { label: "Error", href: "", isCurrent: true },
+            ]}
+          />
+          <div role="alert" className="preview-card" style={{ padding: "var(--mkt-space-5xl)", textAlign: "center" }}>
+            <h2 style={{ marginTop: 0 }}>Could not load this API</h2>
+            <p style={{ color: "var(--muted)" }}>Something went wrong while fetching the API details.</p>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => setReloadToken((n) => n + 1)}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Skeleton loading ──────────────────────────────────────────────────────
 
-  if (isLoading) {
+  if (status === "loading") {
     return <ApiDetailPageSkeleton onBack={onBack} />;
   }
 
@@ -841,7 +898,15 @@ export default function ApiDetailPage({ onBack }: Props) {
                       </div>
                     </div>
 
-                    <h2 style={{ marginTop: "var(--mkt-space-6xl)" }}>Performance Metrics</h2>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--mkt-space-6xl)" }}>
+                      <h2 style={{ marginTop: 0 }}>Performance Metrics</h2>
+                      <Link
+                        to={`/marketplace/${api.id}/sla`}
+                        style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--accent)", textDecoration: "none" }}
+                      >
+                        View SLA &rarr;
+                      </Link>
+                    </div>
                     <div className="api-detail-metrics">
                       {[
                         {
@@ -1250,6 +1315,15 @@ export default function ApiDetailPage({ onBack }: Props) {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: 14, color: "var(--muted)" }}>Status</span>
                       <StatusBadge status={apiStatusToVariant(api.status)} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "var(--mkt-space-xs)", borderTop: "1px solid var(--line, rgba(255,255,255,0.06))" }}>
+                      <span style={{ fontSize: 14, color: "var(--muted)" }}>SLA</span>
+                      <Link
+                        to={`/marketplace/${api.id}/sla`}
+                        style={{ fontSize: 14, color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}
+                      >
+                        View SLA
+                      </Link>
                     </div>
                   </div>
                 </div>

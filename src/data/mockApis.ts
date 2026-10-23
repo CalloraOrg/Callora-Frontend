@@ -44,17 +44,34 @@ const SAMPLE_APIS: Array<{
   status: "operational" | "degraded" | "maintenance"; description: string;
   price: number; latency: number; uptime: number; rating: number;
   tags: string[]; category: string; calls: number; features: string[]; useCases: string[];
+  sla?: APIItem["sla"];
   endpoints: NonNullable<APIItem["endpoints"]>;
 }> = [
   { id: "geocode-01", name: "GeoLocate", provider: "Acme Labs", version: "1.8.0", status: "operational",
     description: "Forward and reverse geocoding with address autocomplete for 200+ countries.",
     price: 0.002, latency: 95, uptime: 99.98, rating: 4.7, tags: ["geocoding", "maps", "address"], category: "Data & Analytics",
     calls: 912340, features: ["Address autocomplete", "Batch geocoding", "Postal code lookup"], useCases: ["Checkout forms", "Delivery routing"],
+    sla: {
+      uptimeTargetPct: 99.95,
+      p99LatencyMs: 250,
+      incidentResponseMinutes: 15,
+      maintenanceWindow: "Sundays 02:00–04:00 UTC",
+      supportTier: "Priority (24/7)",
+      creditThresholdPct: 99.5,
+    },
     endpoints: [{ id: "forward-geocode", title: "Forward Geocode", url: "/v1/geocode", method: "GET", group: "Geocoding", params: [{ name: "address", type: "string", required: true }, { name: "country", type: "string", required: false }], response: '{ "lat": 40.7128, "lon": -74.006, "confidence": 0.98 }' }, { id: "reverse-geocode", title: "Reverse Geocode", url: "/v1/reverse", method: "GET", group: "Geocoding", params: [{ name: "lat", type: "number", required: true }, { name: "lon", type: "number", required: true }], response: '{ "formatted": "350 5th Ave, New York, NY 10118, USA" }' }] },
   { id: "fx-rates-01", name: "FX Rates Live", provider: "Ledgerline", version: "2.1.4", status: "operational",
     description: "Real-time and historical exchange rates for 160 fiat and 40 crypto currencies.",
     price: 0.0015, latency: 70, uptime: 99.99, rating: 4.8, tags: ["forex", "currency", "finance"], category: "Finance",
     calls: 1530200, features: ["Tick-level history", "Cross-rate conversion"], useCases: ["Invoicing", "Portfolio tracking"],
+    sla: {
+      uptimeTargetPct: 99.99,
+      p99LatencyMs: 120,
+      incidentResponseMinutes: 10,
+      maintenanceWindow: "Saturdays 01:00–03:00 UTC",
+      supportTier: "Enterprise (24/7)",
+      creditThresholdPct: 99.8,
+    },
     endpoints: [{ id: "latest-rates", title: "Latest Rates", url: "/v1/rates/latest", method: "GET", group: "Rates", params: [{ name: "base", type: "string", required: true }, { name: "symbols", type: "string", required: false }], response: '{ "base": "USD", "rates": { "EUR": 0.92, "XLM": 8.41 } }' }, { id: "convert-amount", title: "Convert Amount", url: "/v1/convert", method: "GET", group: "Rates", params: [{ name: "from", type: "string", required: true }, { name: "to", type: "string", required: true }, { name: "amount", type: "number", required: true }], response: '{ "result": 92.13, "rate": 0.9213 }' }] },
   { id: "translate-01", name: "PolyTranslate", provider: "Lingua Works", version: "3.2.0", status: "operational",
     description: "Neural machine translation across 90 languages with glossary support.",
@@ -357,6 +374,7 @@ export const MOCK_APIS: APIItem[] = [
       stats: { totalCalls: x.calls, avgResponseMs: x.latency, uptimePct: x.uptime },
       hourlyHealth: health(-1),
       sparklineValues: [10 + i, 12 + i, 11 + i, 14 + i, 16 + i, 15 + i, 18 + i, 19 + i, 17 + i, 21 + i, 22 + i, 24 + i],
+      sla: x.sla,
     } satisfies APIItem;
   }),
 ];

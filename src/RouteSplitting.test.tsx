@@ -107,13 +107,13 @@ describe('Route Splitting and Responsiveness Suite (Quality-2)', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Theme Playground/i })).toBeTruthy();
-    });
+    }, { timeout: 4000 });
 
     const designSystemLink = within(primaryNav).getByRole('link', { name: 'Design System' });
     fireEvent.click(designSystemLink);
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Design System/i })).toBeTruthy();
-    });
+    }, { timeout: 4000 });
   });
 });

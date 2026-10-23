@@ -21,6 +21,7 @@ import App from "./App";
 import { AccountProvider } from "./hooks/useAccountContext";
 import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
+import { PENDING_DEPOSIT_STORAGE_KEY, STELLAR_VAULT_CONTRACT_ID } from "./config/constants";
 import { normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
 
 // Deposits are signed through Freighter via `src/services/walletService`
@@ -29,14 +30,42 @@ import { normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
 const walletMocks = vi.hoisted(() => ({
   isWalletAvailable: vi.fn(),
   submitVaultDeposit: vi.fn(),
+  checkDepositStatus: vi.fn(),
   getWalletAddress: vi.fn(),
   fetch: vi.fn(),
   signTransaction: vi.fn(),
   network: "testnet",
 }));
 
+// Mock the vault balances hook to return predictable values matching the old
+// hardcoded balances (284.62 vault / 1260.5 wallet) so existing tests pass.
+// 284.62 USDC = 2,846,200,000 stroops (10^7 scale)
+// 1260.5 USDC = 12,605,000,000 stroops
+const vaultBalancesMock = vi.hoisted(() => ({
+  vault: 2846200000n,       // 284.62 USDC in stroops
+  wallet: 12605000000n,     // 1260.5 USDC in stroops
+  status: "ready" as const,
+  error: null,
+  configured: true,
+  refresh: vi.fn().mockResolvedValue(undefined),
+  updatedAt: Date.now(),
+  revision: 1,
+}));
+
 vi.mock("@stellar/freighter-api", () => ({
   isConnected: async () => ({ isConnected: true }),
+  isAllowed: async () => ({ isAllowed: true }),
+  getAddress: async () => ({ address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }),
+  getNetworkDetails: async () => ({
+    network: "TESTNET",
+    networkPassphrase: "Test SDF Network ; September 2015",
+  }),
+  WatchWalletChanges: class {
+    watch() {
+      return {};
+    }
+    stop() {}
+  },
   requestAccess: async () => ({ address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }),
   getNetwork: async () => ({ networkPassphrase: "Test SDF Network ; September 2015" }),
   signTransaction: walletMocks.signTransaction,
@@ -66,9 +95,16 @@ vi.mock("./services/walletService", async (importOriginal) => {
     WalletServiceError,
     isWalletAvailable: walletMocks.isWalletAvailable,
     submitVaultDeposit: walletMocks.submitVaultDeposit,
+    checkDepositStatus: walletMocks.checkDepositStatus,
     getWalletAddress: walletMocks.getWalletAddress,
   };
 });
+
+vi.mock("./hooks/useVaultBalances", () => ({
+  useVaultBalances: () => vaultBalancesMock,
+  BalanceReadStatus: "idle" | "loading" | "ready" | "error",
+  VaultBalanceStatus: "idle" | "loading" | "ready" | "error",
+}));
 
 beforeEach(() => {
   // Node's TextEncoder returns a Node-realm Uint8Array. The SDK validates
@@ -84,6 +120,8 @@ beforeEach(() => {
   }) });
   walletMocks.isWalletAvailable.mockReset().mockResolvedValue(true);
   walletMocks.submitVaultDeposit.mockReset();
+  walletMocks.checkDepositStatus.mockReset();
+  sessionStorage.clear();
 });
 
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -348,7 +386,8 @@ describe("App deposit modal timed transitions", () => {
     expect(preset100.getAttribute("aria-checked")).toBe("true");
 
     fireEvent.click(screen.getByRole("button", { name: /Max/i }));
-    expect(amountInput.value).toBe("1260.50");
+    // Max now uses the exact wallet balance from Soroban (no trailing zeros)
+    expect(amountInput.value).toBe("1260.5");
   });
 
   it("drives approving to pending to confirmed and updates the vault balance", async () => {
@@ -408,7 +447,7 @@ describe("App deposit modal timed transitions", () => {
     expect(screen.getByText("Review the transaction details and approve again.")).toBeTruthy();
   });
 
-  it("blocks retry while a submitted deposit still needs reconciliation", async () => {
+  it("shows enabled Check status action while a submitted deposit needs reconciliation", async () => {
     const { WalletServiceError } = await import("./services/walletService");
     walletMocks.submitVaultDeposit.mockRejectedValue(
       new WalletServiceError("NETWORK_TIMEOUT", "Check your wallet activity before retrying.", true),
@@ -423,8 +462,8 @@ describe("App deposit modal timed transitions", () => {
 
     expect(screen.getByText("Deposit failed")).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Check transaction status before retrying" }),
-    ).toBeDisabled();
+      screen.getByRole("button", { name: "Check status" }),
+    ).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Retry deposit" })).toBeNull();
   });
 });
@@ -554,5 +593,179 @@ describe("USDC trustline step (#1316)", () => {
     renderDepositModal();
     fireEvent.click(await screen.findByRole("button", { name: "Connect Freighter" }));
     expect(await screen.findByRole("button", { name: "Approve deposit transaction" })).toBeEnabled();
+  });
+
+  describe("deposit reconciliation (issue #1175 / unconfirmed deposit)", () => {
+    it("scenario 1: confirmation timeout shows locked state with enabled 'Check status'", async () => {
+      const { WalletServiceError } = await import("./services/walletService");
+      walletMocks.submitVaultDeposit.mockImplementation(async (_amount: string, onSubmitted?: (h: string) => void) => {
+        onSubmitted?.("0xdeadbeef1234");
+        throw new WalletServiceError("NETWORK_TIMEOUT", "Confirmation timed out", true);
+      });
+
+      renderDepositModal();
+      const approve = await screen.findByRole("button", { name: "Approve deposit transaction" });
+      fireEvent.click(approve);
+
+      const checkButton = await screen.findByRole("button", { name: "Check status" });
+      expect(checkButton).toBeEnabled();
+      expect(sessionStorage.getItem(PENDING_DEPOSIT_STORAGE_KEY)).toContain("0xdeadbeef1234");
+    });
+
+    it("scenario 2: check returns SUCCESS -> confirmed state and pending record cleared", async () => {
+      const { WalletServiceError } = await import("./services/walletService");
+      walletMocks.submitVaultDeposit.mockImplementation(async (_amount: string, onSubmitted?: (h: string) => void) => {
+        onSubmitted?.("0xsuccesshash");
+        throw new WalletServiceError("NETWORK_TIMEOUT", "Confirmation timed out", true);
+      });
+      walletMocks.checkDepositStatus.mockResolvedValue("SUCCESS");
+
+      renderDepositModal();
+      fireEvent.click(await screen.findByRole("button", { name: "Approve deposit transaction" }));
+
+      const checkButton = await screen.findByRole("button", { name: "Check status" });
+      fireEvent.click(checkButton);
+
+      await waitFor(() => {
+        expect(screen.getAllByText("Deposit successful").length).toBeGreaterThan(0);
+      });
+      expect(sessionStorage.getItem(PENDING_DEPOSIT_STORAGE_KEY)).toBeNull();
+    });
+
+    it("scenario 3: check returns FAILED -> failed state and Retry enabled", async () => {
+      const { WalletServiceError } = await import("./services/walletService");
+      walletMocks.submitVaultDeposit.mockImplementation(async (_amount: string, onSubmitted?: (h: string) => void) => {
+        onSubmitted?.("0xfailedhash");
+        throw new WalletServiceError("NETWORK_TIMEOUT", "Confirmation timed out", true);
+      });
+      walletMocks.checkDepositStatus.mockResolvedValue("FAILED");
+
+      renderDepositModal();
+      fireEvent.click(await screen.findByRole("button", { name: "Approve deposit transaction" }));
+
+      const checkButton = await screen.findByRole("button", { name: "Check status" });
+      fireEvent.click(checkButton);
+
+      const retryButton = await screen.findByRole("button", { name: "Retry deposit" });
+      expect(retryButton).toBeEnabled();
+      expect(sessionStorage.getItem(PENDING_DEPOSIT_STORAGE_KEY)).toBeNull();
+    });
+
+    it("scenario 4: NOT_FOUND inside validity window (t = 60s) -> still locked, remaining time shown", async () => {
+      const now = Date.now();
+      const record = {
+        hash: "0xpendinghash60",
+        amount: 50,
+        submittedAt: now - 60_000,
+        network: "testnet",
+        contractId: STELLAR_VAULT_CONTRACT_ID,
+      };
+      sessionStorage.setItem(PENDING_DEPOSIT_STORAGE_KEY, JSON.stringify(record));
+      walletMocks.checkDepositStatus.mockResolvedValue("NOT_FOUND");
+
+      renderDepositModal();
+
+      await screen.findByText(/Validity window: \d+s remaining/);
+      expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
+      expect(screen.queryByRole("button", { name: "Retry deposit" })).toBeNull();
+    });
+
+    it("scenario 5: NOT_FOUND after validity window (t = 121s) -> unlocked as failed, Retry enabled", async () => {
+      const now = Date.now();
+      const record = {
+        hash: "0xexpiredhash121",
+        amount: 50,
+        submittedAt: now - 121_000,
+        network: "testnet",
+        contractId: STELLAR_VAULT_CONTRACT_ID,
+      };
+      sessionStorage.setItem(PENDING_DEPOSIT_STORAGE_KEY, JSON.stringify(record));
+      walletMocks.checkDepositStatus.mockResolvedValue("NOT_FOUND");
+
+      renderDepositModal();
+
+      const retryButton = await screen.findByRole("button", { name: "Retry deposit" });
+      expect(retryButton).toBeEnabled();
+      expect(sessionStorage.getItem(PENDING_DEPOSIT_STORAGE_KEY)).toBeNull();
+    });
+
+    it("scenario 6: reload with pending record -> opens locked and auto-checks once", async () => {
+      const record = {
+        hash: "0xreloadhash",
+        amount: 50,
+        submittedAt: Date.now() - 30_000,
+        network: "testnet",
+        contractId: STELLAR_VAULT_CONTRACT_ID,
+      };
+      sessionStorage.setItem(PENDING_DEPOSIT_STORAGE_KEY, JSON.stringify(record));
+      walletMocks.checkDepositStatus.mockResolvedValue("NOT_FOUND");
+
+      renderDepositModal();
+
+      await waitFor(() => {
+        expect(walletMocks.checkDepositStatus).toHaveBeenCalledWith("0xreloadhash");
+      });
+      expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
+    });
+
+    it("scenario 7: record for different network or contract is ignored", async () => {
+      const wrongNetworkRecord = {
+        hash: "0xwrongnetwork",
+        amount: 50,
+        submittedAt: Date.now(),
+        network: "mainnet",
+        contractId: STELLAR_VAULT_CONTRACT_ID,
+      };
+      sessionStorage.setItem(PENDING_DEPOSIT_STORAGE_KEY, JSON.stringify(wrongNetworkRecord));
+
+      renderDepositModal();
+
+      const approve = await screen.findByRole("button", { name: "Approve deposit transaction" });
+      expect(approve).toBeEnabled();
+      expect(screen.queryByRole("button", { name: "Check status" })).toBeNull();
+    });
+
+    it("scenario 8: sessionStorage.setItem throws -> flow still works in memory without crash", async () => {
+      const { WalletServiceError } = await import("./services/walletService");
+      walletMocks.submitVaultDeposit.mockImplementation(async (_amount: string, onSubmitted?: (h: string) => void) => {
+        onSubmitted?.("0xquotafull");
+        throw new WalletServiceError("NETWORK_TIMEOUT", "Timeout", true);
+      });
+      const originalSetItem = sessionStorage.setItem;
+      sessionStorage.setItem = vi.fn().mockImplementation(() => {
+        throw new Error("QuotaExceededError");
+      });
+
+      try {
+        renderDepositModal();
+        const approve = await screen.findByRole("button", { name: "Approve deposit transaction" });
+        fireEvent.click(approve);
+
+        const checkBtn = await screen.findByRole("button", { name: "Check status" });
+        expect(checkBtn).toBeEnabled();
+      } finally {
+        sessionStorage.setItem = originalSetItem;
+      }
+    });
+
+    it("scenario 9: check RPC error -> stays locked with error status", async () => {
+      const { WalletServiceError } = await import("./services/walletService");
+      walletMocks.submitVaultDeposit.mockImplementation(async (_amount: string, onSubmitted?: (h: string) => void) => {
+        onSubmitted?.("0xrpcerrorhash");
+        throw new WalletServiceError("NETWORK_TIMEOUT", "Timeout", true);
+      });
+      walletMocks.checkDepositStatus.mockRejectedValue(new Error("RPC failed"));
+
+      renderDepositModal();
+      fireEvent.click(await screen.findByRole("button", { name: "Approve deposit transaction" }));
+
+      const checkButton = await screen.findByRole("button", { name: "Check status" });
+      fireEvent.click(checkButton);
+
+      await waitFor(() => {
+        expect(screen.getAllByText(/Could not check transaction status/).length).toBeGreaterThan(0);
+      });
+      expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
+    });
   });
 });

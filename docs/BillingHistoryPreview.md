@@ -39,6 +39,18 @@ The Billing History page displays a paginated table of USDC transactions. Each r
 4. Press **Escape** to dismiss the card and return focus to the trigger.
 5. Tab again to move to the next row (card closes automatically on blur).
 
+### Touch user (below 640px)
+
+Below 640px the table is replaced by a list of transaction cards. Only one of the two layouts is in the DOM at a time, so screen readers never read both.
+
+1. Each card is a list item with a heading (the description), a status badge, the signed amount (`+` for credits, a minus sign for debits), the date, and a **Details** button.
+2. Tap **Details** to open a bottom sheet with the same on-chain details as the hover preview: transaction hash (with a **Copy** button), network, confirmations and timestamp.
+3. Close the sheet with the close button, a tap on the backdrop, or **Escape**. Focus returns to that card's Details button.
+4. Sorting uses a single **Sort by** select (date or amount, either direction). It writes the same `sort` and `dir` URL params as the desktop column headers, so a shared link sorts the same way on both layouts.
+5. Filters stack in one column and behave exactly as on desktop. The net-balance summary stays at the top.
+
+The breakpoint is `(max-width: 639px)`. It is read in JavaScript by the `useMediaQuery` hook (to choose which layout to render) and in CSS (to stack the filters). All touch targets are at least 44x44px.
+
 ---
 
 ## Filtering
@@ -187,11 +199,12 @@ All colours in `PreviewCard` and `BillingHistory` use CSS custom properties so b
 
 ## Responsive behaviour
 
-- The table container uses `overflow-x: auto` so horizontal scrolling is available on small viewports.
-- The preview card has `maxWidth: 90vw` — it never overflows the viewport on narrow screens.
-- Filter controls use `flexWrap: wrap` so they stack on small screens without clipping.
+- **Below 640px:** transactions render as cards (see "Touch user" above). The table is not rendered, so there is no horizontal scrolling at 320px.
+- **640px and above:** the table renders as before. Its container keeps `overflow-x: auto` as a fallback for narrow desktop windows.
+- The preview card has `maxWidth: 90vw`, so it never overflows the viewport on narrow screens.
+- Filter controls wrap on wider screens and stack into one column below 640px.
 - The page heading uses `clamp(1.35rem, 3vw, 1.75rem)` for fluid sizing.
-
+- Styles live in `src/pages/BillingHistory.css` (`.billing-history .bh-*` classes), not inline.
 ---
 
 ## Running the tests
