@@ -141,14 +141,14 @@ const data: PreviewCardData = {
 
 ## API — BillingHistory page
 
-`BillingHistory` is a default-exported React component at `src/pages/BillingHistory.tsx`. It requires no props — all data comes from the internal `MOCK_TRANSACTIONS` constant.
+`BillingHistory` is a default-exported React component at `src/pages/BillingHistory.tsx`. It requires no props. Deposit rows come from the vault contract's `deposit` events for the connected wallet, read with Soroban RPC `getEvents` (`src/services/vaultEvents.ts`, via `src/hooks/useDepositHistory.ts`). Each row shows the real transaction hash. The page shows loading, no-wallet, error with Retry, and empty states, and a note when history falls outside the RPC retention window. Older deposits load with **Load older deposits**.
 
 ### Exports
 
 | Name | Kind | Description |
 |------|------|-------------|
 | `BillingHistory` | named + default export | Page component |
-| `MOCK_TRANSACTIONS` | named export | Array of `BillingTransaction` for use in tests and Storybook |
+| `MOCK_TRANSACTIONS` | fixture (`src/data/billingFixtures.ts`) | Demo and test rows, not used by the page |
 | `BillingTransaction` | type | Shape of a single transaction record |
 | `TxType` | type | `'Deposit' \| 'API Call' \| 'Refund' \| 'Settlement' \| 'Fee'` |
 | `TxDirection` | type | `'credit' \| 'debit'` |

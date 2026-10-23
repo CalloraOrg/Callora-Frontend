@@ -20,7 +20,26 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AccountProvider } from '../hooks/useAccountContext';
 import { addAccount, switchAccount, _reset } from '../state/accountStore';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { BillingHistory, MOCK_TRANSACTIONS } from './BillingHistory';
+import { BillingHistory } from './BillingHistory';
+import { MOCK_TRANSACTIONS } from '../data/billingFixtures';
+import { fetchDepositEvents } from '../services/vaultEvents';
+
+const walletState = vi.hoisted(() => ({
+  address: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF' as string | null,
+}));
+
+// Deposit history comes from vault events; the page is tested against the
+// fixture rows, served as if the connected wallet had made those deposits.
+vi.mock('../services/vaultEvents', async () => {
+  const { MOCK_TRANSACTIONS: rows } = await import('../data/billingFixtures');
+  return {
+    fetchDepositEvents: vi.fn(async () => ({ transactions: rows, nextCursor: null, retentionTruncated: false })),
+  };
+});
+vi.mock('../state/walletStore', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../state/walletStore')>(),
+  useWalletStore: () => ({ address: walletState.address, status: 'connected', networkPassphrase: null, isNetworkMismatch: false }),
+}));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -28,12 +47,15 @@ import { BillingHistory, MOCK_TRANSACTIONS } from './BillingHistory';
  * Render BillingHistory inside a MemoryRouter.
  * Pass `initialEntries` to pre-seed URL search params, e.g. `['?sort=date&dir=asc']`.
  */
-function renderBH(initialEntries: string[] = ['/']) {
-  return render(
+async function renderBH(initialEntries: string[] = ['/']) {
+  const result = render(
     <MemoryRouter initialEntries={initialEntries}>
       <BillingHistory />
     </MemoryRouter>,
   );
+  // Rows arrive from the deposit history fetch; wait until loading finishes.
+  await waitFor(() => expect(screen.queryByText(/Loading deposit history/)).toBeNull());
+  return result;
 }
 
 /** Get the row element for a given transaction id. */
@@ -51,20 +73,20 @@ function getTriggerInRow(row: HTMLElement) {
 describe('BillingHistory — page structure', () => {
   afterEach(() => { cleanup(); _reset(); });
 
-  it('renders the page heading', () => {
-    renderBH();
+  it('renders the page heading', async () => {
+    await renderBH();
     expect(
       screen.getByRole('heading', { name: /billing history/i, level: 1 }),
     ).toBeTruthy();
   });
 
-  it('renders all mock transactions by default', () => {
-    renderBH();
+  it('renders all mock transactions by default', async () => {
+    await renderBH();
     expect(screen.getByText(`${MOCK_TRANSACTIONS.length} transactions`)).toBeTruthy();
   });
 
-  it('renders a table with an accessible aria-label', () => {
-    renderBH();
+  it('renders a table with an accessible aria-label', async () => {
+    await renderBH();
     expect(
       screen.getByRole('table', { name: /billing transaction history/i }),
     ).toBeTruthy();
@@ -88,8 +110,8 @@ describe('BillingHistory — page structure', () => {
     expect(screen.getByText('Jul 25, 10:32 AM')).toBeTruthy();
   });
 
-  it('renders column headers with scope="col"', () => {
-    renderBH();
+  it('renders column headers with scope="col"', async () => {
+    await renderBH();
     const headerCells = screen
       .getAllByRole('columnheader')
       .filter((th) => th.getAttribute('scope') === 'col');
@@ -97,27 +119,27 @@ describe('BillingHistory — page structure', () => {
     expect(headerCells.length).toBeGreaterThanOrEqual(6);
   });
 
-  it('renders a status live region for filter announcements', () => {
-    renderBH();
+  it('renders a status live region for filter announcements', async () => {
+    await renderBH();
     const liveRegion = document.querySelector('[role="status"][aria-live="polite"]');
     expect(liveRegion).toBeTruthy();
   });
 
-  it('renders a keyboard tip containing "Esc"', () => {
-    renderBH();
+  it('renders a keyboard tip containing "Esc"', async () => {
+    await renderBH();
     // The bottom keyboard tip paragraph
     expect(screen.getAllByText(/Esc/i).length).toBeGreaterThan(0);
   });
 
-  it('renders StatusBadge for each transaction', () => {
-    renderBH();
+  it('renders StatusBadge for each transaction', async () => {
+    await renderBH();
     // StatusBadge uses role="img"; there should be at least one per row.
     const badges = screen.getAllByRole('img');
     expect(badges.length).toBeGreaterThanOrEqual(MOCK_TRANSACTIONS.length);
   });
 
-  it('shows the net balance summary line', () => {
-    renderBH();
+  it('shows the net balance summary line', async () => {
+    await renderBH();
     // Net: label should be visible
     expect(screen.getByText('Net:')).toBeTruthy();
   });
@@ -128,8 +150,8 @@ describe('BillingHistory — page structure', () => {
 describe('BillingHistory — PreviewCard hover/focus integration', () => {
   afterEach(cleanup);
 
-  it('each transaction row has a PreviewCard trigger button', () => {
-    renderBH();
+  it('each transaction row has a PreviewCard trigger button', async () => {
+    await renderBH();
     // Each row must have exactly one trigger per PreviewCard
     MOCK_TRANSACTIONS.forEach((tx) => {
       const row = getRow(tx.id);
@@ -137,8 +159,8 @@ describe('BillingHistory — PreviewCard hover/focus integration', () => {
     });
   });
 
-  it('hovering a row description opens the preview tooltip', () => {
-    renderBH();
+  it('hovering a row description opens the preview tooltip', async () => {
+    await renderBH();
     const row = getRow(MOCK_TRANSACTIONS[0].id);
     const wrapper = row.querySelector('.preview-card__wrapper') as HTMLElement;
 
@@ -150,8 +172,8 @@ describe('BillingHistory — PreviewCard hover/focus integration', () => {
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
 
-  it('focusing a row trigger opens the preview tooltip', () => {
-    renderBH();
+  it('focusing a row trigger opens the preview tooltip', async () => {
+    await renderBH();
     const row = getRow(MOCK_TRANSACTIONS[0].id);
     const trigger = getTriggerInRow(row);
 
@@ -159,8 +181,8 @@ describe('BillingHistory — PreviewCard hover/focus integration', () => {
     expect(screen.getByRole('tooltip')).toBeTruthy();
   });
 
-  it('preview panel shows the transaction description', () => {
-    renderBH();
+  it('preview panel shows the transaction description', async () => {
+    await renderBH();
     const tx = MOCK_TRANSACTIONS[0]; // "USDC vault deposit"
     const row = getRow(tx.id);
     const trigger = getTriggerInRow(row);
@@ -169,8 +191,8 @@ describe('BillingHistory — PreviewCard hover/focus integration', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent(tx.description);
   });
 
-  it('preview panel shows the tx hash (truncated)', () => {
-    renderBH();
+  it('preview panel shows the tx hash (truncated)', async () => {
+    await renderBH();
     const tx = MOCK_TRANSACTIONS[0];
     const row = getRow(tx.id);
     const trigger = getTriggerInRow(row);
@@ -181,32 +203,32 @@ describe('BillingHistory — PreviewCard hover/focus integration', () => {
     expect(panel).toHaveTextContent(tx.txHash.slice(0, 8));
   });
 
-  it('preview panel shows network name', () => {
-    renderBH();
+  it('preview panel shows network name', async () => {
+    await renderBH();
     const tx = MOCK_TRANSACTIONS[0];
     const row = getRow(tx.id);
     fireEvent.focus(getTriggerInRow(row));
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Stellar Mainnet');
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Stellar Testnet');
   });
 
-  it('preview panel shows confirmation count', () => {
-    renderBH();
+  it('preview panel shows confirmation count', async () => {
+    await renderBH();
     const tx = MOCK_TRANSACTIONS[0]; // 120 confirmations
     const row = getRow(tx.id);
     fireEvent.focus(getTriggerInRow(row));
     expect(screen.getByRole('tooltip')).toHaveTextContent('120');
   });
 
-  it('preview panel shows formatted USDC amount', () => {
-    renderBH();
+  it('preview panel shows formatted USDC amount', async () => {
+    await renderBH();
     const tx = MOCK_TRANSACTIONS[0]; // 100.00 USDC
     const row = getRow(tx.id);
     fireEvent.focus(getTriggerInRow(row));
     expect(screen.getByRole('tooltip')).toHaveTextContent('100.00 USDC');
   });
 
-  it('Escape closes the preview and removes aria-describedby', () => {
-    renderBH();
+  it('Escape closes the preview and removes aria-describedby', async () => {
+    await renderBH();
     const row = getRow(MOCK_TRANSACTIONS[0].id);
     const trigger = getTriggerInRow(row);
 
@@ -218,8 +240,8 @@ describe('BillingHistory — PreviewCard hover/focus integration', () => {
     expect(trigger.getAttribute('aria-describedby')).toBeNull();
   });
 
-  it('trigger aria-label includes the transaction description', () => {
-    renderBH();
+  it('trigger aria-label includes the transaction description', async () => {
+    await renderBH();
     const tx = MOCK_TRANSACTIONS[0];
     const row = getRow(tx.id);
     const trigger = getTriggerInRow(row);
@@ -229,8 +251,8 @@ describe('BillingHistory — PreviewCard hover/focus integration', () => {
     );
   });
 
-  it('panel has pointer-events: none to avoid mouse trapping', () => {
-    renderBH();
+  it('panel has pointer-events: none to avoid mouse trapping', async () => {
+    await renderBH();
     const row = getRow(MOCK_TRANSACTIONS[0].id);
     fireEvent.focus(getTriggerInRow(row));
     expect(screen.getByRole('tooltip').style.pointerEvents).toBe('none');
@@ -242,8 +264,8 @@ describe('BillingHistory — PreviewCard hover/focus integration', () => {
 describe('BillingHistory — filters', () => {
   afterEach(cleanup);
 
-  it('filter by type "Deposit" shows only deposit rows', () => {
-    renderBH();
+  it('filter by type "Deposit" shows only deposit rows', async () => {
+    await renderBH();
     const typeSelect = screen.getByRole('combobox', { name: /filter by transaction type/i });
 
     fireEvent.change(typeSelect, { target: { value: 'Deposit' } });
@@ -258,8 +280,8 @@ describe('BillingHistory — filters', () => {
     });
   });
 
-  it('filter by status "pending" shows only pending rows', () => {
-    renderBH();
+  it('filter by status "pending" shows only pending rows', async () => {
+    await renderBH();
     const statusSelect = screen.getByRole('combobox', { name: /filter by transaction status/i });
 
     fireEvent.change(statusSelect, { target: { value: 'pending' } });
@@ -268,8 +290,8 @@ describe('BillingHistory — filters', () => {
     expect(screen.getByText(`${pendingCount} transaction${pendingCount !== 1 ? 's' : ''}`)).toBeTruthy();
   });
 
-  it('filter by direction "credit" shows only credit rows', () => {
-    renderBH();
+  it('filter by direction "credit" shows only credit rows', async () => {
+    await renderBH();
     const dirSelect = screen.getByRole('combobox', { name: /filter by transaction direction/i });
 
     fireEvent.change(dirSelect, { target: { value: 'credit' } });
@@ -283,8 +305,8 @@ describe('BillingHistory — filters', () => {
     });
   });
 
-  it('search by description filters rows', () => {
-    renderBH();
+  it('search by description filters rows', async () => {
+    await renderBH();
     const searchInput = screen.getByRole('searchbox', { name: /search transactions/i });
 
     fireEvent.change(searchInput, { target: { value: 'WeatherSim' } });
@@ -295,8 +317,8 @@ describe('BillingHistory — filters', () => {
     expect(screen.getByText(`${matchCount} transaction${matchCount !== 1 ? 's' : ''}`)).toBeTruthy();
   });
 
-  it('search by tx hash filters rows', () => {
-    renderBH();
+  it('search by tx hash filters rows', async () => {
+    await renderBH();
     const searchInput = screen.getByRole('searchbox', { name: /search transactions/i });
     // Use the first 8 chars of the first tx hash
     const hashPrefix = MOCK_TRANSACTIONS[0].txHash.slice(0, 8).toLowerCase();
@@ -306,8 +328,8 @@ describe('BillingHistory — filters', () => {
     expect(screen.queryByRole('table')).toBeTruthy();
   });
 
-  it('shows empty state when no transactions match', () => {
-    renderBH();
+  it('shows empty state when no transactions match', async () => {
+    await renderBH();
     const searchInput = screen.getByRole('searchbox', { name: /search transactions/i });
 
     fireEvent.change(searchInput, { target: { value: 'ZZZNOMATCH999' } });
@@ -318,8 +340,8 @@ describe('BillingHistory — filters', () => {
     expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('net balance is positive when only credits are shown', () => {
-    renderBH();
+  it('net balance is positive when only credits are shown', async () => {
+    await renderBH();
     const dirSelect = screen.getByRole('combobox', { name: /filter by transaction direction/i });
     fireEvent.change(dirSelect, { target: { value: 'credit' } });
 
@@ -330,8 +352,8 @@ describe('BillingHistory — filters', () => {
     expect(pageText).toContain('+');
   });
 
-  it('live region contains filter summary after type filter change', () => {
-    renderBH();
+  it('live region contains filter summary after type filter change', async () => {
+    await renderBH();
     const typeSelect = screen.getByRole('combobox', { name: /filter by transaction type/i });
     fireEvent.change(typeSelect, { target: { value: 'Fee' } });
 
@@ -339,8 +361,8 @@ describe('BillingHistory — filters', () => {
     expect(liveRegion.textContent).toContain('Fee');
   });
 
-  it('live region reads "Showing all transactions" when no filters active', () => {
-    renderBH();
+  it('live region reads "Showing all transactions" when no filters active', async () => {
+    await renderBH();
     const liveRegion = document.querySelector('[role="status"][aria-live="polite"]') as HTMLElement;
     expect(liveRegion.textContent).toMatch(/showing all transactions/i);
   });
@@ -351,8 +373,8 @@ describe('BillingHistory — filters', () => {
 describe('BillingHistory — table row content', () => {
   afterEach(cleanup);
 
-  it('shows truncated tx hash in the Tx Hash column', () => {
-    renderBH();
+  it('shows truncated tx hash in the Tx Hash column', async () => {
+    await renderBH();
     // First transaction: A3F9B2C1... → "A3F9B2…F0A1" (6+…+4)
     const hashCode = screen.getAllByTitle(MOCK_TRANSACTIONS[0].txHash)[0];
     expect(hashCode).toBeTruthy();
@@ -362,14 +384,14 @@ describe('BillingHistory — table row content', () => {
     );
   });
 
-  it('amount cell has tabular-nums class for alignment', () => {
-    renderBH();
+  it('amount cell has tabular-nums class for alignment', async () => {
+    await renderBH();
     const cells = document.querySelectorAll('td.tabular-nums');
     expect(cells.length).toBeGreaterThan(0);
   });
 
-  it('date cells render <time> elements with dateTime attributes', () => {
-    renderBH();
+  it('date cells render <time> elements with dateTime attributes', async () => {
+    await renderBH();
     const timeTags = document.querySelectorAll('td time');
     // At least one per row
     expect(timeTags.length).toBeGreaterThanOrEqual(MOCK_TRANSACTIONS.length);
@@ -396,13 +418,13 @@ describe('BillingHistory — column sorting', () => {
 
   // ── Date header ────────────────────────────────────────────────────────────
 
-  it('Date header is a button', () => {
-    renderBH();
+  it('Date header is a button', async () => {
+    await renderBH();
     expect(screen.getByRole('button', { name: /date/i })).toBeTruthy();
   });
 
-  it('clicking Date header once sorts ascending by date', () => {
-    renderBH();
+  it('clicking Date header once sorts ascending by date', async () => {
+    await renderBH();
     fireEvent.click(screen.getByRole('button', { name: /date/i }));
 
     const ids = visibleRowIds();
@@ -414,8 +436,8 @@ describe('BillingHistory — column sorting', () => {
     expect(ids).toEqual(expected);
   });
 
-  it('clicking Date header twice sorts descending by date', () => {
-    renderBH();
+  it('clicking Date header twice sorts descending by date', async () => {
+    await renderBH();
     const btn = screen.getByRole('button', { name: /date/i });
     fireEvent.click(btn);
     fireEvent.click(btn);
@@ -428,8 +450,8 @@ describe('BillingHistory — column sorting', () => {
     expect(ids).toEqual(expected);
   });
 
-  it('Date <th> has aria-sort="ascending" after one click', () => {
-    renderBH();
+  it('Date <th> has aria-sort="ascending" after one click', async () => {
+    await renderBH();
     fireEvent.click(screen.getByRole('button', { name: /date/i }));
 
     const dateTh = screen
@@ -438,8 +460,8 @@ describe('BillingHistory — column sorting', () => {
     expect(dateTh?.getAttribute('aria-sort')).toBe('ascending');
   });
 
-  it('Date <th> has aria-sort="descending" after two clicks', () => {
-    renderBH();
+  it('Date <th> has aria-sort="descending" after two clicks', async () => {
+    await renderBH();
     const btn = screen.getByRole('button', { name: /date/i });
     fireEvent.click(btn);
     fireEvent.click(btn);
@@ -450,8 +472,8 @@ describe('BillingHistory — column sorting', () => {
     expect(dateTh?.getAttribute('aria-sort')).toBe('descending');
   });
 
-  it('Amount <th> has aria-sort="none" when date is the active sort', () => {
-    renderBH();
+  it('Amount <th> has aria-sort="none" when date is the active sort', async () => {
+    await renderBH();
     fireEvent.click(screen.getByRole('button', { name: /date/i }));
 
     const amountTh = screen
@@ -462,13 +484,13 @@ describe('BillingHistory — column sorting', () => {
 
   // ── Amount header ──────────────────────────────────────────────────────────
 
-  it('Amount header is a button', () => {
-    renderBH();
+  it('Amount header is a button', async () => {
+    await renderBH();
     expect(screen.getByRole('button', { name: /amount/i })).toBeTruthy();
   });
 
-  it('clicking Amount header once sorts ascending by amount', () => {
-    renderBH();
+  it('clicking Amount header once sorts ascending by amount', async () => {
+    await renderBH();
     fireEvent.click(screen.getByRole('button', { name: /amount/i }));
 
     const ids = visibleRowIds();
@@ -479,8 +501,8 @@ describe('BillingHistory — column sorting', () => {
     expect(ids).toEqual(expected);
   });
 
-  it('clicking Amount header twice sorts descending by amount', () => {
-    renderBH();
+  it('clicking Amount header twice sorts descending by amount', async () => {
+    await renderBH();
     const btn = screen.getByRole('button', { name: /amount/i });
     fireEvent.click(btn);
     fireEvent.click(btn);
@@ -493,8 +515,8 @@ describe('BillingHistory — column sorting', () => {
     expect(ids).toEqual(expected);
   });
 
-  it('Amount <th> has aria-sort="ascending" after one click', () => {
-    renderBH();
+  it('Amount <th> has aria-sort="ascending" after one click', async () => {
+    await renderBH();
     fireEvent.click(screen.getByRole('button', { name: /amount/i }));
 
     const amountTh = screen
@@ -503,8 +525,8 @@ describe('BillingHistory — column sorting', () => {
     expect(amountTh?.getAttribute('aria-sort')).toBe('ascending');
   });
 
-  it('switching from Date sort to Amount sort resets direction to ascending', () => {
-    renderBH();
+  it('switching from Date sort to Amount sort resets direction to ascending', async () => {
+    await renderBH();
     // First click date → asc date
     const dateBtn = screen.getByRole('button', { name: /date/i });
     fireEvent.click(dateBtn);
@@ -521,8 +543,8 @@ describe('BillingHistory — column sorting', () => {
 
   // ── Composition with filters ───────────────────────────────────────────────
 
-  it('sort composes with type filter: Deposit rows sorted by amount asc', () => {
-    renderBH();
+  it('sort composes with type filter: Deposit rows sorted by amount asc', async () => {
+    await renderBH();
     const typeSelect = screen.getByRole('combobox', { name: /filter by transaction type/i });
     fireEvent.change(typeSelect, { target: { value: 'Deposit' } });
     fireEvent.click(screen.getByRole('button', { name: /amount/i }));
@@ -532,8 +554,8 @@ describe('BillingHistory — column sorting', () => {
     expect(visibleRowIds()).toEqual(expectedIds);
   });
 
-  it('sort composes with status filter: success rows sorted by date desc', () => {
-    renderBH();
+  it('sort composes with status filter: success rows sorted by date desc', async () => {
+    await renderBH();
     const statusSelect = screen.getByRole('combobox', { name: /filter by transaction status/i });
     fireEvent.change(statusSelect, { target: { value: 'success' } });
     const dateBtn = screen.getByRole('button', { name: /date/i });
@@ -549,8 +571,8 @@ describe('BillingHistory — column sorting', () => {
 
   // ── URL persistence ────────────────────────────────────────────────────────
 
-  it('pre-seeded ?sort=date&dir=asc renders in ascending date order', () => {
-    renderBH(['/?sort=date&dir=asc']);
+  it('pre-seeded ?sort=date&dir=asc renders in ascending date order', async () => {
+    await renderBH(['/?sort=date&dir=asc']);
 
     const expected = [...MOCK_TRANSACTIONS]
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
@@ -558,8 +580,8 @@ describe('BillingHistory — column sorting', () => {
     expect(visibleRowIds()).toEqual(expected);
   });
 
-  it('pre-seeded ?sort=date&dir=desc renders in descending date order', () => {
-    renderBH(['/?sort=date&dir=desc']);
+  it('pre-seeded ?sort=date&dir=desc renders in descending date order', async () => {
+    await renderBH(['/?sort=date&dir=desc']);
 
     const expected = [...MOCK_TRANSACTIONS]
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
@@ -567,8 +589,8 @@ describe('BillingHistory — column sorting', () => {
     expect(visibleRowIds()).toEqual(expected);
   });
 
-  it('pre-seeded ?sort=amount&dir=asc renders in ascending amount order', () => {
-    renderBH(['/?sort=amount&dir=asc']);
+  it('pre-seeded ?sort=amount&dir=asc renders in ascending amount order', async () => {
+    await renderBH(['/?sort=amount&dir=asc']);
 
     const expected = [...MOCK_TRANSACTIONS]
       .sort((a, b) => a.amount - b.amount)
@@ -576,8 +598,8 @@ describe('BillingHistory — column sorting', () => {
     expect(visibleRowIds()).toEqual(expected);
   });
 
-  it('pre-seeded ?sort=amount&dir=desc renders in descending amount order', () => {
-    renderBH(['/?sort=amount&dir=desc']);
+  it('pre-seeded ?sort=amount&dir=desc renders in descending amount order', async () => {
+    await renderBH(['/?sort=amount&dir=desc']);
 
     const expected = [...MOCK_TRANSACTIONS]
       .sort((a, b) => b.amount - a.amount)
@@ -585,22 +607,22 @@ describe('BillingHistory — column sorting', () => {
     expect(visibleRowIds()).toEqual(expected);
   });
 
-  it('invalid sort param is silently ignored (declaration order preserved)', () => {
-    renderBH(['/?sort=INVALID&dir=INVALID']);
+  it('invalid sort param is silently ignored (declaration order preserved)', async () => {
+    await renderBH(['/?sort=INVALID&dir=INVALID']);
     const expected = MOCK_TRANSACTIONS.map((tx) => tx.id);
     expect(visibleRowIds()).toEqual(expected);
   });
 
-  it('pre-seeded ?sort=date&dir=asc sets correct aria-sort on Date header', () => {
-    renderBH(['/?sort=date&dir=asc']);
+  it('pre-seeded ?sort=date&dir=asc sets correct aria-sort on Date header', async () => {
+    await renderBH(['/?sort=date&dir=asc']);
     const dateTh = screen
       .getAllByRole('columnheader')
       .find((th) => th.textContent?.includes('Date'));
     expect(dateTh?.getAttribute('aria-sort')).toBe('ascending');
   });
 
-  it('pre-seeded ?sort=amount&dir=desc sets correct aria-sort on Amount header', () => {
-    renderBH(['/?sort=amount&dir=desc']);
+  it('pre-seeded ?sort=amount&dir=desc sets correct aria-sort on Amount header', async () => {
+    await renderBH(['/?sort=amount&dir=desc']);
     const amountTh = screen
       .getAllByRole('columnheader')
       .find((th) => th.textContent?.includes('Amount'));
@@ -634,16 +656,16 @@ describe('BillingHistory — responsive layout', () => {
     window.matchMedia = originalMatchMedia;
   });
 
-  it('mobile: renders a card list and no table', () => {
+  it('mobile: renders a card list and no table', async () => {
     setViewport('mobile');
-    renderBH();
+    await renderBH();
     expect(screen.getByRole('list', { name: /billing transactions/i })).toBeTruthy();
     expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('desktop: renders the table and no card list', () => {
+  it('desktop: renders the table and no card list', async () => {
     setViewport('desktop');
-    renderBH();
+    await renderBH();
     expect(screen.getByRole('table')).toBeTruthy();
     expect(screen.queryByRole('list', { name: /billing transactions/i })).toBeNull();
   });
@@ -656,15 +678,15 @@ describe('BillingHistory — mobile cards', () => {
     return within(screen.getByRole('list', { name: /billing transactions/i })).getAllByRole('listitem');
   }
 
-  it('renders one card per transaction', () => {
+  it('renders one card per transaction', async () => {
     setViewport('mobile');
-    renderBH();
+    await renderBH();
     expect(getCards()).toHaveLength(MOCK_TRANSACTIONS.length);
   });
 
-  it('each card has a heading and a signed amount', () => {
+  it('each card has a heading and a signed amount', async () => {
     setViewport('mobile');
-    renderBH();
+    await renderBH();
     const [credit, debit] = getCards();
     expect(within(credit).getByRole('heading', { name: MOCK_TRANSACTIONS[0].description })).toBeTruthy();
     expect(within(credit).getByText(/^\+/)).toBeTruthy();
@@ -677,9 +699,9 @@ describe('BillingHistory — mobile cards', () => {
 const sheetTx = MOCK_TRANSACTIONS[0];
 
 /** Render the mobile layout, focus and tap the first card's Details button. */
-function openSheet() {
+async function openSheet() {
   setViewport('mobile');
-  renderBH();
+  await renderBH();
   const card = screen.getByTestId(`bh-card-${sheetTx.id}`);
   const trigger = within(card).getByRole('button', { name: /^details/i });
   trigger.focus();
@@ -694,8 +716,8 @@ describe('BillingHistory — details sheet', () => {
     window.matchMedia = originalMatchMedia;
   });
 
-  it('Details opens a dialog with hash, network and confirmations', () => {
-    const { dialog } = openSheet();
+  it('Details opens a dialog with hash, network and confirmations', async () => {
+    const { dialog } = await openSheet();
     expect(dialog).toBeTruthy();
     expect(within(dialog).getByText(sheetTx.txHash)).toBeTruthy();
     expect(within(dialog).getByText(sheetTx.network)).toBeTruthy();
@@ -703,7 +725,7 @@ describe('BillingHistory — details sheet', () => {
   });
 
   it('Escape closes the sheet and returns focus to the Details button', async () => {
-    const { trigger, dialog } = openSheet();
+    const { trigger, dialog } = await openSheet();
     expect(dialog).toBeTruthy();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -719,8 +741,8 @@ describe('BillingHistory — details sheet actions', () => {
     Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
   });
 
-  it('the close button closes the sheet', () => {
-    const { dialog } = openSheet();
+  it('the close button closes the sheet', async () => {
+    const { dialog } = await openSheet();
     expect(dialog).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: /^close/i }));
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -729,7 +751,7 @@ describe('BillingHistory — details sheet actions', () => {
   it('Copy puts the full hash on the clipboard', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    const { dialog } = openSheet();
+    const { dialog } = await openSheet();
     expect(dialog).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: /copy/i }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(sheetTx.txHash));
@@ -753,15 +775,15 @@ const cardIds = () =>
 describe('BillingHistory — mobile sort select', () => {
   afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
 
-  it('mobile: shows one sort select', () => {
+  it('mobile: shows one sort select', async () => {
     setViewport('mobile');
-    renderBH();
+    await renderBH();
     expect(sortSelect()).toBeTruthy();
   });
 
-  it('desktop: has no sort select (the headers sort instead)', () => {
+  it('desktop: has no sort select (the headers sort instead)', async () => {
     setViewport('desktop');
-    renderBH();
+    await renderBH();
     expect(sortSelect()).toBeNull();
   });
 });
@@ -769,7 +791,7 @@ describe('BillingHistory — mobile sort select', () => {
 describe('BillingHistory — mobile sort behaviour', () => {
   afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
 
-  it('choosing an option reorders the cards and writes sort/dir to the URL', () => {
+  it('choosing an option reorders the cards and writes sort/dir to the URL', async () => {
     setViewport('mobile');
     render(
       <MemoryRouter initialEntries={['/']}>
@@ -777,6 +799,7 @@ describe('BillingHistory — mobile sort behaviour', () => {
         <LocationProbe />
       </MemoryRouter>,
     );
+    await waitFor(() => expect(screen.queryByText(/Loading deposit history/)).toBeNull());
     fireEvent.change(sortSelect() as HTMLSelectElement, { target: { value: 'amount:desc' } });
     const expected = [...MOCK_TRANSACTIONS]
       .sort((a, b) => b.amount - a.amount)
@@ -787,9 +810,9 @@ describe('BillingHistory — mobile sort behaviour', () => {
     expect(params.get('dir')).toBe('desc');
   });
 
-  it('the select reflects a pre-seeded URL sort', () => {
+  it('the select reflects a pre-seeded URL sort', async () => {
     setViewport('mobile');
-    renderBH(['/?sort=date&dir=asc']);
+    await renderBH(['/?sort=date&dir=asc']);
     expect((sortSelect() as HTMLSelectElement).value).toBe('date:asc');
   });
 });
@@ -797,9 +820,9 @@ describe('BillingHistory — mobile sort behaviour', () => {
 describe('BillingHistory — filters on mobile', () => {
   afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
 
-  function filteredCount(mode: 'mobile' | 'desktop') {
+  async function filteredCount(mode: 'mobile' | 'desktop') {
     setViewport(mode);
-    const view = renderBH();
+    const view = await renderBH();
     fireEvent.change(screen.getByRole('combobox', { name: /filter by transaction type/i }), {
       target: { value: 'Deposit' },
     });
@@ -811,9 +834,9 @@ describe('BillingHistory — filters on mobile', () => {
     return count;
   }
 
-  it('the same filter shows the same number of transactions as on desktop', () => {
-    const mobile = filteredCount('mobile');
-    const desktop = filteredCount('desktop');
+  it('the same filter shows the same number of transactions as on desktop', async () => {
+    const mobile = await filteredCount('mobile');
+    const desktop = await filteredCount('desktop');
     expect(mobile).toBe(desktop);
     expect(mobile).toBe(MOCK_TRANSACTIONS.filter((t) => t.type === 'Deposit').length);
   });
@@ -822,23 +845,67 @@ describe('BillingHistory — filters on mobile', () => {
 describe('BillingHistory — touch-friendly wording', () => {
   afterEach(() => { cleanup(); _reset(); window.matchMedia = originalMatchMedia; });
 
-  it('mobile: tells users to tap Details instead of hovering', () => {
+  it('mobile: tells users to tap Details instead of hovering', async () => {
     setViewport('mobile');
-    renderBH();
+    await renderBH();
     expect(screen.getByText(/tap details/i)).toBeTruthy();
     expect(screen.queryByText(/hover/i)).toBeNull();
   });
 
-  it('mobile: hides the keyboard tip', () => {
+  it('mobile: hides the keyboard tip', async () => {
     setViewport('mobile');
-    renderBH();
+    await renderBH();
     expect(screen.queryByText(/keyboard tip/i)).toBeNull();
   });
 
-  it('desktop: keeps the hover wording and the keyboard tip', () => {
+  it('desktop: keeps the hover wording and the keyboard tip', async () => {
     setViewport('desktop');
-    renderBH();
+    await renderBH();
     expect(screen.getByText(/hover or focus any transaction row/i)).toBeTruthy();
     expect(screen.getByText(/keyboard tip/i)).toBeTruthy();
+  });
+});
+
+describe('BillingHistory — deposit history states', () => {
+  afterEach(() => { cleanup(); _reset(); walletState.address = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF'; });
+
+  it('asks for a wallet and does not fetch when none is connected', async () => {
+    walletState.address = null;
+    vi.mocked(fetchDepositEvents).mockClear();
+    renderBH();
+    expect(screen.getByText(/Connect Freighter/)).toBeTruthy();
+    expect(fetchDepositEvents).not.toHaveBeenCalled();
+  });
+
+  it('shows an alert with Retry on failure, and Retry refetches', async () => {
+    vi.mocked(fetchDepositEvents).mockRejectedValueOnce(new Error('rpc down'));
+    await renderBH();
+    expect(screen.getByRole('alert').textContent).toContain('rpc down');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.getByTestId(`bh-row-${MOCK_TRANSACTIONS[0].id}`)).toBeTruthy());
+  });
+
+  it('says so when the wallet has no deposits', async () => {
+    vi.mocked(fetchDepositEvents).mockResolvedValueOnce({ transactions: [], nextCursor: null, retentionTruncated: false });
+    await renderBH();
+    expect(screen.getByText(/No deposits yet for this wallet/)).toBeTruthy();
+  });
+
+  it('explains when history falls outside the RPC retention window', async () => {
+    vi.mocked(fetchDepositEvents).mockResolvedValueOnce({ transactions: MOCK_TRANSACTIONS, nextCursor: null, retentionTruncated: true });
+    await renderBH();
+    expect(screen.getByRole('note').textContent).toContain('outside the RPC retention window');
+  });
+
+  it('Load older appends the next page without duplicate rows', async () => {
+    const [first, second, third] = MOCK_TRANSACTIONS;
+    vi.mocked(fetchDepositEvents)
+      .mockResolvedValueOnce({ transactions: [first, second], nextCursor: 'page-2', retentionTruncated: false })
+      .mockResolvedValueOnce({ transactions: [second, third], nextCursor: null, retentionTruncated: false });
+    await renderBH();
+    fireEvent.click(screen.getByRole('button', { name: 'Load older deposits' }));
+    await waitFor(() => expect(screen.getByTestId(`bh-row-${third.id}`)).toBeTruthy());
+    expect(screen.getAllByTestId(/^bh-row-/)).toHaveLength(3);
+    expect(fetchDepositEvents).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'page-2' }));
   });
 });
