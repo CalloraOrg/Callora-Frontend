@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import CodeExample from "../components/CodeExample";
 import Breadcrumb from "../components/Breadcrumb";
 import TestInBrowser from "../components/TestInBrowser";
@@ -898,7 +898,15 @@ export default function ApiDetailPage({ onBack }: Props) {
                       </div>
                     </div>
 
-                    <h2 style={{ marginTop: "var(--mkt-space-6xl)" }}>Performance Metrics</h2>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--mkt-space-6xl)" }}>
+                      <h2 style={{ marginTop: 0 }}>Performance Metrics</h2>
+                      <Link
+                        to={`/marketplace/${api.id}/sla`}
+                        style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--accent)", textDecoration: "none" }}
+                      >
+                        View SLA &rarr;
+                      </Link>
+                    </div>
                     <div className="api-detail-metrics">
                       {[
                         {
@@ -1308,7 +1316,15 @@ export default function ApiDetailPage({ onBack }: Props) {
                       <span style={{ fontSize: 14, color: "var(--muted)" }}>Status</span>
                       <StatusBadge status={apiStatusToVariant(api.status)} />
                     </div>
-                    <a href={`/marketplace/${encodeURIComponent(api.id)}/rate-limits`} style={{ fontSize: "var(--mkt-font-size-tag)" }}>View rate limits</a>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "var(--mkt-space-xs)", borderTop: "1px solid var(--line, rgba(255,255,255,0.06))" }}>
+                      <span style={{ fontSize: 14, color: "var(--muted)" }}>SLA</span>
+                      <Link
+                        to={`/marketplace/${api.id}/sla`}
+                        style={{ fontSize: 14, color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}
+                      >
+                        View SLA
+                      </Link>
+                    </div>
                   </div>
                 </div>
 

@@ -144,10 +144,21 @@ export const API_BASE = normalizeBaseUrl(
   runtimeEnv.VITE_API_BASE_URL as string | undefined,
 );
 
+/** Human-readable labels for each supported Stellar network. */
+export const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
+  mainnet: "Mainnet",
+  testnet: "Testnet",
+  futurenet: "Futurenet",
+};
+
 /** Stellar network the UI is currently pointed at. */
 export const STELLAR_NETWORK: StellarNetwork = resolveStellarNetwork(
   runtimeEnv.VITE_STELLAR_NETWORK as string | undefined,
 );
+
+/** Human-readable label for the configured network (e.g. "Testnet"). */
+export const STELLAR_NETWORK_LABEL =
+  STELLAR_NETWORK_LABELS[STELLAR_NETWORK];
 
 // ─── Stellar wallet deposits ─────────────────────────────────────────────────
 // Declared after `STELLAR_NETWORK` because they derive from it.

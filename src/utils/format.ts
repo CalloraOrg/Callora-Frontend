@@ -258,6 +258,132 @@ export function normalizeUsdcAmountInput(raw: string): NormalizedUsdcInput {
   };
 }
 
+// ── On-chain stroops ⇄ USDC ───────────────────────────────────────────────────
+//
+// Balances read from Soroban arrive as `i128` stroops (10^-7 USDC). Routing
+// them through `Number` silently loses precision above 2^53 stroops, so every
+// helper below stays in `bigint` until it produces the final decimal string.
+
+/** Base units in one USDC, as a bigint scale factor (7 decimals). */
+const USDC_SCALE = 10n ** BigInt(USDC_DECIMALS);
+
+/**
+ * Parse a USDC amount into stroops without going through `Number`.
+ *
+ * Returns `null` when the value is not a plain decimal amount (empty text,
+ * separators, scientific notation) or carries more than `USDC_DECIMALS`
+ * fraction digits, so callers can treat `null` as "not a valid amount".
+ *
+ * @example usdcAmountToStroops("1260.5")  // 12605000000n
+ * @example usdcAmountToStroops("1.123456789") // null (too many digits)
+ */
+export function usdcAmountToStroops(amount: string | number): bigint | null {
+  const text = typeof amount === "number" ? String(amount) : (amount ?? "").trim();
+  if (text === "" || text === "." || !/^\d*(?:\.\d*)?$/.test(text)) return null;
+
+  const [whole = "", fraction = ""] = text.split(".");
+  if (fraction.length > USDC_DECIMALS) return null;
+
+  const wholeStroops = BigInt(whole === "" ? "0" : whole) * USDC_SCALE;
+  const fractionStroops = BigInt(
+    (fraction + "0".repeat(USDC_DECIMALS)).slice(0, USDC_DECIMALS) || "0",
+  );
+  return wholeStroops + fractionStroops;
+}
+
+/**
+ * Exact decimal string for a stroops amount: no grouping, no rounding, and
+ * trailing fraction zeros trimmed. Safe for any `bigint`, including values
+ * far above 2^53.
+ *
+ * @example stroopsToUsdcAmount(12605000000n) // "1260.5"
+ * @example stroopsToUsdcAmount(5000000000n)  // "500"
+ */
+export function stroopsToUsdcAmount(stroops: bigint): string {
+  const negative = stroops < 0n;
+  const abs = negative ? -stroops : stroops;
+  const whole = abs / USDC_SCALE;
+  const fraction = (abs % USDC_SCALE)
+    .toString()
+    .padStart(USDC_DECIMALS, "0")
+    .replace(/0+$/, "");
+  return `${negative ? "-" : ""}${whole.toString()}${fraction ? `.${fraction}` : ""}`;
+}
+
+/**
+ * Group an all-digits integer string with the locale's thousands separator.
+ *
+ * `Intl.NumberFormat` (NumberFormat V3) accepts strings and formats them
+ * exactly; older implementations coerce to `number` and would round large
+ * values, so the result is verified against the input digits and a plain
+ * comma-grouped fallback is used when the runtime cannot format exactly.
+ */
+function groupIntegerDigits(digits: string, locale: string): string {
+  if (digits.length <= 3) return digits;
+  try {
+    const formatted = new Intl.NumberFormat(locale, {
+      maximumFractionDigits: 0,
+      useGrouping: true,
+    }).format(digits as any);
+    if (formatted.replace(/\D+/g, "") === digits) return formatted;
+  } catch {
+    // Fall through to the locale-independent grouping below.
+  }
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+export interface FormatUsdcStroopsOptions {
+  /** Locale used for the decimal point and grouping. Defaults to the browser locale. */
+  locale?: string;
+  /** Fraction digits to display. Defaults to 2. Rounded half-up in bigint math. */
+  fractionDigits?: number;
+  /** Whether thousands are grouped. Defaults to true. */
+  grouping?: boolean;
+}
+
+/**
+ * Format a stroops balance as a locale-aware USDC display string without ever
+ * converting the value to `Number`.
+ *
+ * @example formatUsdcStroops(5000000000n)             // "500.00"
+ * @example formatUsdcStroops(12605000000n)            // "1,260.50"
+ * @example formatUsdcStroops(12605000001n)            // "1,260.50" (half-up)
+ * @example formatUsdcStroops(12605000001n, { grouping: false }) // "1260.50"
+ */
+export function formatUsdcStroops(
+  stroops: bigint,
+  options: FormatUsdcStroopsOptions = {},
+): string {
+  const { locale, grouping = true } = options;
+  const digits = Math.min(Math.max(Math.trunc(options.fractionDigits ?? 2), 0), 12);
+
+  const negative = stroops < 0n;
+  const abs = negative ? -stroops : stroops;
+
+  let whole: bigint;
+  let fractionText: string;
+
+  if (digits >= USDC_DECIMALS) {
+    // No rounding possible (or requested): keep every stroop and pad.
+    whole = abs / USDC_SCALE;
+    fractionText = (abs % USDC_SCALE).toString().padStart(USDC_DECIMALS, "0")
+      + "0".repeat(digits - USDC_DECIMALS);
+  } else {
+    const unit = 10n ** BigInt(USDC_DECIMALS - digits); // stroops per display unit
+    const rounded = (abs + unit / 2n) / unit;            // half-up in bigint math
+    const divisor = 10n ** BigInt(digits);
+    whole = rounded / divisor;
+    const fraction = rounded % divisor;
+    fractionText = digits === 0 ? "" : fraction.toString().padStart(digits, "0");
+  }
+
+  const wholeText = grouping
+    ? groupIntegerDigits(whole.toString(), resolveLocale(locale))
+    : whole.toString();
+  const fractionDisplay = digits === 0 ? "" : `.${fractionText}`;
+  return `${negative ? "-" : ""}${wholeText}${fractionDisplay}`;
+}
+
 // ── Duration / time formatters ────────────────────────────────────────────────
 
 /**
