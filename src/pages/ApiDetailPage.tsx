@@ -25,12 +25,12 @@ import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
 import { useToast } from "../components/Toast";
 import { useCollections } from "../state/collectionsStore";
 import RelatedApisRail from "../components/RelatedApisRail";
-import MOCK_APIS from "../data/mockApis";
+import MOCK_APIS, { type APIItem as ApiDetail } from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import LiveRegion from "../components/LiveRegion";
 import { toCurl, type CurlRequest } from "../utils/toCurl";
-import { fetchApiDetail, type ApiDetail } from "../api/catalogApi";
+import { fetchApiDetail } from "../api/catalogApi";
 
 /**
  * ApiDetailPage
@@ -698,7 +698,7 @@ export default function ApiDetailPage({ onBack }: Props) {
     fetchApiDetail(id, controller.signal)
       .then((result) => {
         if (!active) return;
-        if (result.kind === "not-found") {
+        if (result.status === "not-found") {
           setApi(null);
           setStatus("not-found");
           return;

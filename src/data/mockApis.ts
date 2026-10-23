@@ -36,6 +36,14 @@ export type APIItem = {
   sparklineValues?: number[];
   pricingOnRequest?: boolean;
   baseUrl?: string;
+  sla?: {
+    uptimeTargetPct?: number;
+    p99LatencyMs?: number;
+    incidentResponseMinutes?: number;
+    maintenanceWindow?: string;
+    supportTier?: string;
+    creditThresholdPct?: number;
+  };
 };
 
 

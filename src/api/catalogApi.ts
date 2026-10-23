@@ -138,7 +138,7 @@ export interface BackendApiRow {
 
 /**
  * Adapts a snake_case, cursor-paginated Callora-Backend API row into the
- * frontend `APIIdem` contract.
+ * frontend `APIItem` contract.
  *
  * Rules:
  * - Stringifies `id`.
@@ -221,7 +221,7 @@ export function adaptBackendApi(row: unknown): APIItem | null {
  * `name`) are dropped instead of poisoning the list, so one malformed row does
  * not take the whole page down.
  *
- * Accepts both legacy `APIIdem` shapes and backend rows via `adaptBackendApi`.
+ * Accepts both legacy `APIItem` shapes and backend rows via `adaptBackendApi`.
  */
 export function normalizeCatalog(payload: unknown): APIItem[] {
   const list = Array.isArray(payload)
@@ -282,8 +282,8 @@ export function createCatalogApi(
 ): CatalogApi {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
 
-  let cachedEtg: string | null = null;
-  let cachedList: APIIdem[] = [];
+  let cachedEtag: string | null = null;
+  let cachedList: APIItem[] = [];
 
   const resolveBase = (): string =>
     options.baseUrl !== undefined
@@ -299,8 +299,8 @@ export function createCatalogApi(
       const headers: Record<string, string> = {
         Accept: "application/json",
       };
-      if (cachedEtg) {
-        headers["If-None-Match"] = cachedEtg;
+      if (cachedEtag) {
+        headers["If-None-Match"] = cachedEtag;
       }
 
       const base = resolveBase();
@@ -356,7 +356,7 @@ export function createCatalogApi(
         throw abortError();
       }
 
-      const items = normalizeCatalogue(payload);
+      const items = normalizeCatalog(payload);
       cachedList = items;
       return items;
     },
@@ -448,7 +448,7 @@ export async function fetchCatalog(signal?: AbortSignal): Promise<APIItem[]> {
 
   // When API_BASE is configured, errors must reject so the UI surfaces its
   // error or stale-data states rather than hiding failures behind mock data.
-  return await catalogAPI["fetchCatalog"](signal);
+  return await catalogApi["fetchCatalog"](signal);
 }
 
 /**
