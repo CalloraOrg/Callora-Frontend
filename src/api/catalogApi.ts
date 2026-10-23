@@ -79,6 +79,8 @@ export function clearCatalogCache(): void {
   }
 }
 
+export type ApiDetail = APIItem;
+
 /**
  * Result of a single-API detail fetch.
  *
@@ -88,8 +90,8 @@ export function clearCatalogCache(): void {
  * {@link CatalogFetchError}.
  */
 export type ApiDetailResult =
-  | { status: "ready"; api: APIItem }
-  | { status: "not-found" };
+  | { status: "ready"; kind?: "ready"; api: APIItem }
+  | { status: "not-found"; kind: "not-found"; api?: undefined };
 
 export interface CatalogApi {
   /**
@@ -219,13 +221,14 @@ export function adaptBackendApi(raw: unknown): APIItem | null {
     }
   }
 
-  const statusRaw = raw.status;
-  const status =
-    statusRaw === "operational" ||
-    statusRaw === "degraded" ||
-    statusRaw === "down"
-      ? statusRaw
-      : undefined;
+  let status: APIItem["status"] = undefined;
+  if (
+    raw.status === "operational" ||
+    raw.status === "degraded" ||
+    raw.status === "maintenance"
+  ) {
+    status = raw.status;
+  }
 
   const baseUrl =
     typeof raw.baseUrl === "string"
@@ -465,7 +468,7 @@ export function createCatalogApi(
       }
 
       if (response.status === 404 || response.status === 400) {
-        return { status: "not-found" };
+        return { status: "not-found", kind: "not-found" };
       }
 
       if (!response.ok) {
@@ -497,7 +500,7 @@ export function createCatalogApi(
           "The marketplace service returned an unreadable response.",
         );
       }
-      return { status: "ready", api };
+      return { status: "ready", kind: "ready", api };
     },
   };
 }
@@ -540,7 +543,9 @@ export async function fetchApiDetail(
 
   if (!API_BASE) {
     const found = MOCK_APIS.find((api) => api.id === id);
-    return found ? { status: "ready", api: found } : { status: "not-found" };
+    return found
+      ? { status: "ready", kind: "ready", api: found }
+      : { status: "not-found", kind: "not-found" };
   }
 
   return await catalogApi.fetchApiDetail(id, signal);
