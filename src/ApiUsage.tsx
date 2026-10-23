@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import EmptyState from './components/EmptyState';
 import Skeleton from './components/Skeleton';
+import RateLimitAlert from './components/RateLimitAlert';
 import { formatPrice } from './utils/format';
+import { useRateLimit } from './hooks/useRateLimit';
 
 type ApiEndpoint = {
   id: string;
@@ -36,22 +38,22 @@ const MOCK_ENDPOINTS: ApiEndpoint[] = [
     name: 'Get User Profile',
     method: 'GET',
     path: '/api/v1/user/profile',
-    description: 'Retrieve user profile information'
+    description: 'Retrieve user profile information',
   },
   {
     id: '2',
     name: 'Create Transaction',
     method: 'POST',
     path: '/api/v1/transactions',
-    description: 'Create a new transaction'
+    description: 'Create a new transaction',
   },
   {
     id: '3',
     name: 'Update Balance',
     method: 'PUT',
     path: '/api/v1/user/balance',
-    description: 'Update user balance'
-  }
+    description: 'Update user balance',
+  },
 ];
 
 const MOCK_CALL_HISTORY: CallRecord[] = [
@@ -61,7 +63,7 @@ const MOCK_CALL_HISTORY: CallRecord[] = [
     endpoint: '/api/v1/user/profile',
     status: 'success',
     responseTime: 120,
-    cost: 0.001
+    cost: 0.001,
   },
   {
     id: '2',
@@ -69,7 +71,7 @@ const MOCK_CALL_HISTORY: CallRecord[] = [
     endpoint: '/api/v1/transactions',
     status: 'success',
     responseTime: 250,
-    cost: 0.003
+    cost: 0.003,
   },
   {
     id: '3',
@@ -77,8 +79,8 @@ const MOCK_CALL_HISTORY: CallRecord[] = [
     endpoint: '/api/v1/user/balance',
     status: 'error',
     responseTime: 5000,
-    cost: 0.001
-  }
+    cost: 0.001,
+  },
 ];
 
 const CODE_EXAMPLES = {
@@ -111,12 +113,10 @@ response = requests.get(
 data = response.json()
 print(data)`,
   curl: `# cURL example
-curl -X GET "https://api.callora.com/v1/user/profile" \\
-  -H "Authorization: Bearer your-api-key-here" \\
-  -H "Content-Type: application/json"`
+curl -X GET 'https://api.callora.com/v1/user/profile' \\
+  -H 'Authorization: Bearer your-api-key-here' \\
+  -H 'Content-Type: application/json'`,
 };
-
-
 
 function formatTime(ms: number) {
   if (ms < 1000) return `${ms}ms`;
@@ -128,7 +128,7 @@ function formatTimestamp(date: Date) {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   }).format(date);
 }
 
@@ -142,19 +142,32 @@ export default function ApiUsage() {
   const [apiResponse, setApiResponse] = useState<any>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all');
-  const [callHistory, setCallHistory] = useState<CallRecord[]>(MOCK_CALL_HISTORY);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>(
+    'all'
+  );
+  const [callHistory, setCallHistory] =
+    useState<CallRecord[]>(MOCK_CALL_HISTORY);
+  const [shouldSimulateRateLimit, setShouldSimulateRateLimit] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredCallHistory = statusFilter === 'all' ? callHistory : callHistory.filter(call => call.status === statusFilter);
-  const [selectedLanguage, setSelectedLanguage] = useState<'javascript' | 'python' | 'curl'>('javascript');
+  const { rateLimitState, timeUntilReset, updateFromResponse, resetRateLimit } =
+    useRateLimit();
+
+  const filteredCallHistory =
+    statusFilter === 'all'
+      ? callHistory
+      : callHistory.filter((call) => call.status === statusFilter);
+  const [selectedLanguage, setSelectedLanguage] = useState<
+    'javascript' | 'python' | 'curl'
+  >('javascript');
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
-  
+
   const [usageStats, setUsageStats] = useState<UsageStats>({
     callsToday: 47,
     callsWeek: 312,
     totalSpent: 2.847,
     avgResponseTime: 180,
-    successRate: 94.2
+    successRate: 94.2,
   });
 
   const handleCopyApiKey = async () => {
@@ -168,7 +181,10 @@ export default function ApiUsage() {
   };
 
   const handleRegenerateApiKey = () => {
-    const newKey = 'ck_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const newKey =
+      'ck_live_' +
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15);
     setApiKey(newKey);
   };
 
@@ -177,58 +193,95 @@ export default function ApiUsage() {
     setApiResponse(null);
     setResponseTime(null);
     setCallCost(null);
-    
+    setError(null);
+
     const startTime = Date.now();
-    
+
     // Simulate API call
-    setTimeout(() => {
-      const endTime = Date.now();
-      const time = endTime - startTime;
-      const cost = Math.random() * 0.005 + 0.001;
-      
-      setResponseTime(time);
-      setCallCost(cost);
-      
-      // Mock response
-      const mockResponse = {
-        success: true,
-        data: {
-          id: 'user_123',
-          name: 'John Doe',
-          email: 'john@example.com',
-          balance: 1250.50,
-          created_at: new Date().toISOString()
-        },
-        timestamp: new Date().toISOString()
-      };
-      
-      setApiResponse(mockResponse);
-      
-      // Add to call history
-      const newCall: CallRecord = {
-        id: Date.now().toString(),
-        timestamp: new Date(),
-        endpoint: selectedEndpoint.path,
-        status: 'success',
-        responseTime: time,
-        cost: cost,
-        request: requestParams,
-        response: mockResponse
-      };
-      
-      setCallHistory(prev => [newCall, ...prev]);
-      
-      // Update stats
-      setUsageStats(prev => ({
-        ...prev,
-        callsToday: prev.callsToday + 1,
-        callsWeek: prev.callsWeek + 1,
-        totalSpent: prev.totalSpent + cost,
-        avgResponseTime: (prev.avgResponseTime * prev.callsToday + time) / (prev.callsToday + 1)
-      }));
-      
-      setIsLoading(false);
-    }, 1000 + Math.random() * 2000);
+    setTimeout(
+      () => {
+        const endTime = Date.now();
+        const time = endTime - startTime;
+        const cost = Math.random() * 0.005 + 0.001;
+
+        setResponseTime(time);
+        setCallCost(cost);
+
+        // Simulate rate limit response if checkbox is enabled
+        if (shouldSimulateRateLimit) {
+          const resetTime = new Date(Date.now() + 30000); // Reset in 30 seconds
+          const mockErrorResponse = {
+            status: 429,
+            headers: new Headers({
+              'X-RateLimit-Limit': '100',
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': resetTime.toISOString(),
+            }),
+          } as any;
+
+          setError('Rate limited. Too many requests.');
+          updateFromResponse(mockErrorResponse);
+
+          // Add to call history
+          const newCall: CallRecord = {
+            id: Date.now().toString(),
+            timestamp: new Date(),
+            endpoint: selectedEndpoint.path,
+            status: 'error',
+            responseTime: time,
+            cost: 0,
+            request: requestParams,
+            response: { error: 'Rate limited' },
+          };
+
+          setCallHistory((prev) => [newCall, ...prev]);
+        } else {
+          // Mock response
+          const mockResponse = {
+            success: true,
+            data: {
+              id: 'user_123',
+              name: 'John Doe',
+              email: 'john@example.com',
+              balance: 1250.5,
+              created_at: new Date().toISOString(),
+            },
+            timestamp: new Date().toISOString(),
+          };
+
+          setApiResponse(mockResponse);
+          resetRateLimit();
+
+          // Add to call history
+          const newCall: CallRecord = {
+            id: Date.now().toString(),
+            timestamp: new Date(),
+            endpoint: selectedEndpoint.path,
+            status: 'success',
+            responseTime: time,
+            cost: cost,
+            request: requestParams,
+            response: mockResponse,
+          };
+
+          setCallHistory((prev) => [newCall, ...prev]);
+
+          // Update stats
+          setUsageStats((prev) => ({
+            ...prev,
+            callsToday: prev.callsToday + 1,
+            callsWeek: prev.callsWeek + 1,
+            totalSpent: prev.totalSpent + cost,
+            avgResponseTime:
+              (prev.avgResponseTime * prev.callsToday + time) /
+              (prev.callsToday + 1),
+          }));
+        }
+
+        setIsLoading(false);
+      },
+      1000 + Math.random() * 2000
+    );
   };
 
   const handleCopyCode = async (code: string) => {
@@ -242,16 +295,18 @@ export default function ApiUsage() {
   };
 
   const handleExportHistory = (format: 'csv' | 'json') => {
-    const data = callHistory.map(call => ({
+    const data = callHistory.map((call) => ({
       timestamp: call.timestamp.toISOString(),
       endpoint: call.endpoint,
       status: call.status,
       responseTime: call.responseTime,
-      cost: call.cost
+      cost: call.cost,
     }));
-    
+
     if (format === 'json') {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json',
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -260,11 +315,12 @@ export default function ApiUsage() {
     } else {
       const csv = [
         'Timestamp,Endpoint,Status,Response Time,Cost',
-        ...data.map(call => 
-          `${call.timestamp},${call.endpoint},${call.status},${call.responseTime},${call.cost}`
-        )
+        ...data.map(
+          (call) =>
+            `${call.timestamp},${call.endpoint},${call.status},${call.responseTime},${call.cost}`
+        ),
       ].join('\n');
-      
+
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -284,11 +340,16 @@ export default function ApiUsage() {
           </div>
           <div>
             <h1>User Profile API</h1>
-            <p className="api-description">Manage user profiles and authentication</p>
+            <p className="api-description">
+              Manage user profiles and authentication
+            </p>
           </div>
         </div>
         <div className="api-header-actions">
-          <button className="secondary-button" onClick={() => window.history.back()}>
+          <button
+            className="secondary-button"
+            onClick={() => window.history.back()}
+          >
             ← Back to API Details
           </button>
           <div className="status-indicator active">
@@ -297,6 +358,19 @@ export default function ApiUsage() {
           </div>
         </div>
       </div>
+
+      {/* Rate Limit Alert */}
+      {rateLimitState && (
+        <div style={{ marginBottom: '24px' }}>
+          <RateLimitAlert
+            timeUntilReset={timeUntilReset}
+            limit={rateLimitState.limit}
+            remaining={rateLimitState.remaining}
+            onRetry={handleMakeTestCall}
+            compact={false}
+          />
+        </div>
+      )}
 
       {/* API Key Section */}
       <div className="surface api-key-section">
@@ -321,13 +395,17 @@ export default function ApiUsage() {
               <button className="secondary-button" onClick={handleCopyApiKey}>
                 {copied ? 'Copied!' : 'Copy'}
               </button>
-              <button className="danger-button" onClick={handleRegenerateApiKey}>
+              <button
+                className="danger-button"
+                onClick={handleRegenerateApiKey}
+              >
                 Regenerate
               </button>
             </div>
           </div>
           <p className="usage-instruction">
-            Include this key in your requests as a Bearer token in the Authorization header.
+            Include this key in your requests as a Bearer token in the
+            Authorization header.
           </p>
         </div>
       </div>
@@ -341,42 +419,81 @@ export default function ApiUsage() {
             <select
               value={selectedEndpoint.id}
               onChange={(e) => {
-                const endpoint = MOCK_ENDPOINTS.find(ep => ep.id === e.target.value);
+                const endpoint = MOCK_ENDPOINTS.find(
+                  (ep) => ep.id === e.target.value
+                );
                 if (endpoint) setSelectedEndpoint(endpoint);
               }}
               className="endpoint-select"
             >
-              {MOCK_ENDPOINTS.map(endpoint => (
+              {MOCK_ENDPOINTS.map((endpoint) => (
                 <option key={endpoint.id} value={endpoint.id}>
                   {endpoint.method} {endpoint.path} - {endpoint.name}
                 </option>
               ))}
             </select>
           </div>
-          
+
           <div className="form-row">
             <label>Parameters (JSON)</label>
             <textarea
               value={requestParams}
               onChange={(e) => setRequestParams(e.target.value)}
-              placeholder='{"key": "value"}'
+              placeholder={`{'key': 'value'}`}
               className="params-textarea"
               rows={4}
             />
           </div>
-          
+
+          <div
+            className="form-row"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <input
+              type="checkbox"
+              id="simulate-rate-limit"
+              checked={shouldSimulateRateLimit}
+              onChange={(e) => setShouldSimulateRateLimit(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            <label
+              htmlFor="simulate-rate-limit"
+              style={{ cursor: 'pointer', margin: 0 }}
+            >
+              Simulate Rate Limit (429 response)
+            </label>
+          </div>
+
+          {error && (
+            <div
+              style={{
+                padding: '12px 16px',
+                background: 'rgba(255, 125, 141, 0.1)',
+                border: '1px solid var(--danger)',
+                borderRadius: '8px',
+                color: 'var(--danger)',
+                fontSize: '0.875rem',
+                marginBottom: '12px',
+              }}
+            >
+              {error}
+            </div>
+          )}
+
           <button
             className={`primary-button ${isLoading ? 'button-loading' : ''}`}
             onClick={handleMakeTestCall}
             disabled={isLoading}
           >
-            {isLoading && <span className="button-spinner" aria-hidden="true" />}
+            {isLoading && (
+              <span className="button-spinner" aria-hidden="true" />
+            )}
             {isLoading ? 'Making Call...' : 'Make Test Call'}
           </button>
         </div>
-        
+
         {(apiResponse || isLoading) && (
-          <div 
+          <div
             className="response-display"
             aria-live="polite"
             aria-busy={isLoading}
@@ -399,8 +516,12 @@ export default function ApiUsage() {
             ) : (
               <div className="response-content">
                 <div className="response-meta">
-                  <span className="response-time">Response time: {formatTime(responseTime || 0)}</span>
-                  <span className="response-cost">Cost: {formatPrice(callCost || 0)} USDC</span>
+                  <span className="response-time">
+                    Response time: {formatTime(responseTime || 0)}
+                  </span>
+                  <span className="response-cost">
+                    Cost: {formatPrice(callCost || 0)} USDC
+                  </span>
                 </div>
                 <pre className="response-json">
                   {JSON.stringify(apiResponse, null, 2)}
@@ -425,25 +546,33 @@ export default function ApiUsage() {
           </div>
           <div className="stat-card">
             <span className="stat-label">Total Spent</span>
-            <strong className="stat-value">{formatPrice(usageStats.totalSpent)} USDC</strong>
+            <strong className="stat-value">
+              {formatPrice(usageStats.totalSpent)} USDC
+            </strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Avg Response Time</span>
-            <strong className="stat-value">{formatTime(usageStats.avgResponseTime)}</strong>
+            <strong className="stat-value">
+              {formatTime(usageStats.avgResponseTime)}
+            </strong>
           </div>
           <div className="stat-card">
             <span className="stat-label">Success Rate</span>
             <strong className="stat-value">{usageStats.successRate}%</strong>
           </div>
         </div>
-        
+
         <div className="mini-chart">
           <h3>Calls Over Time</h3>
           <div className="chart-placeholder">
             {/* Simple bar chart visualization */}
             <div className="chart-bars">
               {[65, 59, 80, 81, 56, 55, 47].map((height, i) => (
-                <div key={i} className="chart-bar" style={{height: `${height}%`}}></div>
+                <div
+                  key={i}
+                  className="chart-bar"
+                  style={{ height: `${height}%` }}
+                ></div>
               ))}
             </div>
             <div className="chart-labels">
@@ -465,24 +594,32 @@ export default function ApiUsage() {
           <h2>Call History</h2>
           <div className="history-actions">
             <select
-                className="filter-select"
-                aria-label="Call status filter"
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as 'all' | 'success' | 'error')}
-              >
-                <option value="all">All Status</option>
-                <option value="success">Success</option>
-                <option value="error">Error</option>
-              </select>
-            <button className="secondary-button" onClick={() => handleExportHistory('csv')}>
+              className="filter-select"
+              aria-label="Call status filter"
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as 'all' | 'success' | 'error')
+              }
+            >
+              <option value="all">All Status</option>
+              <option value="success">Success</option>
+              <option value="error">Error</option>
+            </select>
+            <button
+              className="secondary-button"
+              onClick={() => handleExportHistory('csv')}
+            >
               Export CSV
             </button>
-            <button className="secondary-button" onClick={() => handleExportHistory('json')}>
+            <button
+              className="secondary-button"
+              onClick={() => handleExportHistory('json')}
+            >
               Export JSON
             </button>
           </div>
         </div>
-        
+
         <div className="call-history-table">
           <div className="table-header">
             <span>Timestamp</span>
@@ -492,52 +629,54 @@ export default function ApiUsage() {
             <span>Cost</span>
             <span>Actions</span>
           </div>
-          
-        {filteredCallHistory.length === 0 ? (
-                <EmptyState message="No call records match the selected filter." />
-              ) : (
-                filteredCallHistory.map(call => (
-                  <div key={call.id} className="table-row">
-                    <span>{formatTimestamp(call.timestamp)}</span>
-                    <span className="endpoint-cell">{call.endpoint}</span>
-                    <span className={`status-cell ${call.status}`}>
-                      {call.status === 'success' ? '✓' : '✗'} {call.status}
-                    </span>
-                    <span>{formatTime(call.responseTime)}</span>
-                    <span>{formatPrice(call.cost)} USDC</span>
-                    <span>
-                      <button
-                        className="ghost-button"
-                        onClick={() => setExpandedCall(expandedCall === call.id ? null : call.id)}
-                      >
-                        {expandedCall === call.id ? 'Hide' : 'View'}
-                      </button>
-                    </span>
 
-                    {expandedCall === call.id && (
-                      <div className="expanded-details">
-                        <div className="detail-section">
-                          <h4>Request</h4>
-                          <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
-                        </div>
-                        <div className="detail-section">
-                          <h4>Response</h4>
-                          <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
-                        </div>
-                      </div>
-                    )}
+          {filteredCallHistory.length === 0 ? (
+            <EmptyState message="No call records match the selected filter." />
+          ) : (
+            filteredCallHistory.map((call) => (
+              <div key={call.id} className="table-row">
+                <span>{formatTimestamp(call.timestamp)}</span>
+                <span className="endpoint-cell">{call.endpoint}</span>
+                <span className={`status-cell ${call.status}`}>
+                  {call.status === 'success' ? '✓' : '✗'} {call.status}
+                </span>
+                <span>{formatTime(call.responseTime)}</span>
+                <span>{formatPrice(call.cost)} USDC</span>
+                <span>
+                  <button
+                    className="ghost-button"
+                    onClick={() =>
+                      setExpandedCall(expandedCall === call.id ? null : call.id)
+                    }
+                  >
+                    {expandedCall === call.id ? 'Hide' : 'View'}
+                  </button>
+                </span>
+
+                {expandedCall === call.id && (
+                  <div className="expanded-details">
+                    <div className="detail-section">
+                      <h4>Request</h4>
+                      <pre>{JSON.stringify(call.request || {}, null, 2)}</pre>
+                    </div>
+                    <div className="detail-section">
+                      <h4>Response</h4>
+                      <pre>{JSON.stringify(call.response || {}, null, 2)}</pre>
+                    </div>
                   </div>
-                ))
-              )}
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
 
       {/* Integration Guide */}
       <div className="surface integration-guide-section">
         <h2>Integration Guide</h2>
-        
+
         <div className="language-tabs">
-          {(['javascript', 'python', 'curl'] as const).map(lang => (
+          {(['javascript', 'python', 'curl'] as const).map((lang) => (
             <button
               key={lang}
               className={`tab-button ${selectedLanguage === lang ? 'active' : ''}`}
@@ -547,10 +686,14 @@ export default function ApiUsage() {
             </button>
           ))}
         </div>
-        
+
         <div className="code-example">
           <div className="code-header">
-            <h3>{selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)} Example</h3>
+            <h3>
+              {selectedLanguage.charAt(0).toUpperCase() +
+                selectedLanguage.slice(1)}{' '}
+              Example
+            </h3>
             <button
               className="secondary-button"
               onClick={() => handleCopyCode(CODE_EXAMPLES[selectedLanguage])}
@@ -562,9 +705,11 @@ export default function ApiUsage() {
             <code>{CODE_EXAMPLES[selectedLanguage]}</code>
           </pre>
         </div>
-        
+
         <div className="documentation-link">
-          <a href="#" className="primary-button">View Full Documentation →</a>
+          <a href="#" className="primary-button">
+            View Full Documentation →
+          </a>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTheme } from '../ThemeContext';
+import { Icons } from '../utils/icons';
 
 type EmbedSize = 'small' | 'medium' | 'large';
 
@@ -8,6 +9,15 @@ const SIZES: Record<EmbedSize, { width: number; height: number }> = {
   medium: { width: 400, height: 200 },
   large: { width: 600, height: 300 },
 };
+
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 interface EmbedPreviewProps {
   providerName: string;
@@ -43,13 +53,15 @@ export default function EmbedPreview({
     theme: 'light' | 'dark'
   ): string => {
     const { width, height } = SIZES[size];
+    const encodedApiId = encodeURIComponent(apiId);
+    const titleApiId = escapeHtmlAttribute(apiId);
     return `<iframe
-  src="https://callora.io/embed/api/${apiId}?theme=${theme}"
+  src="https://callora.io/embed/api/${encodedApiId}?theme=${theme}"
   width="${width}"
   height="${height}"
   frameborder="0"
   allow="clipboard-read; clipboard-write"
-  title="Callora API Widget — ${apiId}">
+  title="Callora API Widget — ${titleApiId}">
 </iframe>`;
   };
 
@@ -351,7 +363,7 @@ export default function EmbedPreview({
           >
             {copied ? (
               <>
-                <span style={{ fontSize: 14 }}>✓</span>
+                <Icons.Check size={14} />
                 Copied!
               </>
             ) : (

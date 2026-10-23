@@ -1,0 +1,109 @@
+.compare-tray {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--surface-strong, rgba(17,24,46,0.98));
+  border-top: 1px solid var(--line-strong, rgba(169,184,255,0.28));
+  backdrop-filter: blur(20px);
+  padding: 12px 24px;
+  box-shadow: var(--shadow, 0 -12px 40px rgba(3,8,22,0.4));
+  animation: tray-slide-up 0.3s ease-out;
+}
+
+@keyframes tray-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.compare-tray-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.compare-tray-items {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.compare-tray-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line-weak, rgba(169,184,255,0.15));
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.compare-tray-item-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.compare-tray-item-remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.compare-tray-item-remove:hover {
+  color: var(--accent);
+}
+
+.compare-tray-compare-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, filter 0.2s;
+  white-space: nowrap;
+}
+
+.compare-tray-compare-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.compare-tray-compare-btn:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .compare-tray {
+    padding: 12px 16px;
+  }
+
+  .compare-tray-content {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .compare-tray-items {
+    justify-content: center;
+  }
+
+  .compare-tray-item-name {
+    max-width: 80px;
+  }
+}

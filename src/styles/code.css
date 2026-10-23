@@ -1,0 +1,293 @@
+/* ==========================================================================
+   code.css — CodeExample component styles
+   Issue #684: Polish layout for narrow (mobile) viewports ≤375 px
+
+   Breakpoint strategy
+   ───────────────────
+   No inline styles exist on the component; all layout lives here so
+   @media overrides work without specificity battles.
+
+   ≥ 481 px   — Default (full) layout
+   376–480 px — Intermediate: slightly larger tap targets
+   ≤ 375 px   — Narrow mobile: stacked column header, 44 px tap targets,
+                horizontal-scroll panel, right-aligned copy button
+
+   The header flex-direction change at ≤375 px is animated via a smooth
+   transition so the visual switch is not jarring when the user resizes.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Design tokens — Light and Dark theme variants
+   These are scoped to .code-sample so they don't leak to other components.
+   -------------------------------------------------------------------------- */
+
+/* Light theme defaults */
+.code-sample {
+  --bg-subtle: #f9f9f9;
+  --bg-highlight: #ffffff;
+  --border-subtle: #e2e8f0;
+  --text-main: #1a2332;
+  --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] .code-sample {
+  --bg-subtle: rgba(255, 255, 255, 0.03);
+  --bg-highlight: var(--surface-strong, rgba(17, 24, 46, 0.96));
+  --border-subtle: var(--line, rgba(169, 184, 255, 0.16));
+  --text-main: var(--text, #f3f5fb);
+}
+
+/* --------------------------------------------------------------------------
+   Container
+   -------------------------------------------------------------------------- */
+.code-sample {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 16px);
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   Header — flex row on wider screens, stacked column on ≤375 px
+   -------------------------------------------------------------------------- */
+.code-sample__header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+
+  /* Prevent the header from growing wider than the container when code
+     lines are very long inside the panel. */
+  min-width: 0;
+
+  /* Smooth transition when the breakpoint toggles flex-direction
+     between "row" and "column". Applied here on the base class so it
+     is active across all viewports (Issue #684). */
+  transition: flex-direction 200ms ease, gap 200ms ease, padding 200ms ease;
+}
+
+/* --------------------------------------------------------------------------
+   Tab strip — horizontally scrollable with hidden scrollbar
+   -------------------------------------------------------------------------- */
+.code-sample__tabs {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 2px;
+  /* Takes up all available space in the header row, leaving room for the
+     copy button without ever pushing it off screen. */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; /* smooth momentum scrolling on iOS */
+  scrollbar-width: none; /* Firefox: hide scrollbar track */
+}
+
+.code-sample__tabs::-webkit-scrollbar {
+  display: none; /* Chrome / Safari: hide scrollbar track */
+}
+
+/* --------------------------------------------------------------------------
+   Individual tab buttons
+   -------------------------------------------------------------------------- */
+.code-sample__tab {
+  /* Prevent tabs from shrinking when they don't fit horizontally. */
+  flex-shrink: 0;
+  padding: 4px 10px;
+  /* WCAG 2.5.5: minimum 44 × 44 px on touch targets.
+     Default is slightly smaller here (comfortable for mouse), enlarged
+     via the ≤375 px breakpoint below. */
+  min-height: 36px;
+  min-width: 44px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted, #64748b);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: all 180ms ease;
+  /* Vertically centre the label text. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.code-sample__tab--active {
+  font-weight: 600;
+  color: var(--text-main);
+  background: var(--bg-highlight);
+  border-color: var(--border-subtle);
+}
+
+/* Keyboard focus ring — matches app-wide focus style from index.css */
+.code-sample__tab:focus-visible {
+  outline: 2px solid var(--accent, #4e85ff);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Copy button
+   -------------------------------------------------------------------------- */
+.code-sample__copy {
+  /* Never shrink so the copy button stays visible even on a full tab strip. */
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font-size: 11px;
+  /* Default desktop minimum — enough for mouse use. */
+  min-height: 36px;
+  min-width: 75px;
+}
+
+.code-sample__copy--success {
+  color: var(--success, #10b981);
+}
+
+/* Inner span used when showing the "Copied" state with a check icon. */
+.code-sample__copy-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   Code panel — always horizontally scrollable so long lines never force the
+   page to overflow on any viewport width (Issue #684 requirement).
+   -------------------------------------------------------------------------- */
+.code-sample__panel {
+  /* overflow-x: auto ensures code lines longer than the viewport scroll
+     inside the panel rather than overflowing to the body. */
+  overflow-x: auto;
+  /* Smooth momentum scrolling on iOS Safari. */
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 12px;
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Pre / code element
+   -------------------------------------------------------------------------- */
+.code-sample__pre {
+  margin: 0;
+  /* white-space: pre preserves indentation and is preferred on larger
+     screens; the ≤375 px rule switches to pre-wrap so lines can soft-wrap
+     on the narrowest phones if the user zooms in. */
+  white-space: pre;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-main);
+  /* Prevent the pre from forcing the panel wider on its own. */
+  min-width: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion — disable tab transition animation
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .code-sample__tab {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   376 px – 480 px  (small / large phones, landscape)
+   Enlarge tap targets slightly without changing the header layout.
+   -------------------------------------------------------------------------- */
+@media (min-width: 376px) and (max-width: 480px) {
+  .code-sample__tab {
+    min-height: 40px;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .code-sample__copy {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   ≤ 375 px  (narrow mobile — iPhone SE, Galaxy A series, etc.)
+   Issue #684: stack header column, full-width tab rail, 44 px tap targets,
+   right-aligned copy button.
+   -------------------------------------------------------------------------- */
+@media (max-width: 375px) {
+  /* Stack header into a vertical column. */
+  .code-sample__header {
+    flex-direction: column;
+    align-items: stretch;   /* children span full width */
+    gap: 8px;
+    padding: 8px;
+  }
+
+  /* Tab strip spans the full width of the header. */
+  .code-sample__tabs {
+    width: 100%;
+    /* A faint right-edge fade hints to the user that the strip is
+       scrollable when tabs overflow. */
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black calc(100% - 28px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      black calc(100% - 28px),
+      transparent 100%
+    );
+    /* Small bottom padding so the last tab's border isn't clipped. */
+    padding-bottom: 2px;
+  }
+
+  /* WCAG 2.5.5 — minimum 44 × 44 px touch target. */
+  .code-sample__tab {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
+
+  /* Copy button — right-aligned at the bottom of the stacked header.
+     align-self: flex-end places it at the trailing edge (right) while
+     keeping it inline (not stretched to full width). */
+  .code-sample__copy {
+    align-self: flex-end;
+    /* 44 × 44 px minimum touch target (WCAG 2.5.5). */
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+
+  /* Tighten panel padding on very narrow screens. */
+  .code-sample__panel {
+    padding: 12px 8px;
+  }
+
+  /* On the narrowest phones, allow lines to soft-wrap (pre-wrap) so
+     the user never has to scroll more than a few hundred pixels to the
+     right to read a long line. */
+  .code-sample__pre {
+    font-size: 12px;
+    /* Switch to pre-wrap at ≤375 px so excessively long single-line
+       snippets break at word / character boundaries rather than forcing
+       the user to scroll far right.  This trades perfect whitespace
+       preservation for readability at tiny sizes. */
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+}

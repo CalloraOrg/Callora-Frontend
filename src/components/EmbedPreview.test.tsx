@@ -165,6 +165,37 @@ describe('EmbedPreview', () => {
     );
   });
 
+  it('encodes hostile API IDs in the URL and escapes the title attribute', () => {
+    const apiId = 'weather" onload="alert(1)"><script>alert(1)</script>&\'';
+    renderComponent({ ...mockProps, apiId });
+
+    const snippet = (screen.getByLabelText('Embed code') as HTMLTextAreaElement).value;
+    const container = document.createElement('div');
+    container.innerHTML = snippet;
+    const iframe = container.querySelector('iframe');
+
+    expect(iframe).not.toBeNull();
+    expect(iframe?.getAttribute('src')).toBe(
+      `https://callora.io/embed/api/${encodeURIComponent(apiId)}?theme=dark`
+    );
+    expect(iframe?.getAttribute('title')).toBe(`Callora API Widget — ${apiId}`);
+    expect(iframe?.attributes).toHaveLength(6);
+    expect(iframe?.hasAttribute('onload')).toBe(false);
+    expect(container.querySelector('script')).toBeNull();
+    expect(snippet).toContain('&quot;');
+    expect(snippet).toContain('&lt;script&gt;');
+    expect(snippet).toContain('&amp;');
+    expect(snippet).toContain('&#39;');
+  });
+
+  it('keeps ordinary API IDs unchanged in the snippet', () => {
+    renderComponent();
+
+    const snippet = (screen.getByLabelText('Embed code') as HTMLTextAreaElement).value;
+    expect(snippet).toContain('src="https://callora.io/embed/api/weather-api-123?theme=dark"');
+    expect(snippet).toContain('title="Callora API Widget — weather-api-123"');
+  });
+
   it('has correct snippet structure', () => {
     renderComponent();
 

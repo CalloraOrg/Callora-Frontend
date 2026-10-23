@@ -1,85 +1,22 @@
-import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./App";
-import RouteProgressBar from "./components/RouteProgressBar";
-import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
+import { renderRoute } from "./renderRoute";
+import "./styles/tokens.css";
 import "./index.css";
+import "./styles/typography.css";
+import "./styles/patterns.css";
+import "./styles/focus.css";
+import "./styles/contrast.css";
+import "./styles/code.css";
 import "./styles/print.css";
-import { ThemeProvider } from "./ThemeContext";
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
-/**
- * Custom manual router that wraps components in BrowserRouter 
- * to support React Router hooks while maintaining custom page imports.
- */
-async function renderRoute() {
-  const pathname = window.location.pathname || "/";
-
-  // Helper to wrap components in the necessary Router context for hooks like useLocation/useNavigate
-  const wrap = (children: React.ReactNode) => (
-    <React.StrictMode>
-      <ThemeProvider>
-        <BrowserRouter>
-          <RouteProgressBar />
-          {children}
-        </BrowserRouter>
-      </ThemeProvider>
-    </React.StrictMode>
-  );
-
-  if (pathname.startsWith("/publish")) {
-    const mod = await import("./pages/PublishApi");
-    const PublishApi = mod.default;
-    root.render(wrap(<PublishApi />));
-    return;
-  }
-
-  if (pathname.startsWith("/marketplace")) {
-    startRouteLoading();
-    const mod = await import("./pages/MarketplacePage");
-    const MarketplacePage = mod.default;
-    root.render(wrap(<MarketplacePage />));
-    stopRouteLoading();
-    return;
-  }
-
-  if (pathname.startsWith("/details/")) {
-    startRouteLoading();
-    const mod = await import("./pages/ApiDetailPage");
-    const ApiDetailPage = mod.default;
-    root.render(
-      wrap(
-        <ApiDetailPage
-          onBack={() => {
-            history.pushState({}, "", "/marketplace");
-            renderRoute();
-          }}
-        />
-      )
-    );
-    stopRouteLoading();
-    return;
-  }
-
-  // Default: render the existing App
-  root.render(
-    <React.StrictMode>
-      <BrowserRouter>
-      <ThemeProvider>
-      <RouteProgressBar />
-      <App />
-      </ThemeProvider>
-      </BrowserRouter>
-    </React.StrictMode>,
-  );
-}
+const currentPathname = () => window.location.pathname || "/";
 
 // Ensure the UI re-renders correctly when the user hits the browser back/forward buttons
 window.addEventListener("popstate", () => {
-  renderRoute();
+  void renderRoute(root, currentPathname());
 });
 
 // Initial application render
-renderRoute();
+void renderRoute(root, currentPathname());

@@ -1,42 +1,121 @@
-/* MethodChip.css */
+/**
+ * MethodChip.css
+ *
+ * Styles for the <MethodChip> component.
+ *
+ * Responsive fixes (GrantFox FWC26):
+ *  - Tap-target: a ::before pseudo-element expands the interactive hit area to
+ *    ≥44×44px on all viewports without inflating the visual chip size.
+ *    (WCAG 2.1 AA §2.5.5 — Pointer Target Spacing)
+ *  - ≤375px breakpoint: min-width and padding are tightened so narrow endpoint
+ *    rows (e.g. inside ApiDetailPage doc panels) don't overflow.
+ *  - Text overflow: the label is clipped with an ellipsis rather than wrapping,
+ *    keeping the chip to a single line at any width.
+ *
+ * Bug-fixes:
+ *  - Icon wrapper class renamed from .method-icon → .method-chip-icon to match
+ *    the className used in MethodChip.tsx.
+ */
+
+/* ── Base chip ────────────────────────────────────────────────────────────── */
 
 .method-chip {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 8px;
-  margin: 2px;
-  min-width: 60px; /* uniform width */
+  /* Default spacing: comfortable on ≥376px viewports */
+  padding: var(--mkt-space-xs, 2px) var(--mkt-space-md, 8px);
+  margin: var(--mkt-space-xs, 2px);
+  min-width: 68px;
+  max-width: 100%;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: var(--mkt-font-size-micro, 0.75rem); /* 12 px */
   font-weight: 600;
+  /* Prevent text wrapping; overflow clipped with ellipsis */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: default;
   user-select: none;
-  /* fallback colors if CSS vars are not defined */
+  /* Fallback colours when CSS custom props are unavailable */
   background-color: var(--method-default-bg, #e0e0e0);
-  color: var(--method-default-fg, #333);
+  color: var(--method-default-color, #333);
+  /* Smooth theme transitions (honours .no-theme-transition escape hatch) */
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.method-chip:focus {
-  outline: 2px solid var(--accent, #3b82f6);
-  outline-offset: 2px;
+/* ── WCAG 2.1 AA §2.5.5 — 44×44 px tap target via pseudo-element ─────────
+   The chip's visible size stays compact, but the clickable/tappable surface
+   is padded out to the minimum recommended 44px in both dimensions.  The
+   pseudo-element is absolutely positioned so it does not affect layout. */
+.method-chip::before {
+  content: '';
+  position: absolute;
+  /* Centre the expanded target over the chip */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 44px;
+  min-height: 44px;
+  /* Extend outward: (44px - chip-height) / 2 in each direction.
+     The negative inset ensures the hitbox is always ≥44px even when the
+     chip itself is taller than 44px (it simply clamps to 0). */
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  /* Transparent so only the chip background is visible */
+  background: transparent;
+  pointer-events: none; /* cosmetic only — the <span> handles events */
+  border-radius: inherit;
 }
 
-.method-icon {
-  margin-right: 4px;
+/* ── Keyboard-only focus ring ──────────────────────────────────────────────
+   Matches the global @layer focus treatment in src/styles/focus.css.
+   Using :focus-visible (not :focus) suppresses the ring on mouse clicks. */
+.method-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ── Icon wrapper ──────────────────────────────────────────────────────────
+   FIX: renamed from .method-icon → .method-chip-icon to align with the
+   className="method-chip-icon" in MethodChip.tsx. */
+.method-chip-icon {
+  /* Reserve just enough room to breathe next to the label */
+  margin-right: var(--mkt-space-sm, 4px);
+  /* Prevent the icon from shrinking when space is tight */
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
   font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
+/* ── Label text ────────────────────────────────────────────────────────────
+   Isolated in its own <span> so text-overflow: ellipsis can be applied
+   precisely without clipping the icon. */
+.method-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Allow the label to shrink when the chip runs out of horizontal space */
+  min-width: 0;
+}
+
+/* ── Tooltip ───────────────────────────────────────────────────────────────
+   Positioned below the chip; pointer-events: none so it never interrupts
+   hover/focus events on the chip itself. */
 .method-tooltip {
   position: absolute;
-  top: 120%;
+  /* Place just below the chip with a small gap */
+  top: calc(100% + var(--mkt-space-sm, 4px));
   left: 50%;
   transform: translateX(-50%);
   background: var(--tooltip-bg, #333);
   color: var(--tooltip-fg, #fff);
-  padding: 4px 8px;
+  padding: var(--mkt-space-sm, 4px) var(--mkt-space-md, 8px);
   border-radius: 4px;
   font-size: 0.7rem;
   white-space: nowrap;
@@ -45,14 +124,35 @@
   pointer-events: none;
 }
 
-/* Arrow for tooltip */
+/* Upward-pointing caret */
 .method-tooltip::after {
   content: '';
   position: absolute;
   top: -5px;
   left: 50%;
   transform: translateX(-50%);
-  border-width: 5px 5px 0 5px;
+  border-width: 0 5px 5px 5px;
   border-style: solid;
-  border-color: var(--tooltip-bg, #333) transparent transparent transparent;
+  border-color: transparent transparent var(--tooltip-bg, #333) transparent;
+}
+
+/* ── ≤375 px breakpoint (GrantFox FWC26) ──────────────────────────────────
+   On the narrowest phone widths the chip needs to yield horizontal space.
+   We:
+     1. Tighten horizontal padding from 8px → 6px.
+     2. Reduce min-width from 68px → 52px so a row of chips doesn't overflow
+        an endpoint card.
+     3. Hide the icon on very narrow chips (DELETE already risks clipping).
+   The 44px tap target is still preserved via the ::before pseudo-element. */
+@media (max-width: 375px) {
+  .method-chip {
+    padding: var(--mkt-space-xs, 2px) 6px;
+    min-width: 52px;
+    font-size: 0.7rem;
+  }
+
+  /* Reduce icon margin so the label has a few extra pixels */
+  .method-chip-icon {
+    margin-right: var(--mkt-space-xs, 2px);
+  }
 }

@@ -1,202 +1,611 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import ApiCard, { ApiCardSkeleton } from "../components/ApiCard";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import ApiCard from "../components/ApiCard";
 import useDocumentTitle from "../hooks/useDocumentTitle";
+import { useFavorites } from "../hooks/useFavorites";
+import { useMarketplaceUrlState } from "../hooks/useMarketplaceUrlState";
+import { useAccountContext } from "../hooks/useAccountContext";
 import SearchBar from "../components/SearchBar";
-import FiltersSidebar from "../components/FiltersSidebar";
+import SortDropdown, { type SortValue } from "../components/SortDropdown";
+
+import CategoryPills from "../components/CategoryPills";
+import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
+import FiltersSidebar, { ALL_CATEGORIES } from "../components/FiltersSidebar";
+import KbdHint from "../components/KbdHint";
+import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import EmptyState from "../components/EmptyState";
-import { useDebounce } from "../hooks/useDebounce";
-import { fetchCatalog, type CatalogParams, type CatalogResponse } from "../api/catalogApi";
+import { Pagination } from "../components/Pagination";
 import type { APIItem } from "../data/mockApis";
-import MOCK_APIS from "../data/mockApis";
+import { API_BASE } from "../config/constants";
+import { useDebounce } from "../hooks/useDebounce";
+import { useFetchTracker } from "../hooks/useFetchTracker";
+import {
+  CATALOG_CACHE_KEY,
+  buildCacheKey,
+  fetchCatalog,
+  isCatalogAbortError,
+  type CatalogParams,
+} from "../api/catalogApi";
+import { getCache, setCache } from "../utils/offlineApiCache";
+import {
+  getDensityPreference,
+  setDensityPreference,
+  type DensityPreference,
+} from "../state/uiPrefs";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
-
-const isBackendMode = Boolean(API_BASE);
-
-function getCategoryFromSelection(selectedCategories: Set<string>): string | undefined {
-  return selectedCategories.size === 1 ? selectedCategories.values().next().value : undefined;
-}
-
-function filterItemsClientSide(
-  items: APIItem[],
-  debouncedSearch: string,
-  selectedCategories: Set<string>,
-  minPrice: number | null,
-  maxPrice: number | null,
-  popularity: string,
-  sort: string
-): APIItem[] {
-  let filtered = items.slice();
-
-  if (debouncedSearch.trim()) {
-    const q = debouncedSearch.toLowerCase();
-    filtered = filtered.filter((a) => {
-      return (
-        a.name.toLowerCase().includes(q) ||
-        a.description.toLowerCase().includes(q) ||
-        a.provider?.name?.toLowerCase().includes(q) ||
-        (a.tags || []).some((t) => t.toLowerCase().includes(q))
-      );
-    });
-  }
-
-  if (selectedCategories.size > 0) {
-    filtered = filtered.filter((a) => selectedCategories.has(a.category ?? ""));
-  }
-
-  const hasInvertedPrice = minPrice !== null && maxPrice !== null && minPrice > maxPrice;
-  if (!hasInvertedPrice) {
-    if (minPrice !== null) filtered = filtered.filter((a) => a.pricePerRequest >= minPrice);
-    if (maxPrice !== null) filtered = filtered.filter((a) => a.pricePerRequest <= maxPrice);
-  }
-
-  if (popularity === "mostUsed") {
-    filtered = filtered.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
-  } else if (popularity === "newest") {
-    filtered = filtered.sort(
-      (a, b) =>
-        Date.parse(b.createdAt ?? "1970-01-01") - Date.parse(a.createdAt ?? "1970-01-01"),
-    );
-  }
-
-  if (sort === "priceAsc") filtered = filtered.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
-  if (sort === "priceDesc") filtered = filtered.sort((a, b) => b.pricePerRequest - a.pricePerRequest);
-  if (sort === "popularity") filtered = filtered.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
-  if (sort === "newest")
-    filtered = filtered.sort(
-      (a, b) => Date.parse(b.createdAt ?? "1970-01-01") - Date.parse(a.createdAt ?? "1970-01-01"),
-    );
-
-  return filtered;
-}
+import FiltersBottomSheet from "../components/FiltersBottomSheet";
+import LiveRegion from "../components/LiveRegion";
+import RecentlyActiveRail from "../components/RecentlyActiveRail";
+import { useCompareStore } from "../state/compareStore";
+import MarketplacePageSkeleton from "./MarketplacePage.skeleton";
+import { useCursorPagination } from "../hooks/useCursorPagination";
 
 export default function MarketplacePage(): JSX.Element {
-  useDocumentTitle("Marketplace – Callora", "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.");
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 300);
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-  const [minPrice, setMinPrice] = useState<number | null>(null);
-  const [maxPrice, setMaxPrice] = useState<number | null>(null);
-  const [popularity, setPopularity] = useState<string>("any");
-  const [sort, setSort] = useState<string>("relevance");
-  const [shown, setShown] = useState<number>(12);
+  const { apis } = useCompareStore();
+  const isTrayVisible = apis.length > 0;
+  const { trackFetch } = useFetchTracker();
+  const [pageSize, setPageSize] = useState(12);
+
+  useDocumentTitle(
+    "Marketplace – Callora",
+    "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
+  );
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Single source of truth for every marketplace filter: the URL. The hook
+  // derives each value from `searchParams` on render and only ever writes back
+  // to the URL, so back/forward, refreshes, and deep links can never leave the
+  // UI showing a stale, locally-cached filter (#989).
+  const {
+    query,
+    queryDraft,
+    commitQuery,
+    setQueryDraft,
+    categories,
+    setCategories,
+    statuses,
+    setStatuses,
+    tag,
+    setTag,
+    minPrice,
+    setMinPrice,
+    maxPrice,
+    setMaxPrice,
+    popularity,
+    setPopularity,
+    favoritesOnly,
+    setFavoritesOnly,
+    sort,
+    setSort,
+    clearAll,
+  } = useMarketplaceUrlState();
+
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+
+  const [density, setDensity] = useState<DensityPreference>(
+    getDensityPreference,
+  );
+  const debouncedQuery = useDebounce(query, 300);
+
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [catalogItems, setCatalogItems] = useState<APIItem[]>([]);
+  const [catalog, setCatalog] = useState<APIItem[]>([]);
+  // True when `catalog` came from the offline cache because the live request
+  // failed. The list is still rendered — an outage should not blank the page —
+  // but it is labelled so nobody mistakes it for fresh data.
+  const [isShowingStaleData, setIsShowingStaleData] = useState(false);
 
-  const abortRef = useRef<AbortController | null>(null);
+  const filtersTriggerRef = useRef<HTMLButtonElement>(null);
+  const isInitialMount = useRef(true);
+  // Monotonic sequence that guards the loading transition: only the latest
+  // in-flight load may flip `isLoading` off, so a stale response from an
+  // earlier request can never overwrite the state of a newer one (#989).
   const requestSeqRef = useRef(0);
+  // Same idea, scoped to the pagination spinner, which is a much shorter-lived
+  // concern than the catalogue request and must not share its sequence.
+  const pageChangeSeqRef = useRef(0);
+  // The controller for the request that is currently in flight, so a retry can
+  // cancel its predecessor and unmount can cancel the live one.
+  const abortRef = useRef<AbortController | null>(null);
 
-  const toggleCategory = (c: string) => {
-    const copy = new Set(selectedCategories);
-    if (copy.has(c)) copy.delete(c);
-    else copy.add(c);
-    setSelectedCategories(copy);
-  };
+  // The catalogue cache is account-scoped (see offlineApiCache), matching the
+  // rest of the app's per-account isolation. The fallback id keeps the page
+  // working when it is rendered outside an AccountProvider.
+  const { account } = useAccountContext();
+  const cacheOwnerId = account?.id ?? "marketplace";
 
-  const clearFilters = () => {
-    setSelectedCategories(new Set());
-    setMinPrice(null);
-    setMaxPrice(null);
-    setPopularity("any");
-    setSort("relevance");
-    setSearch("");
-  };
+  // Only send category when exactly one category is selected.
+  // With several categories, fetch without category and keep filtering on the
+  // client (the backend only accepts a single category query parameter).
+  const serverCategory =
+    categories.size === 1 ? Array.from(categories)[0] : undefined;
+  const serverSearch = debouncedQuery.trim() || undefined;
+
+  const serverParams = useMemo<CatalogParams>(() => {
+    const params: CatalogParams = {};
+    if (serverSearch) params.search = serverSearch;
+    if (serverCategory) params.category = serverCategory;
+    return params;
+  }, [serverSearch, serverCategory]);
+
+  const runCatalogFetch = useCallback(
+    async (
+      seq: number,
+      controller: AbortController,
+      params: CatalogParams = {},
+    ) => {
+      const { signal } = controller;
+      const cacheKey = buildCacheKey(params);
+      const readCachedCatalog = (): APIItem[] =>
+        getCache<APIItem[]>(cacheOwnerId, cacheKey) ?? [];
+
+      try {
+        const items = await trackFetch(fetchCatalog(signal, params));
+        // A superseded request (or an unmount) must never write state.
+        if (signal.aborted || seq !== requestSeqRef.current) return;
+        setCatalog(items);
+        setIsShowingStaleData(false);
+        setFetchError(null);
+        setCache(cacheOwnerId, cacheKey, items);
+      } catch (err) {
+        if (signal.aborted || isCatalogAbortError(err)) return;
+        if (seq !== requestSeqRef.current) return;
+
+        const cached = readCachedCatalog();
+        if (cached.length > 0) {
+          // Outage with a usable cache: keep the last good list on screen and
+          // flag it, rather than replacing a working page with an error.
+          setCatalog(cached);
+          setIsShowingStaleData(true);
+          setFetchError(null);
+        } else {
+          setCatalog([]);
+          setIsShowingStaleData(false);
+          setFetchError(
+            err instanceof Error
+              ? err.message
+              : "We encountered an error fetching the marketplace. Please try again.",
+          );
+        }
+      } finally {
+        if (!signal.aborted && seq === requestSeqRef.current) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [cacheOwnerId, trackFetch],
+  );
+
+  const startCatalogFetch = useCallback(
+    (params: CatalogParams = {}) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const seq = ++requestSeqRef.current;
+      setIsLoading(true);
+      setFetchError(null);
+      return runCatalogFetch(seq, controller, params);
+    },
+    [runCatalogFetch],
+  );
+
+  // In backend mode (API_BASE configured), fetch on mount and refetch whenever
+  // debounced search or single-category selection changes.
+  // In demo mode (!API_BASE), fetch only once on mount with no query params.
+  useEffect(() => {
+    void startCatalogFetch(API_BASE ? serverParams : {});
+    return () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, [
+    startCatalogFetch,
+    Boolean(API_BASE),
+    API_BASE ? serverParams.search : undefined,
+    API_BASE ? serverParams.category : undefined,
+    API_BASE ? categories.size : 0,
+  ]);
+
+  useEffect(() => {
+    setDensityPreference(density);
+  }, [density]);
 
   const hasActiveFilters = () => {
     return (
-      search.trim() !== "" ||
-      selectedCategories.size > 0 ||
+      query.trim() !== "" ||
+      categories.size > 0 ||
+      tag !== null ||
       minPrice !== null ||
       maxPrice !== null ||
-      popularity !== "any"
+      popularity !== "any" ||
+      favoritesOnly ||
+      statuses.size > 0
     );
   };
 
-  const handleRetryFetch = async () => {
-    setFetchError(null);
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setIsLoading(false);
-  };
+  const activeFilterCount =
+    categories.size +
+    (minPrice !== null ? 1 : 0) +
+    (maxPrice !== null ? 1 : 0) +
+    (popularity !== "any" ? 1 : 0) +
+    (favoritesOnly ? 1 : 0) +
+    (statuses.size > 0 ? 1 : 0);
 
-  const fetchParams = useMemo<CatalogParams>(() => {
-    const params: CatalogParams = {};
-    if (debouncedSearch.trim()) {
-      params.search = debouncedSearch.trim();
-    }
-    const category = getCategoryFromSelection(selectedCategories);
-    if (category) {
-      params.category = category;
-    }
-    return params;
-  }, [debouncedSearch, selectedCategories]);
+  const handleRetryFetch = () =>
+    startCatalogFetch(API_BASE ? serverParams : {});
 
+  // Tag facets are derived from the loaded catalogue so a newly published API's
+  // tags are selectable the moment it appears.
+  const allTags = useMemo(() => getAllUniqueTags(catalog), [catalog]);
+
+  // ── Aria-live announcements for screen readers ───────────────────────
+  const [announcement, setAnnouncement] = useState("");
+  const announceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const announce = useCallback((msg: string) => {
+    if (announceTimerRef.current) clearTimeout(announceTimerRef.current);
+    setAnnouncement(msg);
+    announceTimerRef.current = setTimeout(() => setAnnouncement(""), 3000);
+  }, []);
+
+  // Account-switch reset. Marketplace filters are scoped to the active account
+  // (favorites, category availability, etc.), so when the account changes we
+  // clear every filter + cursor from the URL. This guarantees the new account
+  // starts from authoritative, non-stale state instead of inheriting a previous
+  // account's selections (stale-state guard for #989).
+  // account (and therefore `cacheOwnerId`) is read above, next to the fetch.
+  const accountIdRef = useRef(account?.id);
   useEffect(() => {
-    if (!isBackendMode) {
-      setCatalogItems(MOCK_APIS);
-      setIsLoading(false);
+    if (accountIdRef.current === account?.id) return;
+    accountIdRef.current = account?.id;
+    clearAll();
+    announce("Switched account. Marketplace filters were reset.");
+  }, [account?.id, clearAll, announce]);
+
+  // Filter and sort items
+  const filtered = useMemo(() => {
+    let items = catalog.slice();
+
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.toLowerCase();
+      items = items.filter((a) => {
+        return (
+          a.name.toLowerCase().includes(q) ||
+          a.description.toLowerCase().includes(q) ||
+          a.provider?.name?.toLowerCase().includes(q) ||
+          (a.tags || []).some((t) => t.toLowerCase().includes(q))
+        );
+      });
+    }
+
+    if (categories.size > 0) {
+      items = items.filter((a) => categories.has(a.category ?? ""));
+    }
+
+    if (statuses.size > 0) {
+      items = items.filter((a) => a.status && statuses.has(a.status));
+    }
+
+    if (favoritesOnly) {
+      items = items.filter((a) => favorites.includes(a.id));
+    }
+
+    if (tag) {
+      const normalizedTag = tag.toLowerCase();
+      items = items.filter((a) =>
+        (a.tags || []).some((t) => t.toLowerCase() === normalizedTag),
+      );
+    }
+
+    // An inverted range (min > max) would match nothing, so both bounds are
+    // skipped and results stay unfiltered by price. FiltersSidebar renders an
+    // inline error plus a "Swap values" action whenever this is true, so the
+    // no-op is always visible rather than silent.
+    const hasInvertedPrice =
+      minPrice !== null && maxPrice !== null && minPrice > maxPrice;
+    if (!hasInvertedPrice) {
+      if (minPrice !== null)
+        items = items.filter((a) => a.pricePerRequest >= minPrice);
+      if (maxPrice !== null)
+        items = items.filter((a) => a.pricePerRequest <= maxPrice);
+    }
+
+    if (popularity === "mostUsed") {
+      items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
+    } else if (popularity === "newest") {
+      items = items.sort(
+        (a, b) =>
+          Date.parse(b.createdAt ?? "1970-01-01") -
+          Date.parse(a.createdAt ?? "1970-01-01"),
+      );
+    }
+
+    if (sort === "price-asc")
+      items = items.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
+    if (sort === "price-desc")
+      items = items.sort((a, b) => b.pricePerRequest - a.pricePerRequest);
+    if (sort === "latency-asc")
+      items = items.sort(
+        (a, b) =>
+          (a.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER) -
+          (b.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER),
+      );
+    if (sort === "popularity")
+      items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
+    if (sort === "newest")
+      items = items.sort(
+        (a, b) =>
+          Date.parse(b.createdAt ?? "1970-01-01") -
+          Date.parse(a.createdAt ?? "1970-01-01"),
+      );
+    // "relevance" keeps the natural order from MOCK_APIS (index order acts as
+    // a proxy for relevance score until a real ranking signal is available).
+
+    return items;
+  }, [
+    catalog,
+    debouncedQuery,
+    categories,
+    tag,
+    minPrice,
+    maxPrice,
+    popularity,
+    favoritesOnly,
+    sort,
+    statuses,
+  ]);
+
+  // ── Cursor pagination ──────────────────────────────────────────────────
+  const initialCursor = searchParams.get("cursor");
+  const {
+    pageItems,
+    hasNextPage,
+    hasPreviousPage,
+    currentPageIndex,
+    totalItemCount,
+    goToNextPage,
+    goToPreviousPage,
+    resetCursor,
+    currentCursor,
+  } = useCursorPagination(filtered, pageSize, initialCursor);
+
+  // Sync cursor to URL
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        if (currentCursor) {
+          prev.set("cursor", currentCursor);
+        } else {
+          prev.delete("cursor");
+        }
+        return prev;
+      },
+      { replace: true },
+    );
+  }, [currentCursor, setSearchParams]);
+
+  // Reset cursor when filters change (skip initial mount)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
       return;
     }
+    resetCursor();
+  }, [
+    debouncedQuery,
+    categories,
+    tag,
+    minPrice,
+    maxPrice,
+    popularity,
+    sort,
+    statuses,
+    favoritesOnly,
+    resetCursor,
+  ]);
 
-    const seq = ++requestSeqRef.current;
-    const controller = new AbortController();
-    abortRef.current = controller;
+  // ── Aria-live announcements (relies on filtered being defined above) ──
+  const prevIsLoading = useRef(isLoading);
+  const prevFetchError = useRef(fetchError);
+  const prevPageIndex = useRef(currentPageIndex);
 
-    setIsLoading(true);
-    setFetchError(null);
+  useEffect(() => {
+    if (prevIsLoading.current && !isLoading) {
+      if (fetchError) {
+        announce(`Error loading marketplace: ${fetchError}`);
+      } else {
+        announce("Marketplace loaded.");
+      }
+    } else if (!prevIsLoading.current && isLoading) {
+      announce("Loading marketplace...");
+    }
+    prevIsLoading.current = isLoading;
+  }, [isLoading, fetchError, announce]);
 
-    fetchCatalog(controller.signal, fetchParams)
-      .then((response: CatalogResponse) => {
-        if (seq !== requestSeqRef.current) return;
-        setCatalogItems(response.items);
-        setIsLoading(false);
-      })
-      .catch((err: Error) => {
-        if (seq !== requestSeqRef.current) return;
-        if (err.name === "AbortError") return;
-        setFetchError(err.message);
-        setIsLoading(false);
-      });
+  useEffect(() => {
+    if (fetchError && fetchError !== prevFetchError.current && !isLoading) {
+      announce(`Error loading marketplace: ${fetchError}`);
+    }
+    prevFetchError.current = fetchError;
+  }, [fetchError, isLoading, announce]);
 
-    return () => {
-      controller.abort();
-    };
-  }, [fetchParams, isBackendMode]);
+  useEffect(() => {
+    if (prevPageIndex.current !== currentPageIndex) {
+      const newStart = totalItemCount > 0 ? currentPageIndex * pageSize + 1 : 0;
+      const newEnd = Math.min((currentPageIndex + 1) * pageSize, totalItemCount);
+      announce(`Page changed. Showing APIs ${newStart} through ${newEnd}.`);
+      prevPageIndex.current = currentPageIndex;
+    }
+  }, [currentPageIndex, pageSize, totalItemCount, announce]);
 
-  const filtered = useMemo(() => {
-    return filterItemsClientSide(
-      catalogItems,
-      debouncedSearch,
-      selectedCategories,
-      minPrice,
-      maxPrice,
-      popularity,
-      sort
-    );
-  }, [catalogItems, debouncedSearch, selectedCategories, minPrice, maxPrice, popularity, sort]);
+  const prevFilteredCount = useRef(0);
+  const isFirstFilterRender = useRef(true);
+  useEffect(() => {
+    if (isFirstFilterRender.current) {
+      isFirstFilterRender.current = false;
+      return;
+    }
+    const prev = prevFilteredCount.current;
+    if (prev !== filtered.length) {
+      if (filtered.length === 0 && prev > 0) {
+        announce("No APIs match the current filters.");
+      } else if (filtered.length > 0 && prev === 0) {
+        announce(`${filtered.length} API${filtered.length !== 1 ? "s" : ""} found.`);
+      }
+      prevFilteredCount.current = filtered.length;
+    }
+  }, [filtered.length, announce]);
 
-  const displayedItems = filtered.slice(0, shown);
+  const prevTag = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevTag.current;
+    if (tag !== prev) {
+      if (tag) {
+        announce(`Filtering by tag: ${tag}`);
+      } else {
+        announce("Tag filter removed.");
+      }
+      prevTag.current = tag;
+    }
+  }, [tag, announce]);
+
+  const handleTagClick = (clickedTag: string) => {
+    setTag(tag?.toLowerCase() === clickedTag.toLowerCase() ? null : clickedTag);
+  };
+
+  // Handlers
+  const toggleCategory = (c: string) => {
+    const copy = new Set(categories);
+    if (copy.has(c)) copy.delete(c);
+    else copy.add(c);
+    setCategories(copy);
+  };
+
+  const toggleStatus = (s: string) => {
+    const copy = new Set(statuses);
+    if (copy.has(s)) copy.delete(s);
+    else copy.add(s);
+    setStatuses(copy);
+  };
+
+  const clearCategories = () => {
+    setCategories(new Set());
+  };
+
+  const clearFilters = () => {
+    clearAll();
+    announce("All filters cleared. Showing all APIs.");
+    setPageSize(12);
+  };
+
+  const handlePageChange = () => {
+    // Separate counter from the catalogue fetch: a page change must not
+    // invalidate an in-flight catalogue request and strand the page in its
+    // loading state.
+    const seq = ++pageChangeSeqRef.current;
+    setIsPageLoading(true);
+    requestAnimationFrame(() => {
+      if (seq === pageChangeSeqRef.current) setIsPageLoading(false);
+    });
+  };
+
+  const handleGoNext = () => {
+    handlePageChange();
+    goToNextPage();
+  };
+
+  const handleGoPrevious = () => {
+    handlePageChange();
+    goToPreviousPage();
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    resetCursor();
+  };
 
   const handleViewDetails = (api: APIItem) => {
     history.pushState({}, "", `/details/${api.id}`);
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
+  const startItem = totalItemCount > 0 ? currentPageIndex * pageSize + 1 : 0;
+  const endItem = Math.min(
+    (currentPageIndex + 1) * pageSize,
+    totalItemCount,
+  );
+
+  if (isLoading) {
+    return (
+      <>
+        <MarketplacePageSkeleton density={density} />
+        <LiveRegion message={announcement} />
+      </>
+    );
+  }
+
   return (
     <div className="marketplace-page">
+      {/* Top row: title + search only */}
       <div className="marketplace-header">
-        <h1>API Marketplace</h1>
-        <div className="marketplace-search">
-          <SearchBar value={search} onChange={setSearch} />
+        <h1>
+          API Marketplace
+          {!API_BASE && (
+            <span
+              className="marketplace-sample-data-badge"
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--muted)",
+                marginLeft: "0.5rem",
+                fontWeight: "normal",
+                verticalAlign: "middle",
+              }}
+            >
+              Sample data
+            </span>
+          )}
+        </h1>
+        <div className="marketplace-search-row">
+          <div className="marketplace-search">
+            <SearchBar value={queryDraft} onChange={commitQuery} />
+          </div>
+          <div
+            className="marketplace-density-toggle"
+            role="group"
+            aria-label="Results density"
+          >
+            <button
+              type="button"
+              className="density-toggle-button"
+              aria-pressed={density === "comfortable"}
+              onClick={() => setDensity("comfortable")}
+            >
+              Comfortable
+            </button>
+            <button
+              type="button"
+              className="density-toggle-button"
+              aria-pressed={density === "compact"}
+              onClick={() => setDensity("compact")}
+            >
+              Compact
+            </button>
+          </div>
         </div>
+        <SortDropdown value={sort} onChange={setSort} />
       </div>
 
+      {/* Rail of APIs with the most recent usage */}
+      <RecentlyActiveRail apis={catalog} onSelect={handleViewDetails} />
+
+      {/* Bottom: filters left, content right */}
       <div className="marketplace-layout">
         <aside className="marketplace-sidebar">
           <FiltersSidebar
-            selectedCategories={selectedCategories}
+            selectedCategories={categories}
             toggleCategory={toggleCategory}
             minPrice={minPrice}
             maxPrice={maxPrice}
@@ -205,98 +614,193 @@ export default function MarketplacePage(): JSX.Element {
             popularity={popularity}
             setPopularity={setPopularity}
             clearFilters={clearFilters}
+            favoritesOnly={favoritesOnly}
+            toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+            selectedStatuses={statuses}
+            toggleStatus={toggleStatus}
+            resultCount={filtered.length}
           />
         </aside>
 
-        <main className="marketplace-results">
+        <main
+          className={
+            isTrayVisible
+              ? "marketplace-results marketplace-results--tray-open"
+              : "marketplace-results"
+          }
+        >
           <div className="marketplace-toolbar">
             <div className="marketplace-count">
               {filtered.length === 0 ? (
-                <>Showing 0 of 0 APIs</>
+                <>
+                  Showing{" "}
+                  <span className="numeric-tabular">0</span>
+                  {" "}of{" "}
+                  <span className="numeric-tabular">0</span>
+                  {" "}APIs
+                </>
               ) : (
                 <>
-                  Showing 1-{Math.min(shown, filtered.length)} of{" "}
-                  {filtered.length} APIs
+                  Showing{" "}
+                  <span className="numeric-tabular">{startItem}</span>
+                  {"–"}
+                  <span className="numeric-tabular">{endItem}</span>
+                  {" "}of{" "}
+                  <span className="numeric-tabular">{filtered.length}</span>
+                  {" "}APIs
                 </>
+              )}
+              {tag && (
+                <span className="marketplace-active-tag" aria-live="polite">
+                  Filtered by tag: #{tag}
+                </span>
               )}
             </div>
 
             <div className="marketplace-actions">
-              <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="relevance">Relevance</option>
-                <option value="priceAsc">Price: low → high</option>
-                <option value="priceDesc">Price: high → low</option>
-                <option value="popularity">Popularity</option>
-                <option value="newest">Newest</option>
-              </select>
               <button
+                ref={filtersTriggerRef}
                 className="ghost-button marketplace-filter-button"
-                onClick={() => setShowFiltersMobile((s) => !s)}
+                onClick={() => setShowFiltersMobile(true)}
+                aria-haspopup="dialog"
+                aria-expanded={showFiltersMobile}
               >
                 Filters
+                {activeFilterCount > 0 && (
+                  <span
+                    className="marketplace-filter-badge numeric-tabular"
+                    aria-label={`${activeFilterCount} active filter${activeFilterCount !== 1 ? "s" : ""}`}
+                  >
+                    {activeFilterCount}
+                  </span>
+                )}
               </button>
             </div>
           </div>
+
+          <CategoryPills
+            categories={ALL_CATEGORIES}
+            selectedCategories={categories}
+            toggleCategory={toggleCategory}
+            clearCategories={clearCategories}
+          />
+
+          <ApiTagFilter
+            tags={allTags}
+            selectedTag={tag}
+            onTagChange={setTag}
+            apis={catalog}
+          />
+
+          {isShowingStaleData && (
+            <p className="marketplace-stale-notice" role="status">
+              Showing saved results — we could not reach the marketplace to
+              refresh. <strong>These listings may be out of date.</strong>
+            </p>
+          )}
 
           {fetchError ? (
             <EmptyState variant="error" onRetry={handleRetryFetch} />
           ) : filtered.length === 0 ? (
             <EmptyState
               variant={hasActiveFilters() ? "filtered" : "empty"}
+              title={
+                favoritesOnly
+                  ? "No favorites yet"
+                  : hasActiveFilters()
+                    ? "No results found"
+                    : "No APIs available"
+              }
+              message={
+                favoritesOnly
+                  ? "Try starring some APIs to see them here!"
+                  : hasActiveFilters()
+                    ? "Try adjusting your filters or clear them to see all available APIs."
+                    : "The marketplace is empty right now. Check back soon for new integrations!"
+              }
               onClearFilters={hasActiveFilters() ? clearFilters : undefined}
+              action={
+                !hasActiveFilters() && !favoritesOnly
+                  ? {
+                      label: "Clear all filters",
+                      onClick: clearFilters,
+                    }
+                  : undefined
+              }
+              secondaryAction={
+                favoritesOnly
+                  ? {
+                      label: "Browse all APIs",
+                      onClick: () => setFavoritesOnly(false),
+                    }
+                  : hasActiveFilters()
+                    ? {
+                        label: "Browse all APIs",
+                        onClick: clearFilters,
+                      }
+                    : undefined
+              }
             />
           ) : (
             <div className="marketplace-grid">
-              {isLoading ? (
-                Array.from({ length: shown }).map((_, i) => (
-                  <ApiCardSkeleton key={i} />
-                ))
-              ) : (
-                displayedItems.map((a) => (
-                  <ApiCard key={a.id} api={a} onViewDetails={handleViewDetails} />
-                ))
-              )}
+              {pageItems.map((a) => (
+                <ApiCard
+                  key={a.id}
+                  api={a}
+                  density={density}
+                  onViewDetails={handleViewDetails}
+                  onTagClick={handleTagClick}
+                  activeTag={tag}
+                />
+              ))}
             </div>
           )}
 
-          {filtered.length > shown && (
-            <div style={{ marginTop: 16, textAlign: "center" }}>
-              <button className="primary-button" onClick={() => setShown((s) => s + 12)}>
-                Load more
-              </button>
-            </div>
+          {/* Cursor-based pagination */}
+          {filtered.length > 0 && (
+            <Pagination
+              mode="cursor"
+              currentPageIndex={currentPageIndex}
+              hasNextPage={hasNextPage}
+              hasPreviousPage={hasPreviousPage}
+              totalItemCount={totalItemCount}
+              pageSize={pageSize}
+              onGoNext={handleGoNext}
+              onGoPrevious={handleGoPrevious}
+              onPageSizeChange={handlePageSizeChange}
+            />
           )}
         </main>
       </div>
 
-      {showFiltersMobile && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="marketplace-filter-modal"
-          onClick={() => setShowFiltersMobile(false)}
-        >
-          <div onClick={(e) => e.stopPropagation()} className="marketplace-filter-panel">
-            <h3>Filters</h3>
-            <FiltersSidebar
-              selectedCategories={selectedCategories}
-              toggleCategory={toggleCategory}
-              minPrice={minPrice}
-              maxPrice={maxPrice}
-              setMinPrice={setMinPrice}
-              setMaxPrice={setMaxPrice}
-              popularity={popularity}
-              setPopularity={setPopularity}
-              clearFilters={clearFilters}
-            />
-            <div className="marketplace-filter-footer">
-              <button className="primary-button" onClick={() => setShowFiltersMobile(false)}>
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Screen-reader announcement region */}
+      <LiveRegion message={announcement} />
+
+      {/* Mobile bottom-sheet — only rendered when open */}
+      <FiltersBottomSheet
+        open={showFiltersMobile}
+        onClose={() => setShowFiltersMobile(false)}
+        resultCount={filtered.length}
+        selectedCategories={categories}
+        toggleCategory={toggleCategory}
+        minPrice={minPrice}
+        maxPrice={maxPrice}
+        setMinPrice={setMinPrice}
+        setMaxPrice={setMaxPrice}
+        popularity={popularity}
+        setPopularity={setPopularity}
+        clearFilters={clearFilters}
+        favoritesOnly={favoritesOnly}
+        toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
+        selectedStatuses={statuses}
+        toggleStatus={toggleStatus}
+        triggerRef={filtersTriggerRef}
+      />
+
+      {/* Keyboard shortcuts hint */}
+      <KbdHint
+        shortcuts={SHORTCUTS.filter((s) => s.category === "Marketplace")}
+      />
     </div>
   );
 }

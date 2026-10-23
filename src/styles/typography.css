@@ -1,0 +1,84 @@
+/* src/styles/typography.css
+ *
+ * Numeric typography utilities for the Callora design system.
+ *
+ * numeric-tabular / tabular-nums — fixed-width numerals so digits (especially
+ * in tables, stats, and prices) don't shift as values change.  This meets a
+ * common data-display requirement and improves readability of financial and
+ * metric readouts across light and dark themes.
+ *
+ * All rules live inside @layer typography so they are lower-priority than
+ * intentional component overrides but higher-priority than browser defaults.
+ *
+ * Usage:
+ *   • Add className="tabular-nums" (or the canonical "numeric-tabular") to
+ *     any element that displays a number that may change over time: prices,
+ *     counters, percentages, latency values, etc.
+ *   • Container rules (.stat-card__value, .api-detail-plan-price, etc.) act
+ *     as a defensive fallback — the explicit className remains canonical.
+ *
+ * GrantFox FWC26 (Stellar Wave) — Issue #466: ApiDetailPage tabular-nums v7
+ */
+
+@layer typography {
+  /* ── Core utility classes ─────────────────────────────────────────────────
+     .numeric-tabular is the canonical design-system name (matches the
+     UI-Design-System.md docs and ApiCard).  .tabular-nums is kept as an
+     alias for backwards compatibility with existing JSX.                   */
+  .numeric-tabular,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── TagChip amounts ──────────────────────────────────────────────────────
+     Ensure amounts/counts inside TagChip use tabular-nums.                 */
+  .tag-chip {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── MarketplacePage count bar ──────────────────────────────────────────
+     Belt-and-suspenders container rule so every numeric descendant inside the
+     "Showing X–Y of N APIs" label is automatically tabular, even if a span is
+     added in the future without the explicit .numeric-tabular class.
+     Individual <span class="numeric-tabular"> wrappers remain the canonical
+     mechanism — this rule is a defensive fallback (GrantFox FWC26).        */
+  .marketplace-count {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Marketplace filter-active badge ────────────────────────────────────
+     The numeric count of active filters shown on the mobile "Filters" button
+     must also use tabular numerals so single-digit and double-digit counts
+     don't shift the badge width unexpectedly.                              */
+  .marketplace-filter-badge {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── ApiDetailPage: performance metric stat values ───────────────────────
+     Applied to the value <div> inside each .stat-card on the Overview tab
+     (Total Requests, Latency P95, System Uptime).  The explicit
+     className="tabular-nums" on each element is the canonical approach;
+     this container rule is a defensive fallback.                           */
+  .stat-card__value {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── ApiDetailPage: plan price ────────────────────────────────────────────
+     Applied to the large price display inside pricing plan cards
+     (.api-detail-plan-price). Prevents digit-width jitter when prices
+     include varying digit counts (e.g. $0.001 vs $0.0001).               */
+  .api-detail-plan-price {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── ApiDetailPage: cost calculator estimated total ─────────────────────
+     The large estimated-total amount in the cost calculator updates live as
+     the range slider moves. Tabular numerals prevent layout shift.         */
+  .api-detail-calculator-total__amount {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.numeric-tabular {
+  font-variant-numeric: tabular-nums;
+}

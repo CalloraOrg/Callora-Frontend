@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type ChangeEvent } from "react";
+import { useRef, type KeyboardEvent, type ChangeEvent } from "react";
 
 interface SearchBarProps {
   value: string;
@@ -13,7 +13,6 @@ export default function SearchBar({
   placeholder = "Search APIs, providers, tags...",
   onSearch,
 }: SearchBarProps) {
-  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -46,12 +45,10 @@ export default function SearchBar({
           background: "rgba(255,255,255,0.02)",
           padding: "8px 12px",
           borderRadius: 8,
-          border: isFocused
-            ? "2px solid var(--primary, #6366f1)"
-            : "2px solid transparent",
-          outline: isFocused ? "2px solid var(--primary, #6366f1)" : "none",
-          outlineOffset: "2px",
-          transition: "border-color 0.2s ease, outline-color 0.2s ease",
+          // Resting border only. The keyboard-focus ring is supplied globally
+          // by `@layer focus` (input:focus-visible) — no inline outline hacks,
+          // so mouse clicks stay ring-less.
+          border: "2px solid transparent",
         }}
         role="search"
       >
@@ -89,8 +86,6 @@ export default function SearchBar({
           value={value}
           onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
           style={{
             background: "transparent",
@@ -98,7 +93,6 @@ export default function SearchBar({
             color: "var(--text)",
             width: "100%",
             fontSize: 14,
-            outline: "none",
           }}
         />
         {value && (
