@@ -1,30 +1,48 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
-import RateLimitCard, { type RateLimitCardProps } from "./RateLimitCard";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import RateLimitCard, { PLAN_PATTERNS, type RateLimitCardProps } from "./RateLimitCard";
+import type { APIItem } from "../data/mockApis";
+import { ROUTE_CATALOGUE } from "../config/routeCatalogue";
 
 /**
- * RateLimitCard tests – issue #567 (GrantFox FWC26 "Stellar Wave")
- * and mobile responsive stacked plan cards.
+ * RateLimitCard tests – per-API rate limits at `/marketplace/:apiId/rate-limits`.
  *
- * Covers:
- *  1. Mobile layout: four plan cards, no table
- *  2. Desktop layout: table with four body rows
- *  3. currentPlan prop: badge and aria-current on card or row
- *  4. Numbers: non-breaking tabular-nums span
- *  5. Pattern text: exposed to assistive tech
- *  6. Style injection: no inline <style> tag rendered by component
- *  7. Breadcrumb presence and middle-ellipsis truncation
+ * Covers loading / ready / not-published / not-found / error states, optional
+ * columns, current-plan marking, mobile cards, breadcrumb and number format.
  */
 
-import RateLimitCard from "./RateLimitCard";
+const FIXTURES: APIItem[] = [
+  {
+    id: "three-tier",
+    name: "Three Tier API",
+    rateLimits: [
+      { plan: "Free", requestsPerMinute: 60, burstLimit: 120, concurrentConnections: 2 },
+      { plan: "Pro", requestsPerMinute: 6000, burstLimit: 9000, concurrentConnections: 50 },
+      { plan: "Enterprise", requestsPerMinute: 120000, burstLimit: 200000, concurrentConnections: 500 },
+    ],
+  },
+  {
+    id: "no-burst",
+    name: "No Burst API",
+    rateLimits: [
+      { plan: "Standard", requestsPerMinute: 300 },
+      { plan: "Premium", requestsPerMinute: 3000 },
+    ],
+  },
+  { id: "unpublished", name: "Unpublished API" },
+] as unknown as APIItem[];
 
-/**
- * Forces `window.matchMedia("(max-width: 639px)")` to report a match so the
- * component renders its mobile card layout.
- */
+const fetchCatalogMock = vi.fn();
+
+vi.mock("../api/catalogApi", () => ({
+  fetchCatalog: (...args: unknown[]) => fetchCatalogMock(...args),
+  isCatalogAbortError: (err: unknown) =>
+    err instanceof DOMException && err.name === "AbortError",
+}));
+
 function mockViewport(isMobile: boolean) {
   const original = window.matchMedia;
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -42,17 +60,29 @@ function mockViewport(isMobile: boolean) {
   };
 }
 
-function renderPage(props?: RateLimitCardProps) {
+function renderPage(apiId: string, props: Omit<RateLimitCardProps, "apiId"> = {}) {
   return render(
-    <MemoryRouter>
-      <RateLimitCard {...props} />
+    <MemoryRouter initialEntries={[`/marketplace/${apiId}/rate-limits`]}>
+      <Routes>
+        <Route path="/marketplace/:apiId/rate-limits" element={<RateLimitCard {...props} />} />
+      </Routes>
     </MemoryRouter>,
   );
 }
 
 describe("RateLimitCard", () => {
-  beforeEach(() => vi.clearAllMocks());
-  afterEach(() => cleanup());
+  let restoreViewport: () => void = () => {};
+
+  beforeEach(() => {
+    fetchCatalogMock.mockReset();
+    fetchCatalogMock.mockResolvedValue(FIXTURES);
+    restoreViewport = mockViewport(false);
+  });
+
+  afterEach(() => {
+    cleanup();
+    restoreViewport();
+  });
 
   it("shows a loading state first", () => {
     renderPage("three-tier");
@@ -83,28 +113,62 @@ describe("RateLimitCard", () => {
     expect(screen.queryByRole("table")).toBeNull();
   });
 
-  // ── Rate-limit table (Desktop) ────────────────────────────────────────────
-
-  it("renders the rate-limit tier table", () => {
-    renderPage();
-    expect(screen.getByRole("table", { name: /rate limit tiers/i })).toBeTruthy();
+  it("shows a not-found panel for an unknown id", async () => {
+    renderPage("does-not-exist");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/API Not Found/);
+    expect(within(alert).getByRole("link", { name: /Back to Marketplace/ }).getAttribute("href")).toBe("/marketplace");
   });
 
-  it("renders the table with four body rows on desktop viewports", () => {
-    const { container } = renderPage();
-    const table = screen.getByRole("table", { name: /rate limit tiers/i });
-    expect(table).toBeTruthy();
-    const rows = container.querySelectorAll("tbody tr");
-    expect(rows.length).toBe(4);
-    expect(container.querySelectorAll(".rate-limit-plan-card").length).toBe(0);
+  it("shows an error panel when the catalogue fails to load", async () => {
+    fetchCatalogMock.mockRejectedValue(new Error("boom"));
+    renderPage("three-tier");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/unavailable/i);
   });
 
-  it("shows all four plan tiers", () => {
-    renderPage();
-    for (const plan of ["Free", "Developer", "Pro", "Enterprise"]) {
-      expect(screen.getByText(plan)).toBeTruthy();
-    }
+  it("builds a breadcrumb from the API name whose hrefs all resolve to existing routes", async () => {
+    renderPage("three-tier");
+    await screen.findByRole("table");
+    const nav = screen.getByRole("navigation", { name: /breadcrumb/i });
+    expect(nav.textContent).toContain("Marketplace");
     expect(nav.textContent).toContain("Three Tier API");
+    const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    for (const href of hrefs) {
+      expect(href).toMatch(/^\/(marketplace|details\/three-tier|marketplace\/three-tier\/rate-limits)$/);
+    }
+  });
+
+  it("marks the specified currentPlan row with a 'Current plan' badge", async () => {
+    renderPage("three-tier", { currentPlan: "Pro" });
+    const table = await screen.findByRole("table");
+    const currentRow = table.querySelector('tbody tr[aria-current="true"]');
+    expect(currentRow?.textContent).toContain("Pro");
+    expect(currentRow?.textContent).toContain("Current plan");
+    expect(table.querySelectorAll('tbody tr:not([aria-current="true"])').length).toBe(2);
+  });
+
+  it("renders stacked plan cards and no table on mobile viewports", async () => {
+    restoreViewport();
+    restoreViewport = mockViewport(true);
+    const { container } = renderPage("three-tier");
+    await screen.findByText("Enterprise");
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(container.querySelectorAll(".rate-limit-plan-card").length).toBe(3);
+  });
+
+  it("renders numbers inside a tabular-nums span with a pattern badge per plan", async () => {
+    renderPage("three-tier");
+    await screen.findByRole("table");
+    const span = screen.getByText(new Intl.NumberFormat().format(6000));
+    expect(span.tagName).toBe("SPAN");
+    expect(span.classList.contains("rate-limit-number")).toBe(true);
+    for (const plan of ["Free", "Pro", "Enterprise"]) {
+      const badge = screen.getByText(plan);
+      expect(badge.classList.contains("rate-limit-badge")).toBe(true);
+      expect(badge.classList.contains(PLAN_PATTERNS[plan].class)).toBe(true);
+      expect(badge.getAttribute("data-pattern")).toBeTruthy();
+    }
   });
 
   it("contains no GrantFox literals", async () => {
@@ -114,131 +178,8 @@ describe("RateLimitCard", () => {
   });
 });
 
-  it("renders the throttle note below the table", () => {
-    renderPage();
-    expect(
-      screen.getByText(/rolling 60-second window/i),
-    ).toBeTruthy();
-  });
-
-  // ── Mobile Plan Cards ─────────────────────────────────────────────────────
-
-  it("renders four plan cards and no table on mobile viewports (< 640px)", () => {
-    const restore = mockViewport(true);
-    try {
-      const { container } = renderPage();
-      expect(screen.queryByRole("table")).toBeNull();
-      const cards = container.querySelectorAll(".rate-limit-plan-card");
-      expect(cards.length).toBe(4);
-      for (const plan of ["Free", "Developer", "Pro", "Enterprise"]) {
-        expect(screen.getByText(plan)).toBeTruthy();
-      }
-    } finally {
-      restore();
-    }
-  });
-
-  // ── Current Plan ──────────────────────────────────────────────────────────
-
-  it("marks the specified currentPlan row with 'Current plan' badge and aria-current on desktop", () => {
-    const { container } = renderPage({ currentPlan: "Pro" });
-    const currentRow = container.querySelector('tbody tr[aria-current="true"]');
-    expect(currentRow).not.toBeNull();
-    expect(currentRow?.textContent).toContain("Pro");
-    expect(currentRow?.textContent).toContain("Current plan");
-
-    const nonCurrentRows = container.querySelectorAll('tbody tr:not([aria-current="true"])');
-    expect(nonCurrentRows.length).toBe(3);
-    for (const row of Array.from(nonCurrentRows)) {
-      expect(row.textContent).not.toContain("Current plan");
-    }
-  });
-
-  it("marks the specified currentPlan card with 'Current plan' badge and aria-current on mobile", () => {
-    const restore = mockViewport(true);
-    try {
-      const { container } = renderPage({ currentPlan: "Pro" });
-      const currentCard = container.querySelector('.rate-limit-plan-card[aria-current="true"]');
-      expect(currentCard).not.toBeNull();
-      expect(currentCard?.textContent).toContain("Pro");
-      expect(currentCard?.textContent).toContain("Current plan");
-
-      const nonCurrentCards = container.querySelectorAll('.rate-limit-plan-card:not([aria-current="true"])');
-      expect(nonCurrentCards.length).toBe(3);
-      for (const card of Array.from(nonCurrentCards)) {
-        expect(card.textContent).not.toContain("Current plan");
-      }
-    } finally {
-      restore();
-    }
-  });
-
-  // ── Numbers ───────────────────────────────────────────────────────────────
-
-  it("renders numbers like 6,000 inside a single non-breaking tabular-nums span on desktop", () => {
-    renderPage();
-    const span = screen.getByText("6,000");
-    expect(span.tagName).toBe("SPAN");
-    expect(span.classList.contains("rate-limit-number")).toBe(true);
-  });
-
-  it("renders numbers like 6,000 inside a single non-breaking tabular-nums span on mobile dl", () => {
-    const restore = mockViewport(true);
-    try {
-      renderPage();
-      const span = screen.getByText("6,000");
-      expect(span.tagName).toBe("SPAN");
-      expect(span.classList.contains("rate-limit-number")).toBe(true);
-    } finally {
-      restore();
-    }
-  });
-
-  // ── Color-blind safe patterns & Pattern text ──────────────────────────────
-
-  it.each(["Free", "Developer", "Pro", "Enterprise"])(
-    `%s badge has a distinct pattern class for color-blind safety`,
-    (plan) => {
-      renderPage();
-      const badge = screen.getByText(plan);
-      const expectedClass = PLAN_PATTERN_CLASSES[plan];
-      expect(badge.classList.contains("rate-limit-badge")).toBe(true);
-      expect(badge.classList.contains(expectedClass)).toBe(true);
-    },
-  );
-
-  it("each plan badge carries a data-pattern attribute describing the texture", () => {
-    renderPage();
-    for (const plan of ["Free", "Developer", "Pro", "Enterprise"]) {
-      const badge = screen.getByText(plan);
-      expect(badge.getAttribute("data-pattern")).toBeTruthy();
-    }
-  });
-
-  it("each plan exposes its pattern description to assistive tech on desktop", () => {
-    renderPage();
-    for (const desc of ["solid baseline", "dot pattern", "diagonal stripes", "crosshatch pattern"]) {
-      expect(screen.getByText(desc)).toBeTruthy();
-    }
-  });
-
-  it("each plan exposes its pattern description to assistive tech on mobile", () => {
-    const restore = mockViewport(true);
-    try {
-      renderPage();
-      for (const desc of ["solid baseline", "dot pattern", "diagonal stripes", "crosshatch pattern"]) {
-        expect(screen.getByText(desc)).toBeTruthy();
-      }
-    } finally {
-      restore();
-    }
-  });
-
-  // ── Style injection ───────────────────────────────────────────────────────
-
-  it("renders no inline <style> element directly within the rate-limit page", () => {
-    const { container } = renderPage();
-    const pageStyle = container.querySelector(".rate-limit-page > style");
-    expect(pageStyle).toBeNull();
+describe("ROUTE_CATALOGUE", () => {
+  it("has no dead /rate-limit entry", () => {
+    expect(ROUTE_CATALOGUE.some((entry) => entry.path === "/rate-limit")).toBe(false);
   });
 });

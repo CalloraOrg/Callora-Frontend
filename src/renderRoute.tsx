@@ -67,8 +67,9 @@ export async function renderRoute(
     return;
   }
 
-  const isSlaRoute = pathname.split("?")[0].replace(/\/+$/, "").endsWith("/sla");
-  if (pathname.startsWith("/marketplace") && !isSlaRoute) {
+  // Per-API subpages (`/marketplace/:apiId/sla`, `/marketplace/:apiId/rate-limits`)
+  // are routed by `App`; everything else under `/marketplace` is the listing.
+  if (pathname.startsWith("/marketplace") && !isMarketplaceSubpage(pathname)) {
     startRouteLoading();
     root.render(wrap(<StandaloneShell><MarketplacePageSkeleton /></StandaloneShell>));
     const mod = await import("./pages/MarketplacePage");
