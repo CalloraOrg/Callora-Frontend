@@ -34,6 +34,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import BottomSheet from '../components/BottomSheet';
 import { TransactionDetails } from '../components/TransactionDetails';
 import BillingSortSelect from '../components/BillingSortSelect';
+import { useDepositHistory, type DepositHistory } from '../hooks/useDepositHistory';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -60,107 +61,6 @@ export interface BillingTransaction {
   confirmations: number;
 }
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
-// Realistic-looking mock transactions for the GrantFox FWC26 prototype.
-
-export const MOCK_TRANSACTIONS: BillingTransaction[] = [
-  {
-    id: 'tx-001',
-    description: 'USDC vault deposit',
-    type: 'Deposit',
-    direction: 'credit',
-    amount: 100.00,
-    status: 'success',
-    timestamp: '2026-07-25T14:32:00Z',
-    txHash: 'A3F9B2C1D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0C1D2E3F4A5B6C7D8E9F0A1',
-    network: 'Stellar Mainnet',
-    confirmations: 120,
-  },
-  {
-    id: 'tx-002',
-    description: 'WeatherSim API · 3 calls',
-    type: 'API Call',
-    direction: 'debit',
-    amount: 0.24,
-    status: 'success',
-    timestamp: '2026-07-25T15:10:22Z',
-    txHash: 'B4G0C3D2E5F6A8B9C0D1E2F3A4B5C6D7E8F9A0B1C2D3E4F5A6B7C8D9E0F1A2B3',
-    network: 'Stellar Mainnet',
-    confirmations: 98,
-  },
-  {
-    id: 'tx-003',
-    description: 'Stellar settlement · Epoch 1047',
-    type: 'Settlement',
-    direction: 'credit',
-    amount: 12.80,
-    status: 'success',
-    timestamp: '2026-07-26T00:00:00Z',
-    txHash: 'C5H1D4E3F6A9B0C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5',
-    network: 'Stellar Mainnet',
-    confirmations: 60,
-  },
-  {
-    id: 'tx-004',
-    description: 'Refund · CreditScore API',
-    type: 'Refund',
-    direction: 'credit',
-    amount: 0.05,
-    status: 'success',
-    timestamp: '2026-07-26T09:17:44Z',
-    txHash: 'D6I2E5F4A7B0C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6',
-    network: 'Stellar Mainnet',
-    confirmations: 45,
-  },
-  {
-    id: 'tx-005',
-    description: 'Network fee · tx D6I2…',
-    type: 'Fee',
-    direction: 'debit',
-    amount: 0.001,
-    status: 'success',
-    timestamp: '2026-07-26T09:17:44Z',
-    txHash: 'E7J3F6A5B8C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7',
-    network: 'Stellar Mainnet',
-    confirmations: 45,
-  },
-  {
-    id: 'tx-006',
-    description: 'USDC vault deposit',
-    type: 'Deposit',
-    direction: 'credit',
-    amount: 50.00,
-    status: 'pending',
-    timestamp: '2026-07-27T11:04:00Z',
-    txHash: 'F8K4A7B6C9D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8',
-    network: 'Stellar Mainnet',
-    confirmations: 2,
-  },
-  {
-    id: 'tx-007',
-    description: 'ChainRisk API · 1 call',
-    type: 'API Call',
-    direction: 'debit',
-    amount: 0.08,
-    status: 'error',
-    timestamp: '2026-07-27T13:22:10Z',
-    txHash: 'G9L5B8C7D0E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9',
-    network: 'Stellar Mainnet',
-    confirmations: 0,
-  },
-  {
-    id: 'tx-008',
-    description: 'MarketFeed API · 10 calls',
-    type: 'API Call',
-    direction: 'debit',
-    amount: 0.80,
-    status: 'success',
-    timestamp: '2026-07-28T08:55:33Z',
-    txHash: 'H0M6C9D8E1F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0',
-    network: 'Stellar Mainnet',
-    confirmations: 88,
-  },
-];
 
 // ── Filter & sort helpers ─────────────────────────────────────────────────────
 
@@ -223,6 +123,7 @@ function txToPreviewData(tx: BillingTransaction): PreviewCardData {
 
 export function BillingHistory() {
   const { timezone } = useAccountContext();
+  const history = useDepositHistory();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const [selectedTx, setSelectedTx] = useState<BillingTransaction | null>(null);
   const detailsTriggerRef = useRef<HTMLElement | null>(null);
@@ -286,7 +187,7 @@ export function BillingHistory() {
 
   // ── Derived filtered/sorted list ──────────────────────────────────────────
   const filteredTxs = useMemo(() => {
-    const filtered = MOCK_TRANSACTIONS.filter((tx) => {
+    const filtered = history.transactions.filter((tx) => {
       if (typeFilter !== 'All' && tx.type !== typeFilter) return false;
       if (statusFilter !== 'All' && tx.status !== statusFilter) return false;
       if (directionFilter !== 'All' && tx.direction !== directionFilter) return false;
@@ -313,7 +214,7 @@ export function BillingHistory() {
       }
       return sortDirection === 'asc' ? cmp : -cmp;
     });
-  }, [typeFilter, statusFilter, directionFilter, searchQuery, sortColumn, sortDirection]);
+  }, [history.transactions, typeFilter, statusFilter, directionFilter, searchQuery, sortColumn, sortDirection]);
 
   // ── Totals ─────────────────────────────────────────────────────────────────
   const netBalance = useMemo(() => {
@@ -444,8 +345,32 @@ export function BillingHistory() {
         </span>
       </div>
 
+      {history.status === 'ready' && history.retentionTruncated && (
+        <p className="bh-empty" role="note">
+          Older history is outside the RPC retention window and cannot be shown.
+        </p>
+      )}
+
+      {history.status === 'ready' && history.hasMore && (
+        <div className="bh-load-older">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={history.loadOlder}
+            disabled={history.loadingMore}
+          >
+            {history.loadingMore ? 'Loading older deposits…' : 'Load older deposits'}
+          </button>
+          {history.loadMoreError && (
+            <p role="alert" className="bh-empty">{history.loadMoreError}</p>
+          )}
+        </div>
+      )}
+
       {/* ── Transaction table ─────────────────────────────────────────────── */}
-      {filteredTxs.length === 0 ? (
+      {history.status !== 'ready' ? (
+        <DepositHistoryState history={history} />
+      ) : filteredTxs.length === 0 ? (
         <div role="status" className="bh-empty">
           No transactions match the current filters.
         </div>
@@ -607,6 +532,38 @@ export function BillingHistory() {
         {selectedTx && <TransactionDetails data={txToPreviewData(selectedTx)} />}
       </BottomSheet>
     </section>
+  );
+}
+
+function DepositHistoryState({ history }: { history: DepositHistory }) {
+  if (history.status === 'no-wallet') {
+    return (
+      <div role="status" className="bh-empty">
+        Connect Freighter from the top bar to see your on-chain deposit history.
+      </div>
+    );
+  }
+  if (history.status === 'loading') {
+    return (
+      <div role="status" aria-busy="true" className="bh-empty">
+        Loading deposit history…
+      </div>
+    );
+  }
+  if (history.status === 'error') {
+    return (
+      <div role="alert" className="bh-empty">
+        <p>{history.error}</p>
+        <button type="button" className="secondary-button" onClick={history.retry}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div role="status" className="bh-empty">
+      No deposits yet for this wallet on this network.
+    </div>
   );
 }
 
