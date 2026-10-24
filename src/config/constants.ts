@@ -1,4 +1,5 @@
 import { StrKey } from "@stellar/stellar-sdk";
+import { resolveVaultConfig } from "../services/vaultConfig";
 
 /**
  * Shared application constants.
@@ -185,10 +186,21 @@ export const STELLAR_RPC_URL =
   normalizeBaseUrl(runtimeEnv.VITE_STELLAR_RPC_URL as string | undefined) ||
   DEFAULT_STELLAR_RPC_URLS[STELLAR_NETWORK];
 
-/** Deployed Callora vault contract that receives deposits. */
-export const STELLAR_VAULT_CONTRACT_ID = String(
-  runtimeEnv.VITE_STELLAR_VAULT_CONTRACT_ID ?? "",
-).trim();
+/** Reference Callora vault deployed on Stellar testnet. */
+const TESTNET_VAULT_CONTRACT_ID =
+  "CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ";
+
+/**
+ * Deployed Callora vault contract that receives deposits. `testnet` defaults to
+ * the reference vault; mainnet and futurenet must set `VITE_STELLAR_VAULT_CONTRACT_ID`.
+ */
+export const STELLAR_VAULT_CONFIG = resolveVaultConfig({
+  network: STELLAR_NETWORK,
+  envContractId: runtimeEnv.VITE_STELLAR_VAULT_CONTRACT_ID as string | undefined,
+  testnetDefault: TESTNET_VAULT_CONTRACT_ID,
+});
+
+export const STELLAR_VAULT_CONTRACT_ID = STELLAR_VAULT_CONFIG.contractId;
 
 export const STELLAR_USDC_DECIMALS = 7;
 
@@ -224,7 +236,7 @@ export const STELLAR_HORIZON_URL = {
  */
 export const TESTNET_DEPLOYMENT = {
   network: "testnet",
-  vault: "CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ",
+  vault: TESTNET_VAULT_CONTRACT_ID,
   settlement: "CB4BUGCX5LFS5KYWAO2J4ZQTALOQSGXFFAOVKKGAS32OFZLU7O7YYGHS",
   revenuePool: "CC5KINWRSLKSSQG4ZOTP3EZIOUVC6ER7HL5GZALYY4LVE6ZIMX4PMCSE",
 } as const;

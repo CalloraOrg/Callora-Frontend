@@ -22,6 +22,7 @@ import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
 import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
 import LatencyChart from "./pages/LatencyChart";
 import StandaloneShell from "./components/StandaloneShell";
+import { isMarketplaceSubpage } from "./routeMatchers";
 
 /**
  * The slice of a React 18 root that routing needs. Keeping it structural lets

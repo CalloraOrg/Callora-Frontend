@@ -44,6 +44,12 @@ export type APIItem = {
     supportTier?: string;
     creditThresholdPct?: number;
   };
+  rateLimits?: Array<{
+    plan: string;
+    requestsPerMinute: number;
+    burstLimit?: number;
+    concurrentConnections?: number;
+  }>;
 };
 
 
@@ -123,9 +129,27 @@ const SAMPLE_APIS: Array<{
     endpoints: [{ id: "render-pdf", title: "Render PDF", url: "/v1/render", method: "POST", group: "Rendering", params: [{ name: "html", type: "string", required: true }, { name: "page_size", type: "string", required: false }], response: '{ "pdf_url": "https://files.pdfbuilder.dev/r/91c.pdf", "pages": 3 }' }] },
 ];
 
+/** Published rate limits for sample APIs; APIs absent here publish none. */
+const SAMPLE_RATE_LIMITS: Record<string, APIItem["rateLimits"]> = {
+  "geocode-01": [
+    { plan: "Free", requestsPerMinute: 30, burstLimit: 60 },
+    { plan: "Pro", requestsPerMinute: 1200, burstLimit: 2400 },
+  ],
+  "fx-rates-01": [
+    { plan: "Free", requestsPerMinute: 60, concurrentConnections: 2 },
+    { plan: "Developer", requestsPerMinute: 600, concurrentConnections: 10 },
+    { plan: "Enterprise", requestsPerMinute: 12000, concurrentConnections: 200 },
+  ],
+};
+
 export const MOCK_APIS: APIItem[] = [
   {
     id: "weather-001",
+    rateLimits: [
+      { plan: "Free", requestsPerMinute: 10, burstLimit: 20, concurrentConnections: 2 },
+      { plan: "Developer", requestsPerMinute: 120, burstLimit: 200, concurrentConnections: 10 },
+      { plan: "Pro", requestsPerMinute: 600, burstLimit: 1000, concurrentConnections: 50 },
+    ],
     name: "WeatherSim API",
     provider: { name: "Acme Labs", url: "#" },
      version: "2.3.1",
@@ -205,6 +229,10 @@ export const MOCK_APIS: APIItem[] = [
   },
   {
     id: "pay-qr",
+    rateLimits: [
+      { plan: "Standard", requestsPerMinute: 300 },
+      { plan: "Premium", requestsPerMinute: 3000 },
+    ],
     name: "QuickPay",
     provider: { name: "PayFast", url: "#" },
     status: "degraded",
@@ -381,6 +409,7 @@ export const MOCK_APIS: APIItem[] = [
       endpoints: x.endpoints,
       stats: { totalCalls: x.calls, avgResponseMs: x.latency, uptimePct: x.uptime },
       hourlyHealth: health(-1),
+      rateLimits: SAMPLE_RATE_LIMITS[x.id],
       sparklineValues: [10 + i, 12 + i, 11 + i, 14 + i, 16 + i, 15 + i, 18 + i, 19 + i, 17 + i, 21 + i, 22 + i, 24 + i],
       sla: x.sla,
     } satisfies APIItem;

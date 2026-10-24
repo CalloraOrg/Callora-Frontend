@@ -280,3 +280,45 @@ export async function readWalletUsdcBalance(address: string): Promise<bigint> {
     return expectStroops(scValToNative(retval), "USDC balance()");
   });
 }
+
+export type VaultDepositPreflight = {
+  paused: boolean;
+  allowlisted: boolean;
+};
+
+/**
+ * Simulate the vault's `is_paused()` and `is_authorized_depositor(address)`
+ * entry points, so the UI can explain why a deposit would fail before the
+ * wallet is asked to sign. Read-only: nothing is signed or submitted.
+ */
+export async function readVaultDepositPreflight(
+  address: string,
+): Promise<VaultDepositPreflight> {
+  if (!isVaultReadConfigured()) throw notConfiguredError();
+  if (!StrKey.isValidEd25519PublicKey(address)) {
+    throw new VaultReadError(
+      "BAD_RESPONSE",
+      "A valid Stellar account address is required to check vault deposits.",
+    );
+  }
+  return dedupe(`deposit-preflight:${STELLAR_VAULT_CONTRACT_ID}:${address}`, async () => {
+    const [pausedVal, allowlistedVal] = await Promise.all([
+      simulate(STELLAR_VAULT_CONTRACT_ID, "is_paused", [], address),
+      simulate(
+        STELLAR_VAULT_CONTRACT_ID,
+        "is_authorized_depositor",
+        [new Address(address).toScVal()],
+        address,
+      ),
+    ]);
+    const paused = scValToNative(pausedVal);
+    const allowlisted = scValToNative(allowlistedVal);
+    if (typeof paused !== "boolean" || typeof allowlisted !== "boolean") {
+      throw new VaultReadError(
+        "BAD_RESPONSE",
+        "Vault deposit preflight did not return booleans.",
+      );
+    }
+    return { paused, allowlisted };
+  });
+}

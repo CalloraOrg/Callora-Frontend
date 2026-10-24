@@ -182,3 +182,30 @@ Regression proof for row 2: on the original main branch, a wallet without the US
 trustline can click **Approve Transaction**, reaches simulation, and receives a
 generic failure. With this change, the same account is offered the trustline step
 before a deposit can be simulated.
+
+## Simulation failures before signing
+
+Deposits explicitly call `simulateTransaction`, inspect `rpc.Api.isSimulationError`,
+and only assemble a successful response with `rpc.assembleTransaction(...).build()`.
+Contract rejections use `CONTRACT_REJECTED`, carry the decoded `contractErrorCode`
+when available, and never require reconciliation: nothing was signed or submitted.
+The modal shows the specific message/code and offers Retry. Raw host diagnostics,
+XDR, and wallet addresses are never displayed or logged; `SecureErrorHandler`
+receives only the classification and decoded numeric code.
+
+| Vault code | Message/action |
+| --- | --- |
+| 1 | Vault is not initialized; contact the operator. |
+| 4, 37 | Deposits are paused. |
+| 6 | Amount must be positive. |
+| 8 | Amount is below the vault minimum. |
+| 9 | Amount cannot be accepted; try a smaller deposit. |
+| 36 | Rate limit reached; wait before retrying. |
+| 44 | Wallet is not on the deposit allowlist. |
+| Other | Vault rejected the deposit, with the numeric code. |
+| No contract code | Simulation could not prepare the deposit; no funds moved. |
+
+Real account/RPC transport exceptions keep their existing connection/timeout
+messages. Failures after submission keep the existing transaction and
+reconciliation behavior. The decoder reads both the simulation error string and
+structured contract-error values in diagnostic events.

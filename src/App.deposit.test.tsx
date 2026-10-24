@@ -32,6 +32,7 @@ const walletMocks = vi.hoisted(() => ({
   submitVaultDeposit: vi.fn(),
   checkDepositStatus: vi.fn(),
   getWalletAddress: vi.fn(),
+  preflightVaultDeposit: vi.fn(),
   fetch: vi.fn(),
   signTransaction: vi.fn(),
   network: "testnet",
@@ -97,6 +98,7 @@ vi.mock("./services/walletService", async (importOriginal) => {
     submitVaultDeposit: walletMocks.submitVaultDeposit,
     checkDepositStatus: walletMocks.checkDepositStatus,
     getWalletAddress: walletMocks.getWalletAddress,
+    preflightVaultDeposit: walletMocks.preflightVaultDeposit,
   };
 });
 
@@ -120,6 +122,7 @@ beforeEach(() => {
   }) });
   walletMocks.isWalletAvailable.mockReset().mockResolvedValue(true);
   walletMocks.submitVaultDeposit.mockReset();
+  walletMocks.preflightVaultDeposit.mockReset().mockResolvedValue({ paused: false, allowlisted: true });
   walletMocks.checkDepositStatus.mockReset();
   sessionStorage.clear();
 });
@@ -340,6 +343,12 @@ async function renderModalReady() {
   return { dialog, amountInput };
 }
 
+async function flushMicrotasks() {
+  await act(async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  });
+}
+
 function setAmount(input: HTMLInputElement, value: string) {
   fireEvent.change(input, { target: { value } });
 }
@@ -423,6 +432,48 @@ describe("App deposit modal timed transitions", () => {
     expect(screen.getAllByText("Deposit successful").length).toBeGreaterThan(0);
     // 284.62 initial vault + 50 deposit = 334.62
     expect(screen.getAllByText(/334\.62/).length).toBeGreaterThan(0);
+  });
+
+  it("blocks Approve with the paused reason before any signature prompt", async () => {
+    walletMocks.preflightVaultDeposit.mockResolvedValueOnce({ paused: true, allowlisted: true });
+    const { amountInput } = await renderModalReady();
+    setAmount(amountInput, "80");
+    await flushMicrotasks();
+    expect(screen.getByText("Deposits are paused on this vault right now.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Approve deposit transaction" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(walletMocks.submitVaultDeposit).not.toHaveBeenCalled();
+  });
+
+  it("blocks Approve when the wallet is not on the deposit allowlist", async () => {
+    walletMocks.preflightVaultDeposit.mockResolvedValueOnce({ paused: false, allowlisted: false });
+    const { amountInput } = await renderModalReady();
+    setAmount(amountInput, "80");
+    await flushMicrotasks();
+    expect(screen.getByText("This wallet is not on the vault's deposit allowlist.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Approve deposit transaction" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("keeps Approve enabled with a warning when the vault preflight cannot run", async () => {
+    walletMocks.preflightVaultDeposit.mockRejectedValueOnce(new Error("rpc down"));
+    const { amountInput } = await renderModalReady();
+    setAmount(amountInput, "80");
+    await flushMicrotasks();
+    expect(screen.getByText("Could not verify vault status. You can still try the deposit.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Approve deposit transaction" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows the vault rejection message/code and allows retry without reconciliation", async () => {
+    const { WalletServiceError } = await import("./services/walletService");
+    const error = new WalletServiceError("CONTRACT_REJECTED", "This wallet is not on the vault's deposit allowlist.");
+    Object.assign(error, { contractErrorCode: 44 });
+    walletMocks.submitVaultDeposit.mockRejectedValueOnce(error);
+    const { amountInput } = await renderModalReady();
+    setAmount(amountInput, "80");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" })); });
+    expect(screen.getByRole("alert").textContent).toContain("allowlist. (code 44)");
+    expect(screen.queryByRole("button", { name: "Check status" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Retry deposit" }));
+    expect((screen.getByPlaceholderText("0.00") as HTMLInputElement).value).toBe("80");
   });
 
   it("shows failure and retry restores the submitted amount", async () => {

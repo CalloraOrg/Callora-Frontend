@@ -19,13 +19,7 @@ import RateLimitCard, { type RateLimitCardProps } from "./RateLimitCard";
  *  7. Breadcrumb presence and middle-ellipsis truncation
  */
 
-/** Expected pattern class for each plan. */
-const PLAN_PATTERN_CLASSES: Record<string, string> = {
-  Free: "free",
-  Developer: "developer",
-  Pro: "pro",
-  Enterprise: "enterprise",
-};
+import RateLimitCard from "./RateLimitCard";
 
 /**
  * Forces `window.matchMedia("(max-width: 639px)")` to report a match so the
@@ -57,92 +51,36 @@ function renderPage(props?: RateLimitCardProps) {
 }
 
 describe("RateLimitCard", () => {
-  afterEach(() => {
-    cleanup();
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => cleanup());
+
+  it("shows a loading state first", () => {
+    renderPage("three-tier");
+    expect(screen.getByRole("status").textContent).toMatch(/loading/i);
   });
 
-  // ── Page structure ────────────────────────────────────────────────────────
-
-  it("renders the page heading", () => {
-    renderPage();
-    expect(
-      screen.getByRole("heading", { name: /rate limit configuration/i }),
-    ).toBeTruthy();
+  it("renders three rows and a caption naming the API", async () => {
+    renderPage("three-tier");
+    const table = await screen.findByRole("table", { name: /Three Tier API/ });
+    expect(within(table).getByText(/Rate limit tiers for Three Tier API/)).toBeTruthy();
+    expect(within(table).getAllByRole("row").length).toBe(4); // header + 3
+    expect(within(table).getByText(new Intl.NumberFormat().format(120000))).toBeTruthy();
+    expect(within(table).getByText("Burst limit")).toBeTruthy();
+    expect(within(table).getByText("Concurrent connections")).toBeTruthy();
   });
 
-  it("renders the API subtitle", () => {
-    renderPage();
-    expect(
-      screen.getByText(/GrantFox Wave Compute API/),
-    ).toBeTruthy();
+  it("omits Burst and Concurrent columns when no tier has them", async () => {
+    renderPage("no-burst");
+    const table = await screen.findByRole("table", { name: /No Burst API/ });
+    expect(within(table).queryByText("Burst limit")).toBeNull();
+    expect(within(table).queryByText("Concurrent connections")).toBeNull();
+    expect(within(table).getByText("Requests / min")).toBeTruthy();
   });
 
-  // ── Breadcrumb ────────────────────────────────────────────────────────────
-
-  it("renders an accessible breadcrumb navigation", () => {
-    renderPage();
-    const nav = screen.getByRole("navigation", { name: /breadcrumb/i });
-    expect(nav).toBeTruthy();
-  });
-
-  it("shows Marketplace as the first breadcrumb link", () => {
-    renderPage();
-    const marketplaceLink = screen.getByRole("link", {
-      name: "Marketplace",
-    });
-    expect(marketplaceLink).toBeTruthy();
-    expect(marketplaceLink.getAttribute("href")).toBe("/marketplace");
-  });
-
-  it("marks the last crumb as the current page", () => {
-    renderPage();
-    const current = document.querySelector<HTMLElement>(
-      '[aria-current="page"]',
-    );
-    expect(current).not.toBeNull();
-    // Visual text may be truncated but aria-current must be present
-    expect(current?.getAttribute("aria-current")).toBe("page");
-  });
-
-  it("applies middle-ellipsis truncation to long middle crumb labels", () => {
-    const { container } = renderPage();
-
-    // The two middle crumbs are rendered inside `.breadcrumb-middle` list items
-    // as visible links on desktop, and also inside the popover on mobile.
-    // On desktop they are in .breadcrumb-middle items.
-    const middleItems = Array.from(
-      container.querySelectorAll<HTMLElement>(
-        ".breadcrumb-middle .breadcrumb-link",
-      ),
-    );
-
-    // Both middle labels are long and should be truncated
-    expect(middleItems.length).toBe(2);
-    for (const item of middleItems) {
-      expect(item.textContent).toContain("\u2026");
-    }
-  });
-
-  it("preserves full labels as accessible names on truncated crumbs", () => {
-    const { container } = renderPage();
-
-    const middleLinks = Array.from(
-      container.querySelectorAll<HTMLAnchorElement>(
-        ".breadcrumb-middle .breadcrumb-link",
-      ),
-    );
-
-    const fullLabels = [
-      "GrantFox Wave Compute API – Stellar Edition",
-      "Rate Limits & Throttling Policies",
-    ];
-
-    middleLinks.forEach((link, i) => {
-      // title is always set
-      expect(link.getAttribute("title")).toBe(fullLabels[i]);
-      // aria-label is set when truncated (both labels exceed 28 chars)
-      expect(link.getAttribute("aria-label")).toBe(fullLabels[i]);
-    });
+  it("shows the not-published state when the API has no rateLimits", async () => {
+    renderPage("unpublished");
+    expect(await screen.findByText("This provider has not published rate limits.")).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
   });
 
   // ── Rate-limit table (Desktop) ────────────────────────────────────────────
@@ -166,15 +104,15 @@ describe("RateLimitCard", () => {
     for (const plan of ["Free", "Developer", "Pro", "Enterprise"]) {
       expect(screen.getByText(plan)).toBeTruthy();
     }
+    expect(nav.textContent).toContain("Three Tier API");
   });
 
-  it("shows the correct requests-per-minute value for the Free tier", () => {
-    renderPage();
-    // "10" appears in both the Free row (req/min) and Developer row (concurrent),
-    // so we confirm it is present at least once in the table.
-    const cells = screen.getAllByText("10");
-    expect(cells.length).toBeGreaterThanOrEqual(1);
+  it("contains no GrantFox literals", async () => {
+    const { container } = renderPage("three-tier");
+    await screen.findByRole("table");
+    expect(container.textContent).not.toMatch(/GrantFox/i);
   });
+});
 
   it("renders the throttle note below the table", () => {
     renderPage();

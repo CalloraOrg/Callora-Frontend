@@ -21,8 +21,10 @@ import { useDebounce } from "../hooks/useDebounce";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import {
   CATALOG_CACHE_KEY,
+  buildCacheKey,
   fetchCatalog,
   isCatalogAbortError,
+  type CatalogParams,
 } from "../api/catalogApi";
 import { getCache, setCache } from "../utils/offlineApiCache";
 import {
@@ -115,20 +117,39 @@ export default function MarketplacePage(): JSX.Element {
   const { account } = useAccountContext();
   const cacheOwnerId = account?.id ?? "marketplace";
 
+  // Only send category when exactly one category is selected.
+  // With several categories, fetch without category and keep filtering on the
+  // client (the backend only accepts a single category query parameter).
+  const serverCategory =
+    categories.size === 1 ? Array.from(categories)[0] : undefined;
+  const serverSearch = debouncedQuery.trim() || undefined;
+
+  const serverParams = useMemo<CatalogParams>(() => {
+    const params: CatalogParams = {};
+    if (serverSearch) params.search = serverSearch;
+    if (serverCategory) params.category = serverCategory;
+    return params;
+  }, [serverSearch, serverCategory]);
+
   const runCatalogFetch = useCallback(
-    async (seq: number, controller: AbortController) => {
+    async (
+      seq: number,
+      controller: AbortController,
+      params: CatalogParams = {},
+    ) => {
       const { signal } = controller;
+      const cacheKey = buildCacheKey(params);
       const readCachedCatalog = (): APIItem[] =>
-        getCache<APIItem[]>(cacheOwnerId, CATALOG_CACHE_KEY) ?? [];
+        getCache<APIItem[]>(cacheOwnerId, cacheKey) ?? [];
 
       try {
-        const items = await trackFetch(fetchCatalog(signal));
+        const items = await trackFetch(fetchCatalog(signal, params));
         // A superseded request (or an unmount) must never write state.
         if (signal.aborted || seq !== requestSeqRef.current) return;
         setCatalog(items);
         setIsShowingStaleData(false);
         setFetchError(null);
-        setCache(cacheOwnerId, CATALOG_CACHE_KEY, items);
+        setCache(cacheOwnerId, cacheKey, items);
       } catch (err) {
         if (signal.aborted || isCatalogAbortError(err)) return;
         if (seq !== requestSeqRef.current) return;
@@ -158,23 +179,35 @@ export default function MarketplacePage(): JSX.Element {
     [cacheOwnerId, trackFetch],
   );
 
-  const startCatalogFetch = useCallback(() => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const seq = ++requestSeqRef.current;
-    setIsLoading(true);
-    setFetchError(null);
-    return runCatalogFetch(seq, controller);
-  }, [runCatalogFetch]);
+  const startCatalogFetch = useCallback(
+    (params: CatalogParams = {}) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const seq = ++requestSeqRef.current;
+      setIsLoading(true);
+      setFetchError(null);
+      return runCatalogFetch(seq, controller, params);
+    },
+    [runCatalogFetch],
+  );
 
+  // In backend mode (API_BASE configured), fetch on mount and refetch whenever
+  // debounced search or single-category selection changes.
+  // In demo mode (!API_BASE), fetch only once on mount with no query params.
   useEffect(() => {
-    void startCatalogFetch();
+    void startCatalogFetch(API_BASE ? serverParams : {});
     return () => {
       abortRef.current?.abort();
       abortRef.current = null;
     };
-  }, [startCatalogFetch]);
+  }, [
+    startCatalogFetch,
+    Boolean(API_BASE),
+    API_BASE ? serverParams.search : undefined,
+    API_BASE ? serverParams.category : undefined,
+    API_BASE ? categories.size : 0,
+  ]);
 
   useEffect(() => {
     setDensityPreference(density);
@@ -201,9 +234,8 @@ export default function MarketplacePage(): JSX.Element {
     (favoritesOnly ? 1 : 0) +
     (statuses.size > 0 ? 1 : 0);
 
-  // Retry re-issues the real catalogue request rather than faking progress,
-  // so a recovered backend actually replaces the error state.
-  const handleRetryFetch = () => startCatalogFetch();
+  const handleRetryFetch = () =>
+    startCatalogFetch(API_BASE ? serverParams : {});
 
   // Tag facets are derived from the loaded catalogue so a newly published API's
   // tags are selectable the moment it appears.

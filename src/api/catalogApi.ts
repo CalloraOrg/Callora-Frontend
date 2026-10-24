@@ -7,7 +7,7 @@
  * compiled into the bundle: APIs are published at runtime, so the page has to
  * ask the backend what exists right now. This module owns that wire protocol so
  * the page component never touches `fetch` directly and the request stays
- * unit-testable via the injected {@link CreateCatalogAPiOptions.fetchImpl}.
+ * unit-testable via the injected {@link CreateCatalogApiOptions.fetchImpl}.
  *
  * The shape mirrors `quotaApi.ts` deliberately: a factory that returns an
  * object with a catalogue method and a detail method, and a shared singleton
@@ -30,6 +30,57 @@ export const CATALOG_PATH = "/api/apis";
 /** Key the last good catalogue is cached under (scoped per account). */
 export const CATALOG_CACHE_KEY = "catalog";
 
+export const CACHE_KEY_PREFIX = "callora-catalog-cache-";
+
+export interface CatalogParams {
+  search?: string;
+  category?: string;
+}
+
+export interface CatalogResponse {
+  items: APIItem[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * Builds a unique cache key including server query parameters.
+ * This ensures a filtered response never overwrites an unfiltered cache.
+ */
+export function buildCacheKey(params: CatalogParams = {}): string {
+  const searchParams = new URLSearchParams();
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (params.category?.trim()) {
+    searchParams.set("category", params.category.trim());
+  }
+  const qs = searchParams.toString();
+  return `${CACHE_KEY_PREFIX}${qs || "all"}`;
+}
+
+/**
+ * Clears cached catalog responses from sessionStorage.
+ */
+export function clearCatalogCache(): void {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(CACHE_KEY_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+  } catch {
+    // Ignore errors
+  }
+}
+
+export type ApiDetail = APIItem;
+
 /**
  * Result of a single-API detail fetch.
  *
@@ -39,17 +90,18 @@ export const CATALOG_CACHE_KEY = "catalog";
  * {@link CatalogFetchError}.
  */
 export type ApiDetailResult =
-  | { status: "ready"; api: APIItem }
-  | { status: "not-found" };
+  | { status: "ready"; kind?: "ready"; api: APIItem }
+  | { status: "not-found"; kind: "not-found"; api?: undefined };
 
 export interface CatalogApi {
   /**
-   * Fetches the full marketplace catalogue.
+   * Fetches the marketplace catalogue.
    *
    * @param signal Aborts the request; rejects with an `AbortError` when
    *   aborted before the response is read.
+   * @param params Optional server-side search and category filter parameters.
    */
-  fetchCatalog(signal?: AbortSignal): Promise<APIItem[]>;
+  fetchCatalog(signal?: AbortSignal, params?: CatalogParams): Promise<APIItem[]>;
 
   /**
    * Fetches a single API by id.
@@ -123,86 +175,110 @@ export interface BackendEndpoint {
   [key: string]: unknown;
 }
 
-export interface BackendApiRow {
-  id: string | number;
-  name: string;
-  description?: string;
-  base_url?: string;
-  logo_url?: string;
-  category?: string;
-  status?: string;
-  developer?: BackendDeveloper;
-  endpoints?: BackendEndpoint[];
-  [key: string]: unknown;
-}
-
 /**
- * Adapts a snake_case, cursor-paginated Callora-Backend API row into the
- * frontend `APIItem` contract.
+ * Adapts a raw backend API row into the frontend's {@link APIItem}.
  *
- * Rules:
- * - Stringifies `id`.
- * - Maps `developer.name` to `provider.name` (fallback "Unknown provider") and
- *   `developer.website` to `provider.url`.
- * - Maps `logo_url` to `provider.avatar` and `base_url` to `baseUrl`.
- * - Maps backend `status` to UI enum, unknown values become `undefined`.
- * - Derives `pricePerRequest` from the minimum endpoint price when endpoints
- *   carry pricing, and otherwise leaves it as 0 with `pricingOnRequest: true`.
- * - Drops invalid rows (e.g. `id == null`, missing/empty `name`) by returning `null`.
+ * Returns `null` if the row lacks an `id` or `name`, dropping broken rows
+ * before they can render with missing fields.
  */
-export function adaptBackendApi(row: unknown): APIItem | null {
-  if (!isRecord(row)) return null;
+export function adaptBackendApi(raw: unknown): APIItem | null {
+  if (!isRecord(raw)) return null;
 
-  if (row.id === null || row.id === undefined) return null;
-  const idStr = String(row.id).trim();
-  if (!idStr) return null;
+  const rawId = raw.id;
+  if (rawId === null || rawId === undefined || rawId === "") return null;
+  const id = String(rawId).trim();
+  if (!id) return null;
 
-  if (typeof row.name !== "string" || !row.name.trim()) return null;
+  const name = typeof raw.name === "string" ? raw.name.trim() : "";
+  if (!name) return null;
 
-  const developer = isRecord(row.developer) ? (row.developer as BackendDeveloper) : null;
-  const providerName = developer?.name?.trim() || "Unknown provider";
-  const providerUrl = developer?.website?.trim() || undefined;
-  const providerAvatar = typeof row.logo_url === "string" ? row.logo_url : undefined;
-  const baseUrl = typeof row.base_url === "string" ? row.base_url : undefined;
+  const description =
+    typeof raw.description === "string" ? raw.description : "";
+  const category = typeof raw.category === "string" ? raw.category : undefined;
 
-  let status: APIItem["status"] = undefined;
-  if (row.status === "operational" || row.status === "degraded" || row.status === "maintenance") {
-    status = row.status;
-  }
+  let providerName = "Unknown provider";
+  let providerUrl: string | undefined;
+  let providerAvatar: string | undefined;
 
-  // Derive pricing from endpoints
-  let pricePerRequest = 0;
-  let pricingOnRequest = false;
-
-  const endpoints = Array.isArray(row.endpoints) ? row.endpoints : [];
-  const prices: number[] = [];
-  for (const ep of endpoints) {
-    if (isRecord(ep)) {
-      const p = ep.price ?? ep.price_per_call ?? ep.price_per_request ?? ep.pricing ?? ep.cost;
-      if (typeof p === "number" && Number.isFinite(p) && p >= 0) {
-        prices.push(p);
-      }
+  if (isRecord(raw.developer)) {
+    const dev = raw.developer as BackendDeveloper;
+    if (typeof dev.name === "string" && dev.name.trim()) {
+      providerName = dev.name.trim();
+    }
+    if (typeof dev.website === "string" && dev.website.trim()) {
+      providerUrl = dev.website.trim();
+    }
+  } else if (isRecord(raw.provider)) {
+    const prov = raw.provider as Record<string, unknown>;
+    if (typeof prov.name === "string" && prov.name.trim()) {
+      providerName = prov.name.trim();
+    }
+    if (typeof prov.url === "string" && prov.url.trim()) {
+      providerUrl = prov.url.trim();
+    }
+    if (typeof prov.avatar === "string" && prov.avatar.trim()) {
+      providerAvatar = prov.avatar.trim();
     }
   }
 
-  if (prices.length > 0) {
-    pricePerRequest = Math.min(...prices);
-    pricingOnRequest = false;
-  } else {
-    pricePerRequest = 0;
-    pricingOnRequest = true;
+  let status: APIItem["status"] = undefined;
+  if (
+    raw.status === "operational" ||
+    raw.status === "degraded" ||
+    raw.status === "maintenance"
+  ) {
+    status = raw.status;
+  }
+
+  const baseUrl =
+    typeof raw.baseUrl === "string"
+      ? raw.baseUrl
+      : typeof raw.base_url === "string"
+        ? raw.base_url
+        : undefined;
+
+  if (!providerAvatar && typeof raw.logo_url === "string") {
+    providerAvatar = raw.logo_url;
+  }
+
+  // Derive price per request from endpoints if present
+  let pricePerRequest = 0;
+  let pricingOnRequest = false;
+
+  const endpoints = Array.isArray(raw.endpoints) ? raw.endpoints : [];
+  if (endpoints.length > 0) {
+    const prices = endpoints
+      .map((ep: unknown) => {
+        if (!isRecord(ep)) return null;
+        const p =
+          ep.price ?? ep.price_per_call ?? ep.price_per_request ?? ep.pricing ?? ep.cost;
+        return typeof p === "number" && !Number.isNaN(p) ? p : null;
+      })
+      .filter((p): p is number => p !== null);
+
+    if (prices.length > 0) {
+      pricePerRequest = Math.min(...prices);
+    } else {
+      pricingOnRequest = true;
+    }
+  } else if (typeof raw.pricePerRequest === "number") {
+    pricePerRequest = raw.pricePerRequest;
+  } else if (typeof raw.price_per_request === "number") {
+    pricePerRequest = raw.price_per_request;
+  } else if (typeof raw.price === "number") {
+    pricePerRequest = raw.price;
   }
 
   return {
-    id: idStr,
-    name: row.name.trim(),
+    id,
+    name,
+    description,
+    category,
     provider: {
       name: providerName,
       url: providerUrl,
       avatar: providerAvatar,
     },
-    description: typeof row.description === "string" ? row.description : "",
-    category: typeof row.category === "string" ? row.category : undefined,
     status,
     baseUrl,
     pricePerRequest,
@@ -214,13 +290,6 @@ export function adaptBackendApi(row: unknown): APIItem | null {
 /**
  * Normalises the catalogue payload.
  *
- * The backend may answer with a bare array or wrap it (`{ data: [...] }` /
- * `{ apis: [...] }`); both are accepted so a response-shape change is a
- * one-line fix here rather than a page rewrite. Entries that are not objects
- * carrying the two fields the marketplace cannot render without (`id` and
- * `name`) are dropped instead of poisoning the list, so one malformed row does
- * not take the whole page down.
- *
  * Accepts both legacy `APIItem` shapes and backend rows via `adaptBackendApi`.
  */
 export function normalizeCatalog(payload: unknown): APIItem[] {
@@ -230,7 +299,9 @@ export function normalizeCatalog(payload: unknown): APIItem[] {
       ? payload.data
       : isRecord(payload) && Array.isArray(payload.apis)
         ? payload.apis
-        : null;
+        : isRecord(payload) && Array.isArray(payload.items)
+          ? payload.items
+          : null;
 
   if (!list) {
     throw new CatalogFetchError("The catalogue response was not a list of APIs.");
@@ -240,7 +311,6 @@ export function normalizeCatalog(payload: unknown): APIItem[] {
   for (const item of list) {
     if (!isRecord(item)) continue;
 
-    // Legacy shape check: string id, string name, provider object with string name
     if (
       typeof item.id === "string" &&
       typeof item.name === "string" &&
@@ -261,10 +331,6 @@ export function normalizeCatalog(payload: unknown): APIItem[] {
 
 /**
  * Normalises a single-API detail payload into the frontend `APIItem`.
- *
- * The backend returns a single object for `GET /api/apis/:id`, but accepts a
- * wrapper (`{ data: {...} }`) in case the response shape changes. Returns `null`
- * if the payload cannot be adapted.
  */
 export function normalizeApiDetail(payload: unknown): APIItem | null {
   if (isRecord(payload) && isRecord(payload.data)) {
@@ -282,8 +348,8 @@ export function createCatalogApi(
 ): CatalogApi {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
 
-  let cachedEtag: string | null = null;
-  let cachedList: APIItem[] = [];
+  const cachedEtags = new Map<string, string>();
+  const cachedLists = new Map<string, APIItem[]>();
 
   const resolveBase = (): string =>
     options.baseUrl !== undefined
@@ -291,20 +357,32 @@ export function createCatalogApi(
       : "";
 
   return {
-    async fetchCatalog(signal) {
+    async fetchCatalog(signal, params = {}) {
       if (signal?.aborted) {
         throw abortError();
       }
 
+      const searchParams = new URLSearchParams();
+      if (params.search?.trim()) {
+        searchParams.set("search", params.search.trim());
+      }
+      if (params.category?.trim()) {
+        searchParams.set("category", params.category.trim());
+      }
+
+      const queryString = searchParams.toString();
+      const pathWithQuery = queryString ? `${CATALOG_PATH}?${queryString}` : CATALOG_PATH;
+
       const headers: Record<string, string> = {
         Accept: "application/json",
       };
-      if (cachedEtag) {
-        headers["If-None-Match"] = cachedEtag;
+      const etag = cachedEtags.get(pathWithQuery);
+      if (etag) {
+        headers["If-None-Match"] = etag;
       }
 
       const base = resolveBase();
-      const targetUrl = base ? `${base}${CATALOG_PATH}` : apiUrl(CATALOG_PATH);
+      const targetUrl = base ? `${base}${pathWithQuery}` : apiUrl(pathWithQuery);
 
       let response: Response;
       try {
@@ -325,19 +403,19 @@ export function createCatalogApi(
       }
 
       if (response.status === 304) {
-        return cachedList;
+        return cachedLists.get(pathWithQuery) ?? [];
       }
 
       if (!response.ok) {
         throw new CatalogFetchError(
-          "The marketplace service is unavailable right now.",
+          `Failed to fetch catalog: ${response.statusText || response.status}`,
           response.status,
         );
       }
 
-      const etag = response.headers.get("etag") ?? response.headers.get("ETag");
-      if (etag) {
-        cachedEtag = etag;
+      const newEtag = response.headers.get("etag") ?? response.headers.get("ETag");
+      if (newEtag) {
+        cachedEtags.set(pathWithQuery, newEtag);
       }
 
       let payload: unknown;
@@ -357,7 +435,8 @@ export function createCatalogApi(
       }
 
       const items = normalizeCatalog(payload);
-      cachedList = items;
+      cachedLists.set(pathWithQuery, items);
+
       return items;
     },
 
@@ -388,11 +467,8 @@ export function createCatalogApi(
         throw abortError();
       }
 
-      // 404 (unknown id) and 400 (non-integer id) both mean "this API does
-      // not exist for the user", so they resolve to the typed not-found
-      // result rather than rejecting.
       if (response.status === 404 || response.status === 400) {
-        return { status: "not-found" };
+        return { status: "not-found", kind: "not-found" };
       }
 
       if (!response.ok) {
@@ -424,7 +500,7 @@ export function createCatalogApi(
           "The marketplace service returned an unreadable response.",
         );
       }
-      return { status: "ready", api };
+      return { status: "ready", kind: "ready", api };
     },
   };
 }
@@ -441,24 +517,21 @@ export const catalogApi: CatalogApi = createCatalogApi({
  * can `vi.mock` this module with a single replacement and drive every
  * loading / success / failure path of the page.
  */
-export async function fetchCatalog(signal?: AbortSignal): Promise<APIItem[]> {
+export async function fetchCatalog(
+  signal?: AbortSignal,
+  params?: CatalogParams,
+): Promise<APIItem[]> {
   // No backend configured (static demo deployment): use the bundled sample
   // catalogue instead of firing a request that can only fail.
   if (!API_BASE) return MOCK_APIS;
 
   // When API_BASE is configured, errors must reject so the UI surfaces its
   // error or stale-data states rather than hiding failures behind mock data.
-  return await catalogApi["fetchCatalog"](signal);
+  return await catalogApi.fetchCatalog(signal, params);
 }
 
 /**
  * Reads a single API detail from `GET /api/apis/:id`.
- *
- * Exported as a standalone function so the detail page can `iv.mock` this
- * module and drive loading / ready / not-found / error states.
- *
- * Demo mode (no `API_BASE`) resolves from the bundled `MOCK_APIS` without
- * touching the network.
  */
 export async function fetchApiDetail(
   id: string,
@@ -468,11 +541,11 @@ export async function fetchApiDetail(
     throw abortError();
   }
 
-  // No backend configured (static demo deployment): resolve from the
-  // bundled sample catalogue instead of firing a request that can only fail.
   if (!API_BASE) {
     const found = MOCK_APIS.find((api) => api.id === id);
-    return found ? { status: "ready", api: found } : { status: "not-found" };
+    return found
+      ? { status: "ready", kind: "ready", api: found }
+      : { status: "not-found", kind: "not-found" };
   }
 
   return await catalogApi.fetchApiDetail(id, signal);

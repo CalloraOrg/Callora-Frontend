@@ -4,19 +4,11 @@ import useDocumentTitle from "../hooks/useDocumentTitle";
 import "./RateLimitCard.css";
 
 /**
- * RateLimitCard – GrantFox FWC26 campaign "Stellar Wave" (issue #567)
+ * RateLimitCard – per-API rate limits at `/marketplace/:apiId/rate-limits`.
  *
- * Displays rate-limit configuration for a deeply nested API endpoint.
- * The breadcrumb path intentionally contains long segment names to exercise
- * the middle-ellipsis truncation feature (`maxLabelLength` prop) added to
- * the Breadcrumb component.
- *
- * The breadcrumb trail is:
- *   Marketplace → GrantFox Wave Compute API (long) → Rate Limits → Current Page
- *
- * With `maxLabelLength={28}` the two middle segments are each capped at
- * 28 characters in the visible label while the full strings remain available
- * via `title` / `aria-label` for screen readers and on hover.
+ * The API is resolved from the catalogue (`fetchCatalog`) and the table is
+ * built from `api.rateLimits`. Optional columns (burst, concurrent
+ * connections) render only when at least one tier publishes that field.
  */
 
 /** Rate-limit tier shape used in the table below. */
@@ -81,11 +73,7 @@ const BREADCRUMB_ITEMS = [
   },
 ] as const;
 
-/**
- * Maximum characters before a crumb label is shortened with a middle-ellipsis.
- * Chosen so the two long middle segments fit comfortably in a single breadcrumb
- * row even on narrow viewports.
- */
+/** Maximum characters before a crumb label is shortened with a middle-ellipsis. */
 const BREADCRUMB_MAX_LABEL = 28;
 
 /** Pattern class and description for each plan tier (color-blind safe). */
@@ -184,9 +172,7 @@ export default function RateLimitCard({
       <div className="rate-limit-card">
         <div className="rate-limit-card-header">
           <h1 className="rate-limit-card-title">Rate Limit Configuration</h1>
-          <p className="rate-limit-card-subtitle">
-            GrantFox Wave Compute API – Stellar Edition &nbsp;·&nbsp; FWC26
-          </p>
+          {api && <p className="rate-limit-card-subtitle">{api.name}</p>}
         </div>
 
         {isMobile ? (

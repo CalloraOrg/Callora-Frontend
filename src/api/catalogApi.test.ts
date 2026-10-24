@@ -1,47 +1,123 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   adaptBackendApi,
+  buildCacheKey,
+  clearCatalogCache,
   createCatalogApi,
   fetchCatalog,
   normalizeCatalog,
-  CATALOG_PATH,
   CatalogFetchError,
-  isCatalogAbortError,
 } from "./catalogApi";
-import MOCK_APIS from "../data/mockApis";
 import * as constants from "../config/constants";
+import MOCK_APIS from "../data/mockApis";
 
-describe("catalogApi and adaptBackendApi (Issue #1327)", () => {
+const originalFetch = globalThis.fetch;
+const originalSessionStorage = globalThis.sessionStorage;
+
+const mockSessionStorage: Record<string, string> = {};
+
+function createMockSessionStorage() {
+  return {
+    getItem: vi.fn((key: string) => mockSessionStorage[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => {
+      mockSessionStorage[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete mockSessionStorage[key];
+    }),
+    key: vi.fn((index: number) => Object.keys(mockSessionStorage)[index] ?? null),
+    get length() {
+      return Object.keys(mockSessionStorage).length;
+    },
+    clear: vi.fn(() => {
+      Object.keys(mockSessionStorage).forEach((key) => delete mockSessionStorage[key]);
+    }),
+  };
+}
+
+describe("catalogApi module", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    globalThis.sessionStorage = createMockSessionStorage() as unknown as Storage;
+    Object.keys(mockSessionStorage).forEach((k) => delete mockSessionStorage[k]);
+    clearCatalogCache();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    globalThis.sessionStorage = originalSessionStorage;
+  });
+
+  describe("buildCacheKey", () => {
+    it("returns base key for empty params", () => {
+      expect(buildCacheKey({})).toBe("callora-catalog-cache-all");
+    });
+
+    it("includes search param", () => {
+      expect(buildCacheKey({ search: "geo" })).toBe("callora-catalog-cache-search=geo");
+    });
+
+    it("includes category param", () => {
+      expect(buildCacheKey({ category: "Finance" })).toBe("callora-catalog-cache-category=Finance");
+    });
+
+    it("includes both search and category", () => {
+      expect(buildCacheKey({ search: "geo", category: "Finance" })).toBe(
+        "callora-catalog-cache-search=geo&category=Finance",
+      );
+    });
+
+    it("trims whitespace and omits empty values", () => {
+      expect(buildCacheKey({ search: "  geo  ", category: "" })).toBe(
+        "callora-catalog-cache-search=geo",
+      );
+      expect(buildCacheKey({ search: "", category: "  Finance  " })).toBe(
+        "callora-catalog-cache-category=Finance",
+      );
+    });
+  });
+
+  describe("clearCatalogCache", () => {
+    it("removes all catalog cache keys from sessionStorage", () => {
+      globalThis.sessionStorage.setItem("callora-catalog-cache-search=geo", "[]");
+      globalThis.sessionStorage.setItem("callora-catalog-cache-category=Finance", "[]");
+      globalThis.sessionStorage.setItem("unrelated-key", "val");
+
+      clearCatalogCache();
+
+      expect(globalThis.sessionStorage.getItem("callora-catalog-cache-search=geo")).toBeNull();
+      expect(globalThis.sessionStorage.getItem("callora-catalog-cache-category=Finance")).toBeNull();
+      expect(globalThis.sessionStorage.getItem("unrelated-key")).toBe("val");
+    });
   });
 
   describe("adaptBackendApi", () => {
-    it("adapts backend row with number id, developer mapping, logo, status and endpoint pricing (Scenario 1)", () => {
-      const backendRow = {
-        id: 7,
-        name: "Payments Engine",
-        description: "Fast multi-currency settlement",
-        base_url: "https://pay.example.com",
-        logo_url: "https://pay.example.com/logo.png",
+    it("converts a full backend API row into an APIItem (Scenario 5)", () => {
+      const row = {
+        id: "10",
+        name: "Acme Payments",
+        description: "Fast transfers",
         category: "Finance",
-        status: "operational",
         developer: {
-          name: "Acme Payments",
+          name: "Acme Corp",
           website: "https://acme.example.com",
-          description: "Fintech innovator",
         },
+        logo_url: "https://pay.example.com/logo.png",
+        base_url: "https://pay.example.com",
+        status: "operational",
         endpoints: [
-          { path: "/charge", price: 0.05 },
-          { path: "/refund", price_per_call: 0.02 },
+          { path: "/pay", price_per_call: 0.02 },
+          { path: "/status", price_per_call: 0.05 },
         ],
       };
 
-      const item = adaptBackendApi(backendRow);
+      const item = adaptBackendApi(row);
       expect(item).not.toBeNull();
-      expect(item?.id).toBe("7");
-      expect(item?.name).toBe("Payments Engine");
-      expect(item?.provider.name).toBe("Acme Payments");
+      expect(item?.id).toBe("10");
+      expect(item?.name).toBe("Acme Payments");
+      expect(item?.description).toBe("Fast transfers");
+      expect(item?.category).toBe("Finance");
+      expect(item?.provider.name).toBe("Acme Corp");
       expect(item?.provider.url).toBe("https://acme.example.com");
       expect(item?.provider.avatar).toBe("https://pay.example.com/logo.png");
       expect(item?.baseUrl).toBe("https://pay.example.com");
@@ -67,7 +143,7 @@ describe("catalogApi and adaptBackendApi (Issue #1327)", () => {
       expect(adaptBackendApi({ id: null, name: "Null API" })).toBeNull();
       expect(adaptBackendApi({ id: undefined, name: "Undef API" })).toBeNull();
       expect(adaptBackendApi({ id: "", name: "Empty ID" })).toBeNull();
-      expect(adaptBackendApi({ id: 5 })).toBeNull(); // missing name
+      expect(adaptBackendApi({ id: 5 })).toBeNull();
       expect(adaptBackendApi(null)).toBeNull();
       expect(adaptBackendApi("not an object")).toBeNull();
     });
@@ -163,6 +239,35 @@ describe("catalogApi and adaptBackendApi (Issue #1327)", () => {
       expect(items[0].id).toBe("1");
     });
 
+    it("serialises search and category query params correctly (Issue #1328)", async () => {
+      let requestedUrl = "";
+      const mockFetch: typeof fetch = vi.fn().mockImplementation((url: string) => {
+        requestedUrl = url;
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: [{ id: 1, name: "Filtered API" }],
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        );
+      });
+
+      const api = createCatalogApi({
+        baseUrl: "https://api.callora.test",
+        fetchImpl: mockFetch,
+      });
+
+      await api.fetchCatalog(undefined, { search: "geo", category: "Finance" });
+      expect(requestedUrl).toBe("https://api.callora.test/api/apis?search=geo&category=Finance");
+
+      await api.fetchCatalog(undefined, { search: "   " });
+      expect(requestedUrl).toBe("https://api.callora.test/api/apis");
+    });
+
     it("supports conditional request 304 keeping cached list without flashing empty (Scenario 7)", async () => {
       let requestHeaders: Record<string, string> = {};
       let callCount = 0;
@@ -187,7 +292,6 @@ describe("catalogApi and adaptBackendApi (Issue #1327)", () => {
             ),
           );
         } else {
-          // Second call: 304 Not Modified
           return Promise.resolve(
             new Response(null, {
               status: 304,

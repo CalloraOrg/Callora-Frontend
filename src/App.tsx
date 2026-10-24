@@ -7,7 +7,7 @@ import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut, formatUsdcStroops, normalizeUsdcAmountInput, stroopsToUsdcAmount, usdcAmountToStroops, USDC_DECIMALS } from "./utils/format";
 import { useNetworkFee } from "./components/DepositPreview";
-import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR, STELLAR_VAULT_CONTRACT_ID, PENDING_DEPOSIT_STORAGE_KEY, TRANSACTION_TIMEOUT_SECONDS, type StellarNetwork } from "./config/constants";
+import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR, STELLAR_VAULT_CONFIG, STELLAR_VAULT_CONTRACT_ID, PENDING_DEPOSIT_STORAGE_KEY, TRANSACTION_TIMEOUT_SECONDS, type StellarNetwork } from "./config/constants";
 import type { WalletServiceErrorCode, UsdcTrustlineStatus } from "./services/walletService";
 import { useVaultBalances } from "./hooks/useVaultBalances";
 import BalanceReadout from "./components/BalanceReadout";
@@ -19,6 +19,9 @@ import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { useAccountContext } from "./hooks/useAccountContext";
+import { signIn, signOut, isSignedIn, type AuthServiceErrorCode } from "./services/authService";
+import { useSessionExpiry } from "./hooks/useSessionExpiry";
+import SessionExpiryBanner from "./components/SessionExpiryBanner";
 import WalletStatus from "./components/WalletStatus";
 import { useWalletStore } from "./state/walletStore";
 
@@ -52,7 +55,6 @@ const routePrefetchers: Record<string, () => Promise<any>> = {
   "/theme-playground": () => import("./pages/ThemePlayground"),
   "/design-system/docs": () => import("./pages/DesignSystemDocs"),
   "/a11y-audit": () => import("./pages/A11yAudit"),
-  "/rate-limit": () => import("./pages/RateLimitCard"),
   "/webhooks/deliveries": () => import("./pages/WebhookDeliveries"),
   "/endpoints": () => import("./pages/EndpointSummary"),
 };
@@ -115,6 +117,7 @@ export function clearPendingDeposit(): void {
 }
 
 type WalletServiceFailure = Error & {
+  contractErrorCode?: number;
   code: WalletServiceErrorCode;
   requiresReconciliation: boolean;
 };
@@ -228,6 +231,15 @@ const PRIMARY_NAV: Array<{ to: string; label: string }> = [
   { to: APP_ROUTES.billing, label: "Billing" },
   { to: APP_ROUTES.documentation, label: "Docs" },
 ];
+
+/** `/rate-limit` no longer exists; limits are per-API. Send users to the Marketplace. */
+function LegacyRateLimitRedirect() {
+  const { showToast } = useToast();
+  useEffect(() => {
+    showToast("Rate limits are now shown per API. Pick an API to see its limits.");
+  }, [showToast]);
+  return <Navigate to={APP_ROUTES.marketplace} replace />;
+}
 
 function buildExplorerLink(hash: string) {
   return `${EXPLORER_BASE_URL}${hash}`;
@@ -458,6 +470,8 @@ function App() {
   const [walletAddress, setWalletAddress] = useState("");
   const [isAddingTrustline, setIsAddingTrustline] = useState(false);
   const [trustlineCheckVersion, setTrustlineCheckVersion] = useState(0);
+  const [vaultPreflight, setVaultPreflight] = useState<{ status: "idle" | "checking" | "ready" | "blocked" | "unverified"; message: string }>({ status: "idle", message: "" });
+  const [depositContractErrorCode, setDepositContractErrorCode] = useState<number | null>(null);
   const [depositFailureCode, setDepositFailureCode] = useState<WalletServiceErrorCode | null>(null);
   const [depositRequiresReconciliation, setDepositRequiresReconciliation] = useState(false);
   const [txHash, setTxHash] = useState("");
@@ -573,6 +587,7 @@ function App() {
 
   const hasValidAmount = validationMessage.length === 0;
   const stageLabel = getStageLabel(depositStage, hasValidAmount);
+  const vaultBlockReason = STELLAR_VAULT_CONFIG.error ?? (vaultPreflight.status === "blocked" ? vaultPreflight.message : null);
   const pendingHashLabel = txHash ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : null;
 
   useEffect(() => {
@@ -582,8 +597,9 @@ function App() {
     setWalletAvailability("checking");
     setTrustlineStatus("checking");
     setTrustlineMessage("");
+    setVaultPreflight({ status: "idle", message: "" });
     import("./services/walletService")
-      .then(async ({ isWalletAvailable, getWalletAddress, hasUsdcTrustline }) => {
+      .then(async ({ isWalletAvailable, getWalletAddress, hasUsdcTrustline, preflightVaultDeposit }) => {
         const available = await isWalletAvailable();
         if (!isCurrent) return;
         setWalletAvailability(available ? "available" : "missing");
@@ -592,6 +608,23 @@ function App() {
         const address = await getWalletAddress();
         if (!isCurrent) return;
         setWalletAddress(address);
+        if (!STELLAR_VAULT_CONFIG.error) {
+          setVaultPreflight({ status: "checking", message: "" });
+          preflightVaultDeposit(address)
+            .then((result) => {
+              if (!isCurrent) return;
+              if (result.paused) {
+                setVaultPreflight({ status: "blocked", message: "Deposits are paused on this vault right now." });
+              } else if (!result.allowlisted) {
+                setVaultPreflight({ status: "blocked", message: "This wallet is not on the vault's deposit allowlist." });
+              } else {
+                setVaultPreflight({ status: "ready", message: "" });
+              }
+            })
+            .catch(() => {
+              if (isCurrent) setVaultPreflight({ status: "unverified", message: "Could not verify vault status. You can still try the deposit." });
+            });
+        }
         const status = await hasUsdcTrustline(address);
         if (isCurrent) setTrustlineStatus(status);
       })
@@ -763,6 +796,7 @@ function App() {
         return;
       }
       setDepositFailureCode(failureCode);
+      setDepositContractErrorCode(walletError?.contractErrorCode ?? null);
       const reqReconciliation = walletError?.requiresReconciliation ?? false;
       setDepositRequiresReconciliation(reqReconciliation);
       const finalHash = capturedHash || txHash;
@@ -962,12 +996,14 @@ function App() {
               ))}
             </nav>
             <AccountSwitcher />
+            <WalletSignInButton />
             <WalletStatus />
             <ThemeToggle />
           </div>
         </header>
 
         <main id="main-content" role="main" className="page">
+          <AppSessionExpiryBanner />
           <LiveRegion message={balanceAnnouncement} />
           <Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
             <Routes>
@@ -1174,6 +1210,7 @@ function App() {
             <Route path="/a11y-audit" element={<A11yAudit />} />
 
             <Route path={APP_ROUTES.rateLimitCard} element={<RateLimitCard />} />
+            <Route path={APP_ROUTES.legacyRateLimit} element={<LegacyRateLimitRedirect />} />
 
             <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
 
@@ -1433,8 +1470,10 @@ function App() {
                     )}
 
                     {depositStage === "failed" && (
-                      <article className="error-card">
-                        <strong>{depositFailureCode === "SIGNATURE_REJECTED" ? "Signature rejected" : "Deposit failed"}</strong>
+                      <article className="error-card" role="alert">
+                        <strong>{depositFailureCode === "CONTRACT_REJECTED"
+                          ? `${statusMessage}${depositContractErrorCode === null ? "" : ` (code ${depositContractErrorCode})`}`
+                          : depositFailureCode === "SIGNATURE_REJECTED" ? "Signature rejected" : "Deposit failed"}</strong>
                         <p>{statusMessage}</p>
                         {hasUnconfirmedDeposit && validityTimeRemaining !== null && validityTimeRemaining > 0 && (
                           <p className="helper-text" style={{ marginTop: "0.5rem" }}>
@@ -1460,6 +1499,11 @@ function App() {
                 <div role="status" aria-live="polite" className="sr-only">
                   {checkDepositStatusMessage}
                 </div>
+                {depositStage === "input" && (vaultBlockReason || vaultPreflight.status === "unverified") && (
+                  <p id="vault-preflight-status" className="helper-text" role="status" aria-live="polite">
+                    {vaultBlockReason ?? vaultPreflight.message}
+                  </p>
+                )}
                 {walletAvailability === "missing" ? (
                   <div className="wallet-install-prompt" role="status">
                     <p>Install Freighter to sign this Stellar deposit.</p>
@@ -1499,8 +1543,10 @@ function App() {
                   <button className="primary-button" onClick={() => setTrustlineCheckVersion((version) => version + 1)} aria-describedby="usdc-trustline-status">
                     {trustlineStatus === "connect" ? "Connect Freighter" : "Check USDC trustline again"}
                   </button>
+                ) : vaultPreflight.status === "checking" && depositStage === "input" ? (
+                  <button className="primary-button" disabled>Checking vault...</button>
                 ) : (
-                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
+                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy || vaultBlockReason !== null} aria-describedby={vaultBlockReason ? "vault-preflight-status" : undefined} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
                     {depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
                   </button>
                 )}
@@ -1521,6 +1567,127 @@ function App() {
       </div>
   );
 }
+
+/**
+ * AppSessionExpiryBanner — renders the session-expiry banner when the session
+ * has expired, and dismisses it when the user clicks Dismiss or signs in again.
+ */
+function AppSessionExpiryBanner() {
+  const { isExpired, dismiss } = useSessionExpiry();
+  if (!isExpired) return null;
+  return (
+    <div style={{ padding: "0 24px" }}>
+      <SessionExpiryBanner onDismiss={dismiss} />
+    </div>
+  );
+}
+
+/**
+ * WalletSignInButton — topbar control that lets the user sign in with Freighter
+ * or sign out.  Manages its own loading / error state so the rest of the app
+ * does not need to know about it.
+ */
+function WalletSignInButton() {
+  const [signedIn, setSignedIn] = useState(isSignedIn);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Keep local state in sync after a session-expiry clears the token.
+  const { isExpired } = useSessionExpiry();
+  useEffect(() => {
+    if (isExpired) setSignedIn(false);
+  }, [isExpired]);
+
+  const handleSignIn = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await signIn();
+      setSignedIn(true);
+    } catch (err) {
+      const code: AuthServiceErrorCode | undefined =
+        err && typeof err === "object" && "code" in err
+          ? (err as { code: AuthServiceErrorCode }).code
+          : undefined;
+
+      if (code === "SIGNATURE_REJECTED") {
+        // User deliberately cancelled — don't show an error.
+      } else {
+        setError(
+          err instanceof Error && err.message
+            ? err.message
+            : "Sign in failed. Try again.",
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await signOut();
+    } finally {
+      // Clear regardless of whether the revoke call failed.
+      setSignedIn(false);
+      setLoading(false);
+    }
+  }, []);
+
+  return (
+    <div className="wallet-signin-btn-wrap" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+      {signedIn ? (
+        <button
+          type="button"
+          className="wallet-signin-btn wallet-signin-btn--out"
+          onClick={handleSignOut}
+          disabled={loading}
+          aria-busy={loading}
+          aria-label="Sign out of Callora"
+          style={WALLET_BTN_STYLE}
+        >
+          {loading ? "Signing out…" : "Sign out"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="wallet-signin-btn wallet-signin-btn--in"
+          onClick={handleSignIn}
+          disabled={loading}
+          aria-busy={loading}
+          aria-label="Sign in with Freighter wallet"
+          style={{ ...WALLET_BTN_STYLE, background: "var(--accent, #4e85ff)", color: "#fff", border: "none" }}
+        >
+          {loading ? "Signing in…" : "Sign in"}
+        </button>
+      )}
+      {error && (
+        <span
+          role="alert"
+          aria-live="polite"
+          style={{ fontSize: "0.75rem", color: "var(--danger, #ff7d8d)", maxWidth: 220, textAlign: "right" }}
+        >
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const WALLET_BTN_STYLE: React.CSSProperties = {
+  padding: "6px 14px",
+  borderRadius: 8,
+  border: "1px solid var(--line, rgba(169,184,255,0.16))",
+  background: "var(--surface-soft, rgba(255,255,255,0.04))",
+  color: "var(--text, #f3f5fb)",
+  fontSize: "0.82rem",
+  fontWeight: 600,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
 
 function AccountSwitcher() {
   const { account, accounts, switchAccount, addAccount, removeAccount, renameAccount } = useAccountContext();
