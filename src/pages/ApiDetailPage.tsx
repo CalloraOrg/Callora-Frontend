@@ -1325,6 +1325,15 @@ export default function ApiDetailPage({ onBack }: Props) {
                         View SLA
                       </Link>
                     </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "var(--mkt-space-xs)", borderTop: "1px solid var(--line, rgba(255,255,255,0.06))" }}>
+                      <span style={{ fontSize: 14, color: "var(--muted)" }}>Rate limits</span>
+                      <Link
+                        to={`/marketplace/${api.id}/rate-limits`}
+                        style={{ fontSize: 14, color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}
+                      >
+                        View rate limits
+                      </Link>
+                    </div>
                   </div>
                 </div>
 

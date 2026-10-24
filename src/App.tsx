@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from "react";
-import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
@@ -24,6 +24,7 @@ import { useSessionExpiry } from "./hooks/useSessionExpiry";
 import SessionExpiryBanner from "./components/SessionExpiryBanner";
 import WalletStatus from "./components/WalletStatus";
 import { useWalletStore } from "./state/walletStore";
+import { useToast } from "./components/Toast";
 
 // Route splitting: dynamic imports for all heavy page routes
 const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
@@ -216,7 +217,8 @@ const APP_ROUTES = {
   themePlayground: "/theme-playground",
   designSystem: "/design-system/docs",
   serverError: "/500",
-  rateLimitCard: "/rate-limit",
+  rateLimitCard: "/marketplace/:apiId/rate-limits",
+  legacyRateLimit: "/rate-limit",
   slaCard: "/marketplace/:apiId/sla",
   webhookDeliveries: "/webhooks/deliveries",
   onboarding: "/onboarding",
@@ -235,7 +237,11 @@ const PRIMARY_NAV: Array<{ to: string; label: string }> = [
 /** `/rate-limit` no longer exists; limits are per-API. Send users to the Marketplace. */
 function LegacyRateLimitRedirect() {
   const { showToast } = useToast();
+  const announced = useRef(false);
   useEffect(() => {
+    // Guard against StrictMode's double effect invocation in development.
+    if (announced.current) return;
+    announced.current = true;
     showToast("Rate limits are now shown per API. Pick an API to see its limits.");
   }, [showToast]);
   return <Navigate to={APP_ROUTES.marketplace} replace />;

@@ -70,7 +70,7 @@ describe('Route Splitting and Responsiveness Suite (Quality-2)', () => {
   });
 
   it('dynamically loads Rate Limit Card route inside Suspense boundary', async () => {
-    renderApp('/rate-limit');
+    renderApp('/marketplace/weather-001/rate-limits');
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Rate Limit Configuration/i })).toBeTruthy();
     }, { timeout: 4000 });
