@@ -157,7 +157,7 @@ Key contract details and adapter behavior:
 | `resolveStellarNetwork(raw)` | validate with dev-only warning |
 | `STELLAR_NETWORK_PASSPHRASE` | passphrase for `STELLAR_NETWORK`, used to sign deposits |
 | `STELLAR_RPC_URL` | `VITE_STELLAR_RPC_URL`, else the network's public RPC (none for mainnet) |
-| `STELLAR_VAULT_CONTRACT_ID` | `VITE_STELLAR_VAULT_CONTRACT_ID`, empty by default |
+| `STELLAR_VAULT_CONTRACT_ID` | `VITE_STELLAR_VAULT_CONTRACT_ID`; defaults to the reference testnet vault on `testnet`, empty on other networks. An invalid value (for example an account address) blocks deposits before signing. |
 | `STELLAR_USDC_ASSET` | classic USDC code and validated configured issuer |
 | `STELLAR_USDC_CONFIGURATION_ERROR` | invalid/missing issuer configuration error, otherwise `null` |
 | `STELLAR_HORIZON_URL` | Horizon origin for `STELLAR_NETWORK` |

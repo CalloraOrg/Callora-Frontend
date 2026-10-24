@@ -7,7 +7,7 @@ import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut, formatUsdcStroops, normalizeUsdcAmountInput, stroopsToUsdcAmount, usdcAmountToStroops, USDC_DECIMALS } from "./utils/format";
 import { useNetworkFee } from "./components/DepositPreview";
-import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR, STELLAR_VAULT_CONTRACT_ID, PENDING_DEPOSIT_STORAGE_KEY, TRANSACTION_TIMEOUT_SECONDS, type StellarNetwork } from "./config/constants";
+import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR, STELLAR_VAULT_CONFIG, STELLAR_VAULT_CONTRACT_ID, PENDING_DEPOSIT_STORAGE_KEY, TRANSACTION_TIMEOUT_SECONDS, type StellarNetwork } from "./config/constants";
 import type { WalletServiceErrorCode, UsdcTrustlineStatus } from "./services/walletService";
 import { useVaultBalances } from "./hooks/useVaultBalances";
 import BalanceReadout from "./components/BalanceReadout";
@@ -470,6 +470,7 @@ function App() {
   const [walletAddress, setWalletAddress] = useState("");
   const [isAddingTrustline, setIsAddingTrustline] = useState(false);
   const [trustlineCheckVersion, setTrustlineCheckVersion] = useState(0);
+  const [vaultPreflight, setVaultPreflight] = useState<{ status: "idle" | "checking" | "ready" | "blocked" | "unverified"; message: string }>({ status: "idle", message: "" });
   const [depositContractErrorCode, setDepositContractErrorCode] = useState<number | null>(null);
   const [depositFailureCode, setDepositFailureCode] = useState<WalletServiceErrorCode | null>(null);
   const [depositRequiresReconciliation, setDepositRequiresReconciliation] = useState(false);
@@ -586,6 +587,7 @@ function App() {
 
   const hasValidAmount = validationMessage.length === 0;
   const stageLabel = getStageLabel(depositStage, hasValidAmount);
+  const vaultBlockReason = STELLAR_VAULT_CONFIG.error ?? (vaultPreflight.status === "blocked" ? vaultPreflight.message : null);
   const pendingHashLabel = txHash ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : null;
 
   useEffect(() => {
@@ -595,8 +597,9 @@ function App() {
     setWalletAvailability("checking");
     setTrustlineStatus("checking");
     setTrustlineMessage("");
+    setVaultPreflight({ status: "idle", message: "" });
     import("./services/walletService")
-      .then(async ({ isWalletAvailable, getWalletAddress, hasUsdcTrustline }) => {
+      .then(async ({ isWalletAvailable, getWalletAddress, hasUsdcTrustline, preflightVaultDeposit }) => {
         const available = await isWalletAvailable();
         if (!isCurrent) return;
         setWalletAvailability(available ? "available" : "missing");
@@ -605,6 +608,23 @@ function App() {
         const address = await getWalletAddress();
         if (!isCurrent) return;
         setWalletAddress(address);
+        if (!STELLAR_VAULT_CONFIG.error) {
+          setVaultPreflight({ status: "checking", message: "" });
+          preflightVaultDeposit(address)
+            .then((result) => {
+              if (!isCurrent) return;
+              if (result.paused) {
+                setVaultPreflight({ status: "blocked", message: "Deposits are paused on this vault right now." });
+              } else if (!result.allowlisted) {
+                setVaultPreflight({ status: "blocked", message: "This wallet is not on the vault's deposit allowlist." });
+              } else {
+                setVaultPreflight({ status: "ready", message: "" });
+              }
+            })
+            .catch(() => {
+              if (isCurrent) setVaultPreflight({ status: "unverified", message: "Could not verify vault status. You can still try the deposit." });
+            });
+        }
         const status = await hasUsdcTrustline(address);
         if (isCurrent) setTrustlineStatus(status);
       })
@@ -1479,6 +1499,11 @@ function App() {
                 <div role="status" aria-live="polite" className="sr-only">
                   {checkDepositStatusMessage}
                 </div>
+                {depositStage === "input" && (vaultBlockReason || vaultPreflight.status === "unverified") && (
+                  <p id="vault-preflight-status" className="helper-text" role="status" aria-live="polite">
+                    {vaultBlockReason ?? vaultPreflight.message}
+                  </p>
+                )}
                 {walletAvailability === "missing" ? (
                   <div className="wallet-install-prompt" role="status">
                     <p>Install Freighter to sign this Stellar deposit.</p>
@@ -1518,8 +1543,10 @@ function App() {
                   <button className="primary-button" onClick={() => setTrustlineCheckVersion((version) => version + 1)} aria-describedby="usdc-trustline-status">
                     {trustlineStatus === "connect" ? "Connect Freighter" : "Check USDC trustline again"}
                   </button>
+                ) : vaultPreflight.status === "checking" && depositStage === "input" ? (
+                  <button className="primary-button" disabled>Checking vault...</button>
                 ) : (
-                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
+                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy || vaultBlockReason !== null} aria-describedby={vaultBlockReason ? "vault-preflight-status" : undefined} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
                     {depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
                   </button>
                 )}

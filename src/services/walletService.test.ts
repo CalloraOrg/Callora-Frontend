@@ -50,7 +50,7 @@ vi.mock("../config/constants", async (importOriginal) => ({
   get STELLAR_USDC_CONFIGURATION_ERROR() { return mocks.configurationError; },
 }));
 
-import { Account, Asset, Transaction } from "@stellar/stellar-sdk";
+import { Account, Asset, Transaction, xdr } from "@stellar/stellar-sdk";
 import { STELLAR_USDC_ASSET, STELLAR_NETWORK_PASSPHRASE } from "../config/constants";
 const walletAddress = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 import {
@@ -385,6 +385,38 @@ describe("walletService", () => {
     mocks.assembleTransaction.mockImplementationOnce(() => { throw new Error("raw simulation XDR"); });
     await expect(submitVaultDeposit("50")).rejects.toMatchObject({ code: "CONTRACT_REJECTED", requiresReconciliation: false });
     expect(mocks.signTransaction).not.toHaveBeenCalled();
+  });
+
+  describe("preflightVaultDeposit", () => {
+    const simulatedBool = (value: boolean) => ({
+      _parsed: true, latestLedger: 1, events: [], transactionData: {}, result: { retval: xdr.ScVal.scvBool(value) },
+    });
+
+    it("reports paused and allowlist state from read-only simulations", async () => {
+      const { preflightVaultDeposit } = await import("./walletService");
+      mocks.server.simulateTransaction
+        .mockResolvedValueOnce(simulatedBool(true))
+        .mockResolvedValueOnce(simulatedBool(false));
+      await expect(preflightVaultDeposit(walletAddress)).resolves.toEqual({ paused: true, allowlisted: false });
+      expect(mocks.server.simulateTransaction).toHaveBeenCalledTimes(2);
+    });
+
+    it("never signs or submits while checking", async () => {
+      const { preflightVaultDeposit } = await import("./walletService");
+      mocks.server.simulateTransaction
+        .mockResolvedValueOnce(simulatedBool(false))
+        .mockResolvedValueOnce(simulatedBool(true));
+      await preflightVaultDeposit(walletAddress);
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+      expect(mocks.server.sendTransaction).not.toHaveBeenCalled();
+    });
+
+    it("surfaces RPC failures so the UI can leave Approve enabled", async () => {
+      const { preflightVaultDeposit } = await import("./walletService");
+      mocks.server.simulateTransaction.mockRejectedValueOnce(new Error("offline"));
+      await expect(preflightVaultDeposit(walletAddress)).rejects.toThrow();
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
   });
 
   describe("checkDepositStatus", () => {

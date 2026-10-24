@@ -24,12 +24,14 @@ import {
   STELLAR_USDC_DECIMALS,
   STELLAR_USDC_ASSET,
   STELLAR_USDC_CONFIGURATION_ERROR,
+  STELLAR_VAULT_CONFIG,
   STELLAR_VAULT_CONTRACT_ID,
   type StellarNetwork,
 } from "../config/constants";
 import { decodeVaultError } from "./vaultErrors";
 import { logError } from "./SecureErrorHandler";
 import { walletStore } from "../state/walletStore";
+import { readVaultDepositPreflight, type VaultDepositPreflight } from "./vaultReads";
 
 const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
   mainnet: "Mainnet",
@@ -277,11 +279,8 @@ function createRpcServer(): rpc.Server {
 }
 
 function validateConfiguration(): void {
-  if (!STELLAR_VAULT_CONTRACT_ID) {
-    throw new WalletServiceError(
-      "CONFIGURATION",
-      "The Callora vault contract is not configured for this network.",
-    );
+  if (STELLAR_VAULT_CONFIG.error) {
+    throw new WalletServiceError("CONFIGURATION", STELLAR_VAULT_CONFIG.error);
   }
 
   if (!STELLAR_RPC_URL) {
@@ -345,6 +344,17 @@ async function waitForConfirmation(
     "Network confirmation timed out. The transaction may still be processing; check Stellar Explorer before retrying.",
     true,
   );
+}
+
+/**
+ * Read-only check of whether the vault would accept a deposit from `address`.
+ * Simulates only: nothing is signed or submitted, so Freighter is not prompted.
+ */
+export async function preflightVaultDeposit(
+  address: string,
+): Promise<VaultDepositPreflight> {
+  validateConfiguration();
+  return readVaultDepositPreflight(address);
 }
 
 /**
