@@ -31,6 +31,14 @@ import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import LiveRegion from "../components/LiveRegion";
 import { toCurl, type CurlRequest } from "../utils/toCurl";
 import { fetchApiDetail } from "../api/catalogApi";
+import {
+  listActive,
+  subscribe,
+  unsubscribe,
+  isSubscriptionsDemoMode,
+  SubscriptionsApiError,
+  type SubscriptionItem,
+} from "../api/subscriptionsApi";
 
 /**
  * ApiDetailPage
@@ -564,6 +572,11 @@ export default function ApiDetailPage({ onBack }: Props) {
   const [api, setApi] = useState<ApiDetail | null>(null);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [reloadToken, setReloadToken] = useState(0);
+
+  // Subscription state
+  const [subscription, setSubscription] = useState<SubscriptionItem | null>(null);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const isDemo = isSubscriptionsDemoMode();
   useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
 
   const rawReviews = api?.reviews || [];
@@ -720,6 +733,132 @@ export default function ApiDetailPage({ onBack }: Props) {
     };
   }, [id, reloadToken]);
 
+  // Load subscriptions for current API on mount / when id changes
+  useEffect(() => {
+    if (!id || isDemo) {
+      setSubscription(null);
+      setSubscriptionError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    let active = true;
+
+    listActive({ signal: controller.signal })
+      .then((subs) => {
+        if (!active) return;
+        const matching = subs.find(
+          (s) => String(s.apiId).trim() === String(id).trim() && s.status === "active",
+        );
+        setSubscription(matching ?? null);
+      })
+      .catch((err) => {
+        if (!active || controller.signal.aborted) return;
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        // 401: sign in prompt can be logged or ignored on passive load
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [id, isDemo]);
+
+  const handleSubscribe = async () => {
+    if (!api || !id) return;
+    setSubscriptionError(null);
+
+    if (isDemo) {
+      showToast(`Subscribed to ${api.name}!`, "success");
+      setAnnouncement(`Subscribed to ${api.name}`);
+      return;
+    }
+
+    const previousSub = subscription;
+    try {
+      const newSub = await subscribe(id);
+      setSubscription(newSub);
+      showToast(`Subscribed to ${api.name}!`, "success");
+      setAnnouncement(`Subscribed to ${api.name}`);
+    } catch (err: unknown) {
+      if (err instanceof SubscriptionsApiError) {
+        if (err.status === 401 || err.code === "UNAUTHORIZED") {
+          const msg = "Sign in to subscribe to this API.";
+          setSubscriptionError(msg);
+          showToast(msg, "warning");
+          throw err;
+        }
+        if (err.status === 409 || err.code === "CONFLICT") {
+          // 409 (already subscribed): treat as subscribed
+          setSubscription({
+            id: previousSub?.id || `sub-${id}`,
+            apiId: id,
+            status: "active",
+          });
+          showToast(`Subscribed to ${api.name}!`, "success");
+          setAnnouncement(`Subscribed to ${api.name}`);
+          return;
+        }
+        if (err.status === 404 || err.code === "NOT_FOUND") {
+          const msg = "API not found or no longer available.";
+          setSubscriptionError(msg);
+          showToast(msg, "error");
+          throw err;
+        }
+      }
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Subscription failed. Please try again.";
+      setSubscriptionError(msg);
+      throw err;
+    }
+  };
+
+  const handleUnsubscribe = async () => {
+    if (!api || !id) return;
+    setSubscriptionError(null);
+
+    if (isDemo) {
+      setSubscription(null);
+      showToast(`Unsubscribed from ${api.name}.`, "warning");
+      setAnnouncement(`Unsubscribed from ${api.name}`);
+      return;
+    }
+
+    if (!subscription?.id) {
+      setSubscription(null);
+      return;
+    }
+
+    const previousSub = subscription;
+    // Optimistic UI rollback support
+    setSubscription(null);
+
+    try {
+      await unsubscribe(subscription.id);
+      showToast(`Unsubscribed from ${api.name}.`, "warning");
+      setAnnouncement(`Unsubscribed from ${api.name}`);
+    } catch (err: unknown) {
+      // Rollback on failure
+      setSubscription(previousSub);
+      if (err instanceof SubscriptionsApiError) {
+        if (err.status === 401 || err.code === "UNAUTHORIZED") {
+          const msg = "Sign in to manage your subscriptions.";
+          setSubscriptionError(msg);
+          showToast(msg, "warning");
+          throw err;
+        }
+      }
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not unsubscribe. Please try again.";
+      setSubscriptionError(msg);
+      throw err;
+    }
+  };
+
   // ── Not found (post-load) ─────────────────────────────────────────────────
 
   if (status === "not-found") {
@@ -853,7 +992,14 @@ export default function ApiDetailPage({ onBack }: Props) {
             <button className="secondary-button" onClick={() => handleTabChange("pricing")}>
               View Pricing
             </button>
-            <SubscribeButton apiName={api.name} onSubscribe={() => showToast(`Subscribed to ${api.name}!`, "success")} />
+            <SubscribeButton
+              apiName={api.name}
+              isSubscribed={Boolean(subscription && subscription.status === "active")}
+              error={subscriptionError}
+              badgeLabel={isDemo ? "Demo" : undefined}
+              onSubscribe={handleSubscribe}
+              onUnsubscribe={handleUnsubscribe}
+            />
           </div>
 
           {/* ── Content grid: main column + sidebar ───────────────────────── */}
