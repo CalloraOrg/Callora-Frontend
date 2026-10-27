@@ -99,4 +99,142 @@ describe("SubscribeButton", () => {
     expect(tooltip.textContent).toContain("Subscribing");
     expect(tooltip.textContent).toContain("charged per successful API request");
   });
+
+  // ── Scenarios from Test Plan (Issue Requirements) ──────────────────────────
+
+  // Scenario 1: Active subscription exists on load -> button shows Subscribed with Unsubscribe
+  it("Scenario 1: Active subscription exists on load: button shows Subscribed with Unsubscribe", () => {
+    render(<SubscribeButton apiName="Weather API" isSubscribed={true} />);
+
+    expect(screen.getByRole("status")).toBeTruthy();
+    expect(screen.getByText("Subscribed!")).toBeTruthy();
+    const unsubBtn = screen.getByRole("button", { name: "Unsubscribe from Weather API" });
+    expect(unsubBtn).toBeTruthy();
+  });
+
+  // Scenario 3: Subscribe 500 -> alert shown, confirmation stays open, no success toast
+  it("Scenario 3: Subscribe 500: alert shown, confirmation stays open", async () => {
+    const onSubscribe = vi.fn().mockRejectedValue(new Error("Internal Server Error (500)"));
+    render(<SubscribeButton apiName="Weather API" onSubscribe={onSubscribe} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Subscribe to Weather API" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => {
+      expect(onSubscribe).toHaveBeenCalledOnce();
+    });
+
+    // Confirmation dialog stays open
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    // role="alert" rendered
+    const alert = screen.getByRole("alert");
+    expect(alert).toBeTruthy();
+    expect(alert.textContent).toContain("Internal Server Error (500)");
+    // Not marked as subscribed
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  // Scenario 5: Double-click confirm -> exactly one POST/call made
+  it("Scenario 5: Double-click confirm: exactly one call made due to in-flight guard", async () => {
+    let resolveSubscribe: () => void = () => {};
+    const onSubscribe = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSubscribe = resolve;
+        }),
+    );
+
+    render(<SubscribeButton apiName="Weather API" onSubscribe={onSubscribe} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Subscribe to Weather API" }));
+    const confirmBtn = screen.getByRole("button", { name: "Confirm" });
+
+    // Double-click
+    fireEvent.click(confirmBtn);
+    fireEvent.click(confirmBtn);
+
+    expect(onSubscribe).toHaveBeenCalledTimes(1);
+
+    resolveSubscribe();
+    await waitFor(() => {
+      expect(screen.getByText("Subscribed!")).toBeTruthy();
+    });
+  });
+
+  // Scenario 6: Unsubscribe -> confirmation dialog, onUnsubscribe called, returns to idle/unsubscribed
+  it("Scenario 6: Unsubscribe flow: prompts confirmation, calls onUnsubscribe, returns to idle", async () => {
+    const onUnsubscribe = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = render(
+      <SubscribeButton
+        apiName="Weather API"
+        isSubscribed={true}
+        onUnsubscribe={onUnsubscribe}
+      />,
+    );
+
+    // Click Unsubscribe
+    const unsubBtn = screen.getByRole("button", { name: "Unsubscribe from Weather API" });
+    fireEvent.click(unsubBtn);
+
+    // Unsubscribe confirmation dialog opens
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeTruthy();
+    expect(screen.getByText(/Unsubscribe from/)).toBeTruthy();
+
+    // Click Confirm on unsubscribe
+    const confirmBtn = screen.getByRole("button", { name: "Confirm" });
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(onUnsubscribe).toHaveBeenCalledOnce();
+    });
+
+    // Rerender as unsubscribed
+    rerender(
+      <SubscribeButton
+        apiName="Weather API"
+        isSubscribed={false}
+        onUnsubscribe={onUnsubscribe}
+      />,
+    );
+
+    // Back to idle
+    expect(screen.getByRole("button", { name: "Subscribe to Weather API" })).toBeTruthy();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  // Scenario 6b: Unsubscribe failure keeps confirmation open and displays alert
+  it("Unsubscribe failure: alert shown and confirmation dialog remains open", async () => {
+    const onUnsubscribe = vi.fn().mockRejectedValue(new Error("Failed to cancel subscription"));
+    render(
+      <SubscribeButton
+        apiName="Weather API"
+        isSubscribed={true}
+        onUnsubscribe={onUnsubscribe}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Unsubscribe from Weather API" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => {
+      expect(onUnsubscribe).toHaveBeenCalledOnce();
+    });
+
+    // Dialog remains open with alert
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    const alert = screen.getByRole("alert");
+    expect(alert).toBeTruthy();
+    expect(alert.textContent).toContain("Failed to cancel subscription");
+  });
+
+  // Scenario 8: Demo mode badge rendered
+  it("Scenario 8: Demo mode renders 'Demo' label and idle subscribe button", () => {
+    render(<SubscribeButton apiName="Weather API" badgeLabel="Demo" />);
+
+    expect(screen.getByText("Demo")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Subscribe to Weather API" })).toBeTruthy();
+  });
 });

@@ -2,13 +2,21 @@ import { useState, useRef, useEffect } from "react";
 import { CheckIcon } from "./icons/CheckIcon";
 import HelpPopover from "./HelpPopover";
 
-type SubscribeStatus = "idle" | "confirming" | "subscribed";
+type SubscribeStatus = "idle" | "confirming" | "confirming_unsubscribe" | "subscribed";
 
 type Props = {
   /** Name of the API being subscribed to – shown in the confirmation dialog. */
   apiName: string;
+  /** Whether the user is currently subscribed to this API. */
+  isSubscribed?: boolean;
+  /** Error message to display, if any. */
+  error?: string | null;
+  /** Optional badge/tag label (e.g. "Demo"). */
+  badgeLabel?: string;
   /** Called when the user confirms the subscription. */
   onSubscribe?: () => void | Promise<void>;
+  /** Called when the user confirms unsubscribing. */
+  onUnsubscribe?: () => void | Promise<void>;
   /** Optional CSS class forwarded to the outer element. */
   className?: string;
 };
@@ -21,62 +29,99 @@ type Props = {
  *   2. User clicks "Confirm" → subscription is registered and a success state
  *      is shown.
  *   3. "Cancel" returns to the idle state without any side-effects.
+ *   4. Subscribed state shows "Subscribed" with an "Unsubscribe" button that
+ *      prompts for confirmation before calling onUnsubscribe.
+ *   5. On error, displays role="alert" message and keeps confirmation dialog open.
  *
  * Focus management: When the confirmation dialog opens, focus is moved to the
  * "Confirm" button so keyboard-only users can immediately confirm or cancel
  * with a single keystroke.
- *
- * Part of GrantFox FWC26 campaign UI/UX requirements. Uses design tokens
- * instead of hardcoded colors so it respects the active theme.
  */
-export default function SubscribeButton({ apiName, onSubscribe, className }: Props) {
-  const [status, setStatus] = useState<SubscribeStatus>("idle");
+export default function SubscribeButton({
+  apiName,
+  isSubscribed = false,
+  error: externalError = null,
+  badgeLabel,
+  onSubscribe,
+  onUnsubscribe,
+  className,
+}: Props) {
+  const [internalStatus, setInternalStatus] = useState<SubscribeStatus>("idle");
   const [isLoading, setIsLoading] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
+
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const unsubscribeConfirmRef = useRef<HTMLButtonElement>(null);
+
+  const activeError = externalError || localError;
 
   useEffect(() => {
-    if (status === "confirming") {
+    if (internalStatus === "confirming") {
       confirmRef.current?.focus();
+    } else if (internalStatus === "confirming_unsubscribe") {
+      unsubscribeConfirmRef.current?.focus();
     }
-  }, [status]);
+  }, [internalStatus]);
 
   const handleSubscribeClick = () => {
-    setStatus("confirming");
+    setLocalError(null);
+    setInternalStatus("confirming");
   };
 
-  const handleConfirm = async () => {
+  const handleUnsubscribeClick = () => {
+    setLocalError(null);
+    setInternalStatus("confirming_unsubscribe");
+  };
+
+  const handleConfirmSubscribe = async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setIsLoading(true);
+    setLocalError(null);
     try {
       await onSubscribe?.();
-      setStatus("subscribed");
-    } catch {
-      // Surface the error without crashing; keep the confirmation open.
+      setInternalStatus("subscribed");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Subscription failed. Please try again.";
+      setLocalError(msg);
+      // Keep confirmation open
     } finally {
       setIsLoading(false);
+      inFlightRef.current = false;
+    }
+  };
+
+  const handleConfirmUnsubscribe = async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    setIsLoading(true);
+    setLocalError(null);
+    try {
+      await onUnsubscribe?.();
+      setInternalStatus("idle");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Unsubscribe failed. Please try again.";
+      setLocalError(msg);
+      // Keep confirmation open
+    } finally {
+      setIsLoading(false);
+      inFlightRef.current = false;
     }
   };
 
   const handleCancel = () => {
-    setStatus("idle");
+    setLocalError(null);
+    setInternalStatus("idle");
   };
 
-  if (status === "subscribed") {
-    return (
-      <div
-        className={className ? `subscribe-subscribed ${className}` : "subscribe-subscribed"}
-        role="status"
-        aria-live="polite"
-        aria-label={`Successfully subscribed to ${apiName}`}
-      >
-        <CheckIcon size={20} aria-hidden="true" />
-        <span className="subscribe-subscribed__text">
-          Subscribed!
-        </span>
-      </div>
-    );
-  }
-
-  if (status === "confirming") {
+  if (internalStatus === "confirming") {
     return (
       <div
         className={className ? `subscribe-confirming ${className}` : "subscribe-confirming"}
@@ -84,13 +129,24 @@ export default function SubscribeButton({ apiName, onSubscribe, className }: Pro
         aria-modal="false"
         aria-label={`Confirm subscription to ${apiName}`}
       >
-        <p
-          id="subscribe-confirm-desc"
-          className="subscribe-confirming__message"
-        >
+        <p id="subscribe-confirm-desc" className="subscribe-confirming__message">
           Subscribe to <strong className="subscribe-confirming__name">{apiName}</strong>?
           You will receive updates and can manage your subscription at any time.
         </p>
+
+        {activeError && (
+          <div
+            role="alert"
+            className="subscribe-error-alert"
+            style={{
+              color: "var(--danger, #ef4444)",
+              fontSize: "0.85rem",
+              marginBottom: "var(--mkt-space-sm, 6px)",
+            }}
+          >
+            {activeError}
+          </div>
+        )}
 
         <div className="subscribe-confirming__actions">
           <button
@@ -99,7 +155,7 @@ export default function SubscribeButton({ apiName, onSubscribe, className }: Pro
             aria-describedby="subscribe-confirm-desc"
             aria-busy={isLoading}
             disabled={isLoading}
-            onClick={handleConfirm}
+            onClick={handleConfirmSubscribe}
           >
             {isLoading ? "Subscribing…" : "Confirm"}
           </button>
@@ -117,6 +173,116 @@ export default function SubscribeButton({ apiName, onSubscribe, className }: Pro
     );
   }
 
+  if (internalStatus === "confirming_unsubscribe") {
+    return (
+      <div
+        className={className ? `subscribe-confirming subscribe-confirming--unsubscribe ${className}` : "subscribe-confirming subscribe-confirming--unsubscribe"}
+        role="dialog"
+        aria-modal="false"
+        aria-label={`Confirm unsubscribing from ${apiName}`}
+      >
+        <p id="unsubscribe-confirm-desc" className="subscribe-confirming__message">
+          Unsubscribe from <strong className="subscribe-confirming__name">{apiName}</strong>?
+          You can resubscribe at any time.
+        </p>
+
+        {activeError && (
+          <div
+            role="alert"
+            className="subscribe-error-alert"
+            style={{
+              color: "var(--danger, #ef4444)",
+              fontSize: "0.85rem",
+              marginBottom: "var(--mkt-space-sm, 6px)",
+            }}
+          >
+            {activeError}
+          </div>
+        )}
+
+        <div className="subscribe-confirming__actions">
+          <button
+            ref={unsubscribeConfirmRef}
+            className="primary-button subscribe-button-confirm"
+            aria-describedby="unsubscribe-confirm-desc"
+            aria-busy={isLoading}
+            disabled={isLoading}
+            onClick={handleConfirmUnsubscribe}
+          >
+            {isLoading ? "Unsubscribing…" : "Confirm"}
+          </button>
+
+          <button
+            className="ghost-button subscribe-button-cancel"
+            onClick={handleCancel}
+            disabled={isLoading}
+            aria-label="Cancel unsubscribe"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const effectiveSubscribed = isSubscribed || internalStatus === "subscribed";
+
+  if (effectiveSubscribed) {
+    return (
+      <div
+        className={className ? `subscribe-subscribed-wrap ${className}` : "subscribe-subscribed-wrap"}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "var(--mkt-space-sm, 8px)",
+        }}
+      >
+        <div
+          className="subscribe-subscribed"
+          role="status"
+          aria-live="polite"
+          aria-label={`Successfully subscribed to ${apiName}`}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "var(--mkt-space-xs, 4px)",
+          }}
+        >
+          <CheckIcon size={20} aria-hidden="true" />
+          <span className="subscribe-subscribed__text">
+            Subscribed!
+          </span>
+        </div>
+
+        {badgeLabel && (
+          <span
+            className="subscribe-badge-demo"
+            style={{
+              fontSize: "0.75rem",
+              padding: "2px 6px",
+              borderRadius: "4px",
+              background: "rgba(255, 255, 255, 0.1)",
+              color: "var(--muted, #94a3b8)",
+              border: "1px solid var(--line, rgba(255, 255, 255, 0.1))",
+            }}
+          >
+            {badgeLabel}
+          </span>
+        )}
+
+        <button
+          type="button"
+          className="ghost-button subscribe-button-unsubscribe"
+          aria-label={`Unsubscribe from ${apiName}`}
+          onClick={handleUnsubscribeClick}
+          style={{ fontSize: "0.85rem", padding: "4px 8px" }}
+        >
+          Unsubscribe
+        </button>
+      </div>
+    );
+  }
+
   // idle state
   return (
     <span
@@ -128,12 +294,29 @@ export default function SubscribeButton({ apiName, onSubscribe, className }: Pro
       }}
     >
       <button
+        type="button"
         className="secondary-button subscribe-button"
         aria-label={`Subscribe to ${apiName}`}
         onClick={handleSubscribeClick}
       >
         Subscribe
       </button>
+
+      {badgeLabel && (
+        <span
+          className="subscribe-badge-demo"
+          style={{
+            fontSize: "0.75rem",
+            padding: "2px 6px",
+            borderRadius: "4px",
+            background: "rgba(255, 255, 255, 0.1)",
+            color: "var(--muted, #94a3b8)",
+            border: "1px solid var(--line, rgba(255, 255, 255, 0.1))",
+          }}
+        >
+          {badgeLabel}
+        </span>
+      )}
 
       <HelpPopover
         content={
