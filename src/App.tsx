@@ -40,6 +40,7 @@ const DesignSystemDocs = lazy(() => import("./pages/DesignSystemDocs"));
 const A11yAudit = lazy(() => import("./pages/A11yAudit"));
 const RateLimitCard = lazy(() => import("./pages/RateLimitCard"));
 const BillingHistory = lazy(() => import("./pages/BillingHistory"));
+const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
 const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
 const BillingInvoiceSection = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.BillingInvoiceSection })));
@@ -53,6 +54,7 @@ const routePrefetchers: Record<string, () => Promise<any>> = {
   "/apis/my-apis": () => import("./pages/MyApis"),
   "/apis/plan-badge": () => import("./pages/PlanBadge"),
   "/billing/history": () => import("./pages/BillingHistory"),
+  "/billing/subscriptions": () => import("./pages/Subscriptions"),
   "/theme-playground": () => import("./pages/ThemePlayground"),
   "/design-system/docs": () => import("./pages/DesignSystemDocs"),
   "/a11y-audit": () => import("./pages/A11yAudit"),
@@ -212,6 +214,7 @@ const APP_ROUTES = {
   apiUsage: "/api-usage",
   billing: "/billing",
   billingHistory: "/billing/history",
+  subscriptions: "/billing/subscriptions",
   documentation: "/documentation",
   status: "/status",
   themePlayground: "/theme-playground",
@@ -401,6 +404,7 @@ function App() {
     [APP_ROUTES.myApis]: "My APIs – Callora",
     [APP_ROUTES.billing]: "Billing – Callora",
     [APP_ROUTES.billingHistory]: "Billing History – Callora",
+    [APP_ROUTES.subscriptions]: "Subscriptions – Callora",
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
     [APP_ROUTES.endpointSummary]: "Endpoint Summary – Callora",
@@ -410,6 +414,7 @@ function App() {
     [APP_ROUTES.dashboard]: "Your Callora dashboard showing balances, recent activity and quick actions.",
     [APP_ROUTES.billing]: "Manage your USDC vault, deposit funds, and view transaction status.",
     [APP_ROUTES.billingHistory]: "View your full USDC transaction history with on-chain details, filters, and hover previews.",
+    [APP_ROUTES.subscriptions]: "Manage your API subscriptions, plans, and renewals.",
     "/api-usage": "Monitor API usage, request stats, and view call history.",
     [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
     [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
@@ -1164,6 +1169,7 @@ function App() {
                     <p className="helper-text">
                       Every deposit and per-call debit is recorded on-chain. See past activity in{" "}
                       <NavLink to={APP_ROUTES.billingHistory}>Billing History</NavLink>.
+                      {" "}<NavLink to={APP_ROUTES.subscriptions}>Manage subscriptions</NavLink>.
                     </p>
                     {ENABLE_DEMO_OUTCOME && (
                       <>
@@ -1222,6 +1228,7 @@ function App() {
 
             {/* ── Billing History (FWC26) ──────────────────────────────── */}
             <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />
+            <Route path={APP_ROUTES.subscriptions} element={<Subscriptions />} />
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
             </Routes>
