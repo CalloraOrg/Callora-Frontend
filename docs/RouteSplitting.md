@@ -9,10 +9,11 @@ but silently misses prefetching — which is the whole point of the strategy.
 
 | Concern | File |
 | --- | --- |
-| Lazy page imports, prefetch map, `Suspense` boundary | `src/App.tsx` |
-| Manual entry router (skeletons + `startRouteLoading`) | `src/main.tsx` |
+| Lazy page imports, prefetch map, `Suspense` & `RouteErrorBoundary` | `src/App.tsx` |
+| Manual entry router (skeletons, `startRouteLoading`, `StandaloneErrorBoundary`) | `src/renderRoute.tsx`, `src/main.tsx` |
+| Route error boundary fallback & retry/reset logic | `src/components/RouteErrorBoundary.tsx` |
 | Loading state + `RouteProgressBar` | `src/hooks/useRouteLoading.ts`, `src/components/RouteProgressBar.tsx` |
-| Regression coverage | `src/RouteSplitting.test.tsx` |
+| Regression coverage | `src/RouteSplitting.test.tsx`, `src/App.errorBoundary.test.tsx`, `src/renderRoute.test.tsx` |
 
 Two routers exist on purpose:
 
@@ -36,18 +37,48 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 // ...one binding per page
 ```
 
-All of them are rendered from a single `Suspense` boundary that wraps the
-`<Routes>` element:
+All of them are rendered from a single `Suspense` boundary wrapped in a
+`RouteErrorBoundary`:
 
 ```tsx
-<Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
-  <Routes>{/* ... */}</Routes>
-</Suspense>
+<RouteErrorBoundary
+  resetKey={location.pathname}
+  onGoHome={() => navigate(APP_ROUTES.dashboard)}
+>
+  <Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
+    <Routes>{/* ... */}</Routes>
+  </Suspense>
+</RouteErrorBoundary>
 ```
 
 Because the boundary is shared, the chunk for a route is only requested when
 that route first renders. Hovering or focusing a nav link is what removes that
 first-render delay.
+
+## Error boundary placement
+
+`RouteErrorBoundary` (`src/components/RouteErrorBoundary.tsx`) isolates render
+and lazy-chunk load errors so a broken page never white-screens the whole app:
+
+- **In `src/App.tsx`**: `RouteErrorBoundary` wraps the `<Suspense>` / `<Routes>`
+  block inside `<main>`. The `<header>` topbar, primary navigation, and footer
+  remain outside the boundary so the user can always navigate away from a
+  crashed page. Passing `resetKey={location.pathname}` clears the error state
+  automatically when the user navigates to another route, and `onGoHome`
+  navigates back to `APP_ROUTES.dashboard`.
+- **In `src/renderRoute.tsx`**: A small `StandaloneErrorBoundary` inner
+  component reads `useLocation().pathname` as `resetKey` and uses
+  `window.location.assign("/dashboard")` for `onGoHome`. Inside `wrap()`, it
+  wraps the page content inside `StandaloneShell` (for `/publish`,
+  `/marketplace`, and `/details/:id`) or directly around `<LatencyChart />`, so
+  the standalone shell header and navigation stay usable on error.
+- **Lazy-chunk load failures**: Because `RouteErrorBoundary` sits outside
+  `<Suspense>`, rejected dynamic `import()` calls during route resolution are
+  caught by the boundary and present a **Reload** action alongside **Try again**
+  and **Go home** (after `maxRetries`, **Try again** is removed and the
+  exhausted message is shown).
+- `StickyTocErrorBoundary` (`src/components/StickyTocErrorBoundary.tsx`) is a
+  separate, component-level boundary and is unaffected by route-level placement.
 
 ## The prefetch map contract
 

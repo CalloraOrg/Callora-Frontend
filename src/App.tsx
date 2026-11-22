@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
@@ -18,6 +19,7 @@ import ExternalLink from "./components/ExternalLink";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
+import CommandPalette from "./components/CommandPalette";
 import { useAccountContext } from "./hooks/useAccountContext";
 import { signIn, signOut, isSignedIn, type AuthServiceErrorCode } from "./services/authService";
 import { useSessionExpiry } from "./hooks/useSessionExpiry";
@@ -420,6 +422,7 @@ function App() {
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [amountInput, setAmountInput] = useState("50");
   const [selectedPreset, setSelectedPreset] = useState<number | "custom">(50);
 
@@ -468,6 +471,19 @@ function App() {
   );
 
   useGlobalShortcuts(handleGlobalKeyDown);
+
+  useEffect(() => {
+    const handleCommandPaletteKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleCommandPaletteKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleCommandPaletteKeyDown);
+    };
+  }, []);
   const [depositStage, setDepositStage] = useState<DepositStage>("input");
   const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
   const [walletAvailability, setWalletAvailability] = useState<"checking" | "available" | "missing">("checking");
@@ -1011,7 +1027,11 @@ function App() {
         <main id="main-content" role="main" className="page">
           <AppSessionExpiryBanner />
           <LiveRegion message={balanceAnnouncement} />
-          <Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
+          <RouteErrorBoundary
+            resetKey={location.pathname}
+            onGoHome={() => navigate(APP_ROUTES.dashboard)}
+          >
+            <Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
             <Routes>
             <Route
               path={APP_ROUTES.landing}
@@ -1225,7 +1245,8 @@ function App() {
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
             </Routes>
-          </Suspense>
+            </Suspense>
+          </RouteErrorBoundary>
         </main>
 
         <footer className="surface app-footer no-print" role="contentinfo">
@@ -1268,6 +1289,7 @@ function App() {
         </footer>
 
         <ShortcutsModal isOpen={isShortcutsModalOpen} onClose={() => setIsShortcutsModalOpen(false)} />
+        <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
 
         <CompareTray />
         <CompareDrawer />
