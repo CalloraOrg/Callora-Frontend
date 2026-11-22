@@ -20,13 +20,14 @@ import React, {
   useState,
 } from "react";
 import { useCollections } from "../state/collectionsStore";
-import MOCK_APIS from "../data/mockApis";
+import { useApisByIds } from "../hooks/useApisByIds";
+import type { APIItem } from "../data/mockApis";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Look up a human-readable label for a saved endpoint id. */
-function resolveEndpointLabel(endpointId: string): string {
-  for (const api of MOCK_APIS) {
+function resolveEndpointLabel(endpointId: string, apis: readonly APIItem[]): string {
+  for (const api of apis) {
     if (api.id === endpointId) return api.name;
     const ep = (api.endpoints ?? []).find((e: any) => e.id === endpointId);
     if (ep) return `${api.name} – ${ep.title ?? ep.id}`;
@@ -105,6 +106,7 @@ function CollectionRow({
   } = useCollections();
 
   const [expanded, setExpanded] = useState(false);
+  const { apis: resolvedApis } = useApisByIds(expanded ? endpointIds : []);
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(name);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -362,11 +364,11 @@ function CollectionRow({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {resolveEndpointLabel(epId)}
+                  {resolveEndpointLabel(epId, resolvedApis)}
                 </span>
                 <button
                   onClick={() => removeEndpointFromCollection(id, epId)}
-                  aria-label={`Remove ${resolveEndpointLabel(epId)} from ${name}`}
+                  aria-label={`Remove ${resolveEndpointLabel(epId, resolvedApis)} from ${name}`}
                   title="Remove from collection"
                   style={{
                     background: "none",

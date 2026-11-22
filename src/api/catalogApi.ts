@@ -23,6 +23,7 @@
 
 import { API_BASE, API_BASE_URL, apiUrl } from "../config/constants";
 import MOCK_APIS, { type APIItem } from "../data/mockApis";
+import { onAccountCacheInvalidated } from "../utils/offlineApiCache";
 
 /** Path the marketplace catalogue is read from. */
 export const CATALOG_PATH = "/api/apis";
@@ -60,10 +61,20 @@ export function buildCacheKey(params: CatalogParams = {}): string {
   return `${CACHE_KEY_PREFIX}${qs || "all"}`;
 }
 
+const resolverCacheClearHandlers = new Set<() => void>();
+
 /**
- * Clears cached catalog responses from sessionStorage.
+ * Clears cached catalog responses from sessionStorage and resets in-memory
+ * resolver caches across catalog API instances.
  */
 export function clearCatalogCache(): void {
+  for (const clear of resolverCacheClearHandlers) {
+    try {
+      clear();
+    } catch {
+      // Ignore errors
+    }
+  }
   if (typeof sessionStorage === "undefined") return;
   try {
     const keysToRemove: string[] = [];
@@ -79,6 +90,10 @@ export function clearCatalogCache(): void {
   }
 }
 
+onAccountCacheInvalidated(() => {
+  clearCatalogCache();
+});
+
 export type ApiDetail = APIItem;
 
 /**
@@ -92,6 +107,13 @@ export type ApiDetail = APIItem;
 export type ApiDetailResult =
   | { status: "ready"; kind?: "ready"; api: APIItem }
   | { status: "not-found"; kind: "not-found"; api?: undefined };
+
+export interface ResolvedApisResult {
+  /** Resolved APIs in the order their ids were requested (deduplicated). */
+  apis: APIItem[];
+  /** Requested ids that returned not-found / no longer exist. */
+  missing: string[];
+}
 
 export interface CatalogApi {
   /**
@@ -111,6 +133,15 @@ export interface CatalogApi {
    *   aborted before the response is read.
    */
   fetchApiDetail(id: string, signal?: AbortSignal): Promise<ApiDetailResult>;
+
+  /**
+   * Resolves a list of API ids from the cached catalogue, fetching any missing
+   * ids via {@link fetchApiDetail} and deduplicating in-flight requests.
+   */
+  resolveApisByIds(
+    ids: readonly string[],
+    signal?: AbortSignal,
+  ): Promise<ResolvedApisResult>;
 }
 
 export interface CreateCatalogApiOptions {
@@ -151,6 +182,27 @@ function abortError(): Error {
   const err = new Error("The operation was aborted.");
   err.name = "AbortError";
   return err;
+}
+
+function raceWithAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(abortError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(abortError());
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (err) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(err);
+      },
+    );
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -346,17 +398,29 @@ export function normalizeApiDetail(payload: unknown): APIItem | null {
 export function createCatalogApi(
   options: CreateCatalogApiOptions = {},
 ): CatalogApi {
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const fetchImpl: typeof fetch =
+    options.fetchImpl ?? ((...args) => globalThis.fetch(...args));
 
   const cachedEtags = new Map<string, string>();
   const cachedLists = new Map<string, APIItem[]>();
+  const resolvedById = new Map<string, APIItem>();
+  const resolvedNotFound = new Set<string>();
+  const inFlightById = new Map<string, Promise<ApiDetailResult>>();
+
+  resolverCacheClearHandlers.add(() => {
+    cachedEtags.clear();
+    cachedLists.clear();
+    resolvedById.clear();
+    resolvedNotFound.clear();
+    inFlightById.clear();
+  });
 
   const resolveBase = (): string =>
     options.baseUrl !== undefined
       ? options.baseUrl.replace(/\/+$/, "")
       : "";
 
-  return {
+  const api: CatalogApi = {
     async fetchCatalog(signal, params = {}) {
       if (signal?.aborted) {
         throw abortError();
@@ -436,6 +500,10 @@ export function createCatalogApi(
 
       const items = normalizeCatalog(payload);
       cachedLists.set(pathWithQuery, items);
+      for (const item of items) {
+        resolvedById.set(item.id, item);
+        resolvedNotFound.delete(item.id);
+      }
 
       return items;
     },
@@ -468,6 +536,8 @@ export function createCatalogApi(
       }
 
       if (response.status === 404 || response.status === 400) {
+        resolvedNotFound.add(id);
+        resolvedById.delete(id);
         return { status: "not-found", kind: "not-found" };
       }
 
@@ -494,15 +564,80 @@ export function createCatalogApi(
         throw abortError();
       }
 
-      const api = normalizeApiDetail(payload);
-      if (!api) {
+      const item = normalizeApiDetail(payload);
+      if (!item) {
         throw new CatalogFetchError(
           "The marketplace service returned an unreadable response.",
         );
       }
-      return { status: "ready", kind: "ready", api };
+      resolvedById.set(id, item);
+      resolvedNotFound.delete(id);
+      return { status: "ready", kind: "ready", api: item };
+    },
+
+    async resolveApisByIds(ids, signal) {
+      if (signal?.aborted) {
+        throw abortError();
+      }
+
+      if (ids.length === 0) {
+        return { apis: [], missing: [] };
+      }
+
+      const uniqueIds: string[] = [];
+      const seen = new Set<string>();
+      for (const id of ids) {
+        if (!seen.has(id)) {
+          seen.add(id);
+          uniqueIds.push(id);
+        }
+      }
+
+      const toFetch: Array<{ id: string; promise: Promise<ApiDetailResult> }> = [];
+      for (const id of uniqueIds) {
+        if (resolvedById.has(id) || resolvedNotFound.has(id)) {
+          continue;
+        }
+        let inFlight = inFlightById.get(id);
+        if (!inFlight) {
+          const request = api.fetchApiDetail(id).finally(() => {
+            if (inFlightById.get(id) === request) {
+              inFlightById.delete(id);
+            }
+          });
+          inFlightById.set(id, request);
+          inFlight = request;
+        }
+        toFetch.push({ id, promise: inFlight });
+      }
+
+      if (toFetch.length > 0) {
+        await raceWithAbort(
+          Promise.all(toFetch.map((entry) => entry.promise)),
+          signal,
+        );
+      }
+
+      if (signal?.aborted) {
+        throw abortError();
+      }
+
+      const apis: APIItem[] = [];
+      const missing: string[] = [];
+      for (const id of uniqueIds) {
+        const cached = resolvedById.get(id);
+        if (cached) {
+          apis.push(cached);
+        } else {
+          missing.push(id);
+        }
+      }
+
+      return { apis, missing };
     },
   };
+
+  return api;
 }
 
 /** Shared catalogue API used by the app. */
@@ -549,4 +684,38 @@ export async function fetchApiDetail(
   }
 
   return await catalogApi.fetchApiDetail(id, signal);
+}
+
+/**
+ * Resolves a list of API ids from the cached catalogue or `GET /api/apis/:id`.
+ */
+export async function resolveApisByIds(
+  ids: readonly string[],
+  signal?: AbortSignal,
+): Promise<ResolvedApisResult> {
+  if (signal?.aborted) {
+    throw abortError();
+  }
+
+  if (ids.length === 0) {
+    return { apis: [], missing: [] };
+  }
+
+  if (!API_BASE) {
+    const uniqueIds = Array.from(new Set(ids));
+    const mockById = new Map(MOCK_APIS.map((item) => [item.id, item]));
+    const apis: APIItem[] = [];
+    const missing: string[] = [];
+    for (const id of uniqueIds) {
+      const found = mockById.get(id);
+      if (found) {
+        apis.push(found);
+      } else {
+        missing.push(id);
+      }
+    }
+    return { apis, missing };
+  }
+
+  return await catalogApi.resolveApisByIds(ids, signal);
 }

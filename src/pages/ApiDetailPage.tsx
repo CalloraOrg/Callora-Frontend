@@ -25,12 +25,12 @@ import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
 import { useToast } from "../components/Toast";
 import { useCollections } from "../state/collectionsStore";
 import RelatedApisRail from "../components/RelatedApisRail";
-import MOCK_APIS, { type APIItem as ApiDetail } from "../data/mockApis";
+import type { APIItem as ApiDetail } from "../data/mockApis";
 import KbdHint from "../components/KbdHint";
 import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import LiveRegion from "../components/LiveRegion";
 import { toCurl, type CurlRequest } from "../utils/toCurl";
-import { fetchApiDetail } from "../api/catalogApi";
+import { fetchApiDetail, fetchCatalog, isCatalogAbortError } from "../api/catalogApi";
 
 /**
  * ApiDetailPage
@@ -543,6 +543,21 @@ function EndpointSaveButton({
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ApiDetailPage({ onBack }: Props) {
+  const [catalogApis, setCatalogApis] = useState<ApiDetail[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchCatalog(controller.signal)
+      .then((items) => {
+        if (!controller.signal.aborted) {
+          setCatalogApis(items);
+        }
+      })
+      .catch((err) => {
+        if (controller.signal.aborted || isCatalogAbortError(err)) return;
+      });
+    return () => controller.abort();
+  }, []);
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
   const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
@@ -1368,7 +1383,7 @@ export default function ApiDetailPage({ onBack }: Props) {
                 {/* ── Related APIs rail ───────────────────────────────── */}
                 <RelatedApisRail
                   currentApi={api}
-                  allApis={MOCK_APIS}
+                  allApis={catalogApis}
                   onSelect={(related) => {
                     navigate(`/details/${related.id}`);
                   }}

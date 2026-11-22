@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import MOCK_APIS, { type APIItem } from "../data/mockApis";
+import type { APIItem } from "../data/mockApis";
 import Skeleton from "../components/Skeleton";
 import { TagIcon } from "../components/icons";
 import Tooltip from "../components/Tooltip";
@@ -14,7 +14,7 @@ import type { Shortcut } from "../hooks/useGlobalShortcuts";
  * the listings actually on screen.
  */
 export function getAllUniqueTags(
-  apis: readonly APIItem[] = MOCK_APIS,
+  apis: readonly APIItem[] = [],
 ): string[] {
   const tagSet = new Set<string>();
   for (const api of apis) {
@@ -109,7 +109,7 @@ export default function ApiTagFilter({
   tags,
   selectedTag,
   onTagChange,
-  apis = MOCK_APIS,
+  apis = [],
   hoverDelayMs = 0,
   longPressMs = 500,
   isLoading = false,
