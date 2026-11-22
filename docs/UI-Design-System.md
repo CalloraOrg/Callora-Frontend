@@ -1392,6 +1392,16 @@ All keyboard-focus styling is centralized in a single CSS cascade layer named
 - The design tokens are pre-configured to meet these standards
 - Never override token colors with custom values that may violate contrast requirements
 
+### Forced Colors
+
+Callora supports Windows High Contrast via `@media (forced-colors: active)` rules in `src/styles/contrast.css` and `src/styles/focus.css`.
+
+- **Core rule:** No information may be conveyed by background colour alone. Under forced colors, browsers strip author background colours, gradients, box shadows, and SVG background textures, so interactive states and badges must remain perceivable through borders, outlines, and text.
+- **System colours used:**
+  - `Canvas` / `ButtonText` — neutral surfaces and badge/chip labels (with `1px solid CanvasText` borders)
+  - `CanvasText` — borders and active `[role="tab"]` underline
+  - `Highlight` / `HighlightText` — active tag chips (`.tag-chip--active`), the sliding tab indicator (`.tabs-indicator` with `forced-color-adjust: none`), and `:focus-visible` outlines (`2px solid Highlight` with offset)
+
 ### Reduced Motion
 
 - Theme transitions are wrapped in `@media (prefers-reduced-motion: no-preference)`

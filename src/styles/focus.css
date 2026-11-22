@@ -394,6 +394,36 @@
     outline: 2px solid var(--accent);
     outline-offset: 3px;
   }
+
+  /* ── Forced colors (Windows High Contrast) ───────────────────────────────
+     Under forced-colors: active, box-shadow and border-color-only focus cues
+     are stripped or flattened.  Ensure :focus-visible always renders an
+     explicit system-colour outline with offset. */
+  @media (forced-colors: active) {
+    *:focus-visible,
+    .filters-sidebar .filter-checkbox:focus-visible,
+    .filter-checkbox:focus-visible,
+    .filters-sidebar .filter-input:focus-visible,
+    .filter-input:focus-visible,
+    .filters-sidebar .filter-select:focus-visible,
+    .filter-select:focus-visible,
+    .filter-group__header:focus-visible,
+    .pill-bar__item:focus-visible,
+    .api-tag-filter__pill:focus-visible,
+    .density-toggle-button:focus-visible,
+    .marketplace-filter-button:focus-visible,
+    .pagination-button:focus-visible,
+    .page-size-select:focus-visible,
+    .recently-active-rail button:focus-visible,
+    .empty-state button:focus-visible,
+    .bottom-sheet__close:focus-visible,
+    .bottom-sheet__show-btn:focus-visible,
+    [role="tab"]:focus-visible {
+      outline: 2px solid Highlight !important;
+      outline-offset: 3px;
+      box-shadow: none;
+    }
+  }
 }
 
 /* ── reduced-motion: suppress transition on focus for ApiUsage controls ── */

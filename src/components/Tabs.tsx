@@ -212,7 +212,7 @@ export default function Tabs({ tabs, activeTab, onChange, tabPanelId = (id) => `
       </div>
 
       {/* Sliding ink-bar — decorative, hidden from assistive technology */}
-      <span ref={indicatorRef} aria-hidden="true" role="presentation" style={indicatorStyle} />
+      <span ref={indicatorRef} className="tabs-indicator" aria-hidden="true" role="presentation" style={indicatorStyle} />
     </nav>
   );
 }
