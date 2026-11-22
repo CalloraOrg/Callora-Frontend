@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Skeleton, { ApiUsageSkeleton } from "../components/Skeleton";
 import { formatPrice, formatDuration } from "../utils/format";
 import type { JsonSchema } from "../components/RequestBodyEditor";
@@ -29,6 +29,10 @@ import {
 } from "../state/testCallHistory";
 import { copySnapshotUrl, parseSnapshotUrl } from "../utils/snapshotUrl";
 import { authFetch } from "../services/authFetch";
+import { runTestCall } from "../services/testCall";
+import { useRateLimit } from "../hooks/useRateLimit";
+import RateLimitAlert from "../components/RateLimitAlert";
+import { formatCountdown } from "../utils/format";
 
 type ApiEndpoint = {
   id: string;
@@ -203,6 +207,8 @@ const API_USAGE_SHORTCUTS = SHORTCUTS.filter((s) => s.category === "ApiUsage");
 
 export default function ApiUsage() {
   const { trackFetch } = useFetchTracker();
+  const { rateLimitState, timeUntilReset } = useRateLimit();
+  const isRateLimited = timeUntilReset > 0;
   const currentAccountId = useAccountId();
   const { get: getCachedUsage, set: cacheUsage } =
     useApiCache<UsageApiResponse>();
@@ -213,8 +219,16 @@ export default function ApiUsage() {
   const [requestParams, setRequestParams] = useState("{}");
   const [isLoading, setIsLoading] = useState(false);
   const [apiResponse, setApiResponse] = useState<any>(null);
+  const [responseStatus, setResponseStatus] = useState<number | null>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
+  const testCallAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      testCallAbortRef.current?.abort();
+    };
+  }, []);
   const [statusFilter, setStatusFilter] = useState<"all" | "success" | "error">(
     "all",
   );
@@ -235,7 +249,9 @@ export default function ApiUsage() {
     () => setIsHistoryOpen((prev) => !prev),
     [],
   );
-  const [historyEntries, setHistoryEntries] = useState<any[]>([]);
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>(() =>
+    loadHistory(),
+  );
 
   const callHistory =
     usageData?.accountId === currentAccountId
@@ -511,6 +527,15 @@ export default function ApiUsage() {
     window.setTimeout(() => setLiveStatusMessage(message), 0);
   }, []);
 
+  // Politely announce rate-limit start once per reset window (not every second).
+  useEffect(() => {
+    if (!rateLimitState) return;
+    const ms = Math.max(0, new Date(rateLimitState.resetAt).getTime() - Date.now());
+    if (ms > 0) {
+      announceStatus(`Rate limit reached. Retry available in ${formatCountdown(ms)}.`);
+    }
+  }, [rateLimitState, announceStatus]);
+
   // Reset all call-history filters to their defaults and announce the change
   // to assistive technology via the aria-live region below.
   const handleResetFilters = () => {
@@ -666,7 +691,7 @@ export default function ApiUsage() {
         if (event.metaKey || event.ctrlKey || event.altKey) return;
         switch (event.key) {
           case 't':
-            if (!isLoading) {
+            if (!isLoading && !isRateLimited) {
               handleMakeTestCall();
             }
             break;
@@ -688,7 +713,7 @@ export default function ApiUsage() {
             break;
         }
       },
-      [isLoading, isExporting, handleMakeTestCall, toggleHistory, handleCopyApiKey, handleShareSnapshot, handleExportHistory]
+      [isLoading, isRateLimited, isExporting, handleMakeTestCall, toggleHistory, handleCopyApiKey, handleShareSnapshot, handleExportHistory]
     )
   );
 
@@ -710,6 +735,18 @@ export default function ApiUsage() {
       />
       {!isDismissed && (
         <PlanNudge usagePercent={usagePercent} onDismiss={dismiss} />
+      )}
+      {isRateLimited && (
+        <RateLimitAlert
+          timeUntilReset={timeUntilReset}
+          limit={rateLimitState?.limit || undefined}
+          remaining={
+            rateLimitState && rateLimitState.limit > 0
+              ? rateLimitState.remaining
+              : undefined
+          }
+          compact
+        />
       )}
       {/* Header Section */}
       <div className="api-header">
@@ -830,7 +867,7 @@ export default function ApiUsage() {
           <button
             className={`primary-button ${isLoading ? "button-loading" : ""}`}
             onClick={handleMakeTestCall}
-            disabled={isLoading}
+            disabled={isLoading || isRateLimited}
           >
             {isLoading && (
               <span className="button-spinner" aria-hidden="true" />

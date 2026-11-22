@@ -20,6 +20,17 @@ import {
   signOut,
 } from "./authService";
 import { signalExpiry } from "./sessionExpiry";
+import { signalRateLimit } from "./rateLimitSignal";
+import {
+  isRateLimitedResponse,
+  parseRateLimitHeaders,
+} from "../utils/rate-limit";
+
+/** Fallback wait window (ms) when a 429 response omits Retry-After and X-RateLimit-Reset. */
+export const DEFAULT_RATE_LIMIT_RETRY_MS = 60_000;
+
+/** Upper bound (ms) for Retry-After / reset delays so absurd headers cannot lock the UI indefinitely. */
+export const MAX_RATE_LIMIT_RETRY_MS = 3_600_000;
 
 // ─── Single-flight refresh ────────────────────────────────────────────────────
 
@@ -89,6 +100,9 @@ export async function authFetch(
   });
 
   if (firstResponse.status !== 401) {
+    if (isRateLimitedResponse(firstResponse)) {
+      emitRateLimitSignal(firstResponse, path);
+    }
     return firstResponse;
   }
 
@@ -122,6 +136,8 @@ export async function authFetch(
     // Retry still failed — clear session and signal expiry.
     await signOut().catch(() => {});
     signalExpiry("expired");
+  } else if (isRateLimitedResponse(retryResponse)) {
+    emitRateLimitSignal(retryResponse, path);
   }
 
   return retryResponse;
@@ -160,6 +176,60 @@ function buildHeaders(
 function createAbortError(): DOMException {
   // DOMException with "AbortError" is what native fetch throws when aborted.
   return new DOMException("The operation was aborted.", "AbortError");
+}
+
+function parseRetryAfterMs(headerValue: string | null, now: number): number | null {
+  if (!headerValue) return null;
+  const trimmed = headerValue.trim();
+  if (!trimmed) return null;
+
+  // Delta-seconds format (RFC 9110 §10.2.3)
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const seconds = Number(trimmed);
+    if (Number.isFinite(seconds)) {
+      return Math.max(0, Math.round(seconds * 1000));
+    }
+  }
+
+  // HTTP-date format
+  const parsedDateMs = Date.parse(trimmed);
+  if (Number.isFinite(parsedDateMs)) {
+    return Math.max(0, parsedDateMs - now);
+  }
+
+  return null;
+}
+
+function emitRateLimitSignal(response: Response, path: string): void {
+  const now = Date.now();
+  const hasHeaders = Boolean(response.headers && typeof response.headers.get === "function");
+  const parsedHeaders = hasHeaders ? parseRateLimitHeaders(response) : null;
+  const retryAfterHeader = hasHeaders ? response.headers.get("Retry-After") : null;
+  const retryAfterFromHeader = parseRetryAfterMs(retryAfterHeader, now);
+
+  let rawRetryMs: number;
+  if (retryAfterFromHeader !== null) {
+    rawRetryMs = retryAfterFromHeader;
+  } else if (parsedHeaders?.resetAt) {
+    const resetMs = new Date(parsedHeaders.resetAt).getTime();
+    rawRetryMs = Number.isFinite(resetMs)
+      ? Math.max(0, resetMs - now)
+      : DEFAULT_RATE_LIMIT_RETRY_MS;
+  } else {
+    rawRetryMs = DEFAULT_RATE_LIMIT_RETRY_MS;
+  }
+
+  const retryAfterMs = Math.min(Math.max(0, rawRetryMs), MAX_RATE_LIMIT_RETRY_MS);
+  const resetAt = new Date(now + retryAfterMs).toISOString();
+
+  signalRateLimit({
+    retryAfterMs,
+    resetAt,
+    path,
+    ...(parsedHeaders
+      ? { limit: parsedHeaders.limit, remaining: 0 }
+      : {}),
+  });
 }
 
 /** @internal Expose for testing only. */
