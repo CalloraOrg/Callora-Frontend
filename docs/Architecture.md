@@ -11,3 +11,16 @@
 | Styles | `src/styles/`, `src/index.css` | Tokens, themes, print and contrast styles |
 
 Fallback rule: any data fetch that fails because no backend is reachable must resolve to sample data (never an empty error screen) when the app is deployed statically.
+
+## App shell modules (`src/app/`)
+
+The application shell in `src/App.tsx` delegates route definitions, marketing sections, and global controls to dedicated modules under `src/app/`:
+
+| Module | Responsibility |
+| --- | --- |
+| `src/app/routes.ts` | Route path constants (`APP_ROUTES`), primary navigation entries (`PRIMARY_NAV`), and lazy route prefetcher (`prefetchRoute`) |
+| `src/app/deposit.ts` | Pending deposit helpers (`readPendingDeposit`, `writePendingDeposit`, `clearPendingDeposit`), stage labels (`STAGE_LABELS`), `getStageLabel`, and `buildExplorerLink` |
+| `src/app/LandingPage.tsx` | Marketing landing page component shown at `/` with feature grids, consumer/developer flows, and footer |
+| `src/app/StatusPage.tsx` | System operational status route component shown at `/status` |
+| `src/app/WalletSignInButton.tsx` | Topbar Freighter wallet sign-in / sign-out button managing self-contained auth states |
+| `src/app/AccountSwitcher.tsx` | Multi-account selector dropdown with rename, add, and remove capabilities |
