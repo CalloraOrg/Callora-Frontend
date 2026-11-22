@@ -7,7 +7,7 @@ import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut, formatUsdcStroops, normalizeUsdcAmountInput, stroopsToUsdcAmount, usdcAmountToStroops, USDC_DECIMALS } from "./utils/format";
 import { useNetworkFee } from "./components/DepositPreview";
-import { ENABLE_DEMO_OUTCOME, EXPLORER_BASE_URL, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR, STELLAR_VAULT_CONFIG, STELLAR_VAULT_CONTRACT_ID, PENDING_DEPOSIT_STORAGE_KEY, TRANSACTION_TIMEOUT_SECONDS, type StellarNetwork } from "./config/constants";
+import { ENABLE_DEMO_OUTCOME, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR, STELLAR_VAULT_CONFIG, STELLAR_VAULT_CONTRACT_ID, TRANSACTION_TIMEOUT_SECONDS } from "./config/constants";
 import type { WalletServiceErrorCode, UsdcTrustlineStatus } from "./services/walletService";
 import { useVaultBalances } from "./hooks/useVaultBalances";
 import BalanceReadout from "./components/BalanceReadout";
@@ -18,13 +18,36 @@ import ExternalLink from "./components/ExternalLink";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
-import { useAccountContext } from "./hooks/useAccountContext";
-import { signIn, signOut, isSignedIn, type AuthServiceErrorCode } from "./services/authService";
 import { useSessionExpiry } from "./hooks/useSessionExpiry";
 import SessionExpiryBanner from "./components/SessionExpiryBanner";
 import WalletStatus from "./components/WalletStatus";
 import { useWalletStore } from "./state/walletStore";
 import { useToast } from "./components/Toast";
+
+import { APP_ROUTES, PRIMARY_NAV, prefetchRoute } from "./app/routes";
+import {
+  readPendingDeposit,
+  writePendingDeposit,
+  clearPendingDeposit,
+  STAGE_LABELS,
+  buildExplorerLink,
+  getStageLabel,
+  type PendingDepositRecord,
+  type DepositStage,
+} from "./app/deposit";
+import LandingPage from "./app/LandingPage";
+import StatusPage from "./app/StatusPage";
+import WalletSignInButton from "./app/WalletSignInButton";
+import AccountSwitcher from "./app/AccountSwitcher";
+
+// Re-export public API
+export { prefetchRoute } from "./app/routes";
+export {
+  readPendingDeposit,
+  writePendingDeposit,
+  clearPendingDeposit,
+  type PendingDepositRecord,
+} from "./app/deposit";
 
 // Route splitting: dynamic imports for all heavy page routes
 const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
@@ -43,79 +66,8 @@ const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
 const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
 const BillingInvoiceSection = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.BillingInvoiceSection })));
- 
-// Prefetch cache map to ensure modules are loaded on hover / focus without delaying critical interaction
-const routePrefetchers: Record<string, () => Promise<any>> = {
-  "/marketplace": () => import("./pages/MarketplacePage"),
-  "/publish": () => import("./pages/PublishApi"),
-  "/dashboard": () => import("./pages/DashboardPage"),
-  "/api-usage": () => import("./pages/ApiUsage"),
-  "/apis/my-apis": () => import("./pages/MyApis"),
-  "/apis/plan-badge": () => import("./pages/PlanBadge"),
-  "/billing/history": () => import("./pages/BillingHistory"),
-  "/theme-playground": () => import("./pages/ThemePlayground"),
-  "/design-system/docs": () => import("./pages/DesignSystemDocs"),
-  "/a11y-audit": () => import("./pages/A11yAudit"),
-  "/webhooks/deliveries": () => import("./pages/WebhookDeliveries"),
-  "/endpoints": () => import("./pages/EndpointSummary"),
-};
 
-export function prefetchRoute(path: string) {
-  const prefetcher = routePrefetchers[path];
-  if (prefetcher) {
-    prefetcher().catch(() => {
-      // Ignore prefetch failures gracefully
-    });
-  }
-}
-
-type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
-
-export interface PendingDepositRecord {
-  hash: string;
-  amount: number;
-  submittedAt: number;
-  network: StellarNetwork;
-  contractId: string;
-}
-
-export function readPendingDeposit(): PendingDepositRecord | null {
-  try {
-    const raw = sessionStorage.getItem(PENDING_DEPOSIT_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (
-      parsed &&
-      typeof parsed.hash === "string" &&
-      typeof parsed.amount === "number" &&
-      typeof parsed.submittedAt === "number" &&
-      parsed.network === STELLAR_NETWORK &&
-      parsed.contractId === STELLAR_VAULT_CONTRACT_ID
-    ) {
-      return parsed as PendingDepositRecord;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-export function writePendingDeposit(record: PendingDepositRecord): void {
-  try {
-    sessionStorage.setItem(PENDING_DEPOSIT_STORAGE_KEY, JSON.stringify(record));
-  } catch {
-    // Gracefully handle storage quota or private mode restrictions
-  }
-}
-
-export function clearPendingDeposit(): void {
-  try {
-    sessionStorage.removeItem(PENDING_DEPOSIT_STORAGE_KEY);
-  } catch {
-    // Gracefully handle storage restrictions
-  }
-}
 
 type WalletServiceFailure = Error & {
   contractErrorCode?: number;
@@ -123,272 +75,17 @@ type WalletServiceFailure = Error & {
   requiresReconciliation: boolean;
 };
 
-const STAGE_LABELS: Record<DepositStage, string> = {
-  input: "Enter Amount",
-  approving: "Approving",
-  pending: "Pending",
-  confirmed: "Confirmed",
-  failed: "Failed",
-};
-
-type Feature = {
-  icon: string;
-  title: string;
-  description: string;
-};
-
-type Step = {
-  title: string;
-  description: string;
-};
-
-const features: Feature[] = [
-  {
-    icon: "💸",
-    title: "Pay-per-call billing",
-    description: "Micro-payments in USDC mean every API request is billed precisely and transparently.",
-  },
-  {
-    icon: "⛓️",
-    title: "On-chain settlement",
-    description: "Every transaction settles on-chain with verifiable records and near real-time visibility.",
-  },
-  {
-    icon: "🧾",
-    title: "No subscriptions",
-    description: "Skip fixed plans and commitments. Pay only for the API calls your product actually makes.",
-  },
-  {
-    icon: "🧑‍💻",
-    title: "Developer-friendly",
-    description: "Publish APIs quickly, define per-request pricing, and start earning USDC automatically.",
-  },
-];
-const consumerSteps: Step[] = [
-  {
-    title: "Connect wallet or sign up",
-    description: "Create your account and securely link a wallet in minutes.",
-  },
-  {
-    title: "Deposit USDC to vault",
-    description: "Fund your usage balance once and keep API requests flowing.",
-  },
-  {
-    title: "Browse and use APIs",
-    description: "Discover programmable APIs and integrate them into your app.",
-  },
-  {
-    title: "Pay automatically per call",
-    description: "Billing happens in real time based on actual usage and price-per-request.",
-  },
-];
-
-const developerSteps: Step[] = [
-  {
-    title: "Register as developer",
-    description: "Set up your publisher profile and prepare your API listing.",
-  },
-  {
-    title: "Publish your API",
-    description: "Add docs, endpoints, and metadata to make your API easy to adopt.",
-  },
-  {
-    title: "Set pricing per request",
-    description: "Choose flexible per-call pricing that reflects the value of your service.",
-  },
-  {
-    title: "Earn USDC automatically",
-    description: "Collect revenue from each successful call with transparent settlement.",
-  },
-];
-
-const APP_ROUTES = {
-  landing: "/",
-  dashboard: "/dashboard",
-  marketplace: "/marketplace",
-  publish: "/publish",
-  myApis: "/apis/my-apis",
-  planBadge: "/apis/plan-badge",
-  apiUsage: "/api-usage",
-  billing: "/billing",
-  billingHistory: "/billing/history",
-  documentation: "/documentation",
-  status: "/status",
-  themePlayground: "/theme-playground",
-  designSystem: "/design-system/docs",
-  serverError: "/500",
-  rateLimitCard: "/marketplace/:apiId/rate-limits",
-  legacyRateLimit: "/rate-limit",
-  slaCard: "/marketplace/:apiId/sla",
-  webhookDeliveries: "/webhooks/deliveries",
-  onboarding: "/onboarding",
-  endpointSummary: "/endpoints",
-} as const;
-
-const PRIMARY_NAV: Array<{ to: string; label: string }> = [
-  { to: APP_ROUTES.dashboard, label: "Dashboard" },
-  { to: APP_ROUTES.marketplace, label: "Marketplace" },
-  { to: APP_ROUTES.publish, label: "Publish" },
-  { to: APP_ROUTES.myApis, label: "My APIs" },
-  { to: APP_ROUTES.billing, label: "Billing" },
-  { to: APP_ROUTES.documentation, label: "Docs" },
-];
-
 /** `/rate-limit` no longer exists; limits are per-API. Send users to the Marketplace. */
 function LegacyRateLimitRedirect() {
   const { showToast } = useToast();
   const announced = useRef(false);
   useEffect(() => {
-    // Guard against StrictMode's double effect invocation in development.
+    // Guard against StrictMode double effect invocation in development.
     if (announced.current) return;
     announced.current = true;
     showToast("Rate limits are now shown per API. Pick an API to see its limits.");
   }, [showToast]);
   return <Navigate to={APP_ROUTES.marketplace} replace />;
-}
-
-function buildExplorerLink(hash: string) {
-  return `${EXPLORER_BASE_URL}${hash}`;
-}
-
-function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
-  if (stage === "approving") return "Approve in wallet...";
-  if (stage === "pending") return "Transaction submitted...";
-  if (stage === "confirmed") return "Deposit successful";
-  if (stage === "failed") return "Transaction failed";
-
-  return hasValidAmount ? "Review transaction preview" : "Enter a deposit amount";
-}
-
-function LandingPage({ onStartUsingApis, onPublishApi, onTakeTour }: { onStartUsingApis: () => void; onPublishApi: () => void; onTakeTour?: () => void }) {
-  return (
-    <div className="lp-shell">
-      <header className="lp-section lp-hero" aria-labelledby="hero-title">
-        <div>
-          <p className="lp-eyebrow">Built for API consumers and publishers</p>
-          <h1 id="hero-title">Callora - Programmable API Access</h1>
-          <p className="lp-subhead">
-            Access and monetize APIs with usage-based billing. Callora combines programmable API access with pay-per-call settlement in USDC so teams can build faster and
-            charge fairly.
-          </p>
-
-          <div className="lp-cta-row">
-            <button className="lp-btn lp-btn-primary" onClick={onStartUsingApis}>
-              Start Using APIs
-            </button>
-            <button className="lp-btn lp-btn-secondary" onClick={onPublishApi}>
-              Publish Your API
-            </button>
-            {onTakeTour && (
-              <button className="lp-btn lp-btn-secondary" onClick={onTakeTour} style={{ marginLeft: "12px" }}>
-                Take the tour
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="lp-visual" aria-hidden="true">
-          <p>API Marketplace</p>
-          <span>Programmable Access • USDC Per Call • On-chain Settlement</span>
-        </div>
-      </header>
-
-      <section className="lp-section">
-        <p className="lp-eyebrow">Core capabilities</p>
-        <h2>Why teams choose Callora</h2>
-
-        <div className="lp-feature-grid">
-          {features.map((feature) => (
-            <article className="lp-card" key={feature.title}>
-              <span>{feature.icon}</span>
-              <h3>{feature.title}</h3>
-              <p>{feature.description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="lp-section">
-        <p className="lp-eyebrow">How it works</p>
-        <h2>A simple flow for both sides of the marketplace</h2>
-
-        <div className="lp-flow-grid">
-          <article className="lp-card">
-            <h3>For API Consumers</h3>
-            <ol>
-              {consumerSteps.map((step) => (
-                <li key={step.title}>
-                  <strong>{step.title}</strong>
-                  <p>{step.description}</p>
-                </li>
-              ))}
-            </ol>
-          </article>
-
-          <article className="lp-card">
-            <h3>For API Developers</h3>
-            <ol>
-              {developerSteps.map((step) => (
-                <li key={step.title}>
-                  <strong>{step.title}</strong>
-                  <p>{step.description}</p>
-                </li>
-              ))}
-            </ol>
-          </article>
-        </div>
-      </section>
-
-      <section className="lp-section">
-        <p className="lp-eyebrow">Use cases & benefits</p>
-        <h2>Designed for practical adoption</h2>
-
-        <div className="lp-flow-grid">
-          <article className="lp-card">
-            <h3>Where Callora shines</h3>
-            <ul>
-              <li>AI workflows that need utility APIs without subscription overhead.</li>
-              <li>Data providers monetizing endpoint access with frictionless micro-billing.</li>
-              <li>Fintech and web3 apps requiring transparent usage-based costs.</li>
-            </ul>
-          </article>
-
-          <article className="lp-card">
-            <h3>Testimonials</h3>
-            <p>
-              “Callora helped us launch usage-based API monetization in days, not months.”
-              <span> — Case study placeholder</span>
-            </p>
-            <p>
-              “Our teams can scale integration costs exactly with demand, no wasted subscription spend.”
-              <span> — Customer quote placeholder</span>
-            </p>
-          </article>
-        </div>
-      </section>
-
-      <footer className="lp-section lp-footer">
-        <nav aria-label="Footer links">
-          <ExternalLink href={EXTERNAL_LINKS.about} className="link-nav">
-            About
-          </ExternalLink>
-          <NavLink to={APP_ROUTES.documentation} className="link-nav">
-            Documentation
-          </NavLink>
-          <ExternalLink href={EXTERNAL_LINKS.support} className="link-nav">
-            Support
-          </ExternalLink>
-          <ExternalLink href={EXTERNAL_LINKS.terms} className="link-nav">
-            Terms
-          </ExternalLink>
-          <ExternalLink href={EXTERNAL_LINKS.privacy} className="link-nav">
-            Privacy
-          </ExternalLink>
-        </nav>
-        <p>© {new Date().getFullYear()} Callora. All rights reserved.</p>
-      </footer>
-    </div>
-  );
 }
 
 function App() {
@@ -1188,24 +885,7 @@ function App() {
             <Route path={APP_ROUTES.documentation} element={<Documentation />} />
             <Route path={APP_ROUTES.slaCard} element={<SlaCard />} />
 
-            <Route
-              path={APP_ROUTES.status}
-              element={
-                <section className="surface placeholder-card">
-                  <p className="eyebrow">Status</p>
-                  <h1>System status updates in one place.</h1>
-                  <p>All core services are operational. If you are still seeing issues, please contact support and include what action you were trying to complete.</p>
-                  <ul className="status-list" aria-label="Service status">
-                    {["Marketplace API", "Billing & vault deposits", "Usage metering", "Stellar testnet settlement", "Webhooks"].map((svc) => (
-                      <li key={svc}>
-                        <span>{svc}</span>
-                        <span className="status-ok">● Operational</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              }
-            />
+            <Route path={APP_ROUTES.status} element={<StatusPage />} />
 
             <Route path="/api-usage" element={<ApiUsage />} />
 
@@ -1578,304 +1258,13 @@ function App() {
  * AppSessionExpiryBanner — renders the session-expiry banner when the session
  * has expired, and dismisses it when the user clicks Dismiss or signs in again.
  */
+
 function AppSessionExpiryBanner() {
   const { isExpired, dismiss } = useSessionExpiry();
   if (!isExpired) return null;
   return (
     <div style={{ padding: "0 24px" }}>
       <SessionExpiryBanner onDismiss={dismiss} />
-    </div>
-  );
-}
-
-/**
- * WalletSignInButton — topbar control that lets the user sign in with Freighter
- * or sign out.  Manages its own loading / error state so the rest of the app
- * does not need to know about it.
- */
-function WalletSignInButton() {
-  const [signedIn, setSignedIn] = useState(isSignedIn);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Keep local state in sync after a session-expiry clears the token.
-  const { isExpired } = useSessionExpiry();
-  useEffect(() => {
-    if (isExpired) setSignedIn(false);
-  }, [isExpired]);
-
-  const handleSignIn = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await signIn();
-      setSignedIn(true);
-    } catch (err) {
-      const code: AuthServiceErrorCode | undefined =
-        err && typeof err === "object" && "code" in err
-          ? (err as { code: AuthServiceErrorCode }).code
-          : undefined;
-
-      if (code === "SIGNATURE_REJECTED") {
-        // User deliberately cancelled — don't show an error.
-      } else {
-        setError(
-          err instanceof Error && err.message
-            ? err.message
-            : "Sign in failed. Try again.",
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const handleSignOut = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await signOut();
-    } finally {
-      // Clear regardless of whether the revoke call failed.
-      setSignedIn(false);
-      setLoading(false);
-    }
-  }, []);
-
-  return (
-    <div className="wallet-signin-btn-wrap" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-      {signedIn ? (
-        <button
-          type="button"
-          className="wallet-signin-btn wallet-signin-btn--out"
-          onClick={handleSignOut}
-          disabled={loading}
-          aria-busy={loading}
-          aria-label="Sign out of Callora"
-          style={WALLET_BTN_STYLE}
-        >
-          {loading ? "Signing out…" : "Sign out"}
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="wallet-signin-btn wallet-signin-btn--in"
-          onClick={handleSignIn}
-          disabled={loading}
-          aria-busy={loading}
-          aria-label="Sign in with Freighter wallet"
-          style={{ ...WALLET_BTN_STYLE, background: "var(--accent, #4e85ff)", color: "#fff", border: "none" }}
-        >
-          {loading ? "Signing in…" : "Sign in"}
-        </button>
-      )}
-      {error && (
-        <span
-          role="alert"
-          aria-live="polite"
-          style={{ fontSize: "0.75rem", color: "var(--danger, #ff7d8d)", maxWidth: 220, textAlign: "right" }}
-        >
-          {error}
-        </span>
-      )}
-    </div>
-  );
-}
-
-const WALLET_BTN_STYLE: React.CSSProperties = {
-  padding: "6px 14px",
-  borderRadius: 8,
-  border: "1px solid var(--line, rgba(169,184,255,0.16))",
-  background: "var(--surface-soft, rgba(255,255,255,0.04))",
-  color: "var(--text, #f3f5fb)",
-  fontSize: "0.82rem",
-  fontWeight: 600,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
-
-function AccountSwitcher() {
-  const { account, accounts, switchAccount, addAccount, removeAccount, renameAccount } = useAccountContext();
-  const [open, setOpen] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newLabel, setNewLabel] = useState("");
-  const [addError, setAddError] = useState("");
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameLabel, setRenameLabel] = useState("");
-  const [renameError, setRenameError] = useState("");
-
-  if (accounts.length === 0) return null;
-
-  const handleAdd = () => {
-    setAddError("");
-    const trimmed = newLabel.trim();
-    if (!trimmed) {
-      setAddError("Label cannot be empty.");
-      return;
-    }
-    if (accounts.some((a) => a.label === trimmed)) {
-      setAddError("Label must be unique.");
-      return;
-    }
-    addAccount(trimmed);
-    setNewLabel("");
-    setShowAdd(false);
-    setOpen(false);
-  };
-
-  const handleRemoveCurrent = () => {
-    if (account) {
-      removeAccount(account.id);
-    }
-    setOpen(false);
-  };
-
-  const startRename = (acc: { id: string; label: string }) => {
-    setRenamingId(acc.id);
-    setRenameLabel(acc.label);
-    setRenameError("");
-  };
-
-  const handleRename = (accId: string) => {
-    setRenameError("");
-    const trimmed = renameLabel.trim();
-    if (!trimmed) {
-      setRenameError("Label cannot be empty.");
-      return;
-    }
-    if (accounts.some((a) => a.id !== accId && a.label === trimmed)) {
-      setRenameError("Label must be unique.");
-      return;
-    }
-    renameAccount(accId, trimmed);
-    setRenamingId(null);
-    setRenameLabel("");
-  };
-
-  return (
-    <div style={{ position: "relative" }}>
-      <button
-        type="button"
-        className="ghost-button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        style={{ fontSize: 13 }}
-      >
-        {account ? account.label : "Switch account"}
-      </button>
-      {open && (
-        <ul
-          role="listbox"
-          aria-label="Accounts"
-          style={{
-            position: "absolute",
-            right: 0,
-            top: "100%",
-            marginTop: 8,
-            padding: 8,
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            listStyle: "none",
-            minWidth: 180,
-            zIndex: 1000,
-          }}
-        >
-          {accounts.map((acc) => (
-            <li key={acc.id} style={{ marginBottom: 2 }}>
-              {renamingId === acc.id ? (
-                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                  <input
-                    type="text"
-                    value={renameLabel}
-                    onChange={(e) => setRenameLabel(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleRename(acc.id); }}
-                    style={{ flex: 1, fontSize: 13, padding: "4px 6px" }}
-                    autoFocus
-                    aria-label="Rename account"
-                  />
-                  <button type="button" onClick={() => handleRename(acc.id)} style={{ fontSize: 12 }}>OK</button>
-                  <button type="button" onClick={() => { setRenamingId(null); setRenameLabel(""); }} style={{ fontSize: 12 }}>Cancel</button>
-                  {renameError && <span style={{ color: "red", fontSize: 11 }}>{renameError}</span>}
-                </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span
-                    role="option"
-                    aria-selected={account?.id === acc.id}
-                    onClick={() => {
-                      switchAccount(acc.id);
-                      setOpen(false);
-                    }}
-                    style={{
-                      padding: "8px 12px",
-                      cursor: "pointer",
-                      borderRadius: 4,
-                      background: account?.id === acc.id ? "var(--accent)" : "transparent",
-                      color: account?.id === acc.id ? "#fff" : "var(--text)",
-                      fontSize: 13,
-                      flex: 1,
-                    }}
-                  >
-                    {acc.label}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => startRename(acc)}
-                    style={{ fontSize: 11, padding: "2px 6px", marginLeft: 4 }}
-                    aria-label={`Rename ${acc.label}`}
-                  >
-                    Rename
-                  </button>
-                </div>
-              )}
-            </li>
-          ))}
-          {showAdd ? (
-            <li style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <input
-                  type="text"
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-                  placeholder="Account label"
-                  style={{ fontSize: 13, padding: "4px 6px" }}
-                  autoFocus
-                  aria-label="New account label"
-                />
-                <button type="button" onClick={handleAdd} style={{ fontSize: 12 }}>Add</button>
-                {addError && <span style={{ color: "red", fontSize: 11 }}>{addError}</span>}
-              </div>
-            </li>
-          ) : (
-            <li
-              style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}
-            >
-              <button
-                type="button"
-                onClick={() => { setShowAdd(true); setAddError(""); }}
-                style={{ fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--accent)" }}
-              >
-                + Add account
-              </button>
-            </li>
-          )}
-          {account && (
-            <li style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>
-              <button
-                type="button"
-                onClick={handleRemoveCurrent}
-                style={{ fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--accent)" }}
-              >
-                Remove {account.label}
-              </button>
-            </li>
-          )}
-        </ul>
-      )}
     </div>
   );
 }

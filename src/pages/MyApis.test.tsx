@@ -259,4 +259,45 @@ describe("MyApis page", () => {
     expect(screen.getByText("Pending")).toBeTruthy();
     expect(screen.getByText("Rejected")).toBeTruthy();
   });
+
+  // ── 9. Key rotation action ────────────────────────────────────────────────
+
+  it("disables Rotate key button when signed out", async () => {
+    const authService = await import("../services/authService");
+    vi.spyOn(authService, "isSignedIn").mockReturnValue(false);
+
+    renderMyApis();
+
+    await waitFor(
+      () => expect(screen.getByTestId("my-apis-list")).toBeTruthy(),
+      WAIT_OPTS
+    );
+
+    const rotateButtons = screen.getAllByRole("button", { name: /rotate key/i });
+    expect(rotateButtons.length).toBeGreaterThan(0);
+    expect(rotateButtons[0].hasAttribute("disabled")).toBe(true);
+    expect(rotateButtons[0].getAttribute("title")).toBe("Sign in to rotate API key");
+  });
+
+  it("enables Rotate key button and opens KeyRotationModal when signed in", async () => {
+    const authService = await import("../services/authService");
+    vi.spyOn(authService, "isSignedIn").mockReturnValue(true);
+    vi.spyOn(authService, "getAccessToken").mockReturnValue("test-bearer-token");
+
+    renderMyApis();
+
+    await waitFor(
+      () => expect(screen.getByTestId("my-apis-list")).toBeTruthy(),
+      WAIT_OPTS
+    );
+
+    const rotateBtn = screen.getByRole("button", { name: "Rotate key for WeatherSim API" });
+    expect(rotateBtn.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(rotateBtn);
+
+    // Modal dialog opens
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Rotate API Key")).toBeTruthy();
+  });
 });

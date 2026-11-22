@@ -2,20 +2,21 @@
  * KeyRotationApi
  *
  * Backend integration for API key rotation with confirmation tokens.
- * This layer handles the HTTP communication with the backend while maintaining
+ * This layer handles HTTP communication with the backend while maintaining
  * the security boundaries established by KeyRotationService.
  *
  * Token flow (prevents replay and cross-tenant attacks):
- * 1. User clicks "Rotate Key"
- * 2. Frontend obtains a confirmation token (TODO: currently client-side placeholder;
- *    production expects server-issued token. See docs/Key-Rotation.md)
- * 3. Frontend calls /api/rotate-key with the token and idempotency key
- * 4. Backend validates token matches user context
- * 5. Backend verifies token hasn't expired or been replayed
- * 6. Backend rotates key and returns new key (or error)
- * 7. Frontend displays new key or reverts on error
+ * 1. User clicks "Rotate Key" in My APIs or key management UI
+ * 2. Frontend requests an opaque, single-use confirmation token from the server
+ *    via POST /api/rotate-key/token (getRotationToken).
+ * 3. Backend verifies session, key ownership, and mints an unconsumed token with a 15-minute TTL.
+ * 4. Frontend calls POST /api/rotate-key (rotateKeyWithToken) with the server-minted
+ *    token and an Idempotency-Key.
+ * 5. Backend validates token binding and expiry, atomically consumes the token,
+ *    and returns the newly rotated key.
+ * 6. Frontend displays the new key once and announces success.
  *
- * Part of issue #991: Make API-key rotation confirmation lossless
+ * See docs/Key-Rotation.md for the normative trust model.
  */
 
 import { RotationRequest } from "./KeyRotationService";
@@ -23,6 +24,7 @@ import {
   redactSensitiveData,
   classifyHttpError,
   logError,
+  getSafeErrorMessage,
 } from "./SecureErrorHandler";
 import {
   generateIdempotencyKey,
@@ -43,26 +45,12 @@ export interface KeyRotationApiResponse {
 
 /**
  * API endpoint for rotating API keys with token-based authorization.
- * This endpoint is protected by:
+ * Protected by:
  * - Bearer token authentication (session token in Authorization header)
  * - Confirmation token in request body (prevents replay/cross-tenant)
  * - Server-side validation of user context (userId, tenantId, sessionId)
- *
- * The endpoint MUST:
- * 1. Verify the session bearer token is valid for the user
- * 2. Verify the confirmation token matches the user's context
- * 3. Check the token hasn't expired (15 minute window)
- * 4. Verify the keyId belongs to the user
- * 5. Perform the rotation and return the new key
- * 6. Log the rotation (without exposing keys) for audit trail
- *
- * Error responses MUST NOT leak:
- * - Old or new API keys
- * - Confirmation tokens
- * - User IDs, tenant IDs, or session IDs
- * - Implementation details or SQL errors
  */
-const ROTATE_KEY_ENDPOINT = "/api/v1/keys/rotate";
+const ROTATE_KEY_ENDPOINT = "/api/rotate-key";
 const ROTATION_TIMEOUT_MS = 30_000;
 const ROTATION_MAX_RETRIES = 1;
 const ROTATION_BASE_DELAY_MS = 250;
@@ -283,10 +271,28 @@ export async function getRotationToken(
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
+      let code = data?.error?.code;
+      if (!code) {
+        if (response.status === 401) code = "UNAUTHORIZED";
+        else if (response.status === 403) code = "FORBIDDEN";
+        else if (response.status === 429) code = "TOO_MANY_REQUESTS";
+        else code = "TOKEN_REQUEST_FAILED";
+      }
+
+      const rawMessage =
+        data?.error?.message ||
+        (response.status === 401
+          ? "Unauthorized"
+          : response.status === 403
+            ? "Forbidden"
+            : response.status === 429
+              ? "Too many requests"
+              : "Failed to request rotation token.");
+
       return {
         error: {
-          code: data?.error?.code || "TOKEN_REQUEST_FAILED",
-          message: data?.error?.message || "Failed to request rotation token.",
+          code,
+          message: redactSensitiveData(getSafeErrorMessage(rawMessage, code)),
         },
       };
     }
@@ -297,10 +303,19 @@ export async function getRotationToken(
       expiresIn: data.expiresIn,
     };
   } catch (error) {
+    const isTimeout =
+      (error instanceof Error &&
+        (error.name === "TimeoutError" || error.name === "AbortError")) ||
+      isTimeoutError(error);
+    const code = isTimeout ? "TIMEOUT" : "NETWORK_ERROR";
+    const rawMessage = isTimeout
+      ? "Request timed out."
+      : "Network error. Please check your connection.";
+
     return {
       error: {
-        code: "TOKEN_REQUEST_FAILED",
-        message: "Failed to request rotation token. Please try again.",
+        code,
+        message: redactSensitiveData(getSafeErrorMessage(rawMessage, code)),
       },
     };
   }
