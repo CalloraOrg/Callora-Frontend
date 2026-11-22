@@ -2,6 +2,10 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import ApiUsage from "./ApiUsage";
 import { addAccount, switchAccount, _reset } from "../state/accountStore";
+import {
+  signalRateLimit,
+  resetRateLimitSignalForTests,
+} from "../services/rateLimitSignal";
 
 const usagePayload = {
   events: [
@@ -758,5 +762,120 @@ describe("ApiUsage - Real Test Call", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Open request history/i }));
     expect(screen.getAllByText("/api/v1/user/profile").length).toBeGreaterThan(0);
+  });
+});
+
+describe("ApiUsage - Rate Limit Alert & Countdown", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-23T00:00:00.000Z"));
+    resetRateLimitSignalForTests();
+  });
+
+  afterEach(() => {
+    resetRateLimitSignalForTests();
+    vi.useRealTimers();
+  });
+
+  it("shows RateLimitAlert with countdown on 429, disables Make Test Call, and re-enables when countdown ends", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/usage")) {
+        return Promise.resolve(
+          new Response(JSON.stringify(usagePayload), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: "Too Many Requests" }), {
+          status: 429,
+          headers: { "Retry-After": "30" },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ApiUsage />);
+    await settleUsageRequest();
+
+    const makeCallBtn = screen.getByRole("button", {
+      name: /Make Test Call/i,
+    }) as HTMLButtonElement;
+    expect(makeCallBtn.disabled).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(makeCallBtn);
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("Rate limited. Retry in");
+    expect(alert.textContent).toContain("30s");
+    expect(makeCallBtn.disabled).toBe(true);
+
+    // Advance 10 seconds — countdown updates, button remains disabled
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(screen.getByRole("alert").textContent).toContain("20s");
+    expect(makeCallBtn.disabled).toBe(true);
+
+    // Advance past the remaining 20 seconds — alert disappears and button re-enables
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(21_000);
+    });
+    expect(screen.queryByText(/Rate limited\. Retry in/i)).toBeNull();
+    expect(makeCallBtn.disabled).toBe(false);
+  });
+
+  it("keeps the newest reset window when concurrent 429s arrive out of order", async () => {
+    render(<ApiUsage />);
+    await settleUsageRequest();
+
+    const laterResetAt = new Date(Date.now() + 45_000).toISOString();
+    const earlierResetAt = new Date(Date.now() + 10_000).toISOString();
+
+    act(() => {
+      signalRateLimit({
+        retryAfterMs: 45_000,
+        resetAt: laterResetAt,
+        path: "/api/v1/user/profile",
+      });
+      // Older reset arriving second should NOT overwrite the newer 45s window
+      signalRateLimit({
+        retryAfterMs: 10_000,
+        resetAt: earlierResetAt,
+        path: "/api/usage",
+      });
+    });
+
+    expect(screen.getByRole("alert").textContent).toContain("45s");
+
+    // After 15s, the 45s window is still active (30s left)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(screen.getByRole("alert").textContent).toContain("30s");
+  });
+
+  it("clears the countdown interval on unmount", async () => {
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    const { unmount } = render(<ApiUsage />);
+    await settleUsageRequest();
+
+    act(() => {
+      signalRateLimit({
+        retryAfterMs: 30_000,
+        resetAt: new Date(Date.now() + 30_000).toISOString(),
+        path: "/api/usage",
+      });
+    });
+
+    expect(screen.getByRole("alert").textContent).toContain("30s");
+    clearIntervalSpy.mockClear();
+
+    unmount();
+    expect(clearIntervalSpy).toHaveBeenCalled();
   });
 });
