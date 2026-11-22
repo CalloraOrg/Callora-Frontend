@@ -552,72 +552,72 @@ export default function ApiUsage() {
       }
     }
 
+    testCallAbortRef.current?.abort();
+    const controller = new AbortController();
+    testCallAbortRef.current = controller;
+
     setIsLoading(true);
     setApiResponse(null);
+    setResponseStatus(null);
     setResponseTime(null);
     setCallCost(null);
 
-    const startTime = Date.now();
+    try {
+      const result = await trackFetch(
+        runTestCall({
+          endpoint: selectedEndpoint,
+          params: requestParams,
+          signal: controller.signal,
+        }),
+      );
 
-    await trackFetch(
-      new Promise<void>((resolve) => {
-        setTimeout(
-          () => {
-            const endTime = Date.now();
-            const time = endTime - startTime;
-            const cost = Math.random() * 0.005 + 0.001;
+      if (controller.signal.aborted) return;
 
-            setResponseTime(time);
-            setCallCost(cost);
+      setResponseTime(result.responseTime);
+      setCallCost(result.cost);
+      setResponseStatus(result.httpStatus);
+      setApiResponse(result.body);
 
-            const mockResponse = {
-              success: true,
-              data: {
-                id: "user_123",
-                name: "John Doe",
-                email: "john@example.com",
-                balance: 1250.5,
-                created_at: new Date().toISOString(),
-              },
-              timestamp: new Date().toISOString(),
-            };
+      const historyEntry: HistoryEntry = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        endpointId: selectedEndpoint.id,
+        endpointName: selectedEndpoint.name,
+        endpointPath: selectedEndpoint.path,
+        method: selectedEndpoint.method,
+        requestParams,
+        response: result.body,
+        status: result.status,
+        httpStatus: result.httpStatus,
+        responseTime: result.responseTime,
+        cost: result.cost,
+      };
+      saveEntry(historyEntry);
+      setHistoryEntries(loadHistory());
 
-            setApiResponse(mockResponse);
-
-            const newCall: CallRecord = {
-              id: Date.now().toString(),
-              timestamp: new Date(),
-              endpoint: selectedEndpoint.path,
-              status: "success",
-              responseTime: time,
-              cost: cost,
-              request: requestParams,
-              response: mockResponse,
-            };
-
-            const historyEntry: HistoryEntry = {
-              id: newCall.id,
-              timestamp: newCall.timestamp.toISOString(),
-              endpointId: selectedEndpoint.id,
-              endpointName: selectedEndpoint.name,
-              endpointPath: selectedEndpoint.path,
-              method: selectedEndpoint.method,
-              requestParams: requestParams,
-              response: mockResponse,
-              status: "success",
-              responseTime: time,
-              cost: cost,
-            };
-            saveEntry(historyEntry);
-            setHistoryEntries(loadHistory());
-
-            setIsLoading(false);
-            resolve();
-          },
-          1000 + Math.random() * 2000,
+      if (result.ok) {
+        announceStatus(
+          `Test call succeeded (${result.httpStatus ?? 200}) in ${result.responseTime}ms.`,
         );
-      }),
-    );
+      } else {
+        announceStatus(
+          `Test call failed${result.httpStatus ? ` (${result.httpStatus})` : ""}: ${result.errorMessage ?? "An error occurred."}`,
+        );
+      }
+    } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof DOMException && error.name === "AbortError") ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
+        return;
+      }
+    } finally {
+      if (testCallAbortRef.current === controller) {
+        testCallAbortRef.current = null;
+        setIsLoading(false);
+      }
+    }
   };
 
   const handleHistorySelect = useCallback(
@@ -628,6 +628,7 @@ export default function ApiUsage() {
       );
       setRequestParams(entry.requestParams);
       setApiResponse(entry.response);
+      setResponseStatus(entry.httpStatus ?? null);
       setResponseTime(entry.responseTime);
       setCallCost(entry.cost);
       toggleHistory();
@@ -848,7 +849,7 @@ export default function ApiUsage() {
           </button>
         </div>
 
-        {(apiResponse || isLoading) && (
+        {(apiResponse !== null || isLoading) && (
           <div
             className="response-display"
             aria-live="polite"
@@ -872,6 +873,11 @@ export default function ApiUsage() {
             ) : (
               <div className="response-content">
                 <div className="response-meta">
+                  {responseStatus !== null && (
+                    <span className="response-status tabular-nums">
+                      Status: {responseStatus}
+                    </span>
+                  )}
                   <span className="response-time tabular-nums">
                     Response time: {formatDuration(responseTime || 0)}
                   </span>
@@ -880,7 +886,9 @@ export default function ApiUsage() {
                   </span>
                 </div>
                 <pre className="response-json">
-                  {JSON.stringify(apiResponse, null, 2)}
+                  {typeof apiResponse === "string"
+                    ? apiResponse
+                    : JSON.stringify(apiResponse, null, 2)}
                 </pre>
               </div>
             )}
