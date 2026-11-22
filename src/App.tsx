@@ -18,6 +18,7 @@ import ExternalLink from "./components/ExternalLink";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
+import CommandPalette from "./components/CommandPalette";
 import { useAccountContext } from "./hooks/useAccountContext";
 import { signIn, signOut, isSignedIn, type AuthServiceErrorCode } from "./services/authService";
 import { useSessionExpiry } from "./hooks/useSessionExpiry";
@@ -420,6 +421,7 @@ function App() {
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [amountInput, setAmountInput] = useState("50");
   const [selectedPreset, setSelectedPreset] = useState<number | "custom">(50);
 
@@ -468,6 +470,19 @@ function App() {
   );
 
   useGlobalShortcuts(handleGlobalKeyDown);
+
+  useEffect(() => {
+    const handleCommandPaletteKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleCommandPaletteKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleCommandPaletteKeyDown);
+    };
+  }, []);
   const [depositStage, setDepositStage] = useState<DepositStage>("input");
   const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
   const [walletAvailability, setWalletAvailability] = useState<"checking" | "available" | "missing">("checking");
@@ -1268,6 +1283,7 @@ function App() {
         </footer>
 
         <ShortcutsModal isOpen={isShortcutsModalOpen} onClose={() => setIsShortcutsModalOpen(false)} />
+        <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
 
         <CompareTray />
         <CompareDrawer />
