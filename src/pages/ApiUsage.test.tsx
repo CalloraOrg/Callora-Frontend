@@ -617,3 +617,146 @@ describe("ApiUsage - Skeleton Parity", () => {
     );
   });
 });
+
+describe("ApiUsage - Real Test Call", () => {
+  it("renders the stubbed gateway response, saves it to history, and redacts secrets", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("/api/usage")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => usagePayload,
+        });
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            id: "real_user_99",
+            plan: "pro",
+            api_key: "sk_live_supersecret123456789012",
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "X-Callora-Cost": "0.0042",
+            },
+          },
+        ),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ApiUsage />);
+    await settleUsageRequest();
+
+    const makeCallButton = screen.getByRole("button", {
+      name: /Make Test Call/i,
+    });
+    await act(async () => {
+      fireEvent.click(makeCallButton);
+    });
+
+    expect(screen.getByText(/Status: 200/)).toBeTruthy();
+    expect(screen.getByText(/real_user_99/)).toBeTruthy();
+    expect(screen.queryByText(/John Doe/)).toBeNull();
+
+    const rawHistory = localStorage.getItem("callora_test_call_history") ?? "";
+    expect(rawHistory).toContain("real_user_99");
+    expect(rawHistory).toContain('"httpStatus":200');
+    expect(rawHistory).toContain('"cost":0.0042');
+    expect(rawHistory).not.toContain("sk_live_supersecret123456789012");
+  });
+
+  it("saves an error entry with a safe message on HTTP 500 without leaking secrets", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("/api/usage")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => usagePayload,
+        });
+      }
+      return Promise.resolve(
+        new Response("Authorization: Bearer secret_jwt_token_value", {
+          status: 500,
+          headers: { "Content-Type": "text/plain" },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ApiUsage />);
+    await settleUsageRequest();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Make Test Call/i }));
+    });
+
+    expect(screen.getByText(/Status: 500/)).toBeTruthy();
+    expect(screen.queryByText(/secret_jwt_token_value/)).toBeNull();
+
+    const rawHistory = localStorage.getItem("callora_test_call_history") ?? "";
+    expect(rawHistory).toContain('"status":"error"');
+    expect(rawHistory).toContain('"httpStatus":500');
+    expect(rawHistory).not.toContain("secret_jwt_token_value");
+  });
+
+  it("aborts an in-flight test call on unmount", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes("/api/usage")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => usagePayload,
+        });
+      }
+      capturedSignal = init?.signal ?? undefined;
+      return new Promise(() => {
+        // intentionally pending
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { unmount } = render(<ApiUsage />);
+    await settleUsageRequest();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Make Test Call/i }));
+    });
+
+    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal?.aborted).toBe(false);
+
+    unmount();
+    expect(capturedSignal?.aborted).toBe(true);
+  });
+
+  it("loads and renders legacy history entries without httpStatus", async () => {
+    localStorage.setItem(
+      "callora_test_call_history",
+      JSON.stringify([
+        {
+          id: "legacy-1",
+          timestamp: new Date().toISOString(),
+          endpointId: "1",
+          endpointName: "Get User Profile",
+          endpointPath: "/api/v1/user/profile",
+          method: "GET",
+          requestParams: "{}",
+          response: { ok: true },
+          status: "success",
+          responseTime: 120,
+          cost: 0.002,
+        },
+      ]),
+    );
+
+    render(<ApiUsage />);
+    await settleUsageRequest();
+
+    fireEvent.click(screen.getByRole("button", { name: /Open request history/i }));
+    expect(screen.getAllByText("/api/v1/user/profile").length).toBeGreaterThan(0);
+  });
+});
