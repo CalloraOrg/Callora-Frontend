@@ -1,8 +1,15 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../ThemeContext';
-import MOCK_APIS from '../data/mockApis';
+import { fetchCatalog, isCatalogAbortError } from '../api/catalogApi';
+import type { APIItem } from '../data/mockApis';
 import './CommandPalette.css';
+
+export interface CommandPaletteProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
 
 interface Command {
   id: string;
@@ -55,15 +62,12 @@ function useRecentIds() {
   return { recentIds, recordId };
 }
 
-const navigateTo = (path: string) => {
-  window.history.pushState({}, '', path);
-  window.dispatchEvent(new PopStateEvent('popstate'));
-};
-
-export default function CommandPalette() {
-  const [isOpen, setIsOpen] = useState(false);
+export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [catalogApis, setCatalogApis] = useState<APIItem[]>([]);
+  const [catalogStatus, setCatalogStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
 
   const { theme, setTheme } = useTheme();
   const { recentIds, recordId } = useRecentIds();
@@ -72,117 +76,156 @@ export default function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const hasFetchedRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const isMac = typeof window !== 'undefined' && /Mac|iPod|iPhone|iPad|darwin/i.test(navigator.userAgent || navigator.platform || '');
 
+  // Lazily load catalogue APIs the first time the palette opens; abort on unmount
+  useEffect(() => {
+    if (!isOpen || hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setCatalogStatus('loading');
+
+    fetchCatalog(controller.signal)
+      .then((items) => {
+        if (controller.signal.aborted) return;
+        setCatalogApis(items);
+        setCatalogStatus('loaded');
+      })
+      .catch((err) => {
+        if (controller.signal.aborted || isCatalogAbortError(err)) return;
+        setCatalogStatus('error');
+      });
+  }, [isOpen]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   // Define commands
-  const standardCommands: Command[] = [
-    {
-      id: 'dashboard',
-      name: 'Go to Dashboard',
-      category: 'Navigation',
-      action: () => navigateTo('/dashboard'),
-      icon: '📊'
-    },
-    {
-      id: 'marketplace',
-      name: 'Go to Marketplace',
-      category: 'Navigation',
-      action: () => navigateTo('/marketplace'),
-      icon: '🛍️'
-    },
-    {
-      id: 'my-apis',
-      name: 'Go to My APIs',
-      category: 'Navigation',
-      action: () => navigateTo('/apis/my-apis'),
-      icon: '🔌'
-    },
-    {
-      id: 'billing',
-      name: 'Go to Billing',
-      category: 'Navigation',
-      action: () => navigateTo('/billing'),
-      icon: '💳'
-    },
-    {
-      id: 'publish',
-      name: 'Go to Publish API',
-      category: 'Navigation',
-      action: () => navigateTo('/publish'),
-      icon: '🚀'
-    },
-    {
-      id: 'api-usage',
-      name: 'Go to API Usage',
-      category: 'Navigation',
-      action: () => navigateTo('/api-usage'),
-      icon: '📈'
-    },
-    {
-      id: 'documentation',
-      name: 'Go to Documentation',
-      category: 'Navigation',
-      action: () => navigateTo('/documentation'),
-      icon: '📚'
-    },
-    {
-      id: 'status',
-      name: 'Go to Status Page',
-      category: 'Navigation',
-      action: () => navigateTo('/status'),
-      icon: '🟢'
-    },
-    {
-      id: 'deposit',
-      name: 'Open Deposit modal',
-      category: 'Actions',
-      action: () => navigateTo('/billing?deposit=true'),
-      icon: '💰'
-    },
-    {
-      id: 'toggle-theme',
-      name: 'Toggle Theme',
-      category: 'Actions',
-      action: () => {
-        if (theme === 'dark') setTheme('light');
-        else if (theme === 'light') setTheme('system');
-        else setTheme('dark');
+  const standardCommands: Command[] = useMemo(
+    () => [
+      {
+        id: 'dashboard',
+        name: 'Go to Dashboard',
+        category: 'Navigation',
+        action: () => navigate('/dashboard'),
+        icon: '📊'
       },
-      icon: '🌗'
-    },
-    {
-      id: 'theme-dark',
-      name: 'Use Dark Theme',
-      category: 'Actions',
-      action: () => setTheme('dark'),
-      icon: '🌙'
-    },
-    {
-      id: 'theme-light',
-      name: 'Use Light Theme',
-      category: 'Actions',
-      action: () => setTheme('light'),
-      icon: '☀️'
-    },
-    {
-      id: 'theme-system',
-      name: 'Use System Theme',
-      category: 'Actions',
-      action: () => setTheme('system'),
-      icon: '💻'
-    }
-  ];
+      {
+        id: 'marketplace',
+        name: 'Go to Marketplace',
+        category: 'Navigation',
+        action: () => navigate('/marketplace'),
+        icon: '🛍️'
+      },
+      {
+        id: 'my-apis',
+        name: 'Go to My APIs',
+        category: 'Navigation',
+        action: () => navigate('/apis/my-apis'),
+        icon: '🔌'
+      },
+      {
+        id: 'billing',
+        name: 'Go to Billing',
+        category: 'Navigation',
+        action: () => navigate('/billing'),
+        icon: '💳'
+      },
+      {
+        id: 'publish',
+        name: 'Go to Publish API',
+        category: 'Navigation',
+        action: () => navigate('/publish'),
+        icon: '🚀'
+      },
+      {
+        id: 'api-usage',
+        name: 'Go to API Usage',
+        category: 'Navigation',
+        action: () => navigate('/api-usage'),
+        icon: '📈'
+      },
+      {
+        id: 'documentation',
+        name: 'Go to Documentation',
+        category: 'Navigation',
+        action: () => navigate('/documentation'),
+        icon: '📚'
+      },
+      {
+        id: 'status',
+        name: 'Go to Status Page',
+        category: 'Navigation',
+        action: () => navigate('/status'),
+        icon: '🟢'
+      },
+      {
+        id: 'deposit',
+        name: 'Open Deposit modal',
+        category: 'Actions',
+        action: () => navigate('/billing?deposit=true'),
+        icon: '💰'
+      },
+      {
+        id: 'toggle-theme',
+        name: 'Toggle Theme',
+        category: 'Actions',
+        action: () => {
+          if (theme === 'dark') setTheme('light');
+          else if (theme === 'light') setTheme('system');
+          else setTheme('dark');
+        },
+        icon: '🌗'
+      },
+      {
+        id: 'theme-dark',
+        name: 'Use Dark Theme',
+        category: 'Actions',
+        action: () => setTheme('dark'),
+        icon: '🌙'
+      },
+      {
+        id: 'theme-light',
+        name: 'Use Light Theme',
+        category: 'Actions',
+        action: () => setTheme('light'),
+        icon: '☀️'
+      },
+      {
+        id: 'theme-system',
+        name: 'Use System Theme',
+        category: 'Actions',
+        action: () => setTheme('system'),
+        icon: '💻'
+      }
+    ],
+    [navigate, theme, setTheme]
+  );
 
-  const apiCommands: Command[] = MOCK_APIS.map((api) => ({
-    id: `api-${api.id}`,
-    name: `Jump to ${api.name}`,
-    category: 'APIs',
-    action: () => navigateTo(`/details/${api.id}`),
-    icon: '🔌'
-  }));
+  const apiCommands: Command[] = useMemo(
+    () =>
+      catalogApis.map((api) => ({
+        id: `api-${api.id}`,
+        name: `Jump to ${api.name}`,
+        category: 'APIs',
+        action: () => navigate(`/details/${api.id}`),
+        icon: '🔌'
+      })),
+    [catalogApis, navigate]
+  );
 
-  const allCommands = [...standardCommands, ...apiCommands];
+  const allCommands = useMemo(
+    () => [...standardCommands, ...apiCommands],
+    [standardCommands, apiCommands]
+  );
 
   const filteredCommands = allCommands.filter((cmd) => {
     const q = searchQuery.toLowerCase();
@@ -258,9 +301,9 @@ export default function CommandPalette() {
     (cmd: Command) => {
       recordId(cmd.id);
       cmd.action();
-      setIsOpen(false);
+      onClose();
     },
-    [recordId]
+    [recordId, onClose]
   );
 
   // Reset selection index when search query changes
@@ -268,37 +311,32 @@ export default function CommandPalette() {
     setSelectedIndex(0);
   }, [searchQuery]);
 
-  // Open/Close toggle listeners (Cmd+K / Ctrl+K)
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      const isK = e.key === 'k' || e.key === 'K';
-      const isModifier = isMac ? e.metaKey : e.ctrlKey;
-
-      if (isModifier && isK) {
-        e.preventDefault();
-        setIsOpen((prev) => !prev);
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isMac]);
-
-  // Focus trap, page scroll lock, key navigation, and focus restoration
+  // Open/close lifecycle: save/restore focus, lock page scroll, reset search
   useEffect(() => {
     if (!isOpen) return;
 
-    previouslyFocusedRef.current = document.activeElement as HTMLElement;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     document.body.style.overflow = 'hidden';
 
     const focusTimer = setTimeout(() => {
       inputRef.current?.focus();
     }, 50);
 
+    return () => {
+      clearTimeout(focusTimer);
+      document.body.style.overflow = '';
+      previouslyFocusedRef.current?.focus();
+    };
+  }, [isOpen]);
+
+  // Keyboard navigation and focus trap while open
+  useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        setIsOpen(false);
+        onClose();
       }
 
       if (e.key === 'ArrowDown') {
@@ -350,16 +388,9 @@ export default function CommandPalette() {
     window.addEventListener('keydown', handleKeyDown, true);
 
     return () => {
-      clearTimeout(focusTimer);
-      document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown, true);
-      
-      const restoreTimer = setTimeout(() => {
-        previouslyFocusedRef.current?.focus();
-      }, 50);
-      clearTimeout(restoreTimer);
     };
-  }, [isOpen, flatList, selectedIndex, executeCommand]);
+  }, [isOpen, flatList, selectedIndex, executeCommand, onClose]);
 
   // Scroll active item into view
   useEffect(() => {
@@ -377,7 +408,7 @@ export default function CommandPalette() {
   return createPortal(
     <div
       className="command-palette-backdrop"
-      onClick={() => setIsOpen(false)}
+      onClick={onClose}
       role="presentation"
     >
       <div
@@ -428,7 +459,7 @@ export default function CommandPalette() {
           <button
             type="button"
             className="command-palette-close-button"
-            onClick={() => setIsOpen(false)}
+            onClick={onClose}
             aria-label="Close palette"
           >
             Esc
@@ -442,39 +473,57 @@ export default function CommandPalette() {
           role="listbox"
           aria-label="Commands"
         >
-          {flatList.length === 0 ? (
+          {flatList.length === 0 && catalogStatus !== 'loading' && catalogStatus !== 'error' ? (
             <div className="command-palette-empty">No results found</div>
           ) : (
-            displayGroups.map((group) => (
-              <React.Fragment key={group.label}>
-                <div className="command-palette-group-header">{group.label}</div>
-                {group.commands.map((cmd) => {
-                  const index = flatList.indexOf(cmd);
-                  const isSelected = index === selectedIndex;
-                  return (
-                    <div
-                      key={cmd.id}
-                      id={`cmd-opt-${cmd.id}`}
-                      role="option"
-                      aria-selected={isSelected}
-                      className={`command-palette-item ${
-                        isSelected ? 'command-palette-item--selected' : ''
-                      }`}
-                      onClick={() => executeCommand(cmd)}
-                      onMouseEnter={() => setSelectedIndex(index)}
-                    >
-                      <span className="command-palette-item-icon" aria-hidden="true">
-                        {cmd.icon || '⚡'}
-                      </span>
-                      <span className="command-palette-item-name">{cmd.name}</span>
-                      {isSelected && (
-                        <span className="command-palette-item-hint">Enter</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </React.Fragment>
-            ))
+            <>
+              {displayGroups.map((group) => (
+                <React.Fragment key={group.label}>
+                  <div className="command-palette-group-header">{group.label}</div>
+                  {group.commands.map((cmd) => {
+                    const index = flatList.indexOf(cmd);
+                    const isSelected = index === selectedIndex;
+                    return (
+                      <div
+                        key={cmd.id}
+                        id={`cmd-opt-${cmd.id}`}
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`command-palette-item ${
+                          isSelected ? 'command-palette-item--selected' : ''
+                        }`}
+                        onClick={() => executeCommand(cmd)}
+                        onMouseEnter={() => setSelectedIndex(index)}
+                      >
+                        <span className="command-palette-item-icon" aria-hidden="true">
+                          {cmd.icon || '⚡'}
+                        </span>
+                        <span className="command-palette-item-name">{cmd.name}</span>
+                        {isSelected && (
+                          <span className="command-palette-item-hint">Enter</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+              {catalogStatus === 'loading' && (
+                <>
+                  <div className="command-palette-group-header">APIs</div>
+                  <div className="command-palette-empty" role="status">
+                    Loading APIs…
+                  </div>
+                </>
+              )}
+              {catalogStatus === 'error' && (
+                <>
+                  <div className="command-palette-group-header">APIs</div>
+                  <div className="command-palette-empty" role="alert">
+                    Could not load APIs
+                  </div>
+                </>
+              )}
+            </>
           )}
         </main>
 

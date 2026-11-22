@@ -8,6 +8,7 @@ export interface Shortcut {
 
 export const SHORTCUTS: Shortcut[] = [
   // Global
+  { key: 'Cmd/Ctrl + K', description: 'Open command palette', category: 'Global' },
   { key: '?', description: 'Open shortcuts help', category: 'Global' },
   { key: 'Esc', description: 'Close modals', category: 'Global' },
   
