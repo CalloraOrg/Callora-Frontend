@@ -4,7 +4,10 @@ import {
   buildCacheKey,
   clearCatalogCache,
   createCatalogApi,
+  fetchApiHealth,
   fetchCatalog,
+  isCatalogAbortError,
+  normalizeApiHealth,
   normalizeCatalog,
   CatalogFetchError,
 } from "./catalogApi";
@@ -536,6 +539,111 @@ describe("catalogApi module", () => {
 
       await api.resolveApisByIds(["acct-1"]);
       expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("fetchApiHealth", () => {
+    it("parses a valid points payload into HealthStatus[]", async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            points: [
+              { at: "2026-01-01T00:00:00Z", status: "operational" },
+              { at: "2026-01-01T01:00:00Z", status: "degraded" },
+              { at: "2026-01-01T02:00:00Z", status: "down" },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      const result = await api.fetchApiHealth("geocode-01");
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:3000/api/apis/geocode-01/health",
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(result).toEqual(["operational", "degraded", "down"]);
+    });
+
+    it("drops unknown or malformed status values", () => {
+      const result = normalizeApiHealth({
+        points: [
+          { at: "2026-01-01T00:00:00Z", status: "operational" },
+          { at: "2026-01-01T01:00:00Z", status: "unknown" },
+          { at: "2026-01-01T02:00:00Z", status: 123 },
+          { at: "2026-01-01T03:00:00Z", status: "degraded" },
+          null,
+          { at: "2026-01-01T04:00:00Z", status: "down" },
+        ],
+      });
+      expect(result).toEqual(["operational", "degraded", "down"]);
+    });
+
+    it("returns an empty array on 404", async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(null, { status: 404, statusText: "Not Found" }),
+      );
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      const result = await api.fetchApiHealth("missing-api");
+      expect(result).toEqual([]);
+    });
+
+    it("throws CatalogFetchError on 500 server error", async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(null, { status: 500, statusText: "Internal Server Error" }),
+      );
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      await expect(api.fetchApiHealth("broken-api")).rejects.toBeInstanceOf(
+        CatalogFetchError,
+      );
+    });
+
+    it("rejects with AbortError when signal is aborted", async () => {
+      const controller = new AbortController();
+      const mockFetch = vi.fn((_url: string, init?: RequestInit) => {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            const err = new Error("Aborted");
+            err.name = "AbortError";
+            reject(err);
+          });
+        });
+      });
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      const promise = api.fetchApiHealth("slow-api", controller.signal);
+      controller.abort();
+
+      await expect(promise).rejects.toSatisfy(isCatalogAbortError);
+    });
+
+    it("returns an empty array in demo mode (no API_BASE) without throwing", async () => {
+      const spy = vi.spyOn(constants, "API_BASE", "get").mockReturnValue("");
+      try {
+        const result = await fetchApiHealth("geocode-01");
+        expect(result).toEqual([]);
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 });
