@@ -9,7 +9,7 @@ import Tabs from "../components/Tabs";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import EmptyState from "../components/EmptyState";
-import { formatPrice, formatEstimatedCost, formatCount, formatDateShort } from "../utils/format";
+import { formatPrice, formatEstimatedCost, formatCount } from "../utils/format";
 import { Icons } from "../utils/icons";
 import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
 import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
@@ -22,6 +22,8 @@ import { PRICING_PLANS, cheapestPlan, type PricingPlanId } from "../utils/pricin
 import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
 import SubscribeButton from "../components/SubscribeButton";
 import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
+import HealthTimeline from "../components/HealthTimeline";
+import { useApiHealth } from "../hooks/useApiHealth";
 import { useToast } from "../components/Toast";
 import { useCollections } from "../state/collectionsStore";
 import RelatedApisRail from "../components/RelatedApisRail";
@@ -31,6 +33,7 @@ import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import LiveRegion from "../components/LiveRegion";
 import { toCurl, type CurlRequest } from "../utils/toCurl";
 import { fetchApiDetail, fetchCatalog, isCatalogAbortError } from "../api/catalogApi";
+import ReviewsTab from "./ReviewsTab";
 
 /**
  * ApiDetailPage
@@ -48,8 +51,6 @@ type Props = {
 };
 
 type TabType = "overview" | "documentation" | "pricing" | "examples" | "reviews" | "embed";
-
-type ReviewSort = "newest" | "highest" | "lowest";
 
 type LoadStatus = "loading" | "ready" | "not-found" | "error";
 
@@ -560,7 +561,6 @@ export default function ApiDetailPage({ onBack }: Props) {
   }, []);
   const [tab, setTab] = useState<TabType>("overview");
   const [requests, setRequests] = useState(1000);
-  const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
   const [announcement, setAnnouncement] = useState("");
   const [assertiveAnnouncement, setAssertiveAnnouncement] = useState("");
   const { showToast } = useToast();
@@ -578,19 +578,15 @@ export default function ApiDetailPage({ onBack }: Props) {
 
   const [api, setApi] = useState<ApiDetail | null>(null);
   const [status, setStatus] = useState<LoadStatus>("loading");
+  const hasHealthCapability = Boolean(
+    api?.status || (api?.hourlyHealth && api.hourlyHealth.length > 0),
+  );
+  const health = useApiHealth(api?.id, hasHealthCapability);
   const [reloadToken, setReloadToken] = useState(0);
   useDocumentTitle(api?.name ?? "API Detail – Callora", api?.description);
 
   const rawReviews = api?.reviews || [];
   const averageRating = api?.rating ?? 0;
-
-  const sortedReviews = useMemo(() => {
-    return [...rawReviews].sort((a, b) => {
-      if (reviewSort === "highest") return b.rating - a.rating;
-      if (reviewSort === "lowest") return a.rating - b.rating;
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-  }, [rawReviews, reviewSort]);
 
   // ReviewsTab receives the raw (unsorted) reviews; sorting is managed inside
   // the component so the parent no longer needs sortedReviews for that panel.
@@ -1169,122 +1165,30 @@ export default function ApiDetailPage({ onBack }: Props) {
                  * any runtime JS.  See issue #580 and src/styles/print.css.
                  */}
                 {tab === "reviews" && (
-                  <section
-                    id="panel-reviews"
-                    role="tabpanel"
-                    aria-labelledby="tab-reviews"
-                    tabIndex={0}
-                    data-reviews-section
-                  >
-                    <div className="api-detail-reviews-header">
-                      <h3 style={{ margin: 0 }}>Developer Feedback</h3>
-                      {/* Write a Review button: not meaningful on paper */}
-                      <button className="secondary-button no-print">Write a Review</button>
-                    </div>
-
-                    {rawReviews.length === 0 ? (
-                      <div className="preview-card" style={{ padding: "var(--mkt-space-6xl)", textAlign: "center", borderStyle: "dashed", marginTop: "var(--mkt-space-xl)" }}>
-                        <div style={{ fontSize: 40, marginBottom: "var(--mkt-space-xl)" }}>💬</div>
-                        <h4>No public reviews yet</h4>
-                        <p style={{ color: "var(--muted)", maxWidth: 400, margin: "0 auto" }}>Be the first to share your experience with this API.</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ marginTop: 16 }}>
-                          <RatingHistogram rating={averageRating} distribution={ratingDistribution} />
-                        </div>
-
-                        {/* Sort controls: hidden when printing — sort order is irrelevant on paper */}
-                        <div
-                          className="reviews-sort-controls no-print"
-                          style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-lg)", marginBottom: "var(--mkt-space-xl)", flexWrap: "wrap" }}
-                        >
-                          <label htmlFor="review-sort" style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)", whiteSpace: "nowrap" }}>
-                            Sort by
-                          </label>
-                          <select
-                            id="review-sort"
-                            value={reviewSort}
-                            onChange={(e) => {
-                              const nextSort = e.target.value as ReviewSort;
-                              setReviewSort(nextSort);
-                              const sortLabel = nextSort === "newest" ? "newest" : nextSort === "highest" ? "highest rated" : "lowest rated";
-                              setAnnouncement(`Reviews sorted by ${sortLabel}`);
-                            }}
-                            style={{
-                              fontSize: "var(--mkt-font-size-sm)",
-                              padding: "5px 10px",
-                              borderRadius: 6,
-                              border: "1px solid var(--line)",
-                              background: "var(--surface-soft)",
-                              color: "var(--text)",
-                              cursor: "pointer",
-                            }}
-                          >
-                            <option value="newest">Newest</option>
-                            <option value="highest">Highest rated</option>
-                            <option value="lowest">Lowest rated</option>
-                          </select>
-                        </div>
-
-                        <div style={{ display: "grid", gap: "var(--mkt-space-xl)" }}>
-                          {sortedReviews.map((review) => (
-                            <div key={review.id} className="preview-card" style={{ padding: "var(--mkt-space-2xl)" }}>
-                              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--mkt-space-md)", flexWrap: "wrap", marginBottom: "var(--mkt-space-lg)" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-md)", flexWrap: "wrap", minWidth: 0 }}>
-                                  <span style={{ fontWeight: 600, fontSize: "var(--mkt-font-size-tag)", color: "var(--text)", whiteSpace: "nowrap" }}>{review.author}</span>
-                                  {review.verified && (
-                                    <span
-                                      title="Has called this API in the last 30 days"
-                                      aria-label="Verified Developer – has called this API in the last 30 days"
-                                      style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: 4,
-                                        padding: "2px 8px",
-                                        borderRadius: 999,
-                                        fontSize: "var(--mkt-font-size-micro)",
-                                        fontWeight: 600,
-                                        lineHeight: "18px",
-                                        background: "rgba(16, 185, 129, 0.12)",
-                                        color: "var(--success)",
-                                        border: "1px solid rgba(16, 185, 129, 0.3)",
-                                        cursor: "default",
-                                        whiteSpace: "nowrap",
-                                        flexShrink: 0,
-                                        userSelect: "none",
-                                      }}
-                                    >
-                                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">
-                                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                      </svg>
-                                      Verified Developer
-                                    </span>
-                                  )}
-                                </div>
-                                <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-md)", flexShrink: 0 }}>
-                                  <span role="img" aria-label={`${review.rating} out of 5 stars`} style={{ display: "flex", gap: 1 }}>
-                                    {Array.from({ length: 5 }, (_, i) => (
-                                      <svg key={i} width="13" height="13" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                                        <path
-                                          d="M10 1.5l2.39 4.84 5.34.78-3.87 3.77.91 5.32L10 13.77l-4.77 2.44.91-5.32L2.27 7.12l5.34-.78L10 1.5z"
-                                          fill={i < review.rating ? "var(--accent)" : "var(--line)"}
-                                        />
-                                      </svg>
-                                    ))}
-                                  </span>
-                                  <span style={{ fontSize: "var(--mkt-font-size-micro)", color: "var(--muted)", whiteSpace: "nowrap" }}>
-                                    {formatDateShort(review.date)}
-                                  </span>
-                                </div>
-                              </div>
-                              <p style={{ margin: 0, fontSize: "var(--mkt-font-size-tag)", lineHeight: "var(--mkt-line-height-relaxed)", color: "var(--muted)" }}>{review.body}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </section>
+                  <ReviewsTab
+                    apiId={api.id}
+                    reviews={rawReviews}
+                    averageRating={averageRating}
+                    onNotify={(message, variant) => {
+                      showToast(message, variant);
+                      if (variant === "error") {
+                        setAssertiveAnnouncement(message);
+                      } else {
+                        setAnnouncement(message);
+                      }
+                    }}
+                    onReviewsChange={(nextReviews, nextAvg) => {
+                      setApi((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              reviews: nextReviews,
+                              rating: nextAvg,
+                            }
+                          : prev,
+                      );
+                    }}
+                  />
                 )}
 
                 {/* ── EMBED ───────────────────────────────────────────────── */}
@@ -1351,6 +1255,24 @@ export default function ApiDetailPage({ onBack }: Props) {
                     </div>
                   </div>
                 </div>
+
+                {hasHealthCapability && (
+                  <section
+                    className="stat-card"
+                    aria-labelledby="service-health-heading"
+                    style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-2xl)" }}
+                  >
+                    <h4 id="service-health-heading" style={{ marginTop: 0, marginBottom: "var(--mkt-space-xl)" }}>
+                      Service health
+                    </h4>
+                    <HealthTimeline
+                      data={health.data}
+                      loading={health.loading}
+                      error={health.error}
+                      onRetry={health.retry}
+                    />
+                  </section>
+                )}
 
                 <div className="preview-card" style={{ padding: "var(--mkt-space-3xl)", marginBottom: "var(--mkt-space-2xl)" }}>
                   <h4 style={{ marginTop: 0 }}>SDKs &amp; Tools</h4>
