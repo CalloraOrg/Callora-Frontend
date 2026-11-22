@@ -87,6 +87,12 @@ describe("Tabs – rendering", () => {
     expect(indicator?.getAttribute("role")).toBe("presentation");
   });
 
+  it("indicator span has the tabs-indicator class", () => {
+    const { container } = renderTabs();
+    const indicator = container.querySelector("[aria-hidden='true'][role='presentation']");
+    expect(indicator?.classList.contains("tabs-indicator")).toBe(true);
+  });
+
   it("indicator uses inline left and width styles (not transform)", () => {
     const { container } = renderTabs();
     const indicator = container.querySelector("[aria-hidden='true']") as HTMLElement;
