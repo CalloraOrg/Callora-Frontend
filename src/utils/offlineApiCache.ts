@@ -2,6 +2,20 @@ const CACHE_PREFIX = "callora_api_cache";
 const META_PREFIX = "callora_api_cache_meta";
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 
+type InvalidationListener = (accountId: string) => void;
+const invalidationListeners = new Set<InvalidationListener>();
+
+/**
+ * Registers a callback invoked whenever {@link invalidateAccountCache} runs.
+ * Returns an unsubscribe function.
+ */
+export function onAccountCacheInvalidated(listener: InvalidationListener): () => void {
+  invalidationListeners.add(listener);
+  return () => {
+    invalidationListeners.delete(listener);
+  };
+}
+
 export interface CacheEntry<T = unknown> {
   data: T;
   timestamp: number;
@@ -68,6 +82,13 @@ export function setCache<T = unknown>(accountId: string, cacheKey: string, data:
 }
 
 export function invalidateAccountCache(accountId: string): void {
+  for (const listener of invalidationListeners) {
+    try {
+      listener(accountId);
+    } catch {
+      /* ignore listener errors */
+    }
+  }
   if (!isStorageAvailable()) return;
   try {
     const meta: CacheMeta = {

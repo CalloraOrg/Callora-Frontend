@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import './Dashboard.css';
 import LowBalanceBanner from './LowBalanceBanner';
 import { useNavigate } from 'react-router-dom';
@@ -10,7 +10,7 @@ import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { formatUsdc, formatPrice } from '../utils/format';
 import { LOADING_DELAY_MS } from '../config/constants';
 import { usePinnedApis, pinnedApisStore } from '../state/pinnedApis';
-import MOCK_APIS from '../data/mockApis';
+import { useApisByIds } from '../hooks/useApisByIds';
 
 // Props needed from the App state
 interface DashboardProps {
@@ -72,10 +72,11 @@ export default function Dashboard({
   const isLoading = activity === null;
   const totalUsage = activity?.reduce((sum, item) => (item.type === 'usage' ? sum + item.amount : sum), 0) ?? 0;
   const pinnedApiIds = usePinnedApis();
-  const pinnedApis = useMemo(
-    () => MOCK_APIS.filter((api) => pinnedApiIds.has(api.id)),
-    [pinnedApiIds],
-  );
+  const {
+    status: pinnedStatus,
+    apis: pinnedApis,
+    missing: missingPinnedIds,
+  } = useApisByIds(pinnedApiIds);
 
   return (
     <>
@@ -113,16 +114,26 @@ export default function Dashboard({
       <div className="dashboard-card dashboard-card--pinned">
         <div className="dashboard-card__pinned-heading">
           <h3 className="eyebrow">Pinned APIs</h3>
-          {pinnedApis.length > 0 && (
+          {pinnedApiIds.size > 0 && (
             <span className="dashboard-card__pinned-count">
-              {pinnedApis.length} pinned
+              {pinnedApiIds.size} pinned
             </span>
           )}
         </div>
 
-        {pinnedApis.length === 0 ? (
+        {pinnedApiIds.size === 0 ? (
           <p className="dashboard-card__pinned-empty">
             Pin APIs from the marketplace to keep them handy on your dashboard.
+          </p>
+        ) : pinnedStatus === 'loading' ? (
+          <div className="dashboard-pinned-list" role="status" aria-label="Loading pinned APIs">
+            {Array.from({ length: Math.min(pinnedApiIds.size, 3) }).map((_, i) => (
+              <Skeleton key={i} width="100%" height={44} className="mb-2" />
+            ))}
+          </div>
+        ) : pinnedStatus === 'error' ? (
+          <p className="dashboard-card__pinned-empty" role="alert">
+            Could not load pinned APIs right now.
           </p>
         ) : (
           <div className="dashboard-pinned-list">
@@ -141,6 +152,28 @@ export default function Dashboard({
                     aria-label={`Unpin ${api.name} from dashboard`}
                   >
                     Unpin
+                  </button>
+                </div>
+              </div>
+            ))}
+            {missingPinnedIds.map((missingId) => (
+              <div
+                key={missingId}
+                className="dashboard-pinned-item dashboard-pinned-item--unavailable"
+                data-testid={`pinned-api-unavailable-${missingId}`}
+              >
+                <div className="dashboard-pinned-item__content">
+                  <strong>Unavailable API</strong>
+                  <span>This API ({missingId}) is no longer available.</span>
+                </div>
+                <div className="dashboard-pinned-item__meta">
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => pinnedApisStore.unpin(missingId)}
+                    aria-label={`Dismiss unavailable API ${missingId}`}
+                  >
+                    Dismiss
                   </button>
                 </div>
               </div>

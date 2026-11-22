@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import useDocumentTitle from "../hooks/useDocumentTitle";
-import { MOCK_APIS } from "../data/mockApis";
+import { fetchCatalog, isCatalogAbortError } from "../api/catalogApi";
+import type { APIItem } from "../data/mockApis";
 import LiveRegion from "../components/LiveRegion";
 import "./EndpointSummary.css";
 
@@ -10,18 +11,44 @@ export default function EndpointSummary(): JSX.Element {
     "Summary of all endpoints available on Callora."
   );
 
-  // Flatten all endpoints from all mock APIs
-  const allEndpoints = MOCK_APIS.flatMap((api) =>
-    (api.endpoints || []).map((ep) => ({
-      ...ep,
-      apiName: api.name,
-    }))
+  const [apis, setApis] = useState<APIItem[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchCatalog(controller.signal)
+      .then((items) => {
+        if (!controller.signal.aborted) {
+          setApis(items);
+        }
+      })
+      .catch((err) => {
+        if (controller.signal.aborted || isCatalogAbortError(err)) return;
+      });
+    return () => controller.abort();
+  }, []);
+
+  // Flatten all endpoints from the catalogue
+  const allEndpoints = useMemo(
+    () =>
+      apis.flatMap((api) =>
+        (api.endpoints || []).map((ep) => ({
+          ...ep,
+          apiName: api.name,
+        }))
+      ),
+    [apis]
   );
 
   // Track expanded cards
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    new Set(allEndpoints.slice(0, 3).map((ep) => ep.id)) // Expand first 3 by default
-  );
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (allEndpoints.length > 0) {
+      setExpandedIds((prev) =>
+        prev.size > 0 ? prev : new Set(allEndpoints.slice(0, 3).map((ep) => ep.id))
+      );
+    }
+  }, [allEndpoints]);
 
   // Screen-reader announcement state
   const [announcement, setAnnouncement] = useState("");

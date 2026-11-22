@@ -138,6 +138,62 @@ describe("App global keyboard shortcuts", () => {
     );
     // The dialog documents the sequences this suite exercises.
     expect(screen.getByText("Go to Marketplace")).toBeTruthy();
+    expect(screen.getByText("Open command palette")).toBeTruthy();
+  });
+
+  it("toggles the command palette on Ctrl+K and Meta+K", async () => {
+    renderApp("/");
+
+    expect(screen.queryByRole("dialog", { name: /command palette/i })).toBeNull();
+
+    press("k", { ctrlKey: true });
+    await waitFor(() =>
+      expect(screen.getByRole("dialog", { name: /command palette/i })).toBeTruthy(),
+    );
+
+    press("k", { ctrlKey: true });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: /command palette/i })).toBeNull(),
+    );
+
+    press("k", { metaKey: true });
+    await waitFor(() =>
+      expect(screen.getByRole("dialog", { name: /command palette/i })).toBeTruthy(),
+    );
+  });
+
+  it("opens the command palette on Ctrl+K even when an input is focused and prevents default", async () => {
+    renderApp("/");
+    const input = screen.getByTestId("probe-input");
+    input.focus();
+    expect(document.activeElement).toBe(input);
+
+    const event = new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    await waitFor(() =>
+      expect(screen.getByRole("dialog", { name: /command palette/i })).toBeTruthy(),
+    );
+  });
+
+  it("removes the Cmd/Ctrl+K listener on unmount", () => {
+    const { unmount } = renderApp("/");
+    unmount();
+
+    const event = new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it("does not navigate on 'g' alone", async () => {

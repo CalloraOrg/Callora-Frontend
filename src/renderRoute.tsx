@@ -10,8 +10,9 @@
  * render). `main.tsx` stays the only entry point that touches the DOM on load.
  */
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import App from "./App";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import { AccountProvider } from "./hooks/useAccountContext";
 import RouteProgressBar from "./components/RouteProgressBar";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
@@ -33,6 +34,20 @@ export type RouteRenderTarget = {
   render(children: React.ReactNode): void;
 };
 
+function StandaloneErrorBoundary({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  return (
+    <RouteErrorBoundary
+      resetKey={location.pathname}
+      onGoHome={() => {
+        window.location.assign("/dashboard");
+      }}
+    >
+      {children}
+    </RouteErrorBoundary>
+  );
+}
+
 /**
  * Renders the page that owns `pathname` into `root`.
  *
@@ -45,14 +60,22 @@ export async function renderRoute(
   pathname: string,
 ): Promise<void> {
   // Helper to wrap components in the necessary Router context for hooks like useLocation/useNavigate
-  const wrap = (children: React.ReactNode) => (
+  const wrap = (children: React.ReactNode, withShell = false) => (
     <React.StrictMode>
       <ThemeProvider>
         <CollectionsProvider>
           <AccountProvider>
             <BrowserRouter>
               <RouteProgressBar />
-              <ToastProvider>{children}</ToastProvider>
+              <ToastProvider>
+                {withShell ? (
+                  <StandaloneShell>
+                    <StandaloneErrorBoundary>{children}</StandaloneErrorBoundary>
+                  </StandaloneShell>
+                ) : (
+                  <StandaloneErrorBoundary>{children}</StandaloneErrorBoundary>
+                )}
+              </ToastProvider>
             </BrowserRouter>
           </AccountProvider>
         </CollectionsProvider>
@@ -63,7 +86,7 @@ export async function renderRoute(
   if (pathname.startsWith("/publish")) {
     const mod = await import("./pages/PublishApi");
     const PublishApi = mod.default;
-    root.render(wrap(<StandaloneShell><PublishApi /></StandaloneShell>));
+    root.render(wrap(<PublishApi />, true));
     return;
   }
 
@@ -71,28 +94,36 @@ export async function renderRoute(
   // are routed by `App`; everything else under `/marketplace` is the listing.
   if (pathname.startsWith("/marketplace") && !isMarketplaceSubpage(pathname)) {
     startRouteLoading();
-    root.render(wrap(<StandaloneShell><MarketplacePageSkeleton /></StandaloneShell>));
+    root.render(wrap(<MarketplacePageSkeleton />, true));
     const mod = await import("./pages/MarketplacePage");
     const MarketplacePage = mod.default;
-    root.render(wrap(<StandaloneShell><MarketplacePage /></StandaloneShell>));
+    root.render(wrap(<MarketplacePage />, true));
     stopRouteLoading();
     return;
   }
 
   if (pathname.startsWith("/details/")) {
     startRouteLoading();
-    root.render(wrap(<StandaloneShell><ApiDetailPageSkeleton /></StandaloneShell>));
+    root.render(wrap(<ApiDetailPageSkeleton />, true));
     const mod = await import("./pages/ApiDetailPage");
     const ApiDetailPage = mod.default;
     root.render(
       wrap(
-<StandaloneShell><Routes><Route path="/details/:id" element={<ApiDetailPage
-          onBack={() => {
-            history.pushState({}, "", "/marketplace");
-            void renderRoute(root, "/marketplace");
-          }}
-        />} /></Routes></StandaloneShell>
-      )
+        <Routes>
+          <Route
+            path="/details/:id"
+            element={
+              <ApiDetailPage
+                onBack={() => {
+                  history.pushState({}, "", "/marketplace");
+                  void renderRoute(root, "/marketplace");
+                }}
+              />
+            }
+          />
+        </Routes>,
+        true,
+      ),
     );
     stopRouteLoading();
     return;
