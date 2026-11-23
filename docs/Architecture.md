@@ -24,3 +24,16 @@ The application shell in `src/App.tsx` delegates route definitions, marketing se
 | `src/app/StatusPage.tsx` | System operational status route component shown at `/status` |
 | `src/app/WalletSignInButton.tsx` | Topbar Freighter wallet sign-in / sign-out button managing self-contained auth states |
 | `src/app/AccountSwitcher.tsx` | Multi-account selector dropdown with rename, add, and remove capabilities |
+
+## Protected routes & authentication guard
+
+Routes that require an authenticated Freighter session are wrapped in `RequireAuth` (`src/components/RequireAuth.tsx`), which subscribes to `useIsSignedIn()` (`src/services/authService.ts`) and `useSessionExpiry()` (`src/hooks/useSessionExpiry.ts`):
+
+| Route | Tree | Guarded Component |
+| --- | --- | --- |
+| `/billing` | `src/App.tsx` | Billing & USDC vault deposit view |
+| `/apis/my-apis` | `src/App.tsx` | `MyApis` |
+| `/publish` | `src/App.tsx` and `src/renderRoute.tsx` (`StandaloneShell`) | `PublishApi` |
+| `/webhooks/deliveries` | `src/App.tsx` | `WebhookDeliveries` |
+
+When a visitor is signed out (or their session expires mid-session), `RequireAuth` renders a sign-in prompt instead of the protected page so no protected API calls are issued. It stores the requested path (including query string and hash) after validating it as a same-origin relative path to prevent open redirects (falling back to `/dashboard`), and navigates back after a successful Freighter sign-in. Public routes (landing `/`, `/marketplace`, `/details/:id`, `/docs`) remain accessible without authentication.

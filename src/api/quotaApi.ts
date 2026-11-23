@@ -14,6 +14,9 @@
  * cancelled when a newer request supersedes them or the user switches account.
  */
 
+import { authFetch } from "../services/authFetch";
+import { classifyHttpError } from "../services/SecureErrorHandler";
+
 export interface QuotaRecord {
   accountId: string;
   /** Authoritative quota value (e.g. requests-per-window). */
@@ -131,6 +134,217 @@ export function createQuotaApi(
       };
       server.set(accountId, next);
       return { ...next };
+    },
+  };
+}
+
+export type QuotaHttpErrorCategory = ReturnType<
+  typeof classifyHttpError
+>["category"];
+
+/** Typed HTTP error raised by {@link createHttpQuotaApi} for non-409 failures. */
+export class QuotaHttpError extends Error {
+  public readonly status: number;
+  public readonly category: QuotaHttpErrorCategory;
+  public readonly retryable: boolean;
+
+  constructor(status: number, message?: string) {
+    const { category, retryable } = classifyHttpError(status);
+    super(message ?? defaultHttpErrorMessage(status));
+    this.name = "QuotaHttpError";
+    this.status = status;
+    this.category = category;
+    this.retryable = retryable;
+  }
+}
+
+/** Raised when the quota endpoint returns malformed JSON or an invalid record shape. */
+export class QuotaValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "QuotaValidationError";
+  }
+}
+
+export interface CreateHttpQuotaApiOptions {
+  /** Authenticated fetch implementation. Defaults to {@link authFetch}. */
+  fetchImpl?: typeof authFetch;
+}
+
+function defaultHttpErrorMessage(status: number): string {
+  if (status === 401) return "Authentication required to access quota.";
+  if (status === 403) return "You do not have permission to access this quota.";
+  if (status === 429) return "Too many quota requests. Please try again later.";
+  if (status >= 500 && status < 600) {
+    return "Quota service is temporarily unavailable.";
+  }
+  return `Quota request failed (HTTP ${status}).`;
+}
+
+function isAbortError(err: unknown): boolean {
+  return (
+    !!err &&
+    typeof err === "object" &&
+    (err as { name?: string }).name === "AbortError"
+  );
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function parseQuotaRecord(payload: unknown): QuotaRecord {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new QuotaValidationError("Invalid quota response payload.");
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (typeof record.accountId !== "string" || record.accountId.trim() === "") {
+    throw new QuotaValidationError("Quota response missing valid accountId.");
+  }
+  if (typeof record.value !== "number" || !Number.isFinite(record.value)) {
+    throw new QuotaValidationError("Quota response missing finite numeric value.");
+  }
+  if (!isNonNegativeInteger(record.version)) {
+    throw new QuotaValidationError(
+      "Quota response missing non-negative integer version.",
+    );
+  }
+  if (
+    typeof record.updatedAt !== "number" ||
+    !Number.isFinite(record.updatedAt)
+  ) {
+    throw new QuotaValidationError(
+      "Quota response missing finite numeric updatedAt.",
+    );
+  }
+
+  return {
+    accountId: record.accountId,
+    value: record.value,
+    version: record.version,
+    updatedAt: record.updatedAt,
+  };
+}
+
+function parseVersionFromEtag(etag: string | null): number | null {
+  if (!etag) return null;
+  const cleaned = etag.trim().replace(/^W\//i, "").replace(/^"|"$/g, "");
+  if (!/^\d+$/.test(cleaned)) return null;
+  const parsed = Number(cleaned);
+  return isNonNegativeInteger(parsed) ? parsed : null;
+}
+
+async function extractConflictVersion(
+  response: Response,
+  fallbackVersion: number,
+): Promise<number> {
+  try {
+    const body = (await response.json()) as Record<string, unknown> | null;
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      const candidates: unknown[] = [
+        body.serverVersion,
+        body.version,
+        body.currentVersion,
+        (body.record as Record<string, unknown> | undefined)?.version,
+      ];
+      for (const candidate of candidates) {
+        if (isNonNegativeInteger(candidate)) {
+          return candidate;
+        }
+      }
+    }
+  } catch (err) {
+    if (isAbortError(err)) throw err;
+    // Ignore non-JSON 409 bodies and fall through to ETag / fallback.
+  }
+
+  const etagHeader =
+    response.headers && typeof response.headers.get === "function"
+      ? response.headers.get("ETag")
+      : null;
+  const etagVersion = parseVersionFromEtag(etagHeader);
+  if (etagVersion !== null) {
+    return etagVersion;
+  }
+
+  return fallbackVersion;
+}
+
+async function parseJsonPayload(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (err) {
+    if (isAbortError(err)) throw err;
+    throw new QuotaValidationError("Malformed JSON in quota response.");
+  }
+}
+
+/**
+ * Creates an HTTP-backed {@link QuotaApi} using {@link authFetch}.
+ *
+ * Assumed backend contract:
+ *  - `GET /api/quota?accountId=<id>` -> `200 OK` with JSON {@link QuotaRecord}
+ *    `{ accountId: string, value: number, version: integer >= 0, updatedAt: number }`.
+ *  - `PUT /api/quota` with JSON `{ accountId, value, baseVersion }` ->
+ *    `200 OK` with updated {@link QuotaRecord}.
+ *  - `409 Conflict` on stale `baseVersion` -> JSON body containing an integer
+ *    `serverVersion`, `version`, `currentVersion`, or `record.version` (or an
+ *    integer `ETag` header such as `"4"` / `W/"4"`), mapped to
+ *    {@link QuotaConflictError}.
+ *  - Other non-2xx responses (401/403/5xx, etc.) are classified via
+ *    {@link classifyHttpError} and thrown as {@link QuotaHttpError}.
+ *  - `AbortError` is propagated unchanged so callers can ignore cancelled requests.
+ */
+export function createHttpQuotaApi(
+  options: CreateHttpQuotaApiOptions = {},
+): QuotaApi {
+  const fetchImpl = options.fetchImpl ?? authFetch;
+
+  return {
+    async fetchQuota(accountId, signal) {
+      if (signal?.aborted) {
+        throw abortError();
+      }
+      const path = `/api/quota?accountId=${encodeURIComponent(accountId)}`;
+      const response = await fetchImpl(path, {
+        method: "GET",
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new QuotaHttpError(response.status);
+      }
+
+      const payload = await parseJsonPayload(response);
+      return parseQuotaRecord(payload);
+    },
+
+    async updateQuota(accountId, value, baseVersion, signal) {
+      if (signal?.aborted) {
+        throw abortError();
+      }
+      const response = await fetchImpl("/api/quota", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId, value, baseVersion }),
+        signal,
+      });
+
+      if (response.status === 409) {
+        const serverVersion = await extractConflictVersion(
+          response,
+          baseVersion,
+        );
+        throw new QuotaConflictError(serverVersion, accountId);
+      }
+
+      if (!response.ok) {
+        throw new QuotaHttpError(response.status);
+      }
+
+      const payload = await parseJsonPayload(response);
+      return parseQuotaRecord(payload);
     },
   };
 }
