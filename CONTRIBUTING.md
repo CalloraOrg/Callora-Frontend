@@ -6,8 +6,9 @@ Thanks for contributing! Follow these guidelines to keep the codebase consistent
 
 ## Prerequisites
 
-- Node.js 18+
-- npm (comes with Node.js)
+- Node.js 20 (see `.nvmrc`; `nvm use` / `fnm use` picks it up). `package.json`
+  declares `engines: { "node": ">=20", "npm": ">=10" }`, matching the version CI
+  runs.
 
 ## Setup
 

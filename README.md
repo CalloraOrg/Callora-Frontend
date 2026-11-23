@@ -21,7 +21,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Node.js 18+ (CI uses 20). No `.env` is required: if the backend is unreachable the app falls back to bundled mock data, so every page renders.
+Node.js 20 (see `.nvmrc`; `nvm use` picks it up). No `.env` is required: if the backend is unreachable the app falls back to bundled mock data, so every page renders.
 
 ## Environment variables
 
@@ -188,7 +188,7 @@ Key principles:
 
 ## Local setup
 
-1. **Prerequisites:** Node.js 18+
+1. **Prerequisites:** Node.js 20 (see `.nvmrc`; `nvm use` picks it up)
 
 2. **Install and run:**
 
