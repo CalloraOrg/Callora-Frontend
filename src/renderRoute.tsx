@@ -23,6 +23,7 @@ import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
 import LatencyChart from "./pages/LatencyChart";
 import StandaloneShell from "./components/StandaloneShell";
 import { isMarketplaceSubpage } from "./routeMatchers";
+import RuntimeConfigBanner from "./components/RuntimeConfigBanner";
 
 /**
  * The slice of a React 18 root that routing needs. Keeping it structural lets
@@ -52,6 +53,7 @@ export async function renderRoute(
           <AccountProvider>
             <BrowserRouter>
               <RouteProgressBar />
+              <RuntimeConfigBanner />
               <ToastProvider>{children}</ToastProvider>
             </BrowserRouter>
           </AccountProvider>
@@ -111,6 +113,7 @@ export async function renderRoute(
           <CollectionsProvider>
             <AccountProvider>
               <RouteProgressBar />
+              <RuntimeConfigBanner />
               <ToastProvider>
                 <App />
               </ToastProvider>

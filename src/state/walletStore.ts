@@ -7,9 +7,10 @@ import {
   isConnected,
 } from "@stellar/freighter-api";
 import {
-  STELLAR_NETWORK,
-  STELLAR_NETWORK_PASSPHRASE,
-} from "../config/constants";
+  getConfig,
+  networkPassphraseFor,
+  subscribeConfig,
+} from "../config/runtimeConfig";
 
 export type WalletState = {
   status: "unavailable" | "disconnected" | "connected";
@@ -56,7 +57,7 @@ function setWallet(address: string | null, networkPassphrase: string | null) {
     isNetworkMismatch:
       connected &&
       Boolean(networkPassphrase) &&
-      networkPassphrase !== STELLAR_NETWORK_PASSPHRASE,
+      networkPassphrase !== networkPassphraseFor(getConfig().network),
   });
 }
 
@@ -128,6 +129,10 @@ export const walletStore = {
       watcher.stop();
       if (activeWatcher === watcher) activeWatcher = null;
     };
+
+    subscribeConfig(() => {
+      if (state.address) setWallet(state.address, state.networkPassphrase);
+    });
   },
 };
 
@@ -150,7 +155,8 @@ export function getWalletNetworkLabel(networkPassphrase: string | null): string 
   if (networkPassphrase === "Test SDF Future Network ; October 2022") {
     return "Futurenet";
   }
-  return networkPassphrase === STELLAR_NETWORK_PASSPHRASE
-    ? STELLAR_NETWORK[0].toUpperCase() + STELLAR_NETWORK.slice(1)
+  const config = getConfig();
+  return networkPassphrase === networkPassphraseFor(config.network)
+    ? config.network[0].toUpperCase() + config.network.slice(1)
     : "Unknown network";
 }

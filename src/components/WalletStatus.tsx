@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Wallet } from "lucide-react";
 import { requestAccess } from "@stellar/freighter-api";
-import { STELLAR_NETWORK } from "../config/constants";
+import { useRuntimeConfig } from "../config/runtimeConfig";
 import {
   getWalletNetworkLabel,
   useWalletStore,
   walletStore,
 } from "../state/walletStore";
-
-const APP_NETWORK_LABEL =
-  STELLAR_NETWORK[0].toUpperCase() + STELLAR_NETWORK.slice(1);
 
 const FREIGHTER_INSTALL_URL = "https://www.freighter.app/";
 
@@ -19,6 +16,8 @@ function compactAddress(address: string): string {
 
 export default function WalletStatus() {
   const wallet = useWalletStore();
+  const config = useRuntimeConfig();
+  const appNetworkLabel = config.network[0].toUpperCase() + config.network.slice(1);
   const [isConnecting, setIsConnecting] = useState(false);
   const [message, setMessage] = useState("");
   const [announcement, setAnnouncement] = useState("");
@@ -133,7 +132,7 @@ export default function WalletStatus() {
 
       {wallet.isNetworkMismatch && (
         <span className="wallet-network-warning" role="status">
-          Freighter is on {networkLabel}, app uses {APP_NETWORK_LABEL}
+          Freighter is on {networkLabel}, app uses {appNetworkLabel}
         </span>
       )}
       {message && <span className="wallet-status-message" role="status">{message}</span>}

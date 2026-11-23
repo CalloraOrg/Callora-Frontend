@@ -6,11 +6,9 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import {
-  STELLAR_NETWORK_LABEL,
-  STELLAR_RPC_URL,
   STELLAR_USDC_DECIMALS,
-  STELLAR_VAULT_CONTRACT_ID,
 } from "../config/constants";
+import { getConfig, type RuntimeConfig } from "../config/runtimeConfig";
 import type { BillingTransaction } from "../pages/BillingHistory";
 
 /**
@@ -42,16 +40,19 @@ export class DepositHistoryError extends Error {
   }
 }
 
-let rpcServer: rpc.Server | null = null;
+const rpcServers = new Map<string, rpc.Server>();
 
-function getServer(): rpc.Server {
-  if (!STELLAR_RPC_URL) {
+function getServer(config: RuntimeConfig): rpc.Server {
+  if (!config.rpcUrl) {
     throw new DepositHistoryError("Stellar RPC is not configured for this network.");
   }
-  if (!rpcServer) {
-    rpcServer = new rpc.Server(STELLAR_RPC_URL, { timeout: RPC_TIMEOUT_MS });
+  const key = `${config.network}:${config.rpcUrl}`;
+  let server = rpcServers.get(key);
+  if (!server) {
+    server = new rpc.Server(config.rpcUrl, { timeout: RPC_TIMEOUT_MS });
+    rpcServers.set(key, server);
   }
-  return rpcServer;
+  return server;
 }
 
 /** Decode the `(amount, new_balance)` data of a deposit event, or null if it has another shape. */
@@ -77,22 +78,25 @@ export async function fetchDepositEvents(args: {
   address: string;
   cursor?: string | null;
   signal?: AbortSignal;
+  config?: RuntimeConfig;
 }): Promise<DepositHistoryPage> {
   const { address, cursor, signal } = args;
-  if (!STELLAR_VAULT_CONTRACT_ID || !StrKey.isValidContract(STELLAR_VAULT_CONTRACT_ID)) {
+  const config = args.config ?? getConfig();
+  const contractId = config.vaultContractId;
+  if (!contractId || !StrKey.isValidContract(contractId)) {
     throw new DepositHistoryError("The Callora vault contract is not configured for this network.");
   }
   if (!StrKey.isValidEd25519PublicKey(address)) {
     throw new DepositHistoryError("A valid Stellar account address is required to load deposits.");
   }
 
-  const server = getServer();
+  const server = getServer(config);
   const topics = [[
     xdr.ScVal.scvSymbol("deposit").toXDR("base64"),
     "*",
     new Address(address).toScVal().toXDR("base64"),
   ]];
-  const filters = [{ type: "contract" as const, contractIds: [STELLAR_VAULT_CONTRACT_ID], topics }];
+  const filters = [{ type: "contract" as const, contractIds: [contractId], topics }];
 
   let retentionTruncated = false;
   let request: Parameters<rpc.Server["getEvents"]>[0];
@@ -127,7 +131,7 @@ export async function fetchDepositEvents(args: {
         status: "success",
         timestamp: event.ledgerClosedAt,
         txHash: event.txHash,
-        network: STELLAR_NETWORK_LABEL,
+        network: `Stellar ${config.network[0].toUpperCase()}${config.network.slice(1)}`,
         confirmations: Math.max(0, latestLedger - event.ledger),
       });
     }

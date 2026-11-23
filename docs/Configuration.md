@@ -1,7 +1,8 @@
 # Configuration
 
-The Callora frontend reads all of its configuration from `VITE_*` environment
-variables. This document covers the variables, their defaults, the dev-server
+The Callora frontend reads deployment-level Stellar settings from `GET
+/api/config` at runtime, with `VITE_*` values as build-time defaults. This
+document covers both configuration sources, their precedence, the dev-server
 `/api` proxy, and how the pieces fit together at runtime and at build time.
 
 Every variable is listed in [`.env.example`](../.env.example); that file is the
@@ -30,6 +31,47 @@ cp .env.example .env.local
 `VITE_*` values are inlined into the JavaScript bundle by Vite at build time.
 They are **not** secrets. Anything that must stay private belongs in the
 backend, never here.
+
+## Runtime configuration (`GET /api/config`)
+
+Before rendering, the browser requests `/api/config` and applies a valid
+response over the build-time defaults. The request gets a 1.5 second rendering
+head start; if it is still pending, the app renders immediately with the
+build-time values and applies a later successful response live. The request
+itself times out after three seconds. A failed or invalid response keeps the
+build-time configuration and shows a warning; invalid responses are rejected
+as a whole.
+
+The endpoint returns a JSON object with any subset of these fields:
+
+```json
+{
+  "network": "testnet",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "vaultContractId": "CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ",
+  "usdcIssuer": "GDXDZNSTNORCX4373EGGYS4Q3U3XVZMBSIMMRHG5S5GCCF7JHC7QZWAZ",
+  "enableDemoOutcome": false
+}
+```
+
+- `network` must be `testnet`, `mainnet`, or `futurenet`.
+- `rpcUrl` must be an HTTPS URL.
+- `vaultContractId` must be a valid Stellar contract StrKey. Mainnet requires an
+  explicit vault ID; the testnet reference contract is never carried over.
+- `usdcIssuer`, when provided, must be a valid Stellar Ed25519 public key.
+- `enableDemoOutcome`, when provided, must be a JSON boolean.
+- Changing the configured network requires `rpcUrl` and `usdcIssuer` in the
+  same response, so a network switch cannot accidentally reuse another
+  network's endpoint or test asset.
+- Unknown fields are rejected. Do not return private keys, credentials, or
+  other secrets; the browser loader accepts only the listed public settings and
+  never logs response values.
+
+For each supplied setting, runtime values take precedence over the corresponding
+build-time value. Omitted fields keep their build-time defaults. Runtime config
+is deployment-specific and can therefore switch network, RPC, and vault
+without rebuilding the frontend. The endpoint must be served from the app's
+origin or be reachable through the configured API base and CORS policy.
 
 ## Variables
 
@@ -164,9 +206,10 @@ Key contract details and adapter behavior:
 | `ENABLE_DEMO_OUTCOME` | `VITE_ENABLE_DEMO_OUTCOME === "true"` on the dev server only |
 | `EXPLORER_BASE_URL` | stellar.expert transaction URL for `STELLAR_NETWORK` |
 
-`src/config/constants.ts` is the single place these variables are read. Read
-the exported constants instead of `import.meta.env` elsewhere so validation and
-defaults cannot drift between call sites.
+`src/config/constants.ts` supplies build-time defaults. The effective,
+validated settings are held by `src/config/runtimeConfig.ts`; wallet and vault
+operations read a snapshot from that store when they begin. A transaction
+already in progress continues using the config snapshot it started with.
 
 ```ts
 import { STELLAR_NETWORK, apiUrl } from "./config/constants";

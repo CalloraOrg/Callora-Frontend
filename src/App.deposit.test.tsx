@@ -23,6 +23,7 @@ import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
 import { PENDING_DEPOSIT_STORAGE_KEY, STELLAR_VAULT_CONTRACT_ID } from "./config/constants";
 import { normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
+import { getConfig, setRuntimeConfig } from "./config/runtimeConfig";
 
 // Deposits are signed through Freighter via `src/services/walletService`
 // (issue #1043). The wallet is mocked so these tests drive the modal's
@@ -113,6 +114,11 @@ beforeEach(() => {
   // these bytes with instanceof, so align jsdom's constructor for real XDR.
   vi.stubGlobal("Uint8Array", new TextEncoder().encode("").constructor);
   walletMocks.network = "testnet";
+  setRuntimeConfig({
+    ...getConfig(),
+    network: "testnet",
+    vaultContractId: STELLAR_VAULT_CONTRACT_ID,
+  });
   walletMocks.getWalletAddress.mockReset().mockResolvedValue("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF");
   walletMocks.signTransaction.mockReset().mockImplementation(async (xdr: string) => ({ signedTxXdr: xdr, signerAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }));
   vi.stubGlobal("fetch", walletMocks.fetch);
@@ -418,7 +424,11 @@ describe("App deposit modal timed transitions", () => {
       fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" }));
     });
     expect(screen.getAllByText("Approve in wallet...").length).toBeGreaterThan(0);
-    expect(walletMocks.submitVaultDeposit).toHaveBeenCalledWith("50", expect.any(Function));
+    expect(walletMocks.submitVaultDeposit).toHaveBeenCalledWith(
+      "50",
+      expect.any(Function),
+      expect.objectContaining({ network: "testnet", vaultContractId: STELLAR_VAULT_CONTRACT_ID }),
+    );
 
     const hash = "A".repeat(64);
     act(() => {
@@ -564,6 +574,11 @@ describe("USDC trustline step (#1316)", () => {
 
   it.each(["testnet", "mainnet"])("shows Friendbot only on testnet (%s configuration)", async (network) => {
     walletMocks.network = network;
+    setRuntimeConfig({
+      ...getConfig(),
+      network: network as "testnet" | "mainnet",
+      vaultContractId: STELLAR_VAULT_CONTRACT_ID,
+    });
     walletMocks.fetch.mockResolvedValue({ ok: false, status: 404 });
     renderDepositModal();
     await screen.findByText(/This Stellar account is not funded/);
@@ -754,7 +769,7 @@ describe("USDC trustline step (#1316)", () => {
       renderDepositModal();
 
       await waitFor(() => {
-        expect(walletMocks.checkDepositStatus).toHaveBeenCalledWith("0xreloadhash");
+        expect(walletMocks.checkDepositStatus).toHaveBeenCalledWith("0xreloadhash", expect.any(Object));
       });
       expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
     });
