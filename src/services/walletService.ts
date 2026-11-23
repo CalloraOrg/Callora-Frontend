@@ -32,6 +32,10 @@ import { decodeVaultError } from "./vaultErrors";
 import { logError } from "./SecureErrorHandler";
 import { walletStore } from "../state/walletStore";
 import { readVaultDepositPreflight, type VaultDepositPreflight } from "./vaultReads";
+import {
+  summarizeInvokeTransaction,
+  type InvokeTransactionSummary,
+} from "./txSummary";
 
 const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
   mainnet: "Mainnet",
@@ -54,6 +58,7 @@ export type WalletServiceErrorCode =
   | "TRUSTLINE_MISSING"
   | "UNFUNDED_ACCOUNT"
   | "CONTRACT_REJECTED"
+  | "TRANSACTION_MISMATCH"
   | "TRANSACTION_FAILED"
   | "WALLET_ERROR"
   | "NETWORK_ERROR";
@@ -79,6 +84,14 @@ export class WalletServiceError extends Error {
 
 export interface SubmittedDeposit {
   hash: string;
+}
+
+export interface PreparedVaultDeposit {
+  transaction: Transaction;
+  xdr: string;
+  summary: InvokeTransactionSummary;
+  address: string;
+  amountStroops: bigint;
 }
 
 type OnSubmitted = (hash: string) => void;
@@ -357,14 +370,51 @@ export async function preflightVaultDeposit(
   return readVaultDepositPreflight(address);
 }
 
+function verifyPreparedVaultDeposit(
+  xdrOrTx: string | Transaction,
+  expectedAddress: string,
+  expectedAmountStroops: bigint,
+): InvokeTransactionSummary {
+  let summary: InvokeTransactionSummary;
+  try {
+    summary = summarizeInvokeTransaction(xdrOrTx, {
+      passphrase: STELLAR_NETWORK_PASSPHRASE,
+    });
+  } catch {
+    throw new WalletServiceError(
+      "TRANSACTION_MISMATCH",
+      "Prepared deposit transaction could not be verified. Signing was aborted.",
+    );
+  }
+
+  const depositorMatches = summary.args[0]?.value === expectedAddress;
+  const amountMatches =
+    summary.amountStroops === expectedAmountStroops &&
+    summary.args[1]?.value === expectedAmountStroops;
+
+  if (
+    summary.contractId !== STELLAR_VAULT_CONTRACT_ID ||
+    summary.functionName !== "deposit" ||
+    summary.args.length !== 2 ||
+    !depositorMatches ||
+    !amountMatches
+  ) {
+    throw new WalletServiceError(
+      "TRANSACTION_MISMATCH",
+      "Prepared deposit transaction does not match the requested vault deposit. Signing was aborted.",
+    );
+  }
+
+  return summary;
+}
+
 /**
- * Build, sign, submit, and confirm a Callora Soroban vault deposit.
- * `onSubmitted` receives only the hash returned by Stellar RPC after submission.
+ * Build, simulate, assemble, and verify a Callora Soroban vault deposit
+ * transaction without prompting Freighter to sign.
  */
-export async function submitVaultDeposit(
+export async function prepareVaultDeposit(
   amount: string | number,
-  onSubmitted?: OnSubmitted,
-): Promise<SubmittedDeposit> {
+): Promise<PreparedVaultDeposit> {
   if (walletStore.getSnapshot().isNetworkMismatch) {
     throw new WalletServiceError(
       "NETWORK_MISMATCH",
@@ -428,17 +478,48 @@ export async function submitVaultDeposit(
     throw new WalletServiceError("CONTRACT_REJECTED", "The vault could not prepare this deposit. No funds were moved.");
   }
 
+  const summary = verifyPreparedVaultDeposit(
+    preparedTransaction,
+    address,
+    amountStroops,
+  );
+
+  return {
+    transaction: preparedTransaction,
+    xdr: preparedTransaction.toXDR(),
+    summary,
+    address,
+    amountStroops,
+  };
+}
+
+/**
+ * Re-verify a prepared deposit transaction, sign it with Freighter, submit it
+ * to Stellar RPC, and wait for ledger confirmation.
+ */
+export async function signAndSubmit(
+  prepared: PreparedVaultDeposit,
+  onSubmitted?: OnSubmitted,
+): Promise<SubmittedDeposit> {
+  verifyPreparedVaultDeposit(
+    prepared.xdr,
+    prepared.address,
+    prepared.amountStroops,
+  );
+
+  const server = createRpcServer();
+
   let signature;
   try {
-    signature = await signTransaction(preparedTransaction.toXDR(), {
+    signature = await signTransaction(prepared.xdr, {
       networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
-      address,
+      address: prepared.address,
     });
   } catch (error) {
     throwWalletError(error);
   }
   if (signature.error) throwWalletError(signature.error);
-  if (!signature.signedTxXdr || signature.signerAddress !== address) {
+  if (!signature.signedTxXdr || signature.signerAddress !== prepared.address) {
     throw new WalletServiceError(
       "WALLET_ERROR",
       "Freighter did not sign the deposit with the connected account.",
@@ -480,6 +561,18 @@ export async function submitVaultDeposit(
   await waitForConfirmation(server, submission.hash);
 
   return { hash: submission.hash };
+}
+
+/**
+ * Build, sign, submit, and confirm a Callora Soroban vault deposit.
+ * `onSubmitted` receives only the hash returned by Stellar RPC after submission.
+ */
+export async function submitVaultDeposit(
+  amount: string | number,
+  onSubmitted?: OnSubmitted,
+): Promise<SubmittedDeposit> {
+  const prepared = await prepareVaultDeposit(amount);
+  return signAndSubmit(prepared, onSubmitted);
 }
 
 export type DepositStatus = "SUCCESS" | "FAILED" | "NOT_FOUND" | "UNKNOWN";
