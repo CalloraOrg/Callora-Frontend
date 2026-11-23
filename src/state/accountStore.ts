@@ -102,7 +102,7 @@ export function removeAccount(accountId: string): boolean {
   if (idx === -1) return false;
   const wasCurrent = state.currentAccountId === accountId;
   state.accounts.splice(idx, 1);
-  if (wasCurrent && state.accounts.length > 0) {
+  if (wasCurrent && state.accounts[0]) {
     state.currentAccountId = state.accounts[0].id;
   } else if (wasCurrent) {
     state.currentAccountId = null;

@@ -7,6 +7,7 @@ import App from "./App";
 import { AccountProvider } from "./hooks/useAccountContext";
 import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
+import { ToastProvider } from "./components/Toast";
 
 vi.mock("./pages/MarketplacePage", () => ({
   default: () => <div data-testid="stub-page" />,
@@ -22,11 +23,13 @@ function renderApp() {
   return render(
     <ThemeProvider>
       <CollectionsProvider>
-        <AccountProvider>
-          <MemoryRouter initialEntries={["/"]}>
-            <App />
-          </MemoryRouter>
-        </AccountProvider>
+        <ToastProvider>
+          <AccountProvider>
+            <MemoryRouter initialEntries={["/"]}>
+              <App />
+            </MemoryRouter>
+          </AccountProvider>
+        </ToastProvider>
       </CollectionsProvider>
     </ThemeProvider>,
   );

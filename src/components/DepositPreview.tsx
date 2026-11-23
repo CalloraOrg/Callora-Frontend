@@ -4,7 +4,8 @@
 
 import { useEffect, useState } from 'react';
 import { HORIZON_FEE_STATS_URL, NETWORK_FEE_CACHE_TTL_MS } from '../config/constants';
-import { formatUsdc } from '../utils/format';
+import { formatUsdc, formatUsdcStroops } from '../utils/format';
+import type { InvokeTransactionSummary } from '../services/txSummary';
 
 type FeeStats = {
   fee_charged?: { mode?: string | number };
@@ -14,12 +15,17 @@ type FeeStats = {
 let cachedFee: { value: string; expiresAt: number } | null = null;
 let feeRequest: Promise<string | null> | null = null;
 
-function formatStroops(stroops: string | number) {
-  const value = Number(stroops);
+export function formatStroops(stroops: string | number | bigint) {
+  const value = typeof stroops === 'bigint' ? Number(stroops) : Number(stroops);
   if (!Number.isFinite(value) || value < 0) return null;
 
   const xlm = (value / 10_000_000).toFixed(7).replace(/0+$/, '').replace(/\.$/, '');
   return `${xlm} XLM`;
+}
+
+function shortenAddress(address: string): string {
+  if (address.length <= 12) return address;
+  return `${address.slice(0, 6)}...${address.slice(-6)}`;
 }
 
 async function fetchNetworkFee() {
@@ -79,6 +85,62 @@ export function useNetworkFee(fallbackFee: string, enabled = true) {
   return { networkFee, isEstimated };
 }
 
+export function TransactionSummaryDetails({
+  summary,
+}: {
+  summary: InvokeTransactionSummary;
+}) {
+  const [copiedContract, setCopiedContract] = useState(false);
+  const feeDisplay = formatStroops(summary.feeStroops) ?? `${summary.feeStroops.toString()} stroops`;
+
+  const handleCopyContract = async () => {
+    try {
+      await navigator.clipboard.writeText(summary.contractId);
+      setCopiedContract(true);
+      globalThis.setTimeout(() => setCopiedContract(false), 1500);
+    } catch {
+      setCopiedContract(false);
+    }
+  };
+
+  return (
+    <dl className="tx-summary-list" aria-label="Soroban transaction summary">
+      <div className="preview-row">
+        <dt>Contract</dt>
+        <dd>
+          <span title={summary.contractId}>{shortenAddress(summary.contractId)}</span>{' '}
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={handleCopyContract}
+            aria-label="Copy contract address"
+          >
+            {copiedContract ? 'Copied' : 'Copy'}
+          </button>
+        </dd>
+      </div>
+      <div className="preview-row">
+        <dt>Function</dt>
+        <dd>{summary.functionName}</dd>
+      </div>
+      {summary.amountStroops !== undefined && (
+        <div className="preview-row">
+          <dt>Amount</dt>
+          <dd>{formatUsdcStroops(summary.amountStroops)} USDC</dd>
+        </div>
+      )}
+      <div className="preview-row">
+        <dt>Network fee</dt>
+        <dd>{feeDisplay}</dd>
+      </div>
+      <div className="preview-row">
+        <dt>Network</dt>
+        <dd>{summary.network}</dd>
+      </div>
+    </dl>
+  );
+}
+
 interface DepositPreviewProps {
   /** Current vault balance before the deposit */
   previewCurrentBalance: number;
@@ -94,11 +156,20 @@ interface DepositPreviewProps {
   walletBalance: number;
   /** ARIA label for the preview section */
   ariaLabel?: string;
+  /** Decoded Soroban transaction summary from the assembled XDR */
+  txSummary?: InvokeTransactionSummary | null;
+  /** Whether the transaction summary is currently being prepared */
+  isPreparing?: boolean;
+  /** Optional confirmation callback invoked after the user reviews the summary */
+  onConfirmSign?: () => void;
+  /** Whether signing is currently in progress */
+  isConfirming?: boolean;
 }
 
 /**
- * DepositPreview displays a side‑by‑side "Before / After" view of balances.
- * It collapses to a single column on narrow viewports via CSS Grid.
+ * DepositPreview displays a side‑by‑side "Before / After" view of balances,
+ * and when a prepared Soroban transaction summary is provided, displays the
+ * decoded contract call details and exact assembled fee before signing.
  */
 export default function DepositPreview({
   previewCurrentBalance,
@@ -108,8 +179,18 @@ export default function DepositPreview({
   hasAmount,
   walletBalance,
   ariaLabel = 'Deposit transaction preview',
+  txSummary = null,
+  isPreparing = false,
+  onConfirmSign,
+  isConfirming = false,
 }: DepositPreviewProps) {
-  const { networkFee: displayedNetworkFee, isEstimated } = useNetworkFee(networkFee);
+  const { networkFee: horizonNetworkFee, isEstimated: isHorizonEstimated } = useNetworkFee(
+    networkFee,
+    !txSummary,
+  );
+  const assembledFee = txSummary ? formatStroops(txSummary.feeStroops) : null;
+  const displayedNetworkFee = assembledFee ?? horizonNetworkFee;
+  const isEstimated = assembledFee ? false : isHorizonEstimated;
   const newWalletBalance = hasAmount ? walletBalance - amount : walletBalance;
 
   return (
@@ -156,6 +237,28 @@ export default function DepositPreview({
           </li>
         </ul>
       </div>
+
+      {isPreparing && (
+        <p role="status" aria-live="polite">
+          Preparing transaction summary...
+        </p>
+      )}
+
+      {txSummary && (
+        <div className="tx-summary-section">
+          <TransactionSummaryDetails summary={txSummary} />
+          {onConfirmSign && (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={onConfirmSign}
+              disabled={isPreparing || isConfirming}
+            >
+              {isConfirming ? 'Approve in wallet...' : 'Confirm & Sign in Freighter'}
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }

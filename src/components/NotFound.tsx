@@ -33,7 +33,7 @@ export default function NotFound({ onGoHome }: { onGoHome: () => void }) {
       return;
     }
 
-    if (matches.length === 1) {
+    if (matches.length === 1 && matches[0]) {
       setSuggestions([]);
       setSearchMessage("");
       navigate(matches[0].path);

@@ -2,10 +2,15 @@
  * collectionsStore.tsx
  *
  * Collections state management via React context + useReducer.
- * Persists to localStorage under the key "callora_collections".
+ * Persists to localStorage under the key "callora_collections:<accountId>"
+ * (or "callora_collections:anonymous" when no account is active).
+ *
+ * On first load after the upgrade, any data stored under the legacy global key
+ * "callora_collections" is migrated into the first account that opens the app.
  *
  * Usage:
  *   - Wrap your app (or the relevant subtree) with <CollectionsProvider>
+ *     (must be a descendant of <AccountProvider> so account changes are visible)
  *   - Call useCollections() in any child component
  */
 
@@ -14,7 +19,9 @@ import React, {
   useContext,
   useEffect,
   useReducer,
+  useRef,
 } from "react";
+import { useAccountId } from "../hooks/useAccount";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -44,11 +51,18 @@ type Action =
       fromIndex: number;
       toIndex: number;
     }
-  | { type: "CREATE_COLLECTION_WITH_ENDPOINT"; name: string; endpointId: string };
+  | { type: "CREATE_COLLECTION_WITH_ENDPOINT"; name: string; endpointId: string }
+  /** Internal: wholesale replace state when the active account changes. */
+  | { type: "LOAD_STATE"; state: CollectionsState };
+// ─── Storage keys ─────────────────────────────────────────────────────────────
 
-// ─── Storage key ─────────────────────────────────────────────────────────────
+/** Legacy key written before per-account scoping was introduced. */
+export const LEGACY_STORAGE_KEY = "callora_collections";
 
-const STORAGE_KEY = "callora_collections";
+/** Returns the localStorage key for a given account id (or anonymous). */
+export function storageKey(accountId: string | null): string {
+  return `callora_collections:${accountId ?? "anonymous"}`;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -59,22 +73,42 @@ function generateId(): string {
 function reorder<T>(arr: T[], from: number, to: number): T[] {
   const next = arr.slice();
   const [item] = next.splice(from, 1);
-  next.splice(to, 0, item);
+  if (item !== undefined) next.splice(to, 0, item);
   return next;
 }
 
-function loadFromStorage(): CollectionsState {
+function loadFromStorage(accountId: string | null): CollectionsState {
+  const key = storageKey(accountId);
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    // Load from the per-account key first.
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw) as CollectionsState;
-      // Basic validation
       if (Array.isArray(parsed.collections)) {
         return parsed;
       }
     }
+
+    // One-time legacy migration: if the per-account key is absent but the
+    // global legacy key has data, adopt it and remove the legacy key.
+    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw) as CollectionsState;
+      if (Array.isArray(parsed.collections) && parsed.collections.length > 0) {
+        // Write to the per-account key so subsequent loads are fast.
+        try {
+          localStorage.setItem(key, legacyRaw);
+          localStorage.removeItem(LEGACY_STORAGE_KEY);
+        } catch {
+          // Storage quota – best effort.
+        }
+        return parsed;
+      }
+      // Legacy key is present but empty: clean it up and start fresh.
+      try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch { /* ignore */ }
+    }
   } catch {
-    // Ignore parse errors – start fresh
+    // Corrupt JSON – start fresh.
   }
   return { collections: [] };
 }
@@ -181,6 +215,9 @@ export function reducer(state: CollectionsState, action: Action): CollectionsSta
       return { ...state, collections: [...state.collections, newCol] };
     }
 
+    case "LOAD_STATE":
+      return action.state;
+
     default:
       return state;
   }
@@ -224,16 +261,28 @@ export function CollectionsProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadFromStorage);
+  const accountId = useAccountId();
+  const [state, dispatch] = useReducer(reducer, undefined, () =>
+    loadFromStorage(accountId),
+  );
+
+  // Reload state when the active account changes.
+  const prevAccountIdRef = useRef(accountId);
+  useEffect(() => {
+    if (prevAccountIdRef.current !== accountId) {
+      prevAccountIdRef.current = accountId;
+      dispatch({ type: "LOAD_STATE", state: loadFromStorage(accountId) });
+    }
+  }, [accountId]);
 
   // Persist to localStorage whenever state changes
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(storageKey(accountId), JSON.stringify(state));
     } catch {
       // Storage quota exceeded – ignore silently
     }
-  }, [state]);
+  }, [state, accountId]);
 
   const createCollection = (name: string) =>
     dispatch({ type: "CREATE_COLLECTION", name });

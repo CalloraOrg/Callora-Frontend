@@ -627,3 +627,224 @@ describe('OpenAPIImport — loading state', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// URL import
+// ---------------------------------------------------------------------------
+
+/** Minimal valid OpenAPI 3.0 JSON spec reused for URL tests. */
+const VALID_JSON_BODY_URL = JSON.stringify({
+  openapi: '3.0.0',
+  info: { title: 'Test', version: '1.0.0' },
+  paths: {
+    '/items': {
+      get: { summary: 'List items' },
+      post: { summary: 'Create item' },
+    },
+  },
+});
+
+function makeJsonResponse(body: string, status = 200): Response {
+  return new Response(body, {
+    status,
+    statusText: status === 200 ? 'OK' : 'Error',
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+describe('OpenAPIImport — URL import', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders the URL input field and Fetch button', () => {
+    render(<OpenAPIImport onImport={() => {}} />);
+    expect(screen.getByTestId('openapi-url-input')).toBeTruthy();
+    expect(screen.getByTestId('openapi-url-fetch-btn')).toBeTruthy();
+  });
+
+  it('Fetch button is disabled when the input is empty', () => {
+    render(<OpenAPIImport onImport={() => {}} />);
+    const btn = screen.getByTestId('openapi-url-fetch-btn') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('Fetch button becomes enabled when the input has a value', () => {
+    render(<OpenAPIImport onImport={() => {}} />);
+    const input = screen.getByTestId('openapi-url-input');
+    fireEvent.change(input, { target: { value: 'https://example.com/api.json' } });
+    const btn = screen.getByTestId('openapi-url-fetch-btn') as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+  });
+
+  it('shows the preview after a successful URL fetch', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeJsonResponse(VALID_JSON_BODY_URL)));
+
+    render(<OpenAPIImport onImport={() => {}} />);
+    const input = screen.getByTestId('openapi-url-input');
+    fireEvent.change(input, { target: { value: 'https://example.com/petstore.json' } });
+    fireEvent.click(screen.getByTestId('openapi-url-fetch-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/endpoints? found/i)).toBeTruthy();
+    });
+
+    expect(screen.getAllByText('/items').length).toBeGreaterThan(0);
+  });
+
+  it('submits on Enter key in the URL input', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeJsonResponse(VALID_JSON_BODY_URL)));
+
+    render(<OpenAPIImport onImport={() => {}} />);
+    const input = screen.getByTestId('openapi-url-input');
+    fireEvent.change(input, { target: { value: 'https://example.com/petstore.json' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(screen.getByText(/endpoints? found/i)).toBeTruthy();
+    });
+  });
+
+  it('calls onImport with parsed endpoints when confirmed after URL fetch', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeJsonResponse(VALID_JSON_BODY_URL)));
+
+    const onImport = vi.fn<[ParsedEndpoint[]], void>();
+    render(<OpenAPIImport onImport={onImport} />);
+
+    const input = screen.getByTestId('openapi-url-input');
+    fireEvent.change(input, { target: { value: 'https://example.com/api.json' } });
+    fireEvent.click(screen.getByTestId('openapi-url-fetch-btn'));
+
+    await waitFor(() => { screen.getByRole('button', { name: /confirm import/i }); });
+    fireEvent.click(screen.getByRole('button', { name: /confirm import/i }));
+
+    expect(onImport).toHaveBeenCalledTimes(1);
+    const endpoints: ParsedEndpoint[] = onImport.mock.calls[0][0];
+    expect(endpoints).toHaveLength(2);
+    expect(endpoints.map((e) => e.method)).toContain('GET');
+    expect(endpoints.map((e) => e.method)).toContain('POST');
+  });
+
+  it('shows an error panel for a rejected URL scheme (javascript:)', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    render(<OpenAPIImport onImport={() => {}} />);
+    const input = screen.getByTestId('openapi-url-input');
+    fireEvent.change(input, { target: { value: 'javascript:alert(1)' } });
+    fireEvent.click(screen.getByTestId('openapi-url-fetch-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeTruthy();
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const alertText = screen.getByRole('alert').textContent ?? '';
+    expect(alertText).toMatch(/not supported|not a valid URL/i);
+  });
+
+  it('shows an error panel for an http:// non-localhost URL without a network request', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    render(<OpenAPIImport onImport={() => {}} />);
+    const input = screen.getByTestId('openapi-url-input');
+    fireEvent.change(input, { target: { value: 'http://example.com/api.json' } });
+    fireEvent.click(screen.getByTestId('openapi-url-fetch-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeTruthy();
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const alertText = screen.getByRole('alert').textContent ?? '';
+    expect(alertText).toMatch(/https/i);
+  });
+
+  it('shows an error panel when the server returns a 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeJsonResponse('Not Found', 404)));
+
+    render(<OpenAPIImport onImport={() => {}} />);
+    const input = screen.getByTestId('openapi-url-input');
+    fireEvent.change(input, { target: { value: 'https://example.com/missing.json' } });
+    fireEvent.click(screen.getByTestId('openapi-url-fetch-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeTruthy();
+    });
+
+    const alertText = screen.getByRole('alert').textContent ?? '';
+    expect(alertText).toMatch(/404/);
+  });
+
+  it('shows the CORS guidance message on a TypeError', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+    render(<OpenAPIImport onImport={() => {}} />);
+    const input = screen.getByTestId('openapi-url-input');
+    fireEvent.change(input, { target: { value: 'https://cors-blocked.example.com/api.json' } });
+    fireEvent.click(screen.getByTestId('openapi-url-fetch-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeTruthy();
+    });
+
+    const alertText = screen.getByRole('alert').textContent ?? '';
+    expect(alertText).toMatch(/cross-origin/i);
+    expect(alertText).toMatch(/download the file/i);
+  });
+
+  it('shows a loading indicator and Cancel button while fetching from a URL', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => new Promise<Response>(() => {})));
+
+    render(<OpenAPIImport onImport={() => {}} />);
+    const input = screen.getByTestId('openapi-url-input');
+    fireEvent.change(input, { target: { value: 'https://example.com/api.json' } });
+    fireEvent.click(screen.getByTestId('openapi-url-fetch-btn'));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/fetching specification/i)).toBeTruthy();
+    });
+    expect(screen.getByTestId('openapi-url-cancel-btn')).toBeTruthy();
+  });
+
+  it('returns to idle state when Cancel is clicked during URL fetch', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => new Promise<Response>(() => {})));
+
+    render(<OpenAPIImport onImport={() => {}} />);
+    const input = screen.getByTestId('openapi-url-input');
+    fireEvent.change(input, { target: { value: 'https://example.com/api.json' } });
+    fireEvent.click(screen.getByTestId('openapi-url-fetch-btn'));
+
+    await waitFor(() => { screen.getByTestId('openapi-url-cancel-btn'); });
+    fireEvent.click(screen.getByTestId('openapi-url-cancel-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('openapi-drop-zone')).toBeTruthy();
+    });
+    expect(screen.queryByText(/fetching specification/i)).toBeNull();
+  });
+
+  it('file upload is unchanged: dropping a valid JSON file still reaches preview', async () => {
+    render(<OpenAPIImport onImport={() => {}} />);
+    const zone = screen.getByTestId('openapi-drop-zone');
+    const file = new File([VALID_JSON_BODY_URL], 'api.json', { type: 'application/json' });
+
+    const dropEvent = createEvent.drop(zone);
+    const fileList = {
+      length: 1,
+      item: (i: number) => (i === 0 ? file : null),
+      [Symbol.iterator]: function* () { yield file; },
+    } as unknown as FileList;
+    Object.defineProperty(fileList, 0, { value: file, enumerable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: { files: fileList, dropEffect: 'copy' },
+      writable: false,
+    });
+    fireEvent(zone, dropEvent);
+
+    await waitFor(() => {
+      expect(screen.getByText(/endpoints? found/i)).toBeTruthy();
+    });
+  });
+});
