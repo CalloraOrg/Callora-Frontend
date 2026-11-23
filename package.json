@@ -8,6 +8,7 @@
     "test": "vitest",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "check:bundle": "node scripts/check-bundle-size.mjs",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
