@@ -108,6 +108,15 @@ vi.mock("./hooks/useVaultBalances", () => ({
   VaultBalanceStatus: "idle" | "loading" | "ready" | "error",
 }));
 
+vi.mock("./services/authService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./services/authService")>();
+  return {
+    ...actual,
+    isSignedIn: () => true,
+    useIsSignedIn: () => true,
+  };
+});
+
 beforeEach(() => {
   // Node's TextEncoder returns a Node-realm Uint8Array. The SDK validates
   // these bytes with instanceof, so align jsdom's constructor for real XDR.
