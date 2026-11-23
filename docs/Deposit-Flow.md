@@ -237,3 +237,56 @@ transaction rather than the static constant, and `Network`). The user must
 explicitly confirm (**Confirm & Sign in Freighter**) after the summary loads.
 No private data beyond the public address and contract ID is displayed or
 logged.
+
+## Withdrawals
+
+The `/billing` page hosts a **Withdraw** button alongside the existing deposit control. The button is disabled when the wallet is disconnected, the network does not match, or the vault balance is zero.
+
+### Vault contract assumption
+
+The withdrawal path assumes the vault exposes `withdraw(to: Address, amount: i128)`, mirroring the deposit signature. This assumption must be confirmed against the deployed contract spec before mainnet use. The contract entry point name is documented in `src/services/walletService.ts`.
+
+### Withdrawal flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> input: Open WithdrawModal
+    input --> approving: Confirm valid amount
+    approving --> pending: Stellar RPC accepts and returns hash
+    pending --> confirmed: RPC confirms success
+    approving --> failed: Rejection or submission failure
+    pending --> failed: Confirmation timeout or lost response
+    failed --> input: Retry withdrawal
+    confirmed --> input: Withdraw again
+```
+
+Clicking **Withdraw** opens `WithdrawModal`. The amount field is validated before any wallet prompt:
+
+| Condition | Behaviour |
+| --- | --- |
+| Empty or non-numeric | Confirm button disabled |
+| Zero or negative | Confirm button disabled |
+| More than 7 decimal places | Validation error shown |
+| Exceeds vault balance | Validation error shown |
+| **Max** button | Fills the field with the vault balance (truncated to 7 decimals) |
+
+On confirm, `submitVaultWithdraw` (in `walletService.ts`) builds a Soroban transaction calling `withdraw(address, amount_i128)`, simulates it, assembles it, signs via Freighter, submits, and polls confirmation. The flow is byte-for-byte identical to the deposit path except:
+
+- No USDC trustline check (the wallet receives USDC, not sends it).
+- Uses withdraw-specific error messages via `decodeVaultError(simulation, "withdraw")`.
+
+After confirmation, `refresh()` from `useVaultBalances` is called and a success toast with the Stellar Explorer link is shown via `buildExplorerLink`.
+
+### Error handling
+
+Contract simulation errors are decoded by `decodeVaultError` with `action = "withdraw"`. Withdraw-specific messages (e.g. insufficient vault balance, withdrawal paused) are defined in `WITHDRAW_MESSAGES` in `src/services/vaultErrors.ts`. Raw XDR or host error strings never appear in the UI.
+
+### Implementation files
+
+| File | Change |
+| --- | --- |
+| `src/services/walletService.ts` | Added `preflightVaultWithdraw`, `submitVaultWithdraw`, `SubmittedWithdraw` |
+| `src/services/vaultErrors.ts` | Parameterised `decodeVaultError` with `action`; added `WITHDRAW_MESSAGES` |
+| `src/components/WithdrawModal.tsx` | New modal component |
+| `src/App.tsx` | Withdraw button on billing page, `WithdrawModal` mounted |
+| `src/components/WithdrawModal.test.tsx` | Validation and stage-transition tests |
