@@ -41,6 +41,7 @@ import LandingPage from "./app/LandingPage";
 import StatusPage from "./app/StatusPage";
 import WalletSignInButton from "./app/WalletSignInButton";
 import AccountSwitcher from "./app/AccountSwitcher";
+import WithdrawModal from "./components/WithdrawModal";
 
 // Re-export public API
 export { prefetchRoute } from "./app/routes";
@@ -97,6 +98,7 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const wallet = useWalletStore();
+  const { showToast } = useToast();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
@@ -123,6 +125,7 @@ function App() {
   useDocumentTitle(currentTitle, currentDescription);
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [amountInput, setAmountInput] = useState("50");
@@ -801,9 +804,24 @@ function App() {
                         <p className="eyebrow">Deposit USDC to Vault</p>
                         <h1>Review every number before you approve.</h1>
                       </div>
-                      <button className="primary-button no-print" onClick={() => openDeposit()}>
-                        Open deposit modal
-                      </button>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button className="primary-button no-print" onClick={() => openDeposit()}>
+                          Open deposit modal
+                        </button>
+                        <button
+                          className="ghost-button no-print"
+                          onClick={() => setIsWithdrawOpen(true)}
+                          disabled={
+                            !walletAddress ||
+                            wallet.isNetworkMismatch ||
+                            vaultStroops === null ||
+                            vaultStroops === 0n
+                          }
+                          aria-label="Open withdrawal modal"
+                        >
+                          Withdraw
+                        </button>
+                      </div>
                     </div>
 
                     <div className="vault-grid">
@@ -1278,6 +1296,14 @@ function App() {
               </div>
             </section>
           </div>
+        )}
+        {isWithdrawOpen && (
+          <WithdrawModal
+            vaultStroops={vaultStroops}
+            onRefreshBalances={() => void refreshBalances()}
+            onShowSuccessToast={(message) => showToast(message, "success")}
+            onClose={() => setIsWithdrawOpen(false)}
+          />
         )}
       </div>
   );
