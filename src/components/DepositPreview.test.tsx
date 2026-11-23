@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DepositPreview, { clearNetworkFeeCache } from "./DepositPreview";
+import type { InvokeTransactionSummary } from "../services/txSummary";
 
 describe("DepositPreview", () => {
   afterEach(() => {
@@ -130,5 +131,49 @@ describe("DepositPreview", () => {
 
     await waitFor(() => expect(screen.getByText("(estimated)")).toBeTruthy());
     expect(screen.getByText("0.00001 XLM")).toBeTruthy();
+  });
+
+  it("renders decoded Soroban transaction summary with assembled fee and confirm button", () => {
+    const onConfirmSign = vi.fn();
+    const summary: InvokeTransactionSummary = {
+      contractId: "CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ",
+      functionName: "deposit",
+      args: [
+        { type: "scvAddress", value: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" },
+        { type: "scvI128", value: 500_000_000n },
+      ],
+      amountStroops: 500_000_000n,
+      sourceAccount: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      feeStroops: 25_000n, // 0.0025 XLM
+      network: "Testnet",
+    };
+
+    render(
+      <DepositPreview
+        previewCurrentBalance={50}
+        projectedBalance={100}
+        networkFee="0.00001 XLM"
+        amount={50}
+        hasAmount={true}
+        walletBalance={200}
+        txSummary={summary}
+        onConfirmSign={onConfirmSign}
+      />
+    );
+
+    const summaryList = screen.getByLabelText("Soroban transaction summary");
+    expect(summaryList.tagName).toBe("DL");
+    expect(summaryList.textContent).toContain("CBJZLU...R7XDYQ");
+    expect(summaryList.textContent).toContain("deposit");
+    expect(summaryList.textContent).toContain("50.00 USDC");
+    expect(summaryList.textContent).toContain("0.0025 XLM");
+    expect(summaryList.textContent).toContain("Testnet");
+    // Assembled fee replaces the static constant and has no "(estimated)" suffix
+    expect(screen.queryByText("(estimated)")).toBeNull();
+    expect(screen.getByRole("button", { name: "Copy contract address" })).toBeTruthy();
+
+    const confirmBtn = screen.getByRole("button", { name: /Confirm & Sign in Freighter/i });
+    fireEvent.click(confirmBtn);
+    expect(onConfirmSign).toHaveBeenCalledTimes(1);
   });
 });

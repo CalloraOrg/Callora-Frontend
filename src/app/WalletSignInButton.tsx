@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { signIn, signOut, isSignedIn, type AuthServiceErrorCode } from "../services/authService";
+import React, { useState, useCallback } from "react";
+import { signIn, signOut, useIsSignedIn, type AuthServiceErrorCode } from "../services/authService";
 import { useSessionExpiry } from "../hooks/useSessionExpiry";
 
 const WALLET_BTN_STYLE: React.CSSProperties = {
@@ -21,22 +21,17 @@ const WALLET_BTN_STYLE: React.CSSProperties = {
  * does not need to know about it.
  */
 export function WalletSignInButton() {
-  const [signedIn, setSignedIn] = useState(isSignedIn);
+  const isAuthenticated = useIsSignedIn();
+  const { isExpired } = useSessionExpiry();
+  const signedIn = isAuthenticated && !isExpired;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Keep local state in sync after a session-expiry clears the token.
-  const { isExpired } = useSessionExpiry();
-  useEffect(() => {
-    if (isExpired) setSignedIn(false);
-  }, [isExpired]);
 
   const handleSignIn = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       await signIn();
-      setSignedIn(true);
     } catch (err) {
       const code: AuthServiceErrorCode | undefined =
         err && typeof err === "object" && "code" in err
@@ -63,8 +58,6 @@ export function WalletSignInButton() {
     try {
       await signOut();
     } finally {
-      // Clear regardless of whether the revoke call failed.
-      setSignedIn(false);
       setLoading(false);
     }
   }, []);

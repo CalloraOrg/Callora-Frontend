@@ -879,3 +879,25 @@ describe("ApiUsage - Rate Limit Alert & Countdown", () => {
     expect(clearIntervalSpy).toHaveBeenCalled();
   });
 });
+
+describe("ApiUsage - QuotaManager & QuotaBanner", () => {
+  it("renders QuotaManager and QuotaBanner and submits quota updates through quotaStore", async () => {
+    const { quotaStore } = await import("../state/quotaStore");
+    const updateSpy = vi.spyOn(quotaStore, "update");
+
+    render(<ApiUsage />);
+    await settleUsageRequest();
+
+    const input = screen.getByLabelText(/Requests per window/i) as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: "250" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save quota/i }));
+
+    await settleUsageRequest();
+
+    expect(updateSpy).toHaveBeenCalledWith(250);
+    expect(input.value).toBe("250");
+    updateSpy.mockRestore();
+  });
+});

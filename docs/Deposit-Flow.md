@@ -210,6 +210,34 @@ messages. Failures after submission keep the existing transaction and
 reconciliation behavior. The decoder reads both the simulation error string and
 structured contract-error values in diagnostic events.
 
+## Pre-signing transaction summary and verification
+
+Before Freighter is prompted to sign, `prepareVaultDeposit(amount)` builds,
+simulates, and assembles the Soroban deposit transaction, then decodes the
+assembled XDR with `summarizeInvokeTransaction(xdrOrTx, { passphrase })`
+(`src/services/txSummary.ts`).
+
+The verification step asserts every invariant on the decoded transaction:
+
+- Exactly one operation exists, and it is an `invokeHostFunction` contract call.
+- `contractId` matches `STELLAR_VAULT_CONTRACT_ID`.
+- `functionName` is `"deposit"`.
+- The depositor argument matches the connected Freighter account address.
+- The `i128` amount argument matches the requested USDC amount in stroops.
+
+If any check fails, `WalletServiceError("TRANSACTION_MISMATCH")` is thrown and
+`signTransaction` is never invoked. `signAndSubmit(prepared)` re-runs the same
+verification against `prepared.xdr` immediately before calling Freighter so
+post-prepare tampering is also blocked.
+
+In the deposit modal (`DepositPreview.tsx` and `App.tsx`), the decoded summary
+is displayed in an accessible description list (`Contract` with shortened
+address and copy action, `Function`, `Amount`, `Network fee` from the assembled
+transaction rather than the static constant, and `Network`). The user must
+explicitly confirm (**Confirm & Sign in Freighter**) after the summary loads.
+No private data beyond the public address and contract ID is displayed or
+logged.
+
 ## Withdrawals
 
 The `/billing` page hosts a **Withdraw** button alongside the existing deposit control. The button is disabled when the wallet is disconnected, the network does not match, or the vault balance is zero.

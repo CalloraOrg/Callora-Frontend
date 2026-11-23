@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import ApiCard from "../components/ApiCard";
+import CollectionsMenu from "../components/CollectionsMenu";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { useFavorites } from "../hooks/useFavorites";
 import { useMarketplaceUrlState } from "../hooks/useMarketplaceUrlState";
@@ -594,6 +595,7 @@ export default function MarketplacePage(): JSX.Element {
               Compact
             </button>
           </div>
+          <CollectionsMenu />
         </div>
         <SortDropdown value={sort} onChange={setSort} />
       </div>
