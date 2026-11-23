@@ -2,7 +2,7 @@ import {
   PENDING_DEPOSIT_STORAGE_KEY,
   type StellarNetwork,
 } from "../config/constants";
-import { StrKey } from "@stellar/stellar-sdk";
+import { isValidContractId } from "../utils/stellarAddress";
 import { getConfig } from "../config/runtimeConfig";
 
 export type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
@@ -28,7 +28,7 @@ export function readPendingDeposit(): PendingDepositRecord | null {
       typeof parsed.submittedAt === "number" &&
       ["testnet", "mainnet", "futurenet"].includes(parsed.network) &&
       typeof parsed.contractId === "string" &&
-      StrKey.isValidContract(parsed.contractId)
+      isValidContractId(parsed.contractId)
     ) {
       let rpcUrl = parsed.rpcUrl;
       if (typeof rpcUrl === "string") {
