@@ -132,7 +132,7 @@ export function useVirtualList({
     const arr = new Array<number>(itemCount + 1);
     arr[0] = 0;
     for (let i = 0; i < itemCount; i++) {
-      arr[i + 1] = arr[i] + (sizes.get(i) ?? safeEstimate);
+      arr[i + 1] = (arr[i] ?? 0) + (sizes.get(i) ?? safeEstimate);
     }
     return arr;
   }, [measureVersion, itemCount, safeEstimate]);
@@ -148,7 +148,7 @@ export function useVirtualList({
       return { startIndex: 0, endIndex: -1, offset: 0, windowSize: 0, totalSize: 0 };
     }
 
-    const totalSize = prefix[itemCount];
+    const totalSize = prefix[itemCount] ?? 0;
 
     // First index whose top is at or below the scroll position.
     let start = lowerBound(prefix, scrollTop, itemCount);
@@ -163,8 +163,8 @@ export function useVirtualList({
       end = 0;
     }
 
-    const offset = prefix[start];
-    const windowSize = prefix[end + 1] - offset;
+    const offset = prefix[start] ?? 0;
+    const windowSize = (prefix[end + 1] ?? totalSize) - offset;
     return { startIndex: start, endIndex: end, offset, windowSize, totalSize };
   }, [itemCount, prefix, scrollTop, viewportSize, safeOverscan]);
 
@@ -214,7 +214,7 @@ function lowerBound(prefix: number[], target: number, count: number): number {
   let hi = count;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (prefix[mid] < target) lo = mid + 1;
+    if ((prefix[mid] ?? 0) < target) lo = mid + 1;
     else hi = mid;
   }
   return lo;
@@ -226,7 +226,7 @@ function upperBound(prefix: number[], target: number, count: number): number {
   let hi = count;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (prefix[mid] <= target) lo = mid + 1;
+    if ((prefix[mid] ?? 0) <= target) lo = mid + 1;
     else hi = mid;
   }
   return lo;

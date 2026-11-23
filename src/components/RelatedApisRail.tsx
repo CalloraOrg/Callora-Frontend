@@ -222,7 +222,7 @@ export default function RelatedApisRail({
                     flexShrink: 0,
                   }}
                 >
-                  {api.name[0].toUpperCase()}
+                  {(api.name[0] ?? "").toUpperCase()}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>

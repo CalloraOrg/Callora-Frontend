@@ -185,12 +185,12 @@ export function useExportHistory(records: CallRecord[], options: UseExportHistor
           const { content, mimeType } = generateExportContent([], format);
           const blob = new Blob([content], { type: mimeType });
           triggerBrowserDownload(blob, fileName);
-        } catch (err: any) {
+        } catch (err: unknown) {
           if (jobId !== currentJobIdRef.current) return;
           setState((prev) => ({
             ...prev,
             status: 'failed',
-            error: err?.message || 'Failed to generate empty export file.',
+            error: (err instanceof Error ? err.message : null) || 'Failed to generate empty export file.',
             lastFailedFormat: format,
           }));
         }
@@ -260,9 +260,9 @@ export function useExportHistory(records: CallRecord[], options: UseExportHistor
           fileName,
           lastFailedFormat: null,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (jobId !== currentJobIdRef.current) return;
-        if (err.name === 'AbortError') {
+        if (err instanceof Error && err.name === 'AbortError') {
           return;
         }
 
@@ -270,7 +270,7 @@ export function useExportHistory(records: CallRecord[], options: UseExportHistor
         setState((prev) => ({
           ...prev,
           status: 'failed',
-          error: err.message || 'Export failed unexpectedly.',
+          error: (err instanceof Error ? err.message : null) || 'Export failed unexpectedly.',
           lastFailedFormat: format,
           downloadUrl: null,
         }));

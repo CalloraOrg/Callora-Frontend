@@ -23,6 +23,15 @@ import { ToastProvider } from "./components/Toast";
 
 let publishRenderShouldThrow = false;
 
+vi.mock("./services/authService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./services/authService")>();
+  return {
+    ...actual,
+    isSignedIn: () => true,
+    useIsSignedIn: () => true,
+  };
+});
+
 vi.mock("./pages/PublishApi", () => ({
   default: function MockPublishApi() {
     if (publishRenderShouldThrow) {

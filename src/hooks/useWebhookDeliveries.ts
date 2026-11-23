@@ -174,11 +174,11 @@ export function useWebhookDeliveries(
         setLoadedAccountId(currentAccountId);
         setStatus("success");
         setIsStale(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (reqId !== requestCounter.current) return;
-        if (err.name === "AbortError") return;
+        if (err instanceof Error && err.name === "AbortError") return;
 
-        setError(err.message || "An error occurred");
+        setError((err instanceof Error ? err.message : null) || "An error occurred");
         setStatus("error");
         setIsStale(false);
       }

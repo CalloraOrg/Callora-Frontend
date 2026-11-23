@@ -9,6 +9,27 @@ export type Review = {
 
 
 
+export type EndpointParam = {
+  name: string;
+  type: string;
+  required?: boolean;
+};
+
+export type ApiEndpointItem = {
+  id: string;
+  title?: string;
+  method?: string;
+  path?: string;
+  url?: string;
+  price?: number;
+  price_per_call?: number;
+  price_per_request?: number;
+  pricing?: number;
+  cost?: number;
+  params?: EndpointParam[];
+  [key: string]: unknown;
+};
+
 export type APIItem = {
   id: string;
   name: string;
@@ -28,7 +49,7 @@ export type APIItem = {
   usageCount?: number;
   features?: string[];
   useCases?: string[];
-  endpoints?: Array<any>;
+  endpoints?: ApiEndpointItem[];
   stats?: { totalCalls?: number; avgResponseMs?: number; uptimePct?: number };
   ratingDistribution?: Record<number, number>;
   hourlyHealth?: ("operational" | "degraded" | "down")[];

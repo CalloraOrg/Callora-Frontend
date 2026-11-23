@@ -23,7 +23,7 @@ The child node is the always-visible trigger content. The tooltip is rendered on
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
 | `rating` | `number` | — | Average rating (0–5). Shown prominently in the tooltip header. |
-| `distribution` | `Record<number, number>` | derived from `rating` | Per-star review counts keyed by star value (1–5). When omitted, a plausible distribution is generated so the tooltip is never empty. |
+| `distribution` | `Record<number, number>` | — | Per-star review counts keyed by star value (1–5). When omitted or when all counts sum to zero, the tooltip shows "No rating breakdown yet" instead of bars. |
 | `children` | `ReactNode` | — | The trigger content (typically the inline rating string). |
 | `placement` | `"top" \| "top-start" \| "top-end"` | `"top"` | How the tooltip anchors relative to the trigger. `top-end` is recommended when the trigger sits near the right edge of a container (as it does in `ApiCard`) so the 240px-wide popover does not overflow. |
 
@@ -43,7 +43,7 @@ The child node is the always-visible trigger content. The tooltip is rendered on
   - **Dismissible** via Escape.
   - **Hoverable** — the close timer is cancelled when the pointer enters the tooltip, so users with motor impairments can move onto it.
   - **Persistent** until pointer/focus leaves or the user dismisses.
-- The trigger exposes an `aria-label` of the form `"Rating 4.6 out of 5, 124 reviews"` so screen-reader users always hear the rating context, even when the tooltip is not opened.
+- The trigger exposes an `aria-label` of the form `"Rating 4.6 out of 5, 124 reviews"` when a distribution is supplied, or `"Rating 4.6 out of 5"` when no breakdown is available, so screen-reader users always hear the rating context.
 - While the tooltip is visible, the trigger sets `aria-describedby` to the tooltip's `id`, and the tooltip itself uses `role="tooltip"`.
 - Each histogram row has an `aria-label` like `"5 stars: 85 reviews"`.
 
@@ -57,6 +57,7 @@ The tooltip is 240px wide with `max-width: calc(100vw - 32px)` so it never overf
 
 ## Edge cases
 
-- All-zero distribution: rows render with 0% bars and the "X reviews" subtotal is suppressed.
-- Missing `distribution`: a plausible mock is derived from `rating` so the tooltip is never empty.
+- All-zero distribution: tooltip shows "No rating breakdown yet" (no bars, no review count).
+- Missing `distribution`: same as all-zero — tooltip shows "No rating breakdown yet". No synthetic data is ever generated.
+- `rating = 0` or `NaN`: the accessible label prints `"0.0"` rather than `"NaN"`. The tooltip still opens normally.
 - Mounted inside a clickable ancestor: trigger `onClick` stops propagation; Enter/Space on the trigger also stop propagation.

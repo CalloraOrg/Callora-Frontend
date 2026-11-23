@@ -9,7 +9,7 @@ import {
 } from "../state/walletStore";
 
 const APP_NETWORK_LABEL =
-  STELLAR_NETWORK[0].toUpperCase() + STELLAR_NETWORK.slice(1);
+  STELLAR_NETWORK.charAt(0).toUpperCase() + STELLAR_NETWORK.slice(1);
 
 const FREIGHTER_INSTALL_URL = "https://www.freighter.app/";
 

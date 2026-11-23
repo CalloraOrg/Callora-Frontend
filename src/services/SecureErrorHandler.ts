@@ -26,7 +26,7 @@ export const MAX_REDACTION_DEPTH = 5;
  * Safe error messages that can be shown to end users.
  * Each message is generic enough to not leak implementation details.
  */
-const SAFE_ERROR_MESSAGES: Record<string, string> = {
+const SAFE_ERROR_MESSAGES = {
   // Authorization & Authentication
   UNAUTHORIZED: 'You are not authorized to perform this action.',
   AUTHORIZATION_FAILED: 'You are not authorized to rotate this key.',
@@ -67,7 +67,13 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
   SERVER_ERROR: 'Server error. Please try again later.',
   UNKNOWN_ERROR: 'An error occurred. Please try again.',
   ROTATION_FAILED: 'Failed to rotate API key. Please try again.',
-};
+} as const satisfies Record<string, string>;
+
+function getSafeMessageByCode(code: string): string | undefined {
+  return Object.prototype.hasOwnProperty.call(SAFE_ERROR_MESSAGES, code)
+    ? SAFE_ERROR_MESSAGES[code as keyof typeof SAFE_ERROR_MESSAGES]
+    : undefined;
+}
 
 /**
  * Patterns that indicate sensitive data and should be redacted in logs/errors.
@@ -115,7 +121,7 @@ const SENSITIVE_PATTERNS = [
  * Redacts sensitive data from a string for safe logging/telemetry.
  * Applied before sending errors to monitoring systems or logs.
  */
-export function redactSensitiveData(text: string | Error): string {
+export function redactSensitiveData(text: unknown): string {
   if (!text) return '[empty]';
 
   const str = text instanceof Error ? `${text.message}\n${text.stack}` : String(text);
@@ -138,13 +144,14 @@ export function getSafeErrorMessage(
   fallback?: string,
 ): string {
   // If we have a known error code, use the safe message
-  if (errorCode && SAFE_ERROR_MESSAGES[errorCode]) {
-    return SAFE_ERROR_MESSAGES[errorCode];
+  const mappedMessage = errorCode ? getSafeMessageByCode(errorCode) : undefined;
+  if (mappedMessage) {
+    return mappedMessage;
   }
 
   // If error is a known error code enum value
-  if (errorCode && Object.values(RotationErrorCode).includes(errorCode as any)) {
-    return SAFE_ERROR_MESSAGES[errorCode] || SAFE_ERROR_MESSAGES.UNKNOWN_ERROR;
+  if (errorCode && (Object.values(RotationErrorCode) as string[]).includes(errorCode)) {
+    return mappedMessage || SAFE_ERROR_MESSAGES.UNKNOWN_ERROR;
   }
 
   // Extract message from error and check if it matches known patterns
@@ -216,7 +223,9 @@ export function isSensitiveValue(value: unknown): boolean {
  * Deeply redacts sensitive arrays and nested objects using a depth cap.
  * Drops values under sensitive keys completely and passes strings to redactSensitiveData.
  */
-export function redactDeeply(payload: unknown, depth: number = 0): any {
+export function redactDeeply(payload: Record<string, unknown>, depth?: number): Record<string, unknown>;
+export function redactDeeply(payload: unknown, depth?: number): unknown;
+export function redactDeeply(payload: unknown, depth: number = 0): unknown {
   if (depth >= MAX_REDACTION_DEPTH) {
     return '[TRUNCATED]';
   }
@@ -230,7 +239,7 @@ export function redactDeeply(payload: unknown, depth: number = 0): any {
   }
 
   if (typeof payload === 'object') {
-    const redactedObj: Record<string, any> = {};
+    const redactedObj: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(payload)) {
       if (isSensitiveValue(key)) {
         redactedObj[key] = '[REDACTED]';
@@ -257,7 +266,7 @@ export function logError(
   error: unknown,
   metadata?: Record<string, unknown>,
 ): void {
-  const redacted = redactSensitiveData(error as any);
+  const redacted = redactSensitiveData(error);
   const safeMetadata = metadata ? redactDeeply(metadata) : undefined;
 
   // In production, this would be sent to error tracking (Sentry, etc.)

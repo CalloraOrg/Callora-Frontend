@@ -22,8 +22,9 @@
  */
 
 import { API_BASE, API_BASE_URL, apiUrl } from "../config/constants";
-import MOCK_APIS, { type APIItem } from "../data/mockApis";
+import MOCK_APIS, { type APIItem, type ApiEndpointItem } from "../data/mockApis";
 import { onAccountCacheInvalidated } from "../utils/offlineApiCache";
+import type { HealthStatus } from "../components/HealthTimeline";
 import { apiClient, isApiAbortError, isApiError } from "./apiClient";
 
 /** Path the marketplace catalogue is read from. */
@@ -134,6 +135,17 @@ export interface CatalogApi {
    *   aborted before the response is read.
    */
   fetchApiDetail(id: string, signal?: AbortSignal): Promise<ApiDetailResult>;
+
+  /**
+   * Fetches health timeline buckets for a single API from `GET /api/apis/:id/health`.
+   *
+   * Expected payload shape:
+   * `{ points: Array<{ at: string; status: "operational" | "degraded" | "down" }> }`
+   *
+   * @param id The API id to look up.
+   * @param signal Aborts the request; rejects with an `AbortError` when aborted.
+   */
+  fetchApiHealth(id: string, signal?: AbortSignal): Promise<HealthStatus[]>;
 
   /**
    * Resolves a list of API ids from the cached catalogue, fetching any missing
@@ -336,7 +348,7 @@ export function adaptBackendApi(raw: unknown): APIItem | null {
     baseUrl,
     pricePerRequest,
     pricingOnRequest,
-    endpoints: endpoints.length > 0 ? (endpoints as Array<any>) : undefined,
+    endpoints: endpoints.length > 0 ? (endpoints as ApiEndpointItem[]) : undefined,
   };
 }
 
@@ -390,6 +402,50 @@ export function normalizeApiDetail(payload: unknown): APIItem | null {
     return adaptBackendApi(payload.data);
   }
   return adaptBackendApi(payload);
+}
+
+const VALID_HEALTH_STATUSES = new Set<HealthStatus>([
+  "operational",
+  "degraded",
+  "down",
+]);
+
+function isHealthStatus(value: unknown): value is HealthStatus {
+  return (
+    typeof value === "string" &&
+    VALID_HEALTH_STATUSES.has(value as HealthStatus)
+  );
+}
+
+/**
+ * Expected response payload for `GET /api/apis/:id/health`:
+ * `{ points: Array<{ at: string; status: "operational" | "degraded" | "down" }> }`
+ *
+ * Normalises the payload into an array of validated {@link HealthStatus} values,
+ * dropping any entries with unknown or malformed status values.
+ */
+export function normalizeApiHealth(payload: unknown): HealthStatus[] {
+  const container =
+    isRecord(payload) && isRecord(payload.data) ? payload.data : payload;
+
+  const rawPoints = isRecord(container) && Array.isArray(container.points)
+    ? container.points
+    : Array.isArray(container)
+      ? container
+      : null;
+
+  if (!rawPoints) {
+    return [];
+  }
+
+  const statuses: HealthStatus[] = [];
+  for (const point of rawPoints) {
+    const rawStatus = isRecord(point) ? point.status : point;
+    if (isHealthStatus(rawStatus)) {
+      statuses.push(rawStatus);
+    }
+  }
+  return statuses;
 }
 
 /**
@@ -541,6 +597,63 @@ export function createCatalogApi(
       return { status: "ready", kind: "ready", api: item };
     },
 
+    async fetchApiHealth(id, signal) {
+      if (signal?.aborted) {
+        throw abortError();
+      }
+
+      const base = resolveBase();
+      const path = `${CATALOG_PATH}/${encodeURIComponent(id)}/health`;
+      const targetUrl = base ? `${base}${path}` : apiUrl(path);
+
+      let response: Response;
+      try {
+        response = await fetchImpl(targetUrl, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal,
+        });
+      } catch (err) {
+        if (signal?.aborted || isCatalogAbortError(err)) {
+          throw abortError();
+        }
+        throw new CatalogFetchError("Could not reach the health service.");
+      }
+
+      if (signal?.aborted) {
+        throw abortError();
+      }
+
+      if (response.status === 404 || response.status === 400) {
+        return [];
+      }
+
+      if (!response.ok) {
+        throw new CatalogFetchError(
+          `Failed to fetch API health: ${response.statusText || response.status}`,
+          response.status,
+        );
+      }
+
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch (err) {
+        if (signal?.aborted || isCatalogAbortError(err)) {
+          throw abortError();
+        }
+        throw new CatalogFetchError(
+          "The health service returned an unreadable response.",
+        );
+      }
+
+      if (signal?.aborted) {
+        throw abortError();
+      }
+
+      return normalizeApiHealth(payload);
+    },
+
     async resolveApisByIds(ids, signal) {
       if (signal?.aborted) {
         throw abortError();
@@ -650,6 +763,28 @@ export async function fetchApiDetail(
   }
 
   return await catalogApi.fetchApiDetail(id, signal);
+}
+
+/**
+ * Reads health timeline buckets from `GET /api/apis/:id/health`.
+ *
+ * Expected payload: `{ points: Array<{ at: string; status: HealthStatus }> }`.
+ * In static demo mode (when `API_BASE` is unset), returns an empty array so the
+ * UI renders the empty state rather than throwing.
+ */
+export async function fetchApiHealth(
+  id: string,
+  signal?: AbortSignal,
+): Promise<HealthStatus[]> {
+  if (signal?.aborted) {
+    throw abortError();
+  }
+
+  if (!API_BASE) {
+    return [];
+  }
+
+  return await catalogApi.fetchApiHealth(id, signal);
 }
 
 /**

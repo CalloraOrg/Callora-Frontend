@@ -23,6 +23,7 @@ import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
 import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
 import LatencyChart from "./pages/LatencyChart";
 import StandaloneShell from "./components/StandaloneShell";
+import RequireAuth from "./components/RequireAuth";
 import { isMarketplaceSubpage } from "./routeMatchers";
 
 /**
@@ -63,8 +64,8 @@ export async function renderRoute(
   const wrap = (children: React.ReactNode, withShell = false) => (
     <React.StrictMode>
       <ThemeProvider>
-        <CollectionsProvider>
-          <AccountProvider>
+        <AccountProvider>
+          <CollectionsProvider>
             <BrowserRouter>
               <RouteProgressBar />
               <ToastProvider>
@@ -77,8 +78,8 @@ export async function renderRoute(
                 )}
               </ToastProvider>
             </BrowserRouter>
-          </AccountProvider>
-        </CollectionsProvider>
+          </CollectionsProvider>
+        </AccountProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
@@ -86,7 +87,7 @@ export async function renderRoute(
   if (pathname.startsWith("/publish")) {
     const mod = await import("./pages/PublishApi");
     const PublishApi = mod.default;
-    root.render(wrap(<PublishApi />, true));
+    root.render(wrap(<RequireAuth><PublishApi /></RequireAuth>, true));
     return;
   }
 
@@ -139,14 +140,14 @@ export async function renderRoute(
     <React.StrictMode>
       <BrowserRouter>
         <ThemeProvider>
-          <CollectionsProvider>
-            <AccountProvider>
+          <AccountProvider>
+            <CollectionsProvider>
               <RouteProgressBar />
               <ToastProvider>
                 <App />
               </ToastProvider>
-            </AccountProvider>
-          </CollectionsProvider>
+            </CollectionsProvider>
+          </AccountProvider>
         </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,
