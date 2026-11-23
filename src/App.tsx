@@ -21,6 +21,8 @@ import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import CommandPalette from "./components/CommandPalette";
 import { useSessionExpiry } from "./hooks/useSessionExpiry";
+import { useNotifications, NotificationsContext } from "./hooks/useNotifications";
+import { isSignedIn } from "./services/authService";
 import SessionExpiryBanner from "./components/SessionExpiryBanner";
 import WalletStatus from "./components/WalletStatus";
 import { useWalletStore } from "./state/walletStore";
@@ -68,8 +70,8 @@ const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
 const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
+const NotificationCenter = lazy(() => import("./pages/NotificationCenter"));
 const BillingInvoiceSection = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.BillingInvoiceSection })));
-  "/billing/subscriptions": () => import("./pages/Subscriptions"),
 
 type DemoOutcome = "confirmed" | "failed";
 
@@ -79,7 +81,6 @@ type WalletServiceFailure = Error & {
   requiresReconciliation: boolean;
 };
 
-  subscriptions: "/billing/subscriptions",
 /** `/rate-limit` no longer exists; limits are per-API. Send users to the Marketplace. */
 function LegacyRateLimitRedirect() {
   const { showToast } = useToast();
@@ -97,6 +98,21 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const wallet = useWalletStore();
+  const { isExpired: isSessionExpired } = useSessionExpiry();
+  const notifications = useNotifications({
+    enabled: isSignedIn() && !isSessionExpired,
+  });
+  const unreadBadgeText =
+    notifications.unreadCount > 9 ? "9+" : String(notifications.unreadCount);
+  const notificationBellLabel =
+    notifications.unreadCount === 0
+      ? "Notifications (0 unread)"
+      : `Notifications (${unreadBadgeText} unread)`;
+  const notificationAnnouncement = notifications.isSignedIn
+    ? notifications.unreadCount === 0
+      ? "No unread notifications."
+      : `${notifications.unreadCount === 1 ? "1 unread notification" : `${unreadBadgeText} unread notifications`}.`
+    : "";
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
@@ -107,6 +123,7 @@ function App() {
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
     [APP_ROUTES.endpointSummary]: "Endpoint Summary – Callora",
+    [APP_ROUTES.notifications]: "Notifications – Callora",
   };
   const routeDescriptionMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
@@ -117,6 +134,7 @@ function App() {
     "/api-usage": "Monitor API usage, request stats, and view call history.",
     [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
     [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
+    [APP_ROUTES.notifications]: "View your Callora notifications, usage alerts, billing updates, and campaigns.",
   };
   const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
@@ -691,6 +709,7 @@ function App() {
   };
 
   return (
+    <NotificationsContext.Provider value={notifications}>
       <div className="app-shell">
         <a href="#main-content" className="skip-link">
           Skip to main content
@@ -720,6 +739,62 @@ function App() {
               ))}
             </nav>
             <AccountSwitcher />
+            {notifications.isSignedIn && (
+              <NavLink
+                to={APP_ROUTES.notifications}
+                className={({ isActive }) =>
+                  isActive ? "link-nav active notification-bell-link" : "link-nav notification-bell-link"
+                }
+                aria-label={notificationBellLabel}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.notifications)}
+                onFocus={() => prefetchRoute(APP_ROUTES.notifications)}
+                style={{
+                  position: "relative",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "6px 8px",
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {notifications.unreadCount > 0 && (
+                  <span
+                    className="notification-bell-badge"
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      right: 0,
+                      minWidth: "16px",
+                      height: "16px",
+                      padding: "0 4px",
+                      borderRadius: "999px",
+                      background: "var(--accent, #4e85ff)",
+                      color: "#fff",
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      lineHeight: "16px",
+                      textAlign: "center",
+                    }}
+                  >
+                    {unreadBadgeText}
+                  </span>
+                )}
+              </NavLink>
+            )}
             <WalletSignInButton />
             <WalletStatus />
             <ThemeToggle />
@@ -729,6 +804,7 @@ function App() {
         <main id="main-content" role="main" className="page">
           <AppSessionExpiryBanner />
           <LiveRegion message={balanceAnnouncement} />
+          <LiveRegion message={notificationAnnouncement} regionId="notifications-unread" />
           <RouteErrorBoundary
             resetKey={location.pathname}
             onGoHome={() => navigate(APP_ROUTES.dashboard)}
@@ -925,6 +1001,7 @@ function App() {
             <Route path={APP_ROUTES.legacyRateLimit} element={<LegacyRateLimitRedirect />} />
 
             <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
+            <Route path={APP_ROUTES.notifications} element={<NotificationCenter />} />
 
             {/* ── Billing History (FWC26) ──────────────────────────────── */}
             <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />
@@ -1280,6 +1357,7 @@ function App() {
           </div>
         )}
       </div>
+    </NotificationsContext.Provider>
   );
 }
 
