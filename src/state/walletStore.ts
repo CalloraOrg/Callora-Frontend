@@ -129,12 +129,12 @@ export const walletStore = {
       watcher.stop();
       if (activeWatcher === watcher) activeWatcher = null;
     };
-
-    subscribeConfig(() => {
-      if (state.address) setWallet(state.address, state.networkPassphrase);
-    });
   },
 };
+
+subscribeConfig(() => {
+  if (state.address) setWallet(state.address, state.networkPassphrase);
+});
 
 export function useWalletStore() {
   return useSyncExternalStore(
@@ -157,6 +157,6 @@ export function getWalletNetworkLabel(networkPassphrase: string | null): string 
   }
   const config = getConfig();
   return networkPassphrase === networkPassphraseFor(config.network)
-    ? config.network[0].toUpperCase() + config.network.slice(1)
+    ? config.network.charAt(0).toUpperCase() + config.network.slice(1)
     : "Unknown network";
 }

@@ -11,6 +11,6 @@ const MARKETPLACE_SUBPAGE = /^\/marketplace\/[^/]+\/(sla|rate-limits)\/?$/;
  * ignored.
  */
 export function isMarketplaceSubpage(pathname: string): boolean {
-  const path = pathname.split(/[?#]/)[0];
+  const path = pathname.split(/[?#]/)[0] ?? "";
   return MARKETPLACE_SUBPAGE.test(path);
 }

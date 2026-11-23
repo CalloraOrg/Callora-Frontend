@@ -32,7 +32,7 @@ export default function RateLimitAlert({
       <div
         className="rate-limit-alert rate-limit-alert-compact"
         role="alert"
-        aria-live="polite"
+        aria-live="off"
         style={{
           display: "flex",
           alignItems: "center",
@@ -46,7 +46,8 @@ export default function RateLimitAlert({
         }}
       >
         <span style={{ fontWeight: 500 }}>
-          Rate limited. Retry in {countdownText}
+          Rate limited. Retry in{" "}
+          <span className="tabular-nums">{countdownText}</span>
         </span>
         {onRetry && (
           <button

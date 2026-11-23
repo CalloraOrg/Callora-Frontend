@@ -1,7 +1,14 @@
-import { useCallback, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Icons } from '../utils/icons';
-import { parseOpenApiSpec } from '../utils/openapi-parse';
+import {
+  parseOpenApiInWorker,
+  nextGeneration,
+  currentGeneration,
+  OPENAPI_MAX_FILE_BYTES,
+} from '../utils/openapi-parse.client';
+import type { ParseProgressPhase } from '../utils/openapi-parse.client';
 import type { ParsedEndpoint, ParsedSpecSource, ParseError } from '../utils/openapi-parse';
+import { fetchSpecFromUrl } from '../utils/fetchSpec';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -19,7 +26,8 @@ export type OpenAPIImportProps = {
 type ImportState =
   | { kind: 'idle' }
   | { kind: 'dragging' }
-  | { kind: 'loading' }
+  | { kind: 'loading'; phase?: ParseProgressPhase }
+  | { kind: 'loading-url'; controller: AbortController }
   | {
       kind: 'preview';
       endpoints: ParsedEndpoint[];
@@ -120,10 +128,56 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
   const errorRegionId = useId();
   const dropZoneId = useId();
   const helpId = useId();
+  const urlInputId = useId();
+
+  // ── Shared post-parse logic ────────────────────────────────────────────
+
+  /**
+   * Parse spec text + filename and transition to preview or error.
+   * Shared by both the file upload and URL fetch paths.
+   */
+  const handleParseResult = useCallback((text: string, filename: string) => {
+    const result = parseOpenApiSpec(text, filename);
+
+    if (result.errors.length > 0 && result.endpoints.length === 0) {
+      setState({ kind: 'error', filename, errors: result.errors });
+      return;
+    }
+
+    setState({
+      kind: 'preview',
+      endpoints: result.endpoints,
+      filename,
+      warnings: [...result.warnings, ...result.errors],
+      source: result.source,
+    });
+  }, []);
+
+  /**
+   * AbortController for the current in-flight parse.
+   * Replaced every time a new file starts processing; calling .abort()
+   * terminates the worker (or is a no-op if the parse has already finished).
+   */
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Terminate any running worker when the component unmounts.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   // ── File processing ────────────────────────────────────────────────────
 
   const processFile = useCallback(async (file: File) => {
+    // Cancel any currently-running parse before starting a new one.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // Advance the generation so stale results from the previous parse are ignored.
+    const generation = nextGeneration();
+
     // Validate extension before reading.
     const lower = file.name.toLowerCase();
     const accepted = ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
@@ -141,6 +195,22 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
       return;
     }
 
+    // Enforce size limit before reading the file content.
+    if (file.size > OPENAPI_MAX_FILE_BYTES) {
+      const limitMB = (OPENAPI_MAX_FILE_BYTES / (1024 * 1024)).toFixed(0);
+      const fileMB = (file.size / (1024 * 1024)).toFixed(1);
+      setState({
+        kind: 'error',
+        filename: file.name,
+        errors: [
+          {
+            message: `"${file.name}" is too large (${fileMB} MB). The maximum supported size is ${limitMB} MB.`,
+          },
+        ],
+      });
+      return;
+    }
+
     setState({ kind: 'loading' });
 
     // Yield to the event loop so the loading UI renders before parsing.
@@ -150,6 +220,7 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
     try {
       text = await readFileAsText(file);
     } catch {
+      if (generation !== currentGeneration()) return;
       setState({
         kind: 'error',
         filename: file.name,
@@ -158,24 +229,79 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
       return;
     }
 
-    const result = parseOpenApiSpec(text, file.name);
-
-    if (result.errors.length > 0 && result.endpoints.length === 0) {
-      setState({ kind: 'error', filename: file.name, errors: result.errors });
+    let result;
+    try {
+      result = await parseOpenApiInWorker(text, file.name, {
+        signal: controller.signal,
+        onProgress: (phase) => {
+          // Only update state for the active generation.
+          if (generation !== currentGeneration()) return;
+          setState({ kind: 'loading', phase });
+        },
+      });
+    } catch (err) {
+      // AbortError means the user cancelled or a newer file was chosen.
+      if ((err as { name?: string })?.name === 'AbortError') return;
+      if (generation !== currentGeneration()) return;
+      setState({
+        kind: 'error',
+        filename: file.name,
+        errors: [{ message: `An unexpected error occurred while parsing "${file.name}".` }],
+      });
       return;
     }
 
-    // Partial success (e.g. an unresolvable $ref on one operation) and
-    // Swagger 2.0 conversion notes: show the endpoints that did parse, with the
-    // problems listed as non-fatal warnings.
-    setState({
-      kind: 'preview',
-      endpoints: result.endpoints,
-      filename: file.name,
-      warnings: [...result.warnings, ...result.errors],
-      source: result.source,
+    // Discard stale results from a superseded parse.
+    if (generation !== currentGeneration()) return;
+    handleParseResult(text, file.name);
+  }, [handleParseResult]);
+
+  // ── URL fetch ──────────────────────────────────────────────────────────
+
+  const [urlInputValue, setUrlInputValue] = useState('');
+
+  const handleFetchUrl = useCallback(async () => {
+    const trimmed = urlInputValue.trim();
+    if (!trimmed) return;
+
+    const controller = new AbortController();
+    setState({ kind: 'loading-url', controller });
+
+    const fetchResult = await fetchSpecFromUrl(trimmed, { signal: controller.signal });
+
+    // If the state has already been reset (e.g. user clicked Cancel), ignore.
+    setState((prev) => {
+      if (prev.kind !== 'loading-url') return prev;
+      return prev; // placeholder; we update below
     });
-  }, []);
+
+    if (fetchResult.kind === 'fetchError') {
+      setState({ kind: 'error', filename: trimmed, errors: fetchResult.errors });
+      return;
+    }
+
+    handleParseResult(fetchResult.text, fetchResult.filename);
+  }, [urlInputValue, handleParseResult]);
+
+  const handleUrlKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleFetchUrl();
+      }
+    },
+    [handleFetchUrl],
+  );
+
+  const handleCancelUrlFetch = useCallback(() => {
+    setState((prev) => {
+      if (prev.kind === 'loading-url') {
+        prev.controller.abort();
+      }
+      return { kind: 'idle' };
+    });
+    onCancel?.();
+  }, [onCancel]);
 
   // ── Drag-and-drop handlers ─────────────────────────────────────────────
 
@@ -194,9 +320,9 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0) {
-        processFile(files[0]);
+      const file = e.dataTransfer?.files?.[0];
+      if (file) {
+        processFile(file);
       } else {
         setState({ kind: 'idle' });
       }
@@ -233,7 +359,13 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
   }, []);
 
   const reset = useCallback(() => {
-    setState({ kind: 'idle' });
+    // Cancel any in-flight parse before resetting to idle.
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setState((prev) => {
+      if (prev.kind === 'loading-url') prev.controller.abort();
+      return { kind: 'idle' };
+    });
     onCancel?.();
   }, [onCancel]);
 
@@ -245,7 +377,7 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
   // ── Render ─────────────────────────────────────────────────────────────
 
   const isDragging = state.kind === 'dragging';
-  const isLoading = state.kind === 'loading';
+  const isLoading = state.kind === 'loading' || state.kind === 'loading-url';
   const showDropZone = state.kind === 'idle' || state.kind === 'dragging';
 
   return (
@@ -305,11 +437,68 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
           </div>
         )}
 
+        {/* ── URL import ────────────────────────────────────────── */}
+        {showDropZone && (
+          <div className="oai-url-section" data-testid="openapi-url-section">
+            <label htmlFor={urlInputId} className="oai-url-label">
+              Or import from a URL
+            </label>
+            <div className="oai-url-row">
+              <input
+                id={urlInputId}
+                type="url"
+                className="oai-url-input"
+                placeholder="https://example.com/openapi.json"
+                value={urlInputValue}
+                onChange={(e) => setUrlInputValue(e.target.value)}
+                onKeyDown={handleUrlKeyDown}
+                disabled={isLoading}
+                aria-label="OpenAPI specification URL"
+                data-testid="openapi-url-input"
+              />
+              <button
+                type="button"
+                className="oai-url-btn"
+                onClick={handleFetchUrl}
+                disabled={isLoading || !urlInputValue.trim()}
+                aria-label="Fetch specification from URL"
+                data-testid="openapi-url-fetch-btn"
+              >
+                Fetch
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Loading state ──────────────────────────────────────── */}
         {isLoading && (
           <div className="oai-loading" aria-live="polite" aria-label="Parsing file">
             <Spinner />
-            <p className="oai-loading-text">Parsing specification…</p>
+            <p className="oai-loading-text">
+              {state.kind === 'loading' && state.phase === 'read' && 'Reading file…'}
+              {state.kind === 'loading' && state.phase === 'resolve-refs' && 'Resolving references…'}
+              {state.kind === 'loading' && state.phase === 'build-endpoints' && 'Building endpoints…'}
+              {state.kind === 'loading' && !state.phase && 'Parsing specification…'}
+            </p>
+            <button
+              type="button"
+              className="oai-action-secondary"
+              onClick={reset}
+              aria-label="Cancel parsing"
+            >
+              Cancel
+            </button>
+              {state.kind === 'loading-url' ? 'Fetching specification…' : 'Parsing specification…'}
+            {state.kind === 'loading-url' && (
+              <button
+                type="button"
+                className="oai-action-secondary"
+                onClick={handleCancelUrlFetch}
+                data-testid="openapi-url-cancel-btn"
+              >
+                Cancel
+              </button>
+            )}
           </div>
         )}
 
@@ -579,6 +768,89 @@ const STYLES = `
   }
 
   .oai-browse-btn:focus-visible {
+    outline: 2px solid var(--accent, #4e85ff);
+    outline-offset: 2px;
+    box-shadow: var(--focus-ring, 0 0 0 3px rgba(78, 133, 255, 0.55));
+  }
+
+  /* ── URL import ────────────────────────────────────────────────────── */
+
+  .oai-url-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line, rgba(169,184,255,0.16));
+  }
+
+  .oai-url-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted, #93a0bf);
+  }
+
+  .oai-url-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .oai-url-input {
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line, rgba(169,184,255,0.16));
+    background: var(--surface-soft, rgba(255,255,255,0.04));
+    color: var(--text, #f3f5fb);
+    font-size: 0.88rem;
+    outline: none;
+    transition: border-color 180ms ease;
+  }
+
+  .oai-url-input::placeholder {
+    color: var(--muted, #93a0bf);
+  }
+
+  .oai-url-input:focus-visible {
+    border-color: var(--accent, #4e85ff);
+    box-shadow: var(--focus-ring, 0 0 0 3px rgba(78, 133, 255, 0.55));
+  }
+
+  .oai-url-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .oai-url-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 18px;
+    border-radius: 10px;
+    background: rgba(78, 133, 255, 0.14);
+    border: 1px solid rgba(78, 133, 255, 0.3);
+    color: var(--accent, #4e85ff);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      background 180ms ease,
+      opacity 180ms ease;
+  }
+
+  .oai-url-btn:hover:not(:disabled) {
+    background: rgba(78, 133, 255, 0.22);
+  }
+
+  .oai-url-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .oai-url-btn:focus-visible {
     outline: 2px solid var(--accent, #4e85ff);
     outline-offset: 2px;
     box-shadow: var(--focus-ring, 0 0 0 3px rgba(78, 133, 255, 0.55));

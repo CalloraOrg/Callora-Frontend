@@ -17,7 +17,7 @@ function compactAddress(address: string): string {
 export default function WalletStatus() {
   const wallet = useWalletStore();
   const config = useRuntimeConfig();
-  const appNetworkLabel = config.network[0].toUpperCase() + config.network.slice(1);
+  const appNetworkLabel = config.network.charAt(0).toUpperCase() + config.network.slice(1);
   const [isConnecting, setIsConnecting] = useState(false);
   const [message, setMessage] = useState("");
   const [announcement, setAnnouncement] = useState("");

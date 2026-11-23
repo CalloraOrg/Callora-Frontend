@@ -11,7 +11,7 @@
  */
 
 import React from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { renderRoute, type RouteRenderTarget } from "./renderRoute";
@@ -20,6 +20,26 @@ import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
 import { AccountProvider } from "./hooks/useAccountContext";
 import { ToastProvider } from "./components/Toast";
+
+let publishRenderShouldThrow = false;
+
+vi.mock("./services/authService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./services/authService")>();
+  return {
+    ...actual,
+    isSignedIn: () => true,
+    useIsSignedIn: () => true,
+  };
+});
+
+vi.mock("./pages/PublishApi", () => ({
+  default: function MockPublishApi() {
+    if (publishRenderShouldThrow) {
+      throw new Error("PublishApi exploded");
+    }
+    return <div>Mock PublishApi Page</div>;
+  },
+}));
 
 describe("renderRoute — routing dispatcher and deep-link exclusions", () => {
   beforeEach(() => {
@@ -39,8 +59,8 @@ describe("renderRoute — routing dispatcher and deep-link exclusions", () => {
   });
 
   afterEach(() => {
+    publishRenderShouldThrow = false;
     cleanup();
-    vi.restoreAllMocks();
   });
 
   it("Scenario 6: renderRoute('/marketplace/x/sla') falls through to render App, not MarketplacePage", async () => {
@@ -131,5 +151,47 @@ describe("renderRoute — routing dispatcher and deep-link exclusions", () => {
       );
       expect(hasCorrectHref).toBe(true);
     }, { timeout: 3000 });
+  });
+
+  it("catches a render error in a standalone shell route and renders the fallback inside StandaloneShell", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    publishRenderShouldThrow = true;
+
+    try {
+      let renderedTree: React.ReactNode = null;
+      const root: RouteRenderTarget = {
+        render: vi.fn((node) => {
+          renderedTree = node;
+        }),
+      };
+
+      await renderRoute(root, "/publish");
+      expect(renderedTree).not.toBeNull();
+
+      const { container } = render(<>{renderedTree}</>);
+
+      // Fallback is rendered inside the standalone shell while header/nav remain usable
+      expect(screen.getByRole("banner")).toBeTruthy();
+      expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeTruthy();
+      const standaloneMain = container.querySelector(".standalone-main");
+      expect(standaloneMain).not.toBeNull();
+      const alert = screen.getByRole("alert");
+      expect(standaloneMain?.contains(alert)).toBe(true);
+      expect(screen.getByText("Something went wrong")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Reload page" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Go home" })).toBeTruthy();
+
+      // Exhaust retries (default maxRetries = 3)
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      expect(screen.getByText("This page couldn't be recovered")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Go home" })).toBeTruthy();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });

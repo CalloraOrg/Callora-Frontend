@@ -1,4 +1,3 @@
-import React from 'react';
 import type { ExportProgressState } from '../hooks/useExportHistory';
 
 export interface ExportProgressBarProps {

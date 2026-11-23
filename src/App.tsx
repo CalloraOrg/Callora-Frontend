@@ -1,16 +1,17 @@
 import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 import ServerError from "./components/ServerError";
 import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut, formatUsdcStroops, normalizeUsdcAmountInput, stroopsToUsdcAmount, usdcAmountToStroops, USDC_DECIMALS } from "./utils/format";
-import { useNetworkFee } from "./components/DepositPreview";
-import { MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, EXTERNAL_LINKS, TESTNET_DEPLOYMENT, testnetContractUrl, PENDING_DEPOSIT_STORAGE_KEY, TRANSACTION_TIMEOUT_SECONDS, type StellarNetwork } from "./config/constants";
-import { getConfig, useRuntimeConfig, usdcConfigurationError } from "./config/runtimeConfig";
+import { useNetworkFee, formatStroops, TransactionSummaryDetails } from "./components/DepositPreview";
+import { MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, TESTNET_DEPLOYMENT, testnetContractUrl, TRANSACTION_TIMEOUT_SECONDS } from "./config/constants";
+import { useRuntimeConfig, usdcConfigurationError } from "./config/runtimeConfig";
 import { resolveVaultConfig } from "./services/vaultConfig";
-import type { WalletServiceErrorCode, UsdcTrustlineStatus } from "./services/walletService";
+import type { WalletServiceErrorCode, UsdcTrustlineStatus, PreparedVaultDeposit } from "./services/walletService";
 import { useVaultBalances } from "./hooks/useVaultBalances";
 import BalanceReadout from "./components/BalanceReadout";
 import LiveRegion from "./components/LiveRegion";
@@ -20,14 +21,41 @@ import ExternalLink from "./components/ExternalLink";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
-import { useAccountContext } from "./hooks/useAccountContext";
-import { signIn, signOut, isSignedIn, type AuthServiceErrorCode } from "./services/authService";
+import CommandPalette from "./components/CommandPalette";
 import { useSessionExpiry } from "./hooks/useSessionExpiry";
+import { useNotifications, NotificationsContext } from "./hooks/useNotifications";
+import { isSignedIn } from "./services/authService";
 import SessionExpiryBanner from "./components/SessionExpiryBanner";
 import WalletStatus from "./components/WalletStatus";
 import { useWalletStore } from "./state/walletStore";
 import { useToast } from "./components/Toast";
-import { StrKey } from "@stellar/stellar-sdk";
+
+import { APP_ROUTES, PRIMARY_NAV, prefetchRoute } from "./app/routes";
+import {
+  readPendingDeposit,
+  writePendingDeposit,
+  clearPendingDeposit,
+  STAGE_LABELS,
+  buildExplorerLink,
+  getStageLabel,
+  type PendingDepositRecord,
+  type DepositStage,
+} from "./app/deposit";
+import LandingPage from "./app/LandingPage";
+import StatusPage from "./app/StatusPage";
+import WalletSignInButton from "./app/WalletSignInButton";
+import RequireAuth from "./components/RequireAuth";
+import AccountSwitcher from "./app/AccountSwitcher";
+import WithdrawModal from "./components/WithdrawModal";
+
+// Re-export public API
+export { prefetchRoute } from "./app/routes";
+export {
+  readPendingDeposit,
+  writePendingDeposit,
+  clearPendingDeposit,
+  type PendingDepositRecord,
+} from "./app/deposit";
 
 // Route splitting: dynamic imports for all heavy page routes
 const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
@@ -43,97 +71,13 @@ const DesignSystemDocs = lazy(() => import("./pages/DesignSystemDocs"));
 const A11yAudit = lazy(() => import("./pages/A11yAudit"));
 const RateLimitCard = lazy(() => import("./pages/RateLimitCard"));
 const BillingHistory = lazy(() => import("./pages/BillingHistory"));
+const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
 const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
+const NotificationCenter = lazy(() => import("./pages/NotificationCenter"));
 const BillingInvoiceSection = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.BillingInvoiceSection })));
- 
-// Prefetch cache map to ensure modules are loaded on hover / focus without delaying critical interaction
-const routePrefetchers: Record<string, () => Promise<any>> = {
-  "/marketplace": () => import("./pages/MarketplacePage"),
-  "/publish": () => import("./pages/PublishApi"),
-  "/dashboard": () => import("./pages/DashboardPage"),
-  "/api-usage": () => import("./pages/ApiUsage"),
-  "/apis/my-apis": () => import("./pages/MyApis"),
-  "/apis/plan-badge": () => import("./pages/PlanBadge"),
-  "/billing/history": () => import("./pages/BillingHistory"),
-  "/theme-playground": () => import("./pages/ThemePlayground"),
-  "/design-system/docs": () => import("./pages/DesignSystemDocs"),
-  "/a11y-audit": () => import("./pages/A11yAudit"),
-  "/webhooks/deliveries": () => import("./pages/WebhookDeliveries"),
-  "/endpoints": () => import("./pages/EndpointSummary"),
-};
 
-export function prefetchRoute(path: string) {
-  const prefetcher = routePrefetchers[path];
-  if (prefetcher) {
-    prefetcher().catch(() => {
-      // Ignore prefetch failures gracefully
-    });
-  }
-}
-
-type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 type DemoOutcome = "confirmed" | "failed";
-
-export interface PendingDepositRecord {
-  hash: string;
-  amount: number;
-  submittedAt: number;
-  network: StellarNetwork;
-  contractId: string;
-  rpcUrl?: string;
-}
-
-export function readPendingDeposit(): PendingDepositRecord | null {
-  try {
-    const raw = sessionStorage.getItem(PENDING_DEPOSIT_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (
-      parsed &&
-      typeof parsed.hash === "string" &&
-      typeof parsed.amount === "number" &&
-      typeof parsed.submittedAt === "number" &&
-      ["testnet", "mainnet", "futurenet"].includes(parsed.network) &&
-      typeof parsed.contractId === "string" &&
-      StrKey.isValidContract(parsed.contractId)
-    ) {
-      let rpcUrl = parsed.rpcUrl;
-      if (typeof rpcUrl === "string") {
-        const endpoint = new URL(rpcUrl);
-        if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password) return null;
-      } else if (
-        parsed.network === getConfig().network &&
-        parsed.contractId === getConfig().vaultContractId
-      ) {
-        rpcUrl = getConfig().rpcUrl;
-      } else {
-        return null;
-      }
-      if (typeof rpcUrl !== "string" || !rpcUrl) return null;
-      return { ...parsed, rpcUrl } as PendingDepositRecord;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-export function writePendingDeposit(record: PendingDepositRecord): void {
-  try {
-    sessionStorage.setItem(PENDING_DEPOSIT_STORAGE_KEY, JSON.stringify(record));
-  } catch {
-    // Gracefully handle storage quota or private mode restrictions
-  }
-}
-
-export function clearPendingDeposit(): void {
-  try {
-    sessionStorage.removeItem(PENDING_DEPOSIT_STORAGE_KEY);
-  } catch {
-    // Gracefully handle storage restrictions
-  }
-}
 
 type WalletServiceFailure = Error & {
   contractErrorCode?: number;
@@ -141,273 +85,17 @@ type WalletServiceFailure = Error & {
   requiresReconciliation: boolean;
 };
 
-const STAGE_LABELS: Record<DepositStage, string> = {
-  input: "Enter Amount",
-  approving: "Approving",
-  pending: "Pending",
-  confirmed: "Confirmed",
-  failed: "Failed",
-};
-
-type Feature = {
-  icon: string;
-  title: string;
-  description: string;
-};
-
-type Step = {
-  title: string;
-  description: string;
-};
-
-const features: Feature[] = [
-  {
-    icon: "💸",
-    title: "Pay-per-call billing",
-    description: "Micro-payments in USDC mean every API request is billed precisely and transparently.",
-  },
-  {
-    icon: "⛓️",
-    title: "On-chain settlement",
-    description: "Every transaction settles on-chain with verifiable records and near real-time visibility.",
-  },
-  {
-    icon: "🧾",
-    title: "No subscriptions",
-    description: "Skip fixed plans and commitments. Pay only for the API calls your product actually makes.",
-  },
-  {
-    icon: "🧑‍💻",
-    title: "Developer-friendly",
-    description: "Publish APIs quickly, define per-request pricing, and start earning USDC automatically.",
-  },
-];
-const consumerSteps: Step[] = [
-  {
-    title: "Connect wallet or sign up",
-    description: "Create your account and securely link a wallet in minutes.",
-  },
-  {
-    title: "Deposit USDC to vault",
-    description: "Fund your usage balance once and keep API requests flowing.",
-  },
-  {
-    title: "Browse and use APIs",
-    description: "Discover programmable APIs and integrate them into your app.",
-  },
-  {
-    title: "Pay automatically per call",
-    description: "Billing happens in real time based on actual usage and price-per-request.",
-  },
-];
-
-const developerSteps: Step[] = [
-  {
-    title: "Register as developer",
-    description: "Set up your publisher profile and prepare your API listing.",
-  },
-  {
-    title: "Publish your API",
-    description: "Add docs, endpoints, and metadata to make your API easy to adopt.",
-  },
-  {
-    title: "Set pricing per request",
-    description: "Choose flexible per-call pricing that reflects the value of your service.",
-  },
-  {
-    title: "Earn USDC automatically",
-    description: "Collect revenue from each successful call with transparent settlement.",
-  },
-];
-
-const APP_ROUTES = {
-  landing: "/",
-  dashboard: "/dashboard",
-  marketplace: "/marketplace",
-  publish: "/publish",
-  myApis: "/apis/my-apis",
-  planBadge: "/apis/plan-badge",
-  apiUsage: "/api-usage",
-  billing: "/billing",
-  billingHistory: "/billing/history",
-  documentation: "/documentation",
-  status: "/status",
-  themePlayground: "/theme-playground",
-  designSystem: "/design-system/docs",
-  serverError: "/500",
-  rateLimitCard: "/marketplace/:apiId/rate-limits",
-  legacyRateLimit: "/rate-limit",
-  slaCard: "/marketplace/:apiId/sla",
-  webhookDeliveries: "/webhooks/deliveries",
-  onboarding: "/onboarding",
-  endpointSummary: "/endpoints",
-} as const;
-
-const PRIMARY_NAV: Array<{ to: string; label: string }> = [
-  { to: APP_ROUTES.dashboard, label: "Dashboard" },
-  { to: APP_ROUTES.marketplace, label: "Marketplace" },
-  { to: APP_ROUTES.publish, label: "Publish" },
-  { to: APP_ROUTES.myApis, label: "My APIs" },
-  { to: APP_ROUTES.billing, label: "Billing" },
-  { to: APP_ROUTES.documentation, label: "Docs" },
-];
-
 /** `/rate-limit` no longer exists; limits are per-API. Send users to the Marketplace. */
 function LegacyRateLimitRedirect() {
   const { showToast } = useToast();
   const announced = useRef(false);
   useEffect(() => {
-    // Guard against StrictMode's double effect invocation in development.
+    // Guard against StrictMode double effect invocation in development.
     if (announced.current) return;
     announced.current = true;
     showToast("Rate limits are now shown per API. Pick an API to see its limits.");
   }, [showToast]);
   return <Navigate to={APP_ROUTES.marketplace} replace />;
-}
-
-function buildExplorerLink(hash: string, network: StellarNetwork) {
-  const explorerNetwork = network === "mainnet" ? "public" : network;
-  return `https://stellar.expert/explorer/${explorerNetwork}/tx/${hash}`;
-}
-
-function getStageLabel(stage: DepositStage, hasValidAmount: boolean) {
-  if (stage === "approving") return "Approve in wallet...";
-  if (stage === "pending") return "Transaction submitted...";
-  if (stage === "confirmed") return "Deposit successful";
-  if (stage === "failed") return "Transaction failed";
-
-  return hasValidAmount ? "Review transaction preview" : "Enter a deposit amount";
-}
-
-function LandingPage({ onStartUsingApis, onPublishApi, onTakeTour }: { onStartUsingApis: () => void; onPublishApi: () => void; onTakeTour?: () => void }) {
-  return (
-    <div className="lp-shell">
-      <header className="lp-section lp-hero" aria-labelledby="hero-title">
-        <div>
-          <p className="lp-eyebrow">Built for API consumers and publishers</p>
-          <h1 id="hero-title">Callora - Programmable API Access</h1>
-          <p className="lp-subhead">
-            Access and monetize APIs with usage-based billing. Callora combines programmable API access with pay-per-call settlement in USDC so teams can build faster and
-            charge fairly.
-          </p>
-
-          <div className="lp-cta-row">
-            <button className="lp-btn lp-btn-primary" onClick={onStartUsingApis}>
-              Start Using APIs
-            </button>
-            <button className="lp-btn lp-btn-secondary" onClick={onPublishApi}>
-              Publish Your API
-            </button>
-            {onTakeTour && (
-              <button className="lp-btn lp-btn-secondary" onClick={onTakeTour} style={{ marginLeft: "12px" }}>
-                Take the tour
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="lp-visual" aria-hidden="true">
-          <p>API Marketplace</p>
-          <span>Programmable Access • USDC Per Call • On-chain Settlement</span>
-        </div>
-      </header>
-
-      <section className="lp-section">
-        <p className="lp-eyebrow">Core capabilities</p>
-        <h2>Why teams choose Callora</h2>
-
-        <div className="lp-feature-grid">
-          {features.map((feature) => (
-            <article className="lp-card" key={feature.title}>
-              <span>{feature.icon}</span>
-              <h3>{feature.title}</h3>
-              <p>{feature.description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="lp-section">
-        <p className="lp-eyebrow">How it works</p>
-        <h2>A simple flow for both sides of the marketplace</h2>
-
-        <div className="lp-flow-grid">
-          <article className="lp-card">
-            <h3>For API Consumers</h3>
-            <ol>
-              {consumerSteps.map((step) => (
-                <li key={step.title}>
-                  <strong>{step.title}</strong>
-                  <p>{step.description}</p>
-                </li>
-              ))}
-            </ol>
-          </article>
-
-          <article className="lp-card">
-            <h3>For API Developers</h3>
-            <ol>
-              {developerSteps.map((step) => (
-                <li key={step.title}>
-                  <strong>{step.title}</strong>
-                  <p>{step.description}</p>
-                </li>
-              ))}
-            </ol>
-          </article>
-        </div>
-      </section>
-
-      <section className="lp-section">
-        <p className="lp-eyebrow">Use cases & benefits</p>
-        <h2>Designed for practical adoption</h2>
-
-        <div className="lp-flow-grid">
-          <article className="lp-card">
-            <h3>Where Callora shines</h3>
-            <ul>
-              <li>AI workflows that need utility APIs without subscription overhead.</li>
-              <li>Data providers monetizing endpoint access with frictionless micro-billing.</li>
-              <li>Fintech and web3 apps requiring transparent usage-based costs.</li>
-            </ul>
-          </article>
-
-          <article className="lp-card">
-            <h3>Testimonials</h3>
-            <p>
-              “Callora helped us launch usage-based API monetization in days, not months.”
-              <span> — Case study placeholder</span>
-            </p>
-            <p>
-              “Our teams can scale integration costs exactly with demand, no wasted subscription spend.”
-              <span> — Customer quote placeholder</span>
-            </p>
-          </article>
-        </div>
-      </section>
-
-      <footer className="lp-section lp-footer">
-        <nav aria-label="Footer links">
-          <ExternalLink href={EXTERNAL_LINKS.about} className="link-nav">
-            About
-          </ExternalLink>
-          <NavLink to={APP_ROUTES.documentation} className="link-nav">
-            Documentation
-          </NavLink>
-          <ExternalLink href={EXTERNAL_LINKS.support} className="link-nav">
-            Support
-          </ExternalLink>
-          <ExternalLink href={EXTERNAL_LINKS.terms} className="link-nav">
-            Terms
-          </ExternalLink>
-          <ExternalLink href={EXTERNAL_LINKS.privacy} className="link-nav">
-            Privacy
-          </ExternalLink>
-        </nav>
-        <p>© {new Date().getFullYear()} Callora. All rights reserved.</p>
-      </footer>
-    </div>
-  );
 }
 
 function App() {
@@ -419,40 +107,58 @@ function App() {
     network: runtimeConfig.network,
     envContractId: runtimeConfig.vaultContractId,
     testnetDefault: "",
+    source: "runtime",
   });
   const issuerConfigurationError = usdcConfigurationError(runtimeConfig);
+  const { isExpired: isSessionExpired } = useSessionExpiry();
+  const notifications = useNotifications({
+    enabled: isSignedIn() && !isSessionExpired,
+  });
+  const unreadBadgeText =
+    notifications.unreadCount > 9 ? "9+" : String(notifications.unreadCount);
+  const notificationBellLabel =
+    notifications.unreadCount === 0
+      ? "Notifications (0 unread)"
+      : `Notifications (${unreadBadgeText} unread)`;
+  const notificationAnnouncement = notifications.isSignedIn
+    ? notifications.unreadCount === 0
+      ? "No unread notifications."
+      : `${notifications.unreadCount === 1 ? "1 unread notification" : `${unreadBadgeText} unread notifications`}.`
+    : "";
+  const { showToast } = useToast();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
     [APP_ROUTES.myApis]: "My APIs – Callora",
     [APP_ROUTES.billing]: "Billing – Callora",
     [APP_ROUTES.billingHistory]: "Billing History – Callora",
+    [APP_ROUTES.subscriptions]: "Subscriptions – Callora",
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
     [APP_ROUTES.endpointSummary]: "Endpoint Summary – Callora",
+    [APP_ROUTES.notifications]: "Notifications – Callora",
   };
   const routeDescriptionMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
     [APP_ROUTES.dashboard]: "Your Callora dashboard showing balances, recent activity and quick actions.",
     [APP_ROUTES.billing]: "Manage your USDC vault, deposit funds, and view transaction status.",
     [APP_ROUTES.billingHistory]: "View your full USDC transaction history with on-chain details, filters, and hover previews.",
+    [APP_ROUTES.subscriptions]: "Manage your API subscriptions, plans, and renewals.",
     "/api-usage": "Monitor API usage, request stats, and view call history.",
     [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
     [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
+    [APP_ROUTES.notifications]: "View your Callora notifications, usage alerts, billing updates, and campaigns.",
   };
   const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
   useDocumentTitle(currentTitle, currentDescription);
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [amountInput, setAmountInput] = useState("50");
   const [selectedPreset, setSelectedPreset] = useState<number | "custom">(50);
-
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
-  useEffect(() => {
-    setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
-  }, []);
 
   // Handle global shortcuts
   const handleGlobalKeyDown = useCallback(
@@ -494,6 +200,19 @@ function App() {
   );
 
   useGlobalShortcuts(handleGlobalKeyDown);
+
+  useEffect(() => {
+    const handleCommandPaletteKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleCommandPaletteKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleCommandPaletteKeyDown);
+    };
+  }, []);
   const [depositStage, setDepositStage] = useState<DepositStage>("input");
   const [demoOutcome, setDemoOutcome] = useState<DemoOutcome>("confirmed");
   const [walletAvailability, setWalletAvailability] = useState<"checking" | "available" | "missing">("checking");
@@ -516,6 +235,8 @@ function App() {
   const [checkDepositStatusMessage, setCheckDepositStatusMessage] = useState("");
   const [validityTimeRemaining, setValidityTimeRemaining] = useState<number | null>(null);
   const [amountHint, setAmountHint] = useState<string | null>(null);
+  const [preparedDeposit, setPreparedDeposit] = useState<PreparedVaultDeposit | null>(null);
+  const [isPreparingDeposit, setIsPreparingDeposit] = useState(false);
 
   const {
     vault: vaultStroops,
@@ -588,7 +309,6 @@ function App() {
 
   const parsedAmount = Number(amountInput);
   const hasAmount = amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
-  const activeAmount = submittedAmount ?? (hasAmount ? parsedAmount : 0);
   const amountStroops =
     usdcAmountToStroops(submittedAmount !== null ? String(submittedAmount) : amountInput);
   const previewVaultStroops = submittedStartingBalance ?? shownVaultStroops;
@@ -596,9 +316,12 @@ function App() {
     previewVaultStroops === null || amountStroops === null
       ? null
       : previewVaultStroops + amountStroops;
-  const isBusy = isAddingTrustline || depositStage === "approving" || depositStage === "pending";
+  const isBusy = isAddingTrustline || isPreparingDeposit || depositStage === "approving" || depositStage === "pending";
   const hasUnconfirmedDeposit = depositRequiresReconciliation;
-  const { networkFee, isEstimated: isNetworkFeeEstimated } = useNetworkFee(NETWORK_FEE, isDepositOpen);
+  const { networkFee, isEstimated: isNetworkFeeEstimated } = useNetworkFee(NETWORK_FEE, isDepositOpen && !preparedDeposit);
+  const assembledNetworkFee = preparedDeposit ? formatStroops(preparedDeposit.summary.feeStroops) : null;
+  const displayedNetworkFee = assembledNetworkFee ?? networkFee;
+  const displayedNetworkFeeEstimated = assembledNetworkFee ? false : isNetworkFeeEstimated;
   const balanceDelta = formatUsdc(submittedAmount ?? (hasAmount ? parsedAmount : 0));
 
   let validationMessage = "";
@@ -694,6 +417,8 @@ function App() {
     setDepositFailureCode(null);
     setDepositRequiresReconciliation(false);
     setAmountHint(null);
+    setPreparedDeposit(null);
+    setIsPreparingDeposit(false);
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
@@ -729,6 +454,8 @@ function App() {
   const closeDeposit = () => {
     if (isBusy) return;
     setIsDepositOpen(false);
+    setPreparedDeposit(null);
+    setIsPreparingDeposit(false);
 
     // Clean up url parameter if it exists
     const url = new URL(window.location.href);
@@ -771,10 +498,60 @@ function App() {
     }
   };
 
-  const handleApproveTransaction = async () => {
+  const handlePrepareDeposit = async () => {
     if (!hasValidAmount || isBusy || hasUnconfirmedDeposit || walletAvailability !== "available" || (trustlineStatus !== "present" && trustlineStatus !== "unknown")) return;
 
     const depositConfig = runtimeConfig;
+    setTxHash("");
+    setCopied(false);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
+    setPreparedDeposit(null);
+    setIsPreparingDeposit(true);
+    setStatusMessage("Preparing and verifying your Soroban deposit transaction...");
+
+    let isWalletServiceError:
+      | ((error: unknown) => error is WalletServiceFailure)
+      | undefined;
+
+    try {
+      const walletService = await import("./services/walletService");
+      isWalletServiceError = (error): error is WalletServiceFailure =>
+        error instanceof walletService.WalletServiceError;
+
+      const prepared = await walletService.prepareVaultDeposit(amountInput, depositConfig);
+      setPreparedDeposit(prepared);
+      setStatusMessage("Review the decoded Soroban transaction below, then confirm to sign in Freighter.");
+    } catch (error) {
+      const walletError = isWalletServiceError?.(error) ? error : null;
+      const failureCode = walletError?.code ?? "NETWORK_ERROR";
+      if (failureCode === "TRUSTLINE_MISSING" || failureCode === "UNFUNDED_ACCOUNT") {
+        setTrustlineStatus(failureCode === "TRUSTLINE_MISSING" ? "missing" : "unfunded-account");
+        setTrustlineCheckVersion((version) => version + 1);
+        setDepositStage("input");
+        setSubmittedAmount(null);
+        setSubmittedStartingBalance(null);
+        setStatusMessage("Complete the wallet setup below before depositing.");
+        return;
+      }
+      setDepositFailureCode(failureCode);
+      setDepositContractErrorCode(walletError?.contractErrorCode ?? null);
+      setDepositRequiresReconciliation(false);
+      setDepositStage("failed");
+      setStatusMessage(
+        walletError
+          ? walletError.message
+          : "Could not prepare the deposit. Check your wallet and Stellar network, then try again.",
+      );
+    } finally {
+      setIsPreparingDeposit(false);
+    }
+  };
+
+  const handleConfirmSign = async () => {
+    if (!preparedDeposit || isBusy || hasUnconfirmedDeposit) return;
+
+    const depositConfig = preparedDeposit.config;
     const approvedAmount = parsedAmount;
     const startingBalance = shownVaultStroops;
     setSubmittedAmount(approvedAmount);
@@ -796,16 +573,17 @@ function App() {
       isWalletServiceError = (error): error is WalletServiceFailure =>
         error instanceof walletService.WalletServiceError;
 
-      const submittedDeposit = await walletService.submitVaultDeposit(amountInput, (hash) => {
+      const submittedDeposit = await walletService.signAndSubmit(preparedDeposit, (hash) => {
         capturedHash = hash;
         setTxHash(hash);
         setDepositStage("pending");
         setStatusMessage("Transaction submitted to Stellar. Waiting for ledger confirmation.");
-      }, depositConfig);
+      });
 
       const confirmedHash = submittedDeposit.hash || capturedHash;
       clearPendingDeposit();
       setPendingDeposit(null);
+      setPreparedDeposit(null);
       setTxHash(confirmedHash);
       // Optimistic value until the re-read lands; the revision guard clears it.
       const approvedStroops = usdcAmountToStroops(amountInput);
@@ -819,6 +597,7 @@ function App() {
     } catch (error) {
       const walletError = isWalletServiceError?.(error) ? error : null;
       const failureCode = walletError?.code ?? "NETWORK_ERROR";
+      setPreparedDeposit(null);
       if (failureCode === "TRUSTLINE_MISSING" || failureCode === "UNFUNDED_ACCOUNT") {
         setTrustlineStatus(failureCode === "TRUSTLINE_MISSING" ? "missing" : "unfunded-account");
         setTrustlineCheckVersion((version) => version + 1);
@@ -889,10 +668,12 @@ function App() {
     setCopied(false);
     setDepositFailureCode(null);
     setDepositRequiresReconciliation(false);
+    setPreparedDeposit(null);
+    setIsPreparingDeposit(false);
     setStatusMessage("Review the transaction details and approve again.");
   };
 
-  const handleCheckDepositStatus = async (auto = false) => {
+  const handleCheckDepositStatus = async () => {
     const record = pendingDeposit ?? readPendingDeposit();
     const hashToCheck = record?.hash || txHash;
     if (!hashToCheck || isCheckingDepositStatus) return;
@@ -983,7 +764,7 @@ function App() {
       setDepositRequiresReconciliation(true);
       setDepositStage("failed");
       setStatusMessage("You have an unconfirmed deposit. Check transaction status before retrying.");
-      handleCheckDepositStatus(true);
+      handleCheckDepositStatus();
     }
   }, []);
 
@@ -1009,6 +790,7 @@ function App() {
   };
 
   return (
+    <NotificationsContext.Provider value={notifications}>
       <div className="app-shell">
         <a href="#main-content" className="skip-link">
           Skip to main content
@@ -1038,6 +820,62 @@ function App() {
               ))}
             </nav>
             <AccountSwitcher />
+            {notifications.isSignedIn && (
+              <NavLink
+                to={APP_ROUTES.notifications}
+                className={({ isActive }) =>
+                  isActive ? "link-nav active notification-bell-link" : "link-nav notification-bell-link"
+                }
+                aria-label={notificationBellLabel}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.notifications)}
+                onFocus={() => prefetchRoute(APP_ROUTES.notifications)}
+                style={{
+                  position: "relative",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "6px 8px",
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {notifications.unreadCount > 0 && (
+                  <span
+                    className="notification-bell-badge"
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      right: 0,
+                      minWidth: "16px",
+                      height: "16px",
+                      padding: "0 4px",
+                      borderRadius: "999px",
+                      background: "var(--accent, #4e85ff)",
+                      color: "#fff",
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      lineHeight: "16px",
+                      textAlign: "center",
+                    }}
+                  >
+                    {unreadBadgeText}
+                  </span>
+                )}
+              </NavLink>
+            )}
             <WalletSignInButton />
             <WalletStatus />
             <ThemeToggle />
@@ -1047,14 +885,19 @@ function App() {
         <main id="main-content" role="main" className="page">
           <AppSessionExpiryBanner />
           <LiveRegion message={balanceAnnouncement} />
-          <Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
+          <LiveRegion message={notificationAnnouncement} regionId="notifications-unread" />
+          <RouteErrorBoundary
+            resetKey={location.pathname}
+            onGoHome={() => navigate(APP_ROUTES.dashboard)}
+          >
+            <Suspense fallback={<div className="route-loading-fallback" aria-busy="true" aria-label="Loading page" style={{ minHeight: "300px" }} />}>
             <Routes>
             <Route
               path={APP_ROUTES.landing}
               element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} onTakeTour={() => navigate(APP_ROUTES.onboarding)} />}
             />
 
-            <Route path={APP_ROUTES.publish} element={<PublishApi />} />
+            <Route path={APP_ROUTES.publish} element={<RequireAuth><PublishApi /></RequireAuth>} />
 
             <Route path={APP_ROUTES.onboarding} element={<OnboardingTour onComplete={() => navigate(APP_ROUTES.dashboard)} />} />
 
@@ -1087,9 +930,9 @@ function App() {
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
 
             {/* ── My APIs ─────────────────────────────────────────────── */}
-            <Route path={APP_ROUTES.myApis} element={<MyApis />} />
+            <Route path={APP_ROUTES.myApis} element={<RequireAuth><MyApis /></RequireAuth>} />
             
-            <Route path={APP_ROUTES.webhookDeliveries} element={<WebhookDeliveries />} />
+            <Route path={APP_ROUTES.webhookDeliveries} element={<RequireAuth><WebhookDeliveries /></RequireAuth>} />
 
             {/* ── Plan Badge (issue #529) ──────────────────────────────── */}
             <Route path={APP_ROUTES.planBadge} element={<PlanBadgePage />} />
@@ -1097,6 +940,7 @@ function App() {
             <Route
               path={APP_ROUTES.billing}
               element={
+                <RequireAuth>
                 <section className="billing-layout">
                   <div className="surface billing-panel">
                     {hasUnconfirmedDeposit && !isDepositOpen && (
@@ -1115,9 +959,24 @@ function App() {
                         <p className="eyebrow">Deposit USDC to Vault</p>
                         <h1>Review every number before you approve.</h1>
                       </div>
-                      <button className="primary-button no-print" onClick={() => openDeposit()}>
-                        Open deposit modal
-                      </button>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button className="primary-button no-print" onClick={() => openDeposit()}>
+                          Open deposit modal
+                        </button>
+                        <button
+                          className="ghost-button no-print"
+                          onClick={() => setIsWithdrawOpen(true)}
+                          disabled={
+                            !walletAddress ||
+                            wallet.isNetworkMismatch ||
+                            vaultStroops === null ||
+                            vaultStroops === 0n
+                          }
+                          aria-label="Open withdrawal modal"
+                        >
+                          Withdraw
+                        </button>
+                      </div>
                     </div>
 
                     <div className="vault-grid">
@@ -1200,6 +1059,7 @@ function App() {
                     <p className="helper-text">
                       Every deposit and per-call debit is recorded on-chain. See past activity in{" "}
                       <NavLink to={APP_ROUTES.billingHistory}>Billing History</NavLink>.
+                      {" "}<NavLink to={APP_ROUTES.subscriptions}>Manage subscriptions</NavLink>.
                     </p>
                     {runtimeConfig.enableDemoOutcome && (
                       <>
@@ -1218,30 +1078,14 @@ function App() {
                     )}
                   </aside>
                 </section>
+                </RequireAuth>
               }
             />
 
             <Route path={APP_ROUTES.documentation} element={<Documentation />} />
             <Route path={APP_ROUTES.slaCard} element={<SlaCard />} />
 
-            <Route
-              path={APP_ROUTES.status}
-              element={
-                <section className="surface placeholder-card">
-                  <p className="eyebrow">Status</p>
-                  <h1>System status updates in one place.</h1>
-                  <p>All core services are operational. If you are still seeing issues, please contact support and include what action you were trying to complete.</p>
-                  <ul className="status-list" aria-label="Service status">
-                    {["Marketplace API", "Billing & vault deposits", "Usage metering", "Stellar testnet settlement", "Webhooks"].map((svc) => (
-                      <li key={svc}>
-                        <span>{svc}</span>
-                        <span className="status-ok">● Operational</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              }
-            />
+            <Route path={APP_ROUTES.status} element={<StatusPage />} />
 
             <Route path="/api-usage" element={<ApiUsage />} />
 
@@ -1255,13 +1099,16 @@ function App() {
             <Route path={APP_ROUTES.legacyRateLimit} element={<LegacyRateLimitRedirect />} />
 
             <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
+            <Route path={APP_ROUTES.notifications} element={<NotificationCenter />} />
 
             {/* ── Billing History (FWC26) ──────────────────────────────── */}
             <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />
+            <Route path={APP_ROUTES.subscriptions} element={<Subscriptions />} />
 
             <Route path="*" element={<NotFound onGoHome={() => navigate(APP_ROUTES.dashboard)} />} />
             </Routes>
-          </Suspense>
+            </Suspense>
+          </RouteErrorBoundary>
         </main>
 
         <footer className="surface app-footer no-print" role="contentinfo">
@@ -1304,6 +1151,7 @@ function App() {
         </footer>
 
         <ShortcutsModal isOpen={isShortcutsModalOpen} onClose={() => setIsShortcutsModalOpen(false)} />
+        <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
 
         <CompareTray />
         <CompareDrawer />
@@ -1484,15 +1332,19 @@ function App() {
                       <div className="preview-row">
                         <span>Network fee</span>
                         <strong>
-                          <span>{networkFee}</span>
-                          {isNetworkFeeEstimated && <span> (estimated)</span>}
+                          <span>{displayedNetworkFee}</span>
+                          {displayedNetworkFeeEstimated && <span> (estimated)</span>}
                         </strong>
                       </div>
 
                       <div className="preview-row total">
                         <span>Total cost</span>
-                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${networkFee}` : `0.00 USDC + ${networkFee}`}</strong>
+                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${displayedNetworkFee}` : `0.00 USDC + ${displayedNetworkFee}`}</strong>
                       </div>
+
+                      {preparedDeposit && (
+                        <TransactionSummaryDetails summary={preparedDeposit.summary} />
+                      )}
                     </article>
 
                     {(depositStage === "pending" || depositStage === "confirmed" || depositStage === "failed") && txHash && (
@@ -1587,9 +1439,18 @@ function App() {
                   </button>
                 ) : vaultPreflight.status === "checking" && depositStage === "input" ? (
                   <button className="primary-button" disabled>Checking vault...</button>
+                ) : preparedDeposit && depositStage === "input" ? (
+                  <button
+                    className="primary-button"
+                    onClick={handleConfirmSign}
+                    disabled={isBusy}
+                    aria-label="Confirm and sign deposit transaction"
+                  >
+                    Confirm &amp; Sign in Freighter
+                  </button>
                 ) : (
-                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy || vaultBlockReason !== null} aria-describedby={vaultBlockReason ? "vault-preflight-status" : undefined} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
-                    {depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
+                  <button className="primary-button" onClick={handlePrepareDeposit} disabled={!hasValidAmount || isBusy || vaultBlockReason !== null} aria-describedby={vaultBlockReason ? "vault-preflight-status" : undefined} aria-label={isPreparingDeposit ? "Preparing deposit transaction" : depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
+                    {isPreparingDeposit ? "Preparing transaction..." : depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
                   </button>
                 )}
 
@@ -1606,7 +1467,16 @@ function App() {
             </section>
           </div>
         )}
+        {isWithdrawOpen && (
+          <WithdrawModal
+            vaultStroops={vaultStroops}
+            onRefreshBalances={() => void refreshBalances()}
+            onShowSuccessToast={(message) => showToast(message, "success")}
+            onClose={() => setIsWithdrawOpen(false)}
+          />
+        )}
       </div>
+    </NotificationsContext.Provider>
   );
 }
 
@@ -1614,304 +1484,13 @@ function App() {
  * AppSessionExpiryBanner — renders the session-expiry banner when the session
  * has expired, and dismisses it when the user clicks Dismiss or signs in again.
  */
+
 function AppSessionExpiryBanner() {
   const { isExpired, dismiss } = useSessionExpiry();
   if (!isExpired) return null;
   return (
     <div style={{ padding: "0 24px" }}>
       <SessionExpiryBanner onDismiss={dismiss} />
-    </div>
-  );
-}
-
-/**
- * WalletSignInButton — topbar control that lets the user sign in with Freighter
- * or sign out.  Manages its own loading / error state so the rest of the app
- * does not need to know about it.
- */
-function WalletSignInButton() {
-  const [signedIn, setSignedIn] = useState(isSignedIn);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Keep local state in sync after a session-expiry clears the token.
-  const { isExpired } = useSessionExpiry();
-  useEffect(() => {
-    if (isExpired) setSignedIn(false);
-  }, [isExpired]);
-
-  const handleSignIn = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await signIn();
-      setSignedIn(true);
-    } catch (err) {
-      const code: AuthServiceErrorCode | undefined =
-        err && typeof err === "object" && "code" in err
-          ? (err as { code: AuthServiceErrorCode }).code
-          : undefined;
-
-      if (code === "SIGNATURE_REJECTED") {
-        // User deliberately cancelled — don't show an error.
-      } else {
-        setError(
-          err instanceof Error && err.message
-            ? err.message
-            : "Sign in failed. Try again.",
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const handleSignOut = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await signOut();
-    } finally {
-      // Clear regardless of whether the revoke call failed.
-      setSignedIn(false);
-      setLoading(false);
-    }
-  }, []);
-
-  return (
-    <div className="wallet-signin-btn-wrap" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-      {signedIn ? (
-        <button
-          type="button"
-          className="wallet-signin-btn wallet-signin-btn--out"
-          onClick={handleSignOut}
-          disabled={loading}
-          aria-busy={loading}
-          aria-label="Sign out of Callora"
-          style={WALLET_BTN_STYLE}
-        >
-          {loading ? "Signing out…" : "Sign out"}
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="wallet-signin-btn wallet-signin-btn--in"
-          onClick={handleSignIn}
-          disabled={loading}
-          aria-busy={loading}
-          aria-label="Sign in with Freighter wallet"
-          style={{ ...WALLET_BTN_STYLE, background: "var(--accent, #4e85ff)", color: "#fff", border: "none" }}
-        >
-          {loading ? "Signing in…" : "Sign in"}
-        </button>
-      )}
-      {error && (
-        <span
-          role="alert"
-          aria-live="polite"
-          style={{ fontSize: "0.75rem", color: "var(--danger, #ff7d8d)", maxWidth: 220, textAlign: "right" }}
-        >
-          {error}
-        </span>
-      )}
-    </div>
-  );
-}
-
-const WALLET_BTN_STYLE: React.CSSProperties = {
-  padding: "6px 14px",
-  borderRadius: 8,
-  border: "1px solid var(--line, rgba(169,184,255,0.16))",
-  background: "var(--surface-soft, rgba(255,255,255,0.04))",
-  color: "var(--text, #f3f5fb)",
-  fontSize: "0.82rem",
-  fontWeight: 600,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
-
-function AccountSwitcher() {
-  const { account, accounts, switchAccount, addAccount, removeAccount, renameAccount } = useAccountContext();
-  const [open, setOpen] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newLabel, setNewLabel] = useState("");
-  const [addError, setAddError] = useState("");
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameLabel, setRenameLabel] = useState("");
-  const [renameError, setRenameError] = useState("");
-
-  if (accounts.length === 0) return null;
-
-  const handleAdd = () => {
-    setAddError("");
-    const trimmed = newLabel.trim();
-    if (!trimmed) {
-      setAddError("Label cannot be empty.");
-      return;
-    }
-    if (accounts.some((a) => a.label === trimmed)) {
-      setAddError("Label must be unique.");
-      return;
-    }
-    addAccount(trimmed);
-    setNewLabel("");
-    setShowAdd(false);
-    setOpen(false);
-  };
-
-  const handleRemoveCurrent = () => {
-    if (account) {
-      removeAccount(account.id);
-    }
-    setOpen(false);
-  };
-
-  const startRename = (acc: { id: string; label: string }) => {
-    setRenamingId(acc.id);
-    setRenameLabel(acc.label);
-    setRenameError("");
-  };
-
-  const handleRename = (accId: string) => {
-    setRenameError("");
-    const trimmed = renameLabel.trim();
-    if (!trimmed) {
-      setRenameError("Label cannot be empty.");
-      return;
-    }
-    if (accounts.some((a) => a.id !== accId && a.label === trimmed)) {
-      setRenameError("Label must be unique.");
-      return;
-    }
-    renameAccount(accId, trimmed);
-    setRenamingId(null);
-    setRenameLabel("");
-  };
-
-  return (
-    <div style={{ position: "relative" }}>
-      <button
-        type="button"
-        className="ghost-button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        style={{ fontSize: 13 }}
-      >
-        {account ? account.label : "Switch account"}
-      </button>
-      {open && (
-        <ul
-          role="listbox"
-          aria-label="Accounts"
-          style={{
-            position: "absolute",
-            right: 0,
-            top: "100%",
-            marginTop: 8,
-            padding: 8,
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            listStyle: "none",
-            minWidth: 180,
-            zIndex: 1000,
-          }}
-        >
-          {accounts.map((acc) => (
-            <li key={acc.id} style={{ marginBottom: 2 }}>
-              {renamingId === acc.id ? (
-                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                  <input
-                    type="text"
-                    value={renameLabel}
-                    onChange={(e) => setRenameLabel(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleRename(acc.id); }}
-                    style={{ flex: 1, fontSize: 13, padding: "4px 6px" }}
-                    autoFocus
-                    aria-label="Rename account"
-                  />
-                  <button type="button" onClick={() => handleRename(acc.id)} style={{ fontSize: 12 }}>OK</button>
-                  <button type="button" onClick={() => { setRenamingId(null); setRenameLabel(""); }} style={{ fontSize: 12 }}>Cancel</button>
-                  {renameError && <span style={{ color: "red", fontSize: 11 }}>{renameError}</span>}
-                </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span
-                    role="option"
-                    aria-selected={account?.id === acc.id}
-                    onClick={() => {
-                      switchAccount(acc.id);
-                      setOpen(false);
-                    }}
-                    style={{
-                      padding: "8px 12px",
-                      cursor: "pointer",
-                      borderRadius: 4,
-                      background: account?.id === acc.id ? "var(--accent)" : "transparent",
-                      color: account?.id === acc.id ? "#fff" : "var(--text)",
-                      fontSize: 13,
-                      flex: 1,
-                    }}
-                  >
-                    {acc.label}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => startRename(acc)}
-                    style={{ fontSize: 11, padding: "2px 6px", marginLeft: 4 }}
-                    aria-label={`Rename ${acc.label}`}
-                  >
-                    Rename
-                  </button>
-                </div>
-              )}
-            </li>
-          ))}
-          {showAdd ? (
-            <li style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <input
-                  type="text"
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
-                  placeholder="Account label"
-                  style={{ fontSize: 13, padding: "4px 6px" }}
-                  autoFocus
-                  aria-label="New account label"
-                />
-                <button type="button" onClick={handleAdd} style={{ fontSize: 12 }}>Add</button>
-                {addError && <span style={{ color: "red", fontSize: 11 }}>{addError}</span>}
-              </div>
-            </li>
-          ) : (
-            <li
-              style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}
-            >
-              <button
-                type="button"
-                onClick={() => { setShowAdd(true); setAddError(""); }}
-                style={{ fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--accent)" }}
-              >
-                + Add account
-              </button>
-            </li>
-          )}
-          {account && (
-            <li style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>
-              <button
-                type="button"
-                onClick={handleRemoveCurrent}
-                style={{ fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--accent)" }}
-              >
-                Remove {account.label}
-              </button>
-            </li>
-          )}
-        </ul>
-      )}
     </div>
   );
 }

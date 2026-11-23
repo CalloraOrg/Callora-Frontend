@@ -101,12 +101,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Before opening a PR run `npm run typeche
 
 ### Command Palette
 
-`src/components/CommandPalette.tsx` isn't rendered anywhere in the app yet, so these keys currently do nothing. They describe the component as built:
+`src/components/CommandPalette.tsx` is mounted in the app shell and can be toggled from any page (including while a form field has focus):
 
 - **Open Command Palette**: `Cmd + K` (macOS) or `Ctrl + K` (Windows/Linux)
 - **Navigate options**: `Up / Down Arrow` keys
 - **Select option**: `Enter`
-- **Close Palette**: `Escape` or backdrop click
+- **Close Palette**: `Escape`, `Cmd/Ctrl + K`, or backdrop click
 
 ### Shortcut reference
 
@@ -120,6 +120,7 @@ The tables below list every entry in `SHORTCUTS` (`src/hooks/useGlobalShortcuts.
 
 | Key | Action |
 | --- | ------ |
+| `Cmd/Ctrl + K` | Open command palette |
 | `?` | Open shortcuts help |
 | `Esc` | Close modals |
 

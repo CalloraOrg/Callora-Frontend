@@ -131,7 +131,7 @@ export async function fetchDepositEvents(args: {
         status: "success",
         timestamp: event.ledgerClosedAt,
         txHash: event.txHash,
-        network: `Stellar ${config.network[0].toUpperCase()}${config.network.slice(1)}`,
+        network: `Stellar ${config.network.charAt(0).toUpperCase()}${config.network.slice(1)}`,
         confirmations: Math.max(0, latestLedger - event.ledger),
       });
     }

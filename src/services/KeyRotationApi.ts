@@ -2,28 +2,30 @@
  * KeyRotationApi
  *
  * Backend integration for API key rotation with confirmation tokens.
- * This layer handles the HTTP communication with the backend while maintaining
+ * This layer handles HTTP communication with the backend while maintaining
  * the security boundaries established by KeyRotationService.
  *
  * Token flow (prevents replay and cross-tenant attacks):
- * 1. User clicks "Rotate Key"
- * 2. Frontend obtains a confirmation token (TODO: currently client-side placeholder;
- *    production expects server-issued token. See docs/Key-Rotation.md)
- * 3. Frontend calls /api/rotate-key with the token and idempotency key
- * 4. Backend validates token matches user context
- * 5. Backend verifies token hasn't expired or been replayed
- * 6. Backend rotates key and returns new key (or error)
- * 7. Frontend displays new key or reverts on error
+ * 1. User clicks "Rotate Key" in My APIs or key management UI
+ * 2. Frontend requests an opaque, single-use confirmation token from the server
+ *    via POST /api/rotate-key/token (getRotationToken).
+ * 3. Backend verifies session, key ownership, and mints an unconsumed token with a 15-minute TTL.
+ * 4. Frontend calls POST /api/rotate-key (rotateKeyWithToken) with the server-minted
+ *    token and an Idempotency-Key.
+ * 5. Backend validates token binding and expiry, atomically consumes the token,
+ *    and returns the newly rotated key.
+ * 6. Frontend displays the new key once and announces success.
  *
- * Part of issue #991: Make API-key rotation confirmation lossless
+ * See docs/Key-Rotation.md for the normative trust model.
  */
 
 import { RotationRequest } from "./KeyRotationService";
 import {
   redactSensitiveData,
-  classifyHttpError,
   logError,
+  getSafeErrorMessage,
 } from "./SecureErrorHandler";
+import { apiClient, isApiError } from "../api/apiClient";
 import {
   generateIdempotencyKey,
   createInFlightGuard,
@@ -43,26 +45,12 @@ export interface KeyRotationApiResponse {
 
 /**
  * API endpoint for rotating API keys with token-based authorization.
- * This endpoint is protected by:
+ * Protected by:
  * - Bearer token authentication (session token in Authorization header)
  * - Confirmation token in request body (prevents replay/cross-tenant)
  * - Server-side validation of user context (userId, tenantId, sessionId)
- *
- * The endpoint MUST:
- * 1. Verify the session bearer token is valid for the user
- * 2. Verify the confirmation token matches the user's context
- * 3. Check the token hasn't expired (15 minute window)
- * 4. Verify the keyId belongs to the user
- * 5. Perform the rotation and return the new key
- * 6. Log the rotation (without exposing keys) for audit trail
- *
- * Error responses MUST NOT leak:
- * - Old or new API keys
- * - Confirmation tokens
- * - User IDs, tenant IDs, or session IDs
- * - Implementation details or SQL errors
  */
-const ROTATE_KEY_ENDPOINT = "/api/v1/keys/rotate";
+const ROTATE_KEY_ENDPOINT = "/api/rotate-key";
 const ROTATION_TIMEOUT_MS = 30_000;
 const ROTATION_MAX_RETRIES = 1;
 const ROTATION_BASE_DELAY_MS = 250;
@@ -144,47 +132,54 @@ async function performRotation(
   idempotencyKey: string,
   signal: AbortSignal,
 ): Promise<KeyRotationApiResponse> {
-  const response = await fetch(ROTATE_KEY_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${sessionToken}`,
-      "Idempotency-Key": idempotencyKey,
-    },
-    body: JSON.stringify({
-      keyId: rotationRequest.keyId,
-      confirmationToken: rotationRequest.confirmationToken,
-      context: rotationRequest.context,
-    }),
-    signal,
-  });
-
-  if (!response.ok) {
-    const errorClassification = classifyHttpError(response.status);
-    const data = await response.json().catch(() => ({}));
-
-    logError("KeyRotationApi.rotateKeyWithToken", data, {
-      status: response.status,
-      endpoint: ROTATE_KEY_ENDPOINT,
-    });
-
-    const code = data?.error?.code
-      ? String(data.error.code)
-      : errorClassification.retryable
-        ? "ROTATION_FAILED"
-        : "AUTHORIZATION_FAILED";
-
-    throw new RotationApiError(
-      redactSensitiveData(data?.error?.message || "Failed to rotate API key."),
+  let data: { newKey?: string; rotatedAt?: string };
+  try {
+    data = await apiClient.post<{ newKey?: string; rotatedAt?: string }>(
+      ROTATE_KEY_ENDPOINT,
       {
-        code,
-        status: response.status,
-        retryable: errorClassification.retryable,
+        auth: false,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: {
+          keyId: rotationRequest.keyId,
+          confirmationToken: rotationRequest.confirmationToken,
+          context: rotationRequest.context,
+        },
+        signal,
       },
     );
-  }
+  } catch (err) {
+    if (isApiError(err) && err.status > 0) {
+      logError("KeyRotationApi.rotateKeyWithToken", err.data ?? {}, {
+        status: err.status,
+        endpoint: ROTATE_KEY_ENDPOINT,
+      });
 
-  const data = await response.json();
+      const code =
+        err.code && err.code !== "CLIENT_ERROR" && err.code !== "SERVER_ERROR" && err.code !== "CONFLICT"
+          ? err.code
+          : err.retryable
+            ? "ROTATION_FAILED"
+            : "AUTHORIZATION_FAILED";
+
+      const nestedMsg =
+        typeof err.data === "object" &&
+        err.data !== null &&
+        typeof (err.data as { error?: { message?: unknown } }).error?.message === "string"
+          ? (err.data as { error: { message: string } }).error.message
+          : "Failed to rotate API key.";
+
+      throw new RotationApiError(redactSensitiveData(nestedMsg), {
+        code,
+        status: err.status,
+        retryable: err.retryable,
+      });
+    }
+    throw err;
+  }
 
   if (data?.newKey) {
     return {
@@ -271,36 +266,68 @@ export async function getRotationToken(
   };
 }> {
   try {
-    const response = await fetch(`${ROTATE_KEY_ENDPOINT}/token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${sessionToken}`,
-      },
-      body: JSON.stringify({ keyId }),
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      return {
-        error: {
-          code: data?.error?.code || "TOKEN_REQUEST_FAILED",
-          message: data?.error?.message || "Failed to request rotation token.",
+    const data = await apiClient.post<{ token?: string; expiresIn?: number }>(
+      `${ROTATE_KEY_ENDPOINT}/token`,
+      {
+        auth: false,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
         },
-      };
-    }
+        body: { keyId },
+        timeoutMs: 10000,
+      },
+    );
 
-    const data = await response.json();
     return {
       token: data.token,
       expiresIn: data.expiresIn,
     };
   } catch (error) {
+    if (isApiError(error) && error.status > 0) {
+      const data =
+        typeof error.data === "object" && error.data !== null
+          ? (error.data as { error?: { code?: string; message?: string } })
+          : undefined;
+      let code = data?.error?.code;
+      if (!code) {
+        if (error.status === 401) code = "UNAUTHORIZED";
+        else if (error.status === 403) code = "FORBIDDEN";
+        else if (error.status === 429) code = "TOO_MANY_REQUESTS";
+        else code = "TOKEN_REQUEST_FAILED";
+      }
+
+      const rawMessage =
+        data?.error?.message ||
+        (error.status === 401
+          ? "Unauthorized"
+          : error.status === 403
+            ? "Forbidden"
+            : error.status === 429
+              ? "Too many requests"
+              : "Failed to request rotation token.");
+
+      return {
+        error: {
+          code,
+          message: redactSensitiveData(getSafeErrorMessage(rawMessage, code)),
+        },
+      };
+    }
+
+    const isTimeout =
+      (error instanceof Error &&
+        (error.name === "TimeoutError" || error.name === "AbortError")) ||
+      isTimeoutError(error);
+    const code = isTimeout ? "TIMEOUT" : "NETWORK_ERROR";
+    const rawMessage = isTimeout
+      ? "Request timed out."
+      : "Network error. Please check your connection.";
+
     return {
       error: {
-        code: "TOKEN_REQUEST_FAILED",
-        message: "Failed to request rotation token. Please try again.",
+        code,
+        message: redactSensitiveData(getSafeErrorMessage(rawMessage, code)),
       },
     };
   }

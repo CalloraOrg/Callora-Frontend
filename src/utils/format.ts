@@ -123,7 +123,7 @@ export function formatUsdcDecimal(
   }
 
   const sign = match[1] ?? "";
-  const intDigits = match[2].replace(/^0+(?=\d)/, "");
+  const intDigits = (match[2] ?? "").replace(/^0+(?=\d)/, "");
   const rawFrac = (match[3] ?? "").slice(0, USDC_DECIMALS);
 
   // Strip trailing zeros beyond 2 decimal places, and pad to at least 2 decimal places.
@@ -321,10 +321,11 @@ export function stroopsToUsdcAmount(stroops: bigint): string {
 function groupIntegerDigits(digits: string, locale: string): string {
   if (digits.length <= 3) return digits;
   try {
-    const formatted = new Intl.NumberFormat(locale, {
+    const nf = new Intl.NumberFormat(locale, {
       maximumFractionDigits: 0,
       useGrouping: true,
-    }).format(digits as any);
+    });
+    const formatted = (nf.format as unknown as (value: string) => string)(digits);
     if (formatted.replace(/\D+/g, "") === digits) return formatted;
   } catch {
     // Fall through to the locale-independent grouping below.

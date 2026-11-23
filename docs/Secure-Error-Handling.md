@@ -103,3 +103,14 @@ if (classification.retryable) {
 ### Telemetry
 * **DO**: Strip sensitive data using `createTelemetryError` before pushing to an observability platform.
 * **DON'T**: Send un-redacted request bodies or full error stacks into Sentry or Datadog without sanitization.
+
+## HTTP 429 Rate-Limit Handling
+
+`authFetch` inspects every response for HTTP `429 Too Many Requests` (both on the initial request and after a `401` token-refresh retry):
+
+1. Parses `Retry-After` (delta-seconds or HTTP-date) and `X-RateLimit-*` headers via `parseRateLimitHeaders`.
+2. Clamps delays to a sane upper bound (`MAX_RATE_LIMIT_RETRY_MS`, 1 hour) and falls back to a default window (`DEFAULT_RATE_LIMIT_RETRY_MS`, 60 seconds) when headers are absent or unparseable.
+3. Emits a `RateLimitEvent` through `src/services/rateLimitSignal.ts` (`signalRateLimit`) without throwing or altering the `Response` returned to the caller.
+4. Does not auto-retry `429` responses.
+
+UI pages (such as `src/pages/ApiUsage.tsx`) subscribe via `useRateLimit`, render `RateLimitAlert` with a live countdown (announced politely once when rate limiting begins rather than every second), and disable action buttons until `timeUntilReset` reaches zero. Concurrent `429` responses are reconciled with `shouldUpdateRateLimitState` so the newest reset timestamp wins.

@@ -92,3 +92,44 @@
     border-color: var(--line-strong, var(--line));
   }
 }
+
+/* ── Forced colors (Windows High Contrast) ─────────────────────────────────
+   Under forced-colors: active, browsers strip author background colours and
+   SVG background textures.  Ensure badges, chips, and the active tab remain
+   visibly distinguishable using system colours and explicit borders. */
+@media (forced-colors: active) {
+  [class*="sb-pattern-"] {
+    border: 1px solid CanvasText !important;
+    color: ButtonText !important;
+    background: Canvas !important;
+  }
+
+  .method-chip {
+    border: 1px solid CanvasText;
+    color: ButtonText;
+    background: Canvas;
+  }
+
+  .tag-chip {
+    border: 1px solid CanvasText;
+    color: ButtonText;
+    background: Canvas;
+  }
+
+  .tag-chip--active {
+    border: 1px solid CanvasText;
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .tabs-indicator {
+    background: Highlight !important;
+    forced-color-adjust: none;
+  }
+
+  [role="tab"][aria-selected="true"] {
+    border-bottom: 2px solid CanvasText !important;
+    color: CanvasText !important;
+  }
+}

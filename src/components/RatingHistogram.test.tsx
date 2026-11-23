@@ -8,7 +8,7 @@ const getTrigger = (label: string) =>
 describe("RatingHistogram", () => {
   it("renders children", () => {
     render(
-      <RatingHistogram rating={4.5}>
+      <RatingHistogram rating={4.5} distribution={{ 5: 10, 4: 5, 3: 2, 2: 1, 1: 0 }}>
         <span data-testid="child">4.5 Stars</span>
       </RatingHistogram>,
     );
@@ -16,7 +16,7 @@ describe("RatingHistogram", () => {
   });
 
   it("shows tooltip on mouse enter and hides (after grace period) on mouse leave", async () => {
-    render(<RatingHistogram rating={4.5}>Hover me</RatingHistogram>);
+    render(<RatingHistogram rating={4.5} distribution={{ 5: 10, 4: 5, 3: 2, 2: 1, 1: 0 }}>Hover me</RatingHistogram>);
     const trigger = getTrigger("Hover me");
 
     expect(screen.queryByRole("tooltip")).toBeNull();
@@ -32,7 +32,7 @@ describe("RatingHistogram", () => {
   });
 
   it("keeps tooltip open when pointer moves from trigger onto the tooltip (WCAG hoverable)", async () => {
-    render(<RatingHistogram rating={4.5}>Hover me</RatingHistogram>);
+    render(<RatingHistogram rating={4.5} distribution={{ 5: 10, 4: 5, 3: 2, 2: 1, 1: 0 }}>Hover me</RatingHistogram>);
     const trigger = getTrigger("Hover me");
 
     fireEvent.mouseEnter(trigger);
@@ -51,7 +51,7 @@ describe("RatingHistogram", () => {
   });
 
   it("opens on focus and closes on blur (keyboard accessibility)", async () => {
-    render(<RatingHistogram rating={3.7}>Focus me</RatingHistogram>);
+    render(<RatingHistogram rating={3.7} distribution={{ 5: 5, 4: 3, 3: 2, 2: 1, 1: 1 }}>Focus me</RatingHistogram>);
     const trigger = getTrigger("Focus me");
 
     fireEvent.focus(trigger);
@@ -62,7 +62,7 @@ describe("RatingHistogram", () => {
   });
 
   it("dismisses on Escape (WCAG dismissible)", async () => {
-    render(<RatingHistogram rating={4.0}>Hover me</RatingHistogram>);
+    render(<RatingHistogram rating={4.0} distribution={{ 5: 10, 4: 10, 3: 5, 2: 2, 1: 1 }}>Hover me</RatingHistogram>);
     const trigger = getTrigger("Hover me");
 
     fireEvent.mouseEnter(trigger);
@@ -73,7 +73,7 @@ describe("RatingHistogram", () => {
   });
 
   it("shows tooltip on long press (touch) and hides on touchend", async () => {
-    render(<RatingHistogram rating={4.2}>Touch me</RatingHistogram>);
+    render(<RatingHistogram rating={4.2} distribution={{ 5: 8, 4: 6, 3: 4, 2: 2, 1: 1 }}>Touch me</RatingHistogram>);
     const trigger = getTrigger("Touch me");
 
     fireEvent.touchStart(trigger);
@@ -89,7 +89,7 @@ describe("RatingHistogram", () => {
   });
 
   it("does not show tooltip if touch is released before long-press threshold", async () => {
-    render(<RatingHistogram rating={4.2}>Tap me</RatingHistogram>);
+    render(<RatingHistogram rating={4.2} distribution={{ 5: 8, 4: 6, 3: 4, 2: 2, 1: 1 }}>Tap me</RatingHistogram>);
     const trigger = getTrigger("Tap me");
 
     fireEvent.touchStart(trigger);
@@ -135,7 +135,7 @@ describe("RatingHistogram", () => {
     let parentClicked = false;
     render(
       <div onClick={() => (parentClicked = true)}>
-        <RatingHistogram rating={4.5}>Hover me</RatingHistogram>
+        <RatingHistogram rating={4.5} distribution={{ 5: 10, 4: 5, 3: 2, 2: 1, 1: 0 }}>Hover me</RatingHistogram>
       </div>,
     );
     fireEvent.click(getTrigger("Hover me"));
@@ -143,12 +143,47 @@ describe("RatingHistogram", () => {
   });
 
   it("sets aria-describedby only while the tooltip is visible", async () => {
-    render(<RatingHistogram rating={4.5}>Hover me</RatingHistogram>);
+    render(<RatingHistogram rating={4.5} distribution={{ 5: 10, 4: 5, 3: 2, 2: 1, 1: 0 }}>Hover me</RatingHistogram>);
     const trigger = getTrigger("Hover me");
 
     expect(trigger.getAttribute("aria-describedby")).toBeNull();
     fireEvent.mouseEnter(trigger);
     const tooltip = await screen.findByRole("tooltip");
     expect(trigger.getAttribute("aria-describedby")).toBe(tooltip.id);
+  });
+
+  it("shows 'No rating breakdown yet' when distribution prop is omitted", async () => {
+    render(<RatingHistogram rating={4.5}>No dist</RatingHistogram>);
+    fireEvent.mouseEnter(getTrigger("No dist"));
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip.textContent).toContain("No rating breakdown yet");
+    // No bars rendered
+    expect(tooltip.querySelectorAll('[aria-label$="reviews"], [aria-label$="review"]').length).toBe(0);
+    // No review count in accessible label
+    expect(getTrigger("No dist").getAttribute("aria-label")).not.toMatch(/\d+\s+reviews?/);
+  });
+
+  it("shows 'No rating breakdown yet' when all distribution counts are zero", async () => {
+    render(
+      <RatingHistogram rating={0} distribution={{ 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }}>
+        Zero dist
+      </RatingHistogram>,
+    );
+    fireEvent.mouseEnter(getTrigger("Zero dist"));
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip.textContent).toContain("No rating breakdown yet");
+    expect(tooltip.querySelectorAll('[aria-label$="reviews"], [aria-label$="review"]').length).toBe(0);
+  });
+
+  it("aria-label contains no review count when distribution is absent", () => {
+    render(<RatingHistogram rating={4.5}>No dist label</RatingHistogram>);
+    const trigger = getTrigger("No dist label");
+    expect(trigger.getAttribute("aria-label")).toBe("Rating 4.5 out of 5");
+  });
+
+  it("aria-label handles NaN rating without crashing", () => {
+    render(<RatingHistogram rating={NaN}>NaN rating</RatingHistogram>);
+    const trigger = getTrigger("NaN rating");
+    expect(trigger.getAttribute("aria-label")).not.toContain("NaN");
   });
 });

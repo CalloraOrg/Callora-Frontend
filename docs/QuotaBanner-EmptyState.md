@@ -76,3 +76,31 @@ toggle.
 - [x] **1.4.3** Text uses `--text` / `--muted` tokens (4.5:1 calibrated)
 - [x] **2.5.5** CTA min-height 44px (default EmptyState button)
 - [x] **4.1.2** `aria-labelledby` target exists and matches heading id
+
+## Live Wiring & HTTP Quota API
+
+On `src/pages/ApiUsage.tsx`, `QuotaBanner` and `QuotaManager` are mounted
+together and driven by the shared `quotaStore` via `useQuotaStore`:
+
+- **Transport selection (`src/state/quotaStore.ts`):** `createDefaultQuotaApi()`
+  returns `createHttpQuotaApi()` whenever `API_BASE` (`VITE_API_BASE_URL`) is
+  configured, and falls back to the in-memory `createQuotaApi()` in demo mode
+  and unit tests.
+- **HTTP contract (`src/api/quotaApi.ts`):**
+  - `GET /api/quota?accountId=<id>` returns `QuotaRecord`
+    (`{ accountId, value, version, updatedAt }`) via `authFetch` with bearer
+    authentication.
+  - `PUT /api/quota` submits `{ accountId, value, baseVersion }` and returns
+    the updated `QuotaRecord`.
+  - `409 Conflict` maps the server version from the JSON body
+    (`serverVersion` / `version` / `currentVersion` / `record.version`) or
+    `ETag` header to `QuotaConflictError`, triggering `quotaStore`'s automatic
+    reconciliation fetch.
+  - `401`/`403`/`5xx` responses are classified via `classifyHttpError` and
+    thrown as `QuotaHttpError`; malformed JSON or invalid payload shapes throw
+    `QuotaValidationError`; `AbortError` is propagated unchanged.
+- **UI states:** `ApiUsage.tsx` passes loading, stale (cross-tab update),
+  error, and conflict states from `useQuotaStore` into `QuotaBanner` and
+  `QuotaManager`. When the authoritative quota is `0` or unset, `QuotaBanner`
+  renders its themed empty state whose "Set up quota" CTA focuses the
+  `QuotaManager` input.

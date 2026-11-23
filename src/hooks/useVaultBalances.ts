@@ -160,7 +160,7 @@ export function useVaultBalances(
         vault,
         wallet,
         status: failures.length > 0 ? "error" : "ready",
-        error: failures.length > 0 ? failures[0] : null,
+        error: failures[0] ?? null,
         updatedAt: failures.length > 0 ? prev.updatedAt : Date.now(),
         revision: failures.length > 0 ? prev.revision : prev.revision + 1,
       }));

@@ -16,13 +16,30 @@
  * that surface to the user.
  */
 
+import { useSyncExternalStore } from "react";
 import { requestAccess, signMessage } from "@stellar/freighter-api";
 import { apiUrl } from "../config/constants";
+import { clearSessionExpiry } from "./sessionExpiry";
 
 // ─── In-memory token store ────────────────────────────────────────────────────
 
 /** Access token kept only in memory; never written to any persistent store. */
 let _accessToken: string | null = null;
+
+type AuthListener = () => void;
+
+const _authListeners = new Set<AuthListener>();
+
+function notifyAuthChange(): void {
+  // Copy before iterating: a listener may unsubscribe during dispatch.
+  for (const listener of Array.from(_authListeners)) {
+    try {
+      listener();
+    } catch {
+      // One bad subscriber must not stop the rest from being notified.
+    }
+  }
+}
 
 const REFRESH_TOKEN_KEY = "callora-refresh-token";
 
@@ -62,6 +79,24 @@ export function getAccessToken(): string | null {
 /** Return whether the user currently has an access token in memory. */
 export function isSignedIn(): boolean {
   return _accessToken !== null;
+}
+
+/**
+ * Subscribe to authentication state changes (sign-in, sign-out, token refresh
+ * success or failure). Matches the contract expected by `useSyncExternalStore`.
+ *
+ * @returns an unsubscribe function; safe to call more than once.
+ */
+export function subscribeAuth(listener: AuthListener): () => void {
+  _authListeners.add(listener);
+  return () => {
+    _authListeners.delete(listener);
+  };
+}
+
+/** React hook that returns whether the user is currently signed in. */
+export function useIsSignedIn(): boolean {
+  return useSyncExternalStore(subscribeAuth, isSignedIn, isSignedIn);
 }
 
 export type SignInResult = {
@@ -174,6 +209,8 @@ export async function signIn(): Promise<SignInResult> {
   // Persist tokens.
   _accessToken = accessToken;
   if (refreshToken) saveRefreshToken(refreshToken);
+  clearSessionExpiry();
+  notifyAuthChange();
 
   return { accessToken, walletAddress };
 }
@@ -208,6 +245,7 @@ export async function refreshAccessToken(): Promise<string> {
     // Token is dead — clear everything so the caller can show the sign-in UI.
     _accessToken = null;
     clearRefreshToken();
+    notifyAuthChange();
     throw new AuthServiceError("AUTH_FAILED", `Token refresh failed (${response.status}).`);
   }
 
@@ -217,6 +255,7 @@ export async function refreshAccessToken(): Promise<string> {
   } catch {
     _accessToken = null;
     clearRefreshToken();
+    notifyAuthChange();
     throw new AuthServiceError("NETWORK_ERROR", "Unexpected response during token refresh.");
   }
 
@@ -224,6 +263,8 @@ export async function refreshAccessToken(): Promise<string> {
 
   _accessToken = accessToken;
   if (newRefreshToken) saveRefreshToken(newRefreshToken);
+  clearSessionExpiry();
+  notifyAuthChange();
 
   return accessToken;
 }
@@ -254,6 +295,7 @@ export async function signOut(): Promise<void> {
 
   _accessToken = null;
   clearRefreshToken();
+  notifyAuthChange();
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -355,4 +397,5 @@ export class AuthServiceError extends Error {
 /** @internal Reset in-memory state between tests. */
 export function _resetAuthStateForTests(): void {
   _accessToken = null;
+  _authListeners.clear();
 }
