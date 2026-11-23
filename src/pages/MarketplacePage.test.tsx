@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -35,9 +35,9 @@ const TEST_BACKEND_APIS: APIItem[] = [
   },
 ];
 
-function renderMarketplace() {
+function renderMarketplace(initialEntries: string[] = ["/"]) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <ToastProvider>
         <CollectionsProvider>
           <MarketplacePage />
@@ -209,6 +209,81 @@ describe("MarketplacePage backend catalogue integration (Issue #1327 & #1328)", 
           {},
         );
       });
+    });
+  });
+
+  describe("ActiveFilterChips integration (Issue #1400)", () => {
+    it("renders active chips when category is filtered and removing chip updates results and live region", async () => {
+      vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
+      vi.spyOn(catalogApiModule, "fetchCatalog").mockResolvedValue(TEST_BACKEND_APIS);
+
+      renderMarketplace(["/?categories=Security"]);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Remove filter: Category Security" })).toBeInTheDocument();
+      });
+
+      const grid = document.querySelector(".marketplace-grid")!;
+      expect(grid).toBeInTheDocument();
+      expect(within(grid).getByText("Enterprise KYC Verifier")).toBeInTheDocument();
+      expect(within(grid).queryByText("Live Blockchain Indexer")).not.toBeInTheDocument();
+
+      // Remove the chip
+      const removeBtn = screen.getByRole("button", {
+        name: "Remove filter: Category Security",
+      });
+      await userEvent.click(removeBtn);
+
+      // Now both APIs are visible in the grid and chip is gone
+      await waitFor(() => {
+        expect(screen.queryByRole("button", { name: "Remove filter: Category Security" })).not.toBeInTheDocument();
+        expect(within(grid).getByText("Live Blockchain Indexer")).toBeInTheDocument();
+      });
+
+      // Announcement in live region
+      await waitFor(() => {
+        expect(screen.getByText(/Removed filter Category Security/i)).toBeInTheDocument();
+      });
+    });
+
+    it("renders chips for status, tag, and price and clicking Clear all resets them", async () => {
+      vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
+      vi.spyOn(catalogApiModule, "fetchCatalog").mockResolvedValue(TEST_BACKEND_APIS);
+
+      renderMarketplace(["/?statuses=operational&tag=events&minPrice=1"]);
+
+      await waitFor(() => {
+        expect(screen.getByText("Status: Operational")).toBeInTheDocument();
+        expect(screen.getByText("Tag: events")).toBeInTheDocument();
+        expect(screen.getByText("Min price: $1")).toBeInTheDocument();
+      });
+
+      const clearAllBtn = screen.getByRole("button", { name: "Clear all" });
+      await userEvent.click(clearAllBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByRole("button", { name: "Clear all" })).not.toBeInTheDocument();
+      });
+    });
+
+    it("renders inverted price range as inactive chips without filtering results", async () => {
+      vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
+      vi.spyOn(catalogApiModule, "fetchCatalog").mockResolvedValue(TEST_BACKEND_APIS);
+
+      renderMarketplace(["/?minPrice=50&maxPrice=10"]);
+
+      await waitFor(() => {
+        const minChip = screen.getByTestId("filter-chip-minPrice");
+        const maxChip = screen.getByTestId("filter-chip-maxPrice");
+        expect(minChip).toHaveClass("filter-chip--inactive");
+        expect(maxChip).toHaveClass("filter-chip--inactive");
+        expect(minChip).toHaveAttribute("title", "Min price exceeds max price; price filter is inactive");
+      });
+
+      // Inverted price skips price filtering, so both APIs are still displayed in grid
+      const grid = document.querySelector(".marketplace-grid")!;
+      expect(within(grid).getByText("Live Blockchain Indexer")).toBeInTheDocument();
+      expect(within(grid).getByText("Enterprise KYC Verifier")).toBeInTheDocument();
     });
   });
 });
