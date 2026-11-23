@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useWalletStore } from "../state/walletStore";
 import { fetchDepositEvents } from "../services/vaultEvents";
 import type { BillingTransaction } from "../pages/BillingHistory";
+import { useRuntimeConfig } from "../config/runtimeConfig";
 
 export type DepositHistoryStatus = "no-wallet" | "loading" | "error" | "empty" | "ready";
 
@@ -44,6 +45,7 @@ function mergeById(existing: BillingTransaction[], incoming: BillingTransaction[
  */
 export function useDepositHistory(): DepositHistory {
   const { address } = useWalletStore();
+  const config = useRuntimeConfig();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -55,7 +57,7 @@ export function useDepositHistory(): DepositHistory {
     setLoaded(null);
     setLoadingMore(false);
     setLoadMoreError(null);
-    fetchDepositEvents({ address, signal: controller.signal })
+    fetchDepositEvents({ address, signal: controller.signal, config })
       .then((page) => {
         if (controller.signal.aborted) return;
         setLoaded({
@@ -71,7 +73,7 @@ export function useDepositHistory(): DepositHistory {
         setLoaded({ address, transactions: [], nextCursor: null, retentionTruncated: false, error: errorMessage(error) });
       });
     return () => controller.abort();
-  }, [address, reloadKey]);
+  }, [address, config, reloadKey]);
 
   const current = loaded && loaded.address === address ? loaded : null;
 
@@ -80,7 +82,7 @@ export function useDepositHistory(): DepositHistory {
     const cursor = current.nextCursor;
     setLoadingMore(true);
     setLoadMoreError(null);
-    fetchDepositEvents({ address, cursor })
+    fetchDepositEvents({ address, cursor, config })
       .then((page) => {
         setLoaded((prev) => {
           if (!prev || prev.address !== address) return prev;
@@ -98,7 +100,7 @@ export function useDepositHistory(): DepositHistory {
       .finally(() => {
         setLoadingMore(false);
       });
-  }, [address, current, loadingMore]);
+  }, [address, config, current, loadingMore]);
 
   const retry = useCallback(() => setReloadKey((key) => key + 1), []);
 

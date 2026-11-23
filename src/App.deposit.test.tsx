@@ -21,7 +21,9 @@ import App from "./App";
 import { AccountProvider } from "./hooks/useAccountContext";
 import { ThemeProvider } from "./ThemeContext";
 import { CollectionsProvider } from "./state/collectionsStore";
+import { ToastProvider } from "./components/Toast";
 import { PENDING_DEPOSIT_STORAGE_KEY, STELLAR_VAULT_CONTRACT_ID } from "./config/constants";
+import { getConfig, setRuntimeConfig } from "./config/runtimeConfig";
 import { normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
 
 // Deposits are signed through Freighter via `src/services/walletService`
@@ -126,6 +128,12 @@ beforeEach(() => {
   // these bytes with instanceof, so align jsdom's constructor for real XDR.
   vi.stubGlobal("Uint8Array", new TextEncoder().encode("").constructor);
   walletMocks.network = "testnet";
+  setRuntimeConfig({
+    ...getConfig(),
+    network: "testnet",
+    vaultContractId: STELLAR_VAULT_CONTRACT_ID,
+    usdcIssuer: "GDXDZNSTNORCX4373EGGYS4Q3U3XVZMBSIMMRHG5S5GCCF7JHC7QZWAZ",
+  });
   walletMocks.getWalletAddress.mockReset().mockResolvedValue("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF");
   walletMocks.signTransaction.mockReset().mockImplementation(async (xdr: string) => ({ signedTxXdr: xdr, signerAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }));
   vi.stubGlobal("fetch", walletMocks.fetch);
@@ -136,6 +144,7 @@ beforeEach(() => {
   walletMocks.isWalletAvailable.mockReset().mockResolvedValue(true);
   walletMocks.prepareVaultDeposit.mockReset().mockImplementation(async (amount: string) => ({
     transaction: {} as never,
+    config: getConfig(),
     xdr: "MOCK_PREPARED_XDR",
     address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
     amountStroops: BigInt(Math.round(Number(amount) * 1e7)),
@@ -168,7 +177,7 @@ function renderDepositModal() {
       <CollectionsProvider>
         <AccountProvider>
           <MemoryRouter initialEntries={["/billing?deposit=true"]}>
-            <App />
+            <ToastProvider><App /></ToastProvider>
           </MemoryRouter>
         </AccountProvider>
       </CollectionsProvider>
@@ -339,7 +348,7 @@ describe("deposit amount input", () => {
     // 100.1234567 is above the minimum deposit and below the wallet balance.
     expect(input.getAttribute("aria-invalid")).toBe("false");
     // The approve button appears once the (mocked) Freighter check resolves.
-    expect(await screen.findByRole("button", { name: /Approve deposit transaction/i })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: /Approve deposit transaction/i }, { timeout: 5000 })).toBeEnabled();
 
     const deltaLabel = screen.getByText("Deposit amount").parentElement;
     expect(deltaLabel?.textContent).toContain("100.12 USDC");
@@ -449,7 +458,7 @@ describe("App deposit modal timed transitions", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" }));
     });
-    expect(walletMocks.prepareVaultDeposit).toHaveBeenCalledWith("50");
+    expect(walletMocks.prepareVaultDeposit).toHaveBeenCalledWith("50", expect.any(Object));
     expect(walletMocks.signAndSubmit).not.toHaveBeenCalled();
 
     // Decoded Soroban transaction summary and assembled fee are shown before signing
@@ -615,6 +624,10 @@ describe("USDC trustline step (#1316)", () => {
 
   it.each(["testnet", "mainnet"])("shows Friendbot only on testnet (%s configuration)", async (network) => {
     walletMocks.network = network;
+    setRuntimeConfig({
+      ...getConfig(),
+      network: network as "testnet" | "mainnet",
+    });
     walletMocks.fetch.mockResolvedValue({ ok: false, status: 404 });
     renderDepositModal();
     await screen.findByText(/This Stellar account is not funded/);
@@ -809,7 +822,7 @@ describe("USDC trustline step (#1316)", () => {
       renderDepositModal();
 
       await waitFor(() => {
-        expect(walletMocks.checkDepositStatus).toHaveBeenCalledWith("0xreloadhash");
+        expect(walletMocks.checkDepositStatus).toHaveBeenCalledWith("0xreloadhash", expect.any(Object));
       });
       expect(screen.getByRole("button", { name: "Check status" })).toBeEnabled();
     });

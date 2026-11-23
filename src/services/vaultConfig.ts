@@ -1,6 +1,6 @@
 import { StrKey } from "@stellar/stellar-sdk";
 
-export type VaultConfigSource = "env" | "testnet-default" | "missing";
+export type VaultConfigSource = "env" | "runtime" | "testnet-default" | "missing";
 
 export type VaultConfig = {
   /** Contract ID deposits are sent to; empty when the config is unusable. */
@@ -19,10 +19,11 @@ export function resolveVaultConfig(env: {
   network: string;
   envContractId?: string;
   testnetDefault: string;
+  source?: "env" | "runtime";
 }): VaultConfig {
   const fromEnv = (env.envContractId ?? "").trim();
   let contractId = fromEnv;
-  let source: VaultConfigSource = "env";
+  let source: VaultConfigSource = env.source ?? "env";
 
   if (!contractId && env.network === "testnet") {
     contractId = env.testnetDefault;
