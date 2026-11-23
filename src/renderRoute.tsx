@@ -60,7 +60,9 @@ export async function renderRoute(
   root: RouteRenderTarget,
   pathname: string,
 ): Promise<void> {
-  // Helper to wrap components in the necessary Router context for hooks like useLocation/useNavigate
+  // Helper to wrap components in the necessary Router context for hooks like useLocation/useNavigate.
+  // Pages rendered inside StandaloneShell supply their own <main> landmark via the shell,
+  // so the shell is the single source of the main landmark on these routes.
   const wrap = (children: React.ReactNode, withShell = false) => (
     <React.StrictMode>
       <ThemeProvider>
