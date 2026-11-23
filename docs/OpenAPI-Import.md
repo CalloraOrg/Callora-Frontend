@@ -8,6 +8,28 @@ Parsing runs in a **Web Worker** (issue #1394) so that large specifications neve
 
 Files larger than **5 MB** are rejected before posting to the worker. The error message shows the file's actual size and the limit.
 
+## Import Methods
+
+### File Upload
+Drag and drop a file onto the drop zone, or click **Browse files** to open the file picker. Accepted extensions: `.json`, `.yaml`, `.yml`. Keyboard users can press `Enter` or `Space` on the drop zone to open the picker.
+
+### Import from URL
+Type or paste a URL into the **Or import from a URL** field and press `Enter` or click **Fetch**. While the request is in progress, a **Cancel** button aborts the fetch.
+
+**URL rules:**
+- Only `https://` URLs are accepted. `http://localhost` (and `http://127.0.0.1`) is also permitted for local development.
+- `http://` URLs pointing to non-localhost hosts are rejected without a network request.
+- `javascript:`, `file:`, and all other non-HTTP schemes are rejected without a network request.
+- URLs must not contain a username or password (embedded credentials are rejected).
+
+**Limits:**
+- Timeout: 10 seconds. If the server does not respond in time, the fetch is aborted and an error is shown.
+- Size cap: 2 MiB. Enforced by both the `Content-Length` response header and by reading the body incrementally. Responses that exceed the limit are rejected mid-stream.
+
+**CORS failures:** When a `TypeError` is thrown (the most common symptom of a browser CORS block), the error message reads: *"The server may not allow cross-origin requests; download the file and upload it instead."* In that case, save the file locally and use the file-upload path.
+
+**Filename derivation:** The importer derives a filename (`.json` / `.yaml` / `.yml`) from the URL path. When the URL path carries no recognised extension, the `Content-Type` response header is used as a fallback. This filename is passed to the parser so it can select the correct JSON or YAML path.
+
 ## Supported Versions
 * **OpenAPI 3.x** is supported.
 * **Swagger 2.0** is supported and converted into the same endpoint stubs (issue #1075):
@@ -51,3 +73,4 @@ The importer captures errors and displays them inline:
 * **YAML Structural Errors**: Displays an error with the 1-based line number of the first problem the custom parser detects.
 * **Validation Errors**: Missing or incorrect `openapi` version fields will produce a validation error. A missing `paths` block is considered valid per spec but results in 0 endpoints.
 * **Worker errors**: If the parser throws an unexpected exception inside the worker, a safe generic error is shown without exposing the stack trace.
+* **URL Fetch Errors**: Invalid URL, unsupported scheme, embedded credentials, timeout, oversized response, HTTP error status, or CORS/network failure — each produces a specific inline message.
