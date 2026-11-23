@@ -69,7 +69,6 @@ const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
 const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
 const BillingInvoiceSection = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.BillingInvoiceSection })));
-  "/billing/subscriptions": () => import("./pages/Subscriptions"),
 
 type DemoOutcome = "confirmed" | "failed";
 
@@ -79,7 +78,6 @@ type WalletServiceFailure = Error & {
   requiresReconciliation: boolean;
 };
 
-  subscriptions: "/billing/subscriptions",
 /** `/rate-limit` no longer exists; limits are per-API. Send users to the Marketplace. */
 function LegacyRateLimitRedirect() {
   const { showToast } = useToast();
