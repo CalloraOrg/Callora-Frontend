@@ -109,7 +109,7 @@ export function useLatencyData(accountId: string) {
           isError: false,
         });
       }
-    }).catch((err) => {
+    }).catch(() => {
       if (currentGen === generationRef.current) {
         setState(prev => ({ ...prev, isLoading: false, isError: true, isStale: false }));
       }

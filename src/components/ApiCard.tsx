@@ -347,7 +347,6 @@ function BookmarkButton({ endpointId, prefersReducedMotion = false, onStatusChan
   const toggleSave = () => setPopoverOpen((s) => !s);
 
   const handleToggleCollection = (colId: string) => {
-    const colName = collections.find(c => c.id === colId)?.name || "collection";
     if (savedIn.has(colId)) {
       removeEndpointFromCollection(colId, endpointId);
       onStatusChange?.("Removed from collection");
@@ -587,7 +586,7 @@ function useMediaQuery(query: string) {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
     const mql = window.matchMedia(query);
     setMatches(mql.matches);
-    const handler = (e: any) => setMatches(e.matches);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
     mql.addEventListener("change", handler);
     return () => mql.removeEventListener("change", handler);
   }, [query]);
@@ -601,7 +600,7 @@ export default function ApiCard({
   onViewDetails,
   onTagClick,
   activeTag,
-  onBrowse,
+  onBrowse: _onBrowse,
 }: {
   api?: APIItem;
   loading?: boolean;
@@ -740,6 +739,7 @@ export default function ApiCard({
   const handleTouchStart = (e: React.TouchEvent) => {
     if ((e.target as HTMLElement).closest("button, a")) return;
     const touch = e.touches[0];
+    if (!touch) return;
     longPressTimer.current = setTimeout(() => {
       handleOpenMenu(e, touch.clientX, touch.clientY);
     }, 600); // 600ms long press threshold

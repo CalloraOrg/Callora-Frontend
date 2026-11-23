@@ -1,6 +1,6 @@
 import React from 'react';
 
-export const JsonViewer: React.FC<{ data: any }> = ({ data }) => {
+export const JsonViewer: React.FC<{ data: unknown }> = ({ data }) => {
   return (
     <div className="json-viewer">
       {/* TODO: JSON Viewer tree implementation */}

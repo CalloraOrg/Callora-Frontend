@@ -262,9 +262,9 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0) {
-        processFile(files[0]);
+      const file = e.dataTransfer?.files?.[0];
+      if (file) {
+        processFile(file);
       } else {
         setState({ kind: 'idle' });
       }

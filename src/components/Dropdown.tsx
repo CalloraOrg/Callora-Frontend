@@ -192,7 +192,7 @@ export function Dropdown<T extends string = string>({
           currentEnabledPos < enabledIndices.length - 1
             ? enabledIndices[currentEnabledPos + 1]
             : enabledIndices[0]; // wrap to first
-        setActiveIndex(next);
+        if (next !== undefined) setActiveIndex(next);
         break;
       }
       case "ArrowUp": {
@@ -201,17 +201,21 @@ export function Dropdown<T extends string = string>({
           currentEnabledPos > 0
             ? enabledIndices[currentEnabledPos - 1]
             : enabledIndices[enabledIndices.length - 1]; // wrap to last
-        setActiveIndex(prev);
+        if (prev !== undefined) setActiveIndex(prev);
         break;
       }
-      case "Home":
+      case "Home": {
         e.preventDefault();
-        setActiveIndex(enabledIndices[0]);
+        const first = enabledIndices[0];
+        if (first !== undefined) setActiveIndex(first);
         break;
-      case "End":
+      }
+      case "End": {
         e.preventDefault();
-        setActiveIndex(enabledIndices[enabledIndices.length - 1]);
+        const last = enabledIndices[enabledIndices.length - 1];
+        if (last !== undefined) setActiveIndex(last);
         break;
+      }
       case "Enter":
       case " ":
         e.preventDefault();

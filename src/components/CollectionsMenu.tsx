@@ -33,6 +33,7 @@ function resolveEndpointLabel(endpointId: string, apis: readonly APIItem[]): str
       (e: { id?: unknown }) => e.id === endpointId,
     );
     if (ep) return `${api.name} – ${(ep as { title?: string; id: string }).title ?? ep.id}`;
+    const ep = (api.endpoints ?? []).find((e) => e.id === endpointId);
   }
   return endpointId;
 }

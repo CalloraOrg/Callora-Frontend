@@ -22,7 +22,7 @@
  */
 
 import { API_BASE, API_BASE_URL, apiUrl } from "../config/constants";
-import MOCK_APIS, { type APIItem } from "../data/mockApis";
+import MOCK_APIS, { type APIItem, type ApiEndpointItem } from "../data/mockApis";
 import { onAccountCacheInvalidated } from "../utils/offlineApiCache";
 import type { HealthStatus } from "../components/HealthTimeline";
 
@@ -347,7 +347,7 @@ export function adaptBackendApi(raw: unknown): APIItem | null {
     baseUrl,
     pricePerRequest,
     pricingOnRequest,
-    endpoints: endpoints.length > 0 ? (endpoints as Array<any>) : undefined,
+    endpoints: endpoints.length > 0 ? (endpoints as ApiEndpointItem[]) : undefined,
   };
 }
 

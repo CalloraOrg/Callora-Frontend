@@ -1,4 +1,4 @@
-import React, { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, KeyboardEvent } from "react";
 import { useAccountContext } from "../hooks/useAccountContext";
 import { resolveTimeZone } from "../utils/format";
 
@@ -73,6 +73,7 @@ export default function HealthTimeline({
     .formatToParts(new Date())
     .find((part) => part.type === "timeZoneName")?.value;
 
+  const timelineData: HealthStatus[] = Array<HealthStatus>(24).fill("operational").map((def, i) => data[i] ?? def);
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 

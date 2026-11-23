@@ -61,7 +61,8 @@ function fillRandomBytes(target: Uint8Array): Uint8Array {
 function toHex(bytes: Uint8Array): string {
   let out = '';
   for (let i = 0; i < bytes.length; i += 1) {
-    out += HEX_DIGITS[bytes[i] >> 4] + HEX_DIGITS[bytes[i] & 0x0f];
+    const byte = bytes[i] ?? 0;
+    out += (HEX_DIGITS[byte >> 4] ?? '') + (HEX_DIGITS[byte & 0x0f] ?? '');
   }
   return out;
 }
@@ -88,8 +89,8 @@ export function generateIdempotencyKey(): string {
 
   const bytes = fillRandomBytes(new Uint8Array(16));
   // Version 4 (random) and RFC 4122 variant bits.
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
 
   const hex = toHex(bytes);
   return [

@@ -59,8 +59,8 @@ export type CallRecord = {
   status: "success" | "error" | "unknown";
   responseTime: number | null;
   cost: number;
-  request?: any;
-  response?: any;
+  request?: unknown;
+  response?: unknown;
 };
 
 type UsageStats = {
@@ -219,10 +219,11 @@ export default function ApiUsage() {
   const [apiKey, setApiKey] = useState("ck_live_4e85ff1ed6a4ff73893a0bf73f2bb");
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [selectedEndpoint, setSelectedEndpoint] = useState(MOCK_ENDPOINTS[0]);
+  // Safe: MOCK_ENDPOINTS is a non-empty static array.
+  const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint>(MOCK_ENDPOINTS[0]!);
   const [requestParams, setRequestParams] = useState("{}");
   const [isLoading, setIsLoading] = useState(false);
-  const [apiResponse, setApiResponse] = useState<any>(null);
+  const [apiResponse, setApiResponse] = useState<unknown>(null);
   const [responseStatus, setResponseStatus] = useState<number | null>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
@@ -396,9 +397,6 @@ export default function ApiUsage() {
     fileName: exportFileName,
     lastFailedFormat: exportLastFailedFormat,
     isExporting,
-    isFailed: isExportFailed,
-    isCompleted: isExportCompleted,
-    isCancelled: isExportCancelled,
     startExport,
     cancelExport,
     retryLastFailedExport,
@@ -686,7 +684,8 @@ export default function ApiUsage() {
     (entry: HistoryEntry) => {
       setSelectedEndpoint(
         MOCK_ENDPOINTS.find((ep) => ep.id === entry.endpointId) ??
-          MOCK_ENDPOINTS[0],
+          // Safe: MOCK_ENDPOINTS is a non-empty static array.
+          MOCK_ENDPOINTS[0]!,
       );
       setRequestParams(entry.requestParams);
       setApiResponse(entry.response);

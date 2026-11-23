@@ -146,7 +146,7 @@ function toUsdcStroops(amount: string | number): bigint {
     );
   }
 
-  const [whole, fraction = ""] = amountText.split(".");
+  const [whole = "0", fraction = ""] = amountText.split(".");
   const scale = 10n ** BigInt(STELLAR_USDC_DECIMALS);
   const fractionalStroops = BigInt(
     fraction.padEnd(STELLAR_USDC_DECIMALS, "0") || "0",

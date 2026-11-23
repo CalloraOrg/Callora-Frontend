@@ -19,14 +19,16 @@ export function downsampleLatencyData(data: LatencyPoint[], maxPoints: number): 
 
   for (let i = 0; i < data.length; i += bucketSize) {
     const chunk = data.slice(i, i + bucketSize);
-    
+    const first = chunk[0];
+    if (!first) continue;
+
     // Compute max value in the chunk
     const maxValue = Math.max(...chunk.map((p) => p.value));
-    
+
     // We use the timestamp and label of the first element in the bucket
     downsampled.push({
-      label: chunk[0].label,
-      timestamp: chunk[0].timestamp,
+      label: first.label,
+      timestamp: first.timestamp,
       value: maxValue,
     });
   }
