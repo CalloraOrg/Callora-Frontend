@@ -8,6 +8,7 @@ export type { APIItem };
  * matching the mock provider API rows used in demo mode.
  */
 export function getProviderApis(): (APIItem & { publishStatus: "live" | "pending" | "rejected" })[] {
+  const statuses: ("live" | "pending" | "rejected")[] = ["live", "pending", "rejected"];
   return MOCK_APIS
     .filter(
       (api) =>
@@ -15,6 +16,6 @@ export function getProviderApis(): (APIItem & { publishStatus: "live" | "pending
     )
     .map((api, i) => ({
       ...api,
-      publishStatus: (["live", "pending", "rejected"] as const)[i % 3],
+      publishStatus: statuses[i % 3] ?? "live",
     }));
 }

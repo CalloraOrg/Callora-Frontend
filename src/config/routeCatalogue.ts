@@ -56,6 +56,11 @@ export const ROUTE_CATALOGUE: RouteCatalogueEntry[] = [
     keywords: ["history", "billing history", "transactions", "statement"],
   },
   {
+    label: "Subscriptions",
+    path: "/billing/subscriptions",
+    keywords: ["subscriptions", "manage subscriptions", "plans", "cancel subscription"],
+  },
+  {
     label: "Documentation",
     path: "/documentation",
     keywords: ["doc", "docs", "guide", "documentation", "help"],
@@ -84,6 +89,11 @@ export const ROUTE_CATALOGUE: RouteCatalogueEntry[] = [
     label: "Onboarding Tour",
     path: "/onboarding",
     keywords: ["onboarding", "tour", "getting started"],
+  },
+  {
+    label: "Notifications",
+    path: "/notifications",
+    keywords: ["notifications", "alerts", "inbox", "updates", "bell"],
   },
 ];
 

@@ -650,7 +650,7 @@ export default function EmptyState({
   onClearFilters,
   onRetry,
   action,
-  secondaryAction,
+  secondaryAction: _secondaryAction,
   loading = false,
   copyable = false,
 }: EmptyStateProps) {
@@ -790,21 +790,6 @@ export default function EmptyState({
         lineHeight: 1.2,
       };
 
-  const messageStyle: React.CSSProperties = isCompact
-    ? {
-        margin: 0,
-        color: "var(--muted)",
-        fontSize: "0.8125rem",
-        lineHeight: 1.4,
-        maxWidth: "240px",
-      }
-    : {
-        margin: 0,
-        color: "var(--muted)",
-        fontSize: "0.9375rem",
-        lineHeight: 1.5,
-        maxWidth: "320px",
-      };
 
   const buttonStyle: React.CSSProperties = isCompact
     ? {

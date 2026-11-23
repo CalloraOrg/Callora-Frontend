@@ -55,7 +55,9 @@ const parseInputToDate = (value: string): Date | undefined => {
   if (!value) return undefined;
   const parts = value.split('-').map(Number);
   if (parts.length !== 3 || parts.some(isNaN)) return undefined;
-  const date = new Date(parts[0], parts[1] - 1, parts[2]);
+  const [y, m, d] = parts;
+  if (y === undefined || m === undefined || d === undefined) return undefined;
+  const date = new Date(y, m - 1, d);
   return isNaN(date.getTime()) ? undefined : date;
 };
 

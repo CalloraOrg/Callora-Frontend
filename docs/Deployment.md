@@ -84,6 +84,18 @@ This places `public/mockServiceWorker.js` in the public directory and registers 
    );
    ```
 
+## Endpoint behaviours
+
+When `VITE_DEMO_MODE=true`, MSW intercepts requests across the app and serves consistent fixtures:
+- **Marketplace (`GET /api/apis`)**: Returns catalogue items supporting search, category, and `304 Not Modified` conditional ETag revalidation.
+- **API Details (`GET /api/apis/:id`)**: Returns API details or 404 for unknown IDs.
+- **Provider APIs (`GET /api/provider/apis`)**: Returns publisher APIs for `acme-labs` with cyclical publish statuses.
+- **API Usage (`GET /api/usage`)**: Returns aggregated daily usage and history matching `UsageApiResponse`.
+- **Billing Invoices (`GET /api/invoices`)**: Returns invoice listings with status, amounts, and dates.
+- **Activity Feed (`GET /api/activity`)**: Returns recent account activity events.
+- **Quota (`GET /api/quota`, `PUT /api/quota`)**: In-memory stateful store supporting updates and version conflict detection.
+- **Auth (`/api/auth/*`)**: Simulated wallet authentication, session refresh, and revocation.
+
 ## CI
 
 `.github/workflows/ci.yml` runs on every push to `main` and on pull requests: `tsc --noEmit`, `npm run build`, `vitest run`.

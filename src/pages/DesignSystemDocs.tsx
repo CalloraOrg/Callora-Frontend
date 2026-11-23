@@ -1124,7 +1124,7 @@ export default function DesignSystemDocs(): JSX.Element {
   // ── State ────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TabId>("components");
   const [searchQuery, setSearchQuery] = useState("");
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set([COMPONENT_DOCS[0].id]));
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set(COMPONENT_DOCS[0] ? [COMPONENT_DOCS[0].id] : []));
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const filteredDocs = useMemo(() => {

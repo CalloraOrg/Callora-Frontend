@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   refreshAccessToken: vi.fn<[], Promise<string>>(),
   signOut: vi.fn<[], Promise<void>>(),
   signalExpiry: vi.fn(),
+  signalRateLimit: vi.fn(),
   apiUrl: vi.fn((path: string) => path),
   fetch: vi.fn(),
 }));
@@ -22,6 +23,10 @@ vi.mock("./sessionExpiry", () => ({
   signalExpiry: mocks.signalExpiry,
 }));
 
+vi.mock("./rateLimitSignal", () => ({
+  signalRateLimit: mocks.signalRateLimit,
+}));
+
 vi.mock("../config/constants", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../config/constants")>()),
   apiUrl: mocks.apiUrl,
@@ -30,6 +35,8 @@ vi.mock("../config/constants", async (importOriginal) => ({
 // ─── Module under test ────────────────────────────────────────────────────────
 import {
   authFetch,
+  DEFAULT_RATE_LIMIT_RETRY_MS,
+  MAX_RATE_LIMIT_RETRY_MS,
   _resetRefreshPromiseForTests,
 } from "./authFetch";
 
@@ -254,6 +261,141 @@ describe("authFetch", () => {
       expect(url).toContain("/api/usage");
       const headers = init.headers as Record<string, string>;
       expect(headers["Authorization"]).toBe(`Bearer ${ACCESS_TOKEN}`);
+    });
+  });
+
+  // ─── Scenario 10: HTTP 429 rate-limit handling ────────────────────────────
+  describe("Scenario 10 – HTTP 429 rate-limit handling", () => {
+    function rateLimitedResponse(headersInit: Record<string, string> = {}) {
+      return new Response(JSON.stringify({ error: "Too Many Requests" }), {
+        status: 429,
+        headers: headersInit,
+      });
+    }
+
+    it("parses Retry-After in delta-seconds, emits signal once, and returns 429 unchanged", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-11-23T00:00:00.000Z"));
+      try {
+        const res = rateLimitedResponse({
+          "Retry-After": "30",
+          "X-RateLimit-Limit": "100",
+          "X-RateLimit-Remaining": "0",
+        });
+        mocks.fetch.mockResolvedValueOnce(res);
+
+        const returned = await authFetch("/api/usage");
+
+        expect(returned).toBe(res);
+        expect(returned.status).toBe(429);
+        expect(mocks.fetch).toHaveBeenCalledTimes(1);
+        expect(mocks.signalRateLimit).toHaveBeenCalledTimes(1);
+        expect(mocks.signalRateLimit).toHaveBeenCalledWith({
+          retryAfterMs: 30_000,
+          resetAt: "2026-11-23T00:00:30.000Z",
+          path: "/api/usage",
+          limit: 100,
+          remaining: 0,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("parses Retry-After as an HTTP-date", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-11-23T00:00:00.000Z"));
+      try {
+        const retryDate = new Date("2026-11-23T00:01:30.000Z").toUTCString();
+        mocks.fetch.mockResolvedValueOnce(
+          rateLimitedResponse({ "Retry-After": retryDate }),
+        );
+
+        const returned = await authFetch("/api/v1/transactions", {
+          method: "POST",
+        });
+
+        expect(returned.status).toBe(429);
+        expect(mocks.signalRateLimit).toHaveBeenCalledTimes(1);
+        expect(mocks.signalRateLimit).toHaveBeenCalledWith({
+          retryAfterMs: 90_000,
+          resetAt: "2026-11-23T00:01:30.000Z",
+          path: "/api/v1/transactions",
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("falls back to DEFAULT_RATE_LIMIT_RETRY_MS when Retry-After is missing", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-11-23T00:00:00.000Z"));
+      try {
+        mocks.fetch.mockResolvedValueOnce(rateLimitedResponse());
+
+        const returned = await authFetch("/api/usage");
+
+        expect(returned.status).toBe(429);
+        expect(mocks.signalRateLimit).toHaveBeenCalledTimes(1);
+        expect(mocks.signalRateLimit).toHaveBeenCalledWith({
+          retryAfterMs: DEFAULT_RATE_LIMIT_RETRY_MS,
+          resetAt: new Date(
+            Date.now() + DEFAULT_RATE_LIMIT_RETRY_MS,
+          ).toISOString(),
+          path: "/api/usage",
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("clamps huge Retry-After values to MAX_RATE_LIMIT_RETRY_MS", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-11-23T00:00:00.000Z"));
+      try {
+        mocks.fetch.mockResolvedValueOnce(
+          rateLimitedResponse({ "Retry-After": "99999999" }),
+        );
+
+        await authFetch("/api/usage");
+
+        expect(mocks.signalRateLimit).toHaveBeenCalledTimes(1);
+        expect(mocks.signalRateLimit).toHaveBeenCalledWith({
+          retryAfterMs: MAX_RATE_LIMIT_RETRY_MS,
+          resetAt: new Date(
+            Date.now() + MAX_RATE_LIMIT_RETRY_MS,
+          ).toISOString(),
+          path: "/api/usage",
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("signals rate limit once when a 401 refresh retry receives 429", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-11-23T00:00:00.000Z"));
+      try {
+        const rateLimitRes = rateLimitedResponse({ "Retry-After": "15" });
+        mocks.fetch
+          .mockResolvedValueOnce(unauthorizedResponse())
+          .mockResolvedValueOnce(rateLimitRes);
+
+        const returned = await authFetch("/api/usage");
+
+        expect(returned).toBe(rateLimitRes);
+        expect(returned.status).toBe(429);
+        expect(mocks.refreshAccessToken).toHaveBeenCalledTimes(1);
+        expect(mocks.signalExpiry).not.toHaveBeenCalled();
+        expect(mocks.signalRateLimit).toHaveBeenCalledTimes(1);
+        expect(mocks.signalRateLimit).toHaveBeenCalledWith({
+          retryAfterMs: 15_000,
+          resetAt: "2026-11-23T00:00:15.000Z",
+          path: "/api/usage",
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

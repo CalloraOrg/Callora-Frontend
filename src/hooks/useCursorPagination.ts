@@ -14,21 +14,6 @@ function encodeCursor(id: string): string {
     .replace(/=+$/g, "");
 }
 
-function decodeCursor(cursor: string): string {
-  try {
-    const base64 = cursor.replace(/-/g, "+").replace(/_/g, "/");
-    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64) || base64.length % 4 === 1) {
-      return "";
-    }
-
-    const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="));
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    return "";
-  }
-}
-
 /**
  * Result object returned by the {@link useCursorPagination} hook.
  *
@@ -148,10 +133,12 @@ export function useCursorPagination<T extends { id: string }>(
       [];
 
     for (let i = 0; i < items.length; i += pageSize) {
+      const item = items[i];
+      if (!item) continue;
       boundaries.push({
         start: i,
         end: Math.min(i + pageSize, items.length),
-        cursor: encodeCursor(items[i].id),
+        cursor: encodeCursor(item.id),
       });
     }
 
@@ -172,6 +159,7 @@ export function useCursorPagination<T extends { id: string }>(
     if (pageBoundaries.length === 0) return [];
 
     const boundary = pageBoundaries[currentPageIndex] ?? pageBoundaries[0];
+    if (!boundary) return [];
     return items.slice(boundary.start, boundary.end);
   }, [items, pageBoundaries, currentPageIndex]);
 

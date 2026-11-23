@@ -4,6 +4,7 @@ import {
   backoffDelayMs,
   isTimeoutError,
 } from "../services/idempotency";
+import { isApiError } from "../api/apiClient";
 
 export interface WebhookDelivery {
   id: string;
@@ -101,6 +102,7 @@ const RETRY_BASE_DELAY_MS = 250;
 
 function isRetryableDeliveryError(error: unknown): boolean {
   if (isTimeoutError(error)) return true;
+  if (isApiError(error)) return error.retryable;
   if (error instanceof Error) {
     const message = error.message || "";
     return (
@@ -172,11 +174,11 @@ export function useWebhookDeliveries(
         setLoadedAccountId(currentAccountId);
         setStatus("success");
         setIsStale(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (reqId !== requestCounter.current) return;
-        if (err.name === "AbortError") return;
+        if (err instanceof Error && err.name === "AbortError") return;
 
-        setError(err.message || "An error occurred");
+        setError((err instanceof Error ? err.message : null) || "An error occurred");
         setStatus("error");
         setIsStale(false);
       }

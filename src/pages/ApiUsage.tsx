@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Skeleton, { ApiUsageSkeleton } from "../components/Skeleton";
 import { formatPrice, formatDuration } from "../utils/format";
 import type { JsonSchema } from "../components/RequestBodyEditor";
@@ -9,6 +9,10 @@ import ParamsBuilder from "../components/ParamsBuilder";
 import UsageChart from "../components/UsageChart";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import { useQuota } from "../hooks/useQuota";
+import { useQuotaStore } from "../hooks/useQuotaStore";
+import { quotaStore } from "../state/quotaStore";
+import QuotaManager from "../components/QuotaManager";
+import QuotaBanner, { type QuotaStatus } from "./QuotaBanner";
 import PlanNudge from "../components/PlanNudge";
 import CallsHeatmap from "../components/CallsHeatmap";
 import Tabs from "../components/Tabs";
@@ -29,6 +33,12 @@ import {
 } from "../state/testCallHistory";
 import { copySnapshotUrl, parseSnapshotUrl } from "../utils/snapshotUrl";
 import { authFetch } from "../services/authFetch";
+import { runTestCall } from "../services/testCall";
+import { useRateLimit } from "../hooks/useRateLimit";
+import RateLimitAlert from "../components/RateLimitAlert";
+import { formatCountdown } from "../utils/format";
+import { DateRangePicker } from "../components/DateRangePicker";
+import type { DateRange as DateRangePickerRange } from "../components/DateRangePicker";
 
 type ApiEndpoint = {
   id: string;
@@ -51,8 +61,8 @@ export type CallRecord = {
   status: "success" | "error" | "unknown";
   responseTime: number | null;
   cost: number;
-  request?: any;
-  response?: any;
+  request?: unknown;
+  response?: unknown;
 };
 
 type UsageStats = {
@@ -88,12 +98,6 @@ type UsageApiResponse = {
   };
   usagePercent?: number;
   quota?: { usagePercent?: number };
-};
-
-type DateRange = {
-  preset: "24h" | "7d" | "30d" | "custom";
-  from?: Date;
-  to?: Date;
 };
 
 const MOCK_ENDPOINTS: ApiEndpoint[] = [
@@ -203,18 +207,29 @@ const API_USAGE_SHORTCUTS = SHORTCUTS.filter((s) => s.category === "ApiUsage");
 
 export default function ApiUsage() {
   const { trackFetch } = useFetchTracker();
+  const { rateLimitState, timeUntilReset } = useRateLimit();
+  const isRateLimited = timeUntilReset > 0;
   const currentAccountId = useAccountId();
   const { get: getCachedUsage, set: cacheUsage } =
     useApiCache<UsageApiResponse>();
   const [apiKey, setApiKey] = useState("ck_live_4e85ff1ed6a4ff73893a0bf73f2bb");
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [selectedEndpoint, setSelectedEndpoint] = useState(MOCK_ENDPOINTS[0]);
+  // Safe: MOCK_ENDPOINTS is a non-empty static array.
+  const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint>(MOCK_ENDPOINTS[0]!);
   const [requestParams, setRequestParams] = useState("{}");
   const [isLoading, setIsLoading] = useState(false);
-  const [apiResponse, setApiResponse] = useState<any>(null);
+  const [apiResponse, setApiResponse] = useState<unknown>(null);
+  const [responseStatus, setResponseStatus] = useState<number | null>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
+  const testCallAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      testCallAbortRef.current?.abort();
+    };
+  }, []);
   const [statusFilter, setStatusFilter] = useState<"all" | "success" | "error">(
     "all",
   );
@@ -235,7 +250,9 @@ export default function ApiUsage() {
     () => setIsHistoryOpen((prev) => !prev),
     [],
   );
-  const [historyEntries, setHistoryEntries] = useState<any[]>([]);
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>(() =>
+    loadHistory(),
+  );
 
   const callHistory =
     usageData?.accountId === currentAccountId
@@ -365,29 +382,8 @@ export default function ApiUsage() {
     (isUsageLoading || usageRequestAccountId !== currentAccountId);
   const isTableLoading = isPageLoading;
 
-  const {
-    status: exportStatus,
-    format: exportFormat,
-    progress: exportProgress,
-    totalRecords: exportTotalRecords,
-    processedRecords: exportProcessedRecords,
-    error: exportError,
-    downloadUrl: exportDownloadUrl,
-    fileName: exportFileName,
-    lastFailedFormat: exportLastFailedFormat,
-    isExporting,
-    isFailed: isExportFailed,
-    isCompleted: isExportCompleted,
-    isCancelled: isExportCancelled,
-    startExport,
-    cancelExport,
-    retryLastFailedExport,
-    recoverDownload,
-    resetExport,
-  } = useExportHistory(callHistory, { accountId: currentAccountId ?? undefined });
-
-  const [selectedRange, setSelectedRange] = useState<DateRange>({
-    preset: "24h",
+  const [selectedRange, setSelectedRange] = useState<DateRangePickerRange>({
+    preset: "7d",
   });
   const [selectedLanguage, setSelectedLanguage] = useState<
     "javascript" | "python" | "curl"
@@ -466,10 +462,44 @@ export default function ApiUsage() {
       : callHistory.filter((call) => call.status === statusFilter),
   );
 
+  // Export uses the range-filtered history so the downloaded file matches what
+  // is shown in the table. The filename includes the preset for traceability.
+  const exportRangeLabel = selectedRange.preset === "custom"
+    ? (selectedRange.from && selectedRange.to
+        ? `${selectedRange.from.toISOString().slice(0, 10)}_to_${selectedRange.to.toISOString().slice(0, 10)}`
+        : "custom")
+    : selectedRange.preset;
+
+  const {
+    status: exportStatus,
+    format: exportFormat,
+    progress: exportProgress,
+    totalRecords: exportTotalRecords,
+    processedRecords: exportProcessedRecords,
+    error: exportError,
+    downloadUrl: exportDownloadUrl,
+    fileName: exportFileName,
+    lastFailedFormat: exportLastFailedFormat,
+    isExporting,
+    isFailed: isExportFailed,
+    isCompleted: isExportCompleted,
+    isCancelled: isExportCancelled,
+    startExport: startExportBase,
+    cancelExport,
+    retryLastFailedExport,
+    recoverDownload,
+    resetExport,
+  } = useExportHistory(filteredCallHistory, { accountId: currentAccountId ?? undefined });
+
+  const startExport = useCallback(
+    (format: "csv" | "json") => startExportBase(format),
+    [startExportBase],
+  );
+
   // Initialize selected range from URL query on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const preset = params.get("range") as DateRange["preset"] | null;
+    const preset = params.get("range") as DateRangePickerRange["preset"] | null;
     const from = params.get("from");
     const to = params.get("to");
     if (preset && ["24h", "7d", "30d", "custom"].includes(preset)) {
@@ -485,7 +515,7 @@ export default function ApiUsage() {
   // Sync selected range to URL query whenever it changes
   useEffect(() => {
     const params = new URLSearchParams();
-    if (selectedRange.preset !== "24h") {
+    if (selectedRange.preset !== "7d") {
       params.set("range", selectedRange.preset);
       if (
         selectedRange.preset === "custom" &&
@@ -501,22 +531,64 @@ export default function ApiUsage() {
   }, [selectedRange]);
 
   const { isDismissed, dismiss } = useQuota(usagePercent);
+  const quotaState = useQuotaStore(quotaStore);
+  const quotaAccountId = currentAccountId ?? "default";
+  const quotaSlice =
+    quotaState.slices[quotaAccountId] ?? quotaStore.getSlice(quotaAccountId);
+
+  const quotaBannerStatus: QuotaStatus =
+    usagePercent >= 100 ? "danger" : usagePercent >= 80 ? "warn" : "ok";
+  const showQuotaEmptyState =
+    quotaSlice.loadStatus === "ready" &&
+    (quotaSlice.value === null || quotaSlice.value === 0);
+  const quotaBannerStatusLabel =
+    quotaSlice.loadStatus === "loading" && quotaSlice.value === null
+      ? "Loading…"
+      : quotaSlice.loadStatus === "error"
+        ? "Error"
+        : quotaSlice.loadStatus === "stale"
+          ? "Stale"
+          : quotaSlice.pendingStatus === "error"
+            ? "Action needed"
+            : undefined;
+  const quotaBannerExtraInfo =
+    quotaSlice.pendingStatus === "error" && quotaSlice.pendingError
+      ? quotaSlice.pendingError
+      : quotaSlice.loadStatus === "error" && quotaSlice.loadError
+        ? quotaSlice.loadError
+        : quotaSlice.loadStatus === "stale"
+          ? "Quota updated in another tab. Refresh to review the latest value."
+          : quotaSlice.loadStatus === "loading" && quotaSlice.value === null
+            ? "Loading authoritative quota…"
+            : "Authoritative quota synced with your account.";
+  const handleSetupQuota = () => {
+    document.getElementById("quota-manager-input")?.focus();
+  };
 
   // Whether any call-history filter differs from its default value.
   const filtersAreActive =
-    statusFilter !== "all" || selectedRange.preset !== "24h";
+    statusFilter !== "all" || selectedRange.preset !== "7d";
 
   const announceStatus = useCallback((message: string) => {
     setLiveStatusMessage("");
     window.setTimeout(() => setLiveStatusMessage(message), 0);
   }, []);
 
+  // Politely announce rate-limit start once per reset window (not every second).
+  useEffect(() => {
+    if (!rateLimitState) return;
+    const ms = Math.max(0, new Date(rateLimitState.resetAt).getTime() - Date.now());
+    if (ms > 0) {
+      announceStatus(`Rate limit reached. Retry available in ${formatCountdown(ms)}.`);
+    }
+  }, [rateLimitState, announceStatus]);
+
   // Reset all call-history filters to their defaults and announce the change
   // to assistive technology via the aria-live region below.
   const handleResetFilters = () => {
     setStatusFilter("all");
-    setSelectedRange({ preset: "24h" });
-    announceStatus("Filters reset. Showing all calls from the last 24 hours.");
+    setSelectedRange({ preset: "7d" });
+    announceStatus("Filters reset. Showing all calls from the last 7 days.");
   };
 
   const handleCopyApiKey = async () => {
@@ -552,82 +624,84 @@ export default function ApiUsage() {
       }
     }
 
+    testCallAbortRef.current?.abort();
+    const controller = new AbortController();
+    testCallAbortRef.current = controller;
+
     setIsLoading(true);
     setApiResponse(null);
+    setResponseStatus(null);
     setResponseTime(null);
     setCallCost(null);
 
-    const startTime = Date.now();
+    try {
+      const result = await trackFetch(
+        runTestCall({
+          endpoint: selectedEndpoint,
+          params: requestParams,
+          signal: controller.signal,
+        }),
+      );
 
-    await trackFetch(
-      new Promise<void>((resolve) => {
-        setTimeout(
-          () => {
-            const endTime = Date.now();
-            const time = endTime - startTime;
-            const cost = Math.random() * 0.005 + 0.001;
+      if (controller.signal.aborted) return;
 
-            setResponseTime(time);
-            setCallCost(cost);
+      setResponseTime(result.responseTime);
+      setCallCost(result.cost);
+      setResponseStatus(result.httpStatus);
+      setApiResponse(result.body);
 
-            const mockResponse = {
-              success: true,
-              data: {
-                id: "user_123",
-                name: "John Doe",
-                email: "john@example.com",
-                balance: 1250.5,
-                created_at: new Date().toISOString(),
-              },
-              timestamp: new Date().toISOString(),
-            };
+      const historyEntry: HistoryEntry = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        endpointId: selectedEndpoint.id,
+        endpointName: selectedEndpoint.name,
+        endpointPath: selectedEndpoint.path,
+        method: selectedEndpoint.method,
+        requestParams,
+        response: result.body,
+        status: result.status,
+        httpStatus: result.httpStatus,
+        responseTime: result.responseTime,
+        cost: result.cost,
+      };
+      saveEntry(historyEntry);
+      setHistoryEntries(loadHistory());
 
-            setApiResponse(mockResponse);
-
-            const newCall: CallRecord = {
-              id: Date.now().toString(),
-              timestamp: new Date(),
-              endpoint: selectedEndpoint.path,
-              status: "success",
-              responseTime: time,
-              cost: cost,
-              request: requestParams,
-              response: mockResponse,
-            };
-
-            const historyEntry: HistoryEntry = {
-              id: newCall.id,
-              timestamp: newCall.timestamp.toISOString(),
-              endpointId: selectedEndpoint.id,
-              endpointName: selectedEndpoint.name,
-              endpointPath: selectedEndpoint.path,
-              method: selectedEndpoint.method,
-              requestParams: requestParams,
-              response: mockResponse,
-              status: "success",
-              responseTime: time,
-              cost: cost,
-            };
-            saveEntry(historyEntry);
-            setHistoryEntries(loadHistory());
-
-            setIsLoading(false);
-            resolve();
-          },
-          1000 + Math.random() * 2000,
+      if (result.ok) {
+        announceStatus(
+          `Test call succeeded (${result.httpStatus ?? 200}) in ${result.responseTime}ms.`,
         );
-      }),
-    );
+      } else {
+        announceStatus(
+          `Test call failed${result.httpStatus ? ` (${result.httpStatus})` : ""}: ${result.errorMessage ?? "An error occurred."}`,
+        );
+      }
+    } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof DOMException && error.name === "AbortError") ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
+        return;
+      }
+    } finally {
+      if (testCallAbortRef.current === controller) {
+        testCallAbortRef.current = null;
+        setIsLoading(false);
+      }
+    }
   };
 
   const handleHistorySelect = useCallback(
     (entry: HistoryEntry) => {
       setSelectedEndpoint(
         MOCK_ENDPOINTS.find((ep) => ep.id === entry.endpointId) ??
-          MOCK_ENDPOINTS[0],
+          // Safe: MOCK_ENDPOINTS is a non-empty static array.
+          MOCK_ENDPOINTS[0]!,
       );
       setRequestParams(entry.requestParams);
       setApiResponse(entry.response);
+      setResponseStatus(entry.httpStatus ?? null);
       setResponseTime(entry.responseTime);
       setCallCost(entry.cost);
       toggleHistory();
@@ -665,7 +739,7 @@ export default function ApiUsage() {
         if (event.metaKey || event.ctrlKey || event.altKey) return;
         switch (event.key) {
           case 't':
-            if (!isLoading) {
+            if (!isLoading && !isRateLimited) {
               handleMakeTestCall();
             }
             break;
@@ -687,7 +761,7 @@ export default function ApiUsage() {
             break;
         }
       },
-      [isLoading, isExporting, handleMakeTestCall, toggleHistory, handleCopyApiKey, handleShareSnapshot, handleExportHistory]
+      [isLoading, isRateLimited, isExporting, handleMakeTestCall, toggleHistory, handleCopyApiKey, handleShareSnapshot, handleExportHistory]
     )
   );
 
@@ -709,6 +783,18 @@ export default function ApiUsage() {
       />
       {!isDismissed && (
         <PlanNudge usagePercent={usagePercent} onDismiss={dismiss} />
+      )}
+      {isRateLimited && (
+        <RateLimitAlert
+          timeUntilReset={timeUntilReset}
+          limit={rateLimitState?.limit || undefined}
+          remaining={
+            rateLimitState && rateLimitState.limit > 0
+              ? rateLimitState.remaining
+              : undefined
+          }
+          compact
+        />
       )}
       {/* Header Section */}
       <div className="api-header">
@@ -746,6 +832,29 @@ export default function ApiUsage() {
       </div>
 
       <KbdHint shortcuts={API_USAGE_SHORTCUTS} />
+
+      {/* Quota Management Section */}
+      <div className="surface quota-management-section">
+        <QuotaBanner
+          title="API Quota"
+          status={quotaBannerStatus}
+          statusLabel={quotaBannerStatusLabel}
+          value={quotaSlice.value !== null ? String(quotaSlice.value) : ""}
+          hint="Current authoritative requests-per-window quota"
+          extraInfo={quotaBannerExtraInfo}
+          statusOptions={
+            quotaSlice.loadStatus === "error" ||
+            quotaSlice.pendingStatus === "error"
+              ? "error"
+              : quotaSlice.loadStatus === "ready"
+                ? "success"
+                : "idle"
+          }
+          showEmptyState={showQuotaEmptyState}
+          onSetupQuota={handleSetupQuota}
+        />
+        <QuotaManager store={quotaStore} accountId={quotaAccountId} />
+      </div>
 
       {/* API Key Section */}
       <div className="surface api-key-section">
@@ -829,7 +938,7 @@ export default function ApiUsage() {
           <button
             className={`primary-button ${isLoading ? "button-loading" : ""}`}
             onClick={handleMakeTestCall}
-            disabled={isLoading}
+            disabled={isLoading || isRateLimited}
           >
             {isLoading && (
               <span className="button-spinner" aria-hidden="true" />
@@ -848,7 +957,7 @@ export default function ApiUsage() {
           </button>
         </div>
 
-        {(apiResponse || isLoading) && (
+        {(apiResponse !== null || isLoading) && (
           <div
             className="response-display"
             aria-live="polite"
@@ -872,6 +981,11 @@ export default function ApiUsage() {
             ) : (
               <div className="response-content">
                 <div className="response-meta">
+                  {responseStatus !== null && (
+                    <span className="response-status tabular-nums">
+                      Status: {responseStatus}
+                    </span>
+                  )}
                   <span className="response-time tabular-nums">
                     Response time: {formatDuration(responseTime || 0)}
                   </span>
@@ -880,7 +994,9 @@ export default function ApiUsage() {
                   </span>
                 </div>
                 <pre className="response-json">
-                  {JSON.stringify(apiResponse, null, 2)}
+                  {typeof apiResponse === "string"
+                    ? apiResponse
+                    : JSON.stringify(apiResponse, null, 2)}
                 </pre>
               </div>
             )}
@@ -931,10 +1047,12 @@ export default function ApiUsage() {
 
         <div className="mini-chart">
           <h3>Calls Over Time</h3>
-          <CallsHeatmap />
+          <CallsHeatmap from={selectedRange.from} to={selectedRange.to} />
           <UsageChart
             title="API Call Trends"
             alt="Usage statistics chart showing API call trends over time"
+            from={selectedRange.from}
+            to={selectedRange.to}
           />
         </div>
       </div>
@@ -944,6 +1062,20 @@ export default function ApiUsage() {
         <div className="section-header">
           <h2>Call History</h2>
           <div className="history-actions">
+            <DateRangePicker
+              selectedRange={selectedRange}
+              onChange={(range) => {
+                setSelectedRange(range);
+                announceStatus(
+                  range.preset === "custom"
+                    ? "Custom date range selected."
+                    : `Showing calls from the last ${range.preset}.`,
+                );
+              }}
+              label="Time range"
+              maxDate={new Date()}
+              id="api-usage-date-range"
+            />
             <Tabs
               tabs={[
                 { id: "all", label: "All Status" },

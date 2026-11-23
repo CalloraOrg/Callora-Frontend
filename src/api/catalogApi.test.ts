@@ -7,11 +7,15 @@ import {
   clearCatalogCache,
   createCatalogApi,
   fetchApiDetail,
+  fetchApiHealth,
   fetchCatalog,
+  isCatalogAbortError,
+  normalizeApiHealth,
   normalizeCatalog,
   CatalogFetchError,
 } from "./catalogApi";
 import MOCK_APIS from "../data/mockApis";
+import { invalidateAccountCache } from "../utils/offlineApiCache";
 
 const originalSessionStorage = globalThis.sessionStorage;
 
@@ -381,6 +385,270 @@ describe("catalogApi module", () => {
     it("returns not-found for an unknown API id", async () => {
       const result = await fetchApiDetail("unknown-999");
       expect(result.status).toBe("not-found");
+    });
+  });
+
+  describe("resolveApisByIds", () => {
+    const makeBackendRow = (id: string, name: string) => ({
+      id,
+      name,
+      description: `${name} desc`,
+      developer: { name: "Dev Co" },
+      price: 0.02,
+    });
+
+    it("returns empty arrays immediately for an empty id list without fetching", async () => {
+      const mockFetch = vi.fn();
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch,
+      });
+
+      const result = await api.resolveApisByIds([]);
+      expect(result).toEqual({ apis: [], missing: [] });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("serves from the cached catalogue without additional fetches (cache hit)", async () => {
+      const mockFetch = vi.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            makeBackendRow("api-1", "One"),
+            makeBackendRow("api-2", "Two"),
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch,
+      });
+
+      await api.fetchCatalog();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      const result = await api.resolveApisByIds(["api-2", "api-1", "api-2"]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result.apis.map((a) => a.id)).toEqual(["api-2", "api-1"]);
+      expect(result.missing).toEqual([]);
+    });
+
+    it("fetches only missing ids on partial miss and records 404s in missing", async () => {
+      const mockFetch = vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/api/apis")) {
+          return Promise.resolve(
+            new Response(JSON.stringify([makeBackendRow("api-1", "One")]), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        if (url.endsWith("/api/apis/api-2")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(makeBackendRow("api-2", "Two")), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        if (url.endsWith("/api/apis/deleted-99")) {
+          return Promise.resolve(new Response("Not Found", { status: 404 }));
+        }
+        return Promise.resolve(new Response("Unexpected", { status: 500 }));
+      });
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      await api.fetchCatalog();
+      const result = await api.resolveApisByIds(["api-1", "deleted-99", "api-2"]);
+
+      expect(result.apis.map((a) => a.id)).toEqual(["api-1", "api-2"]);
+      expect(result.missing).toEqual(["deleted-99"]);
+      // 1 for catalog + 1 for api-2 + 1 for deleted-99 (api-1 was a cache hit)
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it("deduplicates concurrent in-flight requests for the same id", async () => {
+      let resolveFetch!: (res: Response) => void;
+      const mockFetch = vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve;
+          }),
+      );
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      const p1 = api.resolveApisByIds(["shared-1"]);
+      const p2 = api.resolveApisByIds(["shared-1"]);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      resolveFetch(
+        new Response(JSON.stringify(makeBackendRow("shared-1", "Shared")), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      const [r1, r2] = await Promise.all([p1, p2]);
+      expect(r1.apis.map((a) => a.id)).toEqual(["shared-1"]);
+      expect(r2.apis.map((a) => a.id)).toEqual(["shared-1"]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects with AbortError when signal is aborted", async () => {
+      const mockFetch = vi.fn(
+        () => new Promise<Response>(() => {}),
+      );
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      const controller = new AbortController();
+      const promise = api.resolveApisByIds(["slow-1"], controller.signal);
+      controller.abort();
+
+      await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+    });
+
+    it("invalidates the resolver cache on account switch via invalidateAccountCache", async () => {
+      const mockFetch = vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(makeBackendRow("acct-1", "Account API")), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      );
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      await api.resolveApisByIds(["acct-1"]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Cached hit before account switch
+      await api.resolveApisByIds(["acct-1"]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Account switch invalidates cache
+      invalidateAccountCache("account-b");
+
+      await api.resolveApisByIds(["acct-1"]);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("fetchApiHealth", () => {
+    it("parses a valid points payload into HealthStatus[]", async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            points: [
+              { at: "2026-01-01T00:00:00Z", status: "operational" },
+              { at: "2026-01-01T01:00:00Z", status: "degraded" },
+              { at: "2026-01-01T02:00:00Z", status: "down" },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      const result = await api.fetchApiHealth("geocode-01");
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:3000/api/apis/geocode-01/health",
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(result).toEqual(["operational", "degraded", "down"]);
+    });
+
+    it("drops unknown or malformed status values", () => {
+      const result = normalizeApiHealth({
+        points: [
+          { at: "2026-01-01T00:00:00Z", status: "operational" },
+          { at: "2026-01-01T01:00:00Z", status: "unknown" },
+          { at: "2026-01-01T02:00:00Z", status: 123 },
+          { at: "2026-01-01T03:00:00Z", status: "degraded" },
+          null,
+          { at: "2026-01-01T04:00:00Z", status: "down" },
+        ],
+      });
+      expect(result).toEqual(["operational", "degraded", "down"]);
+    });
+
+    it("returns an empty array on 404", async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(null, { status: 404, statusText: "Not Found" }),
+      );
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      const result = await api.fetchApiHealth("missing-api");
+      expect(result).toEqual([]);
+    });
+
+    it("throws CatalogFetchError on 500 server error", async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(null, { status: 500, statusText: "Internal Server Error" }),
+      );
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      await expect(api.fetchApiHealth("broken-api")).rejects.toBeInstanceOf(
+        CatalogFetchError,
+      );
+    });
+
+    it("rejects with AbortError when signal is aborted", async () => {
+      const controller = new AbortController();
+      const mockFetch = vi.fn((_url: string, init?: RequestInit) => {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            const err = new Error("Aborted");
+            err.name = "AbortError";
+            reject(err);
+          });
+        });
+      });
+
+      const api = createCatalogApi({
+        baseUrl: "http://localhost:3000",
+        fetchImpl: mockFetch as unknown as typeof fetch,
+      });
+
+      const promise = api.fetchApiHealth("slow-api", controller.signal);
+      controller.abort();
+
+      await expect(promise).rejects.toSatisfy(isCatalogAbortError);
+    });
+
+    it("fetches health status for an API using MSW handler", async () => {
+      const result = await fetchApiHealth("weather-001");
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 });

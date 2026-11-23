@@ -68,14 +68,8 @@ export const EXTERNAL_LINKS = {
   privacy: "https://callora.org/privacy",
 } as const;
 
-/** Application route paths. */
-export const APP_ROUTES = {
-  home: "/",
-  marketplace: "/marketplace",
-  apiDetail: "/api/:id",
-  dashboard: "/dashboard",
-  endpointSummary: "/endpoints",
-} as const;
+/** Application route paths. Reconciled with src/app/routes.ts */
+export { APP_ROUTES } from "../app/routes";
 
 /**
  * Stellar networks the app can be pointed at.

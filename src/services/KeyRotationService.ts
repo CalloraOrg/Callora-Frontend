@@ -73,9 +73,9 @@ function generateSecureNonce(): string {
 }
 
 /**
- * Encodes the rotation context with a 128-bit random nonce for this frontend
- * placeholder. Base64 does not authenticate the token; the server must still
- * authorize the request and should issue/store its own confirmation token.
+ * @deprecated Test-only placeholder for confirmation token generation.
+ * In production, confirmation tokens MUST be issued server-side via getRotationToken().
+ * Kept for unit testing and backwards compatibility with test harnesses.
  */
 export function generateConfirmationToken(context: RotationContext): string {
   const payload = {
@@ -157,10 +157,16 @@ export function validateRotationRequest(
   }
 
   // 2. Parse and validate the token
-  let tokenPayload: any;
+  interface ConfirmationTokenPayload {
+    timestamp: number;
+    userId?: string;
+    tenantId?: string;
+    sessionId?: string;
+  }
+  let tokenPayload: ConfirmationTokenPayload;
   try {
     const decoded = atob(request.confirmationToken);
-    tokenPayload = JSON.parse(decoded);
+    tokenPayload = JSON.parse(decoded) as ConfirmationTokenPayload;
   } catch {
     return {
       valid: false,

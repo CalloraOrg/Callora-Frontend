@@ -16,8 +16,9 @@
  *   401 unauthorized responses distinctly from server/network errors.
  */
 
-import { API_BASE, apiUrl } from "../config/constants";
+import { API_BASE } from "../config/constants";
 import { getCurrentAccount } from "../state/accountStore";
+import { apiClient, isApiAbortError, isApiError } from "./apiClient";
 
 /** Path the billing invoices endpoint is mounted at. */
 export const INVOICES_PATH = "/api/invoices";
@@ -272,31 +273,57 @@ export async function fetchLatestInvoices(
   }
 
   const clampedLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
-  const params = new URLSearchParams({ limit: String(clampedLimit) });
-  if (cursor) {
-    params.set("cursor", cursor);
-  }
-
-  const pathWithQuery = `${INVOICES_PATH}?${params.toString()}`;
-  const targetUrl =
-    baseUrl !== undefined
-      ? `${baseUrl.replace(/\/+$/, "")}${pathWithQuery}`
-      : apiUrl(pathWithQuery);
-
   const effectiveFetch = fetchImpl ?? getSharedAuthenticatedFetch(globalThis.fetch);
 
-  let response: Response;
   try {
-    response = await effectiveFetch(targetUrl, {
-      method: "GET",
+    return await apiClient.get<FetchInvoicesResponse>(INVOICES_PATH, {
+      auth: false,
+      query: {
+        limit: clampedLimit,
+        ...(cursor ? { cursor } : {}),
+      },
       headers: {
         Accept: "application/json",
       },
       signal,
+      baseUrl,
+      fetchImpl: effectiveFetch,
+      parse: validateInvoicesResponse,
     });
   } catch (err) {
-    if (signal?.aborted || isInvoicesAbortError(err)) {
+    if (err instanceof InvoicesFetchError) {
+      throw err;
+    }
+    if (signal?.aborted || isApiAbortError(err) || isInvoicesAbortError(err)) {
       throw abortError();
+    }
+    if (isApiError(err)) {
+      if (err.status === 401) {
+        throw new InvoicesFetchError(
+          "Sign in to view your latest invoices.",
+          401,
+          "UNAUTHORIZED",
+        );
+      }
+      if (err.code === "NETWORK_ERROR") {
+        throw new InvoicesFetchError(
+          "Could not reach the billing service. Check your connection and try again.",
+          null,
+          "NETWORK_ERROR",
+        );
+      }
+      if (err.code === "INVALID_RESPONSE") {
+        throw new InvoicesFetchError(
+          "The billing service returned an unreadable response.",
+          err.status,
+          "INVALID_RESPONSE",
+        );
+      }
+      throw new InvoicesFetchError(
+        "Could not load your latest invoice. Please try again.",
+        err.status,
+        "HTTP_ERROR",
+      );
     }
     throw new InvoicesFetchError(
       "Could not reach the billing service. Check your connection and try again.",
@@ -304,46 +331,6 @@ export async function fetchLatestInvoices(
       "NETWORK_ERROR",
     );
   }
-
-  if (signal?.aborted) {
-    throw abortError();
-  }
-
-  if (response.status === 401) {
-    throw new InvoicesFetchError(
-      "Sign in to view your latest invoices.",
-      401,
-      "UNAUTHORIZED",
-    );
-  }
-
-  if (!response.ok) {
-    throw new InvoicesFetchError(
-      "Could not load your latest invoice. Please try again.",
-      response.status,
-      "HTTP_ERROR",
-    );
-  }
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch (err) {
-    if (signal?.aborted || isInvoicesAbortError(err)) {
-      throw abortError();
-    }
-    throw new InvoicesFetchError(
-      "The billing service returned an unreadable response.",
-      response.status,
-      "INVALID_RESPONSE",
-    );
-  }
-
-  if (signal?.aborted) {
-    throw abortError();
-  }
-
-  return validateInvoicesResponse(payload);
 }
 
 /** Clearly labelled demo invoice used when no backend (`VITE_API_BASE_URL`) is configured. */

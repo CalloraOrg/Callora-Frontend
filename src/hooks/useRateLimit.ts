@@ -6,6 +6,10 @@ import {
   shouldUpdateRateLimitState,
   isRateLimitedResponse,
 } from "../utils/rate-limit";
+import {
+  subscribeRateLimit,
+  type RateLimitEvent,
+} from "../services/rateLimitSignal";
 
 /**
  * useRateLimit: Manages rate-limit state and countdown timer.
@@ -57,6 +61,34 @@ export function useRateLimit() {
       });
     }
   }, []);
+
+  /**
+   * Update rate-limit state from a `rateLimitSignal` event emitted by `authFetch`.
+   * Uses `shouldUpdateRateLimitState` so concurrent 429s with different reset
+   * timestamps keep the newest window.
+   */
+  const updateFromSignal = useCallback((event: RateLimitEvent) => {
+    const newState: RateLimitState = {
+      limit: event.limit ?? 0,
+      remaining: event.remaining ?? 0,
+      resetAt: event.resetAt,
+      isRateLimited: true,
+    };
+
+    setRateLimitState((current) => {
+      if (shouldUpdateRateLimitState(current, newState)) {
+        return newState;
+      }
+      return current;
+    });
+  }, []);
+
+  /**
+   * Subscribe to global 429 signals emitted by `authFetch`.
+   */
+  useEffect(() => {
+    return subscribeRateLimit(updateFromSignal);
+  }, [updateFromSignal]);
 
   /**
    * Manually clear rate-limit state (e.g., on successful response).
@@ -116,6 +148,8 @@ export function useRateLimit() {
     timeUntilReset,
     /** Update state from a fetch Response. */
     updateFromResponse,
+    /** Update state from a rateLimitSignal event. */
+    updateFromSignal,
     /** Manually clear rate-limit state. */
     resetRateLimit,
   };

@@ -38,7 +38,7 @@ describe('Dashboard', () => {
     );
   });
 
-  it('renders a pinned APIs section when APIs are pinned', () => {
+  it('renders a pinned APIs section when APIs are pinned', async () => {
     pinnedApisStore.pin('weather-001');
 
     render(
@@ -48,7 +48,7 @@ describe('Dashboard', () => {
     );
 
     expect(screen.getByText('Pinned APIs')).toBeTruthy();
-    expect(screen.getByText('WeatherSim API')).toBeTruthy();
+    expect(await screen.findByText('WeatherSim API')).toBeTruthy();
     expect(screen.getByText('1 pinned')).toBeTruthy();
   });
 
