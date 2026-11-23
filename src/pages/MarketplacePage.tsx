@@ -28,6 +28,11 @@ import {
 } from "../api/catalogApi";
 import { getCache, setCache } from "../utils/offlineApiCache";
 import {
+  computeFacetCounts,
+  matchesFilters,
+  type FacetFilters,
+} from "../utils/facetCounts";
+import {
   getDensityPreference,
   setDensityPreference,
   type DensityPreference,
@@ -264,58 +269,38 @@ export default function MarketplacePage(): JSX.Element {
     announce("Switched account. Marketplace filters were reset.");
   }, [account?.id, clearAll, announce]);
 
+  // Filter values shared by the result list and the facet counts.
+  const facetFilters = useMemo<FacetFilters>(
+    () => ({
+      query: debouncedQuery,
+      categories,
+      statuses,
+      favoritesOnly,
+      favorites,
+      tag,
+      minPrice,
+      maxPrice,
+    }),
+    [
+      debouncedQuery,
+      categories,
+      statuses,
+      favoritesOnly,
+      favorites,
+      tag,
+      minPrice,
+      maxPrice,
+    ],
+  );
+
   // Filter and sort items
   const filtered = useMemo(() => {
-    let items = catalog.slice();
-
-    if (debouncedQuery.trim()) {
-      const q = debouncedQuery.toLowerCase();
-      items = items.filter((a) => {
-        return (
-          a.name.toLowerCase().includes(q) ||
-          a.description.toLowerCase().includes(q) ||
-          a.provider?.name?.toLowerCase().includes(q) ||
-          (a.tags || []).some((t) => t.toLowerCase().includes(q))
-        );
-      });
-    }
-
-    if (categories.size > 0) {
-      items = items.filter((a) => categories.has(a.category ?? ""));
-    }
-
-    if (statuses.size > 0) {
-      items = items.filter((a) => a.status && statuses.has(a.status));
-    }
-
-    if (favoritesOnly) {
-      items = items.filter((a) => favorites.includes(a.id));
-    }
-
-    if (tag) {
-      const normalizedTag = tag.toLowerCase();
-      items = items.filter((a) =>
-        (a.tags || []).some((t) => t.toLowerCase() === normalizedTag),
-      );
-    }
-
-    // An inverted range (min > max) would match nothing, so both bounds are
-    // skipped and results stay unfiltered by price. FiltersSidebar renders an
-    // inline error plus a "Swap values" action whenever this is true, so the
-    // no-op is always visible rather than silent.
-    const hasInvertedPrice =
-      minPrice !== null && maxPrice !== null && minPrice > maxPrice;
-    if (!hasInvertedPrice) {
-      if (minPrice !== null)
-        items = items.filter((a) => a.pricePerRequest >= minPrice);
-      if (maxPrice !== null)
-        items = items.filter((a) => a.pricePerRequest <= maxPrice);
-    }
+    const items = catalog.filter((api) => matchesFilters(api, facetFilters));
 
     if (popularity === "mostUsed") {
-      items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
+      items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
     } else if (popularity === "newest") {
-      items = items.sort(
+      items.sort(
         (a, b) =>
           Date.parse(b.createdAt ?? "1970-01-01") -
           Date.parse(a.createdAt ?? "1970-01-01"),
@@ -323,19 +308,19 @@ export default function MarketplacePage(): JSX.Element {
     }
 
     if (sort === "price-asc")
-      items = items.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
+      items.sort((a, b) => a.pricePerRequest - b.pricePerRequest);
     if (sort === "price-desc")
-      items = items.sort((a, b) => b.pricePerRequest - a.pricePerRequest);
+      items.sort((a, b) => b.pricePerRequest - a.pricePerRequest);
     if (sort === "latency-asc")
-      items = items.sort(
+      items.sort(
         (a, b) =>
           (a.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER) -
           (b.stats?.avgResponseMs ?? Number.MAX_SAFE_INTEGER),
       );
     if (sort === "popularity")
-      items = items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
+      items.sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0));
     if (sort === "newest")
-      items = items.sort(
+      items.sort(
         (a, b) =>
           Date.parse(b.createdAt ?? "1970-01-01") -
           Date.parse(a.createdAt ?? "1970-01-01"),
@@ -344,18 +329,14 @@ export default function MarketplacePage(): JSX.Element {
     // a proxy for relevance score until a real ranking signal is available).
 
     return items;
-  }, [
-    catalog,
-    debouncedQuery,
-    categories,
-    tag,
-    minPrice,
-    maxPrice,
-    popularity,
-    favoritesOnly,
-    sort,
-    statuses,
-  ]);
+  }, [catalog, facetFilters, popularity, sort]);
+
+  // Per-facet counts for the sidebar and tag pills. Each facet ignores its own
+  // selection so its siblings stay informative while one is active.
+  const facetCounts = useMemo(
+    () => computeFacetCounts(catalog, facetFilters),
+    [catalog, facetFilters],
+  );
 
   // ── Cursor pagination ──────────────────────────────────────────────────
   const initialCursor = searchParams.get("cursor");
@@ -619,6 +600,7 @@ export default function MarketplacePage(): JSX.Element {
             selectedStatuses={statuses}
             toggleStatus={toggleStatus}
             resultCount={filtered.length}
+            categoryCounts={facetCounts.categories}
           />
         </aside>
 
@@ -690,6 +672,7 @@ export default function MarketplacePage(): JSX.Element {
             selectedTag={tag}
             onTagChange={setTag}
             apis={catalog}
+            counts={facetCounts.tags}
           />
 
           {isShowingStaleData && (
@@ -794,6 +777,7 @@ export default function MarketplacePage(): JSX.Element {
         toggleFavoritesOnly={() => setFavoritesOnly(!favoritesOnly)}
         selectedStatuses={statuses}
         toggleStatus={toggleStatus}
+        categoryCounts={facetCounts.categories}
         triggerRef={filtersTriggerRef}
       />
 
