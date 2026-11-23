@@ -17,21 +17,26 @@ import {
   rpc,
 } from "@stellar/stellar-sdk";
 import {
-  STELLAR_NETWORK,
-  STELLAR_HORIZON_URL,
-  STELLAR_NETWORK_PASSPHRASE,
-  STELLAR_RPC_URL,
   STELLAR_USDC_DECIMALS,
   STELLAR_USDC_ASSET,
-  STELLAR_USDC_CONFIGURATION_ERROR,
-  STELLAR_VAULT_CONFIG,
-  STELLAR_VAULT_CONTRACT_ID,
   type StellarNetwork,
 } from "../config/constants";
+import {
+  getConfig,
+  getHorizonUrl,
+  networkPassphraseFor,
+  usdcConfigurationError,
+  type RuntimeConfig,
+} from "../config/runtimeConfig";
 import { decodeVaultError } from "./vaultErrors";
 import { logError } from "./SecureErrorHandler";
 import { walletStore } from "../state/walletStore";
 import { readVaultDepositPreflight, type VaultDepositPreflight } from "./vaultReads";
+import {
+  summarizeInvokeTransaction,
+  type InvokeTransactionSummary,
+} from "./txSummary";
+import { resolveVaultConfig } from "./vaultConfig";
 
 const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
   mainnet: "Mainnet",
@@ -54,6 +59,7 @@ export type WalletServiceErrorCode =
   | "TRUSTLINE_MISSING"
   | "UNFUNDED_ACCOUNT"
   | "CONTRACT_REJECTED"
+  | "TRANSACTION_MISMATCH"
   | "TRANSACTION_FAILED"
   | "WALLET_ERROR"
   | "NETWORK_ERROR";
@@ -79,6 +85,15 @@ export class WalletServiceError extends Error {
 
 export interface SubmittedDeposit {
   hash: string;
+}
+
+export interface PreparedVaultDeposit {
+  transaction: Transaction;
+  xdr: string;
+  summary: InvokeTransactionSummary;
+  address: string;
+  amountStroops: bigint;
+  config: RuntimeConfig;
 }
 
 type OnSubmitted = (hash: string) => void;
@@ -133,7 +148,7 @@ function toUsdcStroops(amount: string | number): bigint {
     );
   }
 
-  const [whole, fraction = ""] = amountText.split(".");
+  const [whole = "0", fraction = ""] = amountText.split(".");
   const scale = 10n ** BigInt(STELLAR_USDC_DECIMALS);
   const fractionalStroops = BigInt(
     fraction.padEnd(STELLAR_USDC_DECIMALS, "0") || "0",
@@ -158,17 +173,23 @@ export async function isWalletAvailable(): Promise<boolean> {
 
 export type UsdcTrustlineStatus = "present" | "missing" | "unfunded-account" | "unknown";
 
-function validateUsdcConfiguration(): void {
-  if (STELLAR_USDC_CONFIGURATION_ERROR) {
-    throw new WalletServiceError("CONFIGURATION", STELLAR_USDC_CONFIGURATION_ERROR);
+function validateUsdcConfiguration(config: RuntimeConfig): void {
+  const error = usdcConfigurationError(config);
+  if (error) {
+    throw new WalletServiceError("CONFIGURATION", error);
   }
 }
 
-async function horizonRequest(path: string, options?: RequestInit, timeoutMs = RPC_TIMEOUT_MS): Promise<Response> {
+async function horizonRequest(
+  path: string,
+  config: RuntimeConfig,
+  options?: RequestInit,
+  timeoutMs = RPC_TIMEOUT_MS,
+): Promise<Response> {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(`${STELLAR_HORIZON_URL}${path}`, {
+    return await fetch(`${getHorizonUrl(config)}${path}`, {
       ...options,
       signal: controller.signal,
     });
@@ -178,17 +199,20 @@ async function horizonRequest(path: string, options?: RequestInit, timeoutMs = R
 }
 
 /** A failed lookup is not evidence that an account lacks a trustline. */
-export async function hasUsdcTrustline(address: string): Promise<UsdcTrustlineStatus> {
-  validateUsdcConfiguration();
+export async function hasUsdcTrustline(
+  address: string,
+  config: RuntimeConfig = getConfig(),
+): Promise<UsdcTrustlineStatus> {
+  validateUsdcConfiguration(config);
   try {
-    const response = await horizonRequest(`/accounts/${encodeURIComponent(address)}`);
+    const response = await horizonRequest(`/accounts/${encodeURIComponent(address)}`, config);
     if (response.status === 404) return "unfunded-account";
     if (!response.ok) return "unknown";
     const account = await response.json();
     if (!Array.isArray(account?.balances)) return "unknown";
     return account.balances.some((balance: { asset_code?: string; asset_issuer?: string } | null) =>
       balance?.asset_code === STELLAR_USDC_ASSET.code &&
-      balance?.asset_issuer === STELLAR_USDC_ASSET.issuer,
+      balance?.asset_issuer === config.usdcIssuer,
     ) ? "present" : "missing";
   } catch {
     return "unknown";
@@ -196,7 +220,7 @@ export async function hasUsdcTrustline(address: string): Promise<UsdcTrustlineSt
 }
 
 /** Connect Freighter and ensure every action targets the configured network. */
-export async function getWalletAddress(): Promise<string> {
+export async function getWalletAddress(config: RuntimeConfig = getConfig()): Promise<string> {
   if (!(await isWalletAvailable())) {
     throw new WalletServiceError("WALLET_UNAVAILABLE", "Freighter is not installed or available in this browser.");
   }
@@ -208,8 +232,8 @@ export async function getWalletAddress(): Promise<string> {
     }
     const network = await getNetwork();
     if (network.error) throw network.error;
-    if (network.networkPassphrase !== STELLAR_NETWORK_PASSPHRASE) {
-      throw new WalletServiceError("NETWORK_MISMATCH", `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[STELLAR_NETWORK]} and try again.`);
+    if (network.networkPassphrase !== networkPassphraseFor(config.network)) {
+      throw new WalletServiceError("NETWORK_MISMATCH", `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[config.network]} and try again.`);
     }
     return access.address;
   } catch (error) {
@@ -219,11 +243,11 @@ export async function getWalletAddress(): Promise<string> {
 }
 
 /** Horizon's synchronous submission waits until the transaction reaches a ledger. */
-export async function addUsdcTrustline(): Promise<"present" | "cancelled"> {
-  validateUsdcConfiguration();
+export async function addUsdcTrustline(config: RuntimeConfig = getConfig()): Promise<"present" | "cancelled"> {
+  validateUsdcConfiguration(config);
   try {
-    const address = await getWalletAddress();
-    const response = await horizonRequest(`/accounts/${encodeURIComponent(address)}`);
+    const address = await getWalletAddress(config);
+    const response = await horizonRequest(`/accounts/${encodeURIComponent(address)}`, config);
     if (response.status === 404) {
       throw new WalletServiceError("UNFUNDED_ACCOUNT", "Fund this Stellar account with XLM before adding a USDC trustline.");
     }
@@ -231,23 +255,23 @@ export async function addUsdcTrustline(): Promise<"present" | "cancelled"> {
     const account = await response.json();
     const transaction = new TransactionBuilder(new Account(address, account.sequence), {
       fee: BASE_FEE,
-      networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+      networkPassphrase: networkPassphraseFor(config.network),
     })
       .addOperation(Operation.changeTrust({
-        asset: new Asset(STELLAR_USDC_ASSET.code, STELLAR_USDC_ASSET.issuer),
+        asset: new Asset(STELLAR_USDC_ASSET.code, config.usdcIssuer ?? ""),
       }))
       .setTimeout(TRANSACTION_TIMEOUT_SECONDS)
       .build();
 
     const signature = await signTransaction(transaction.toXDR(), {
-      networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+      networkPassphrase: networkPassphraseFor(config.network),
       address,
     });
     if (signature.error) throw signature.error;
     if (!signature.signedTxXdr || signature.signerAddress !== address) {
       throw new WalletServiceError("WALLET_ERROR", "Freighter did not sign the trustline with the connected account.");
     }
-    const submission = await horizonRequest("/transactions", {
+    const submission = await horizonRequest("/transactions", config, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ tx: signature.signedTxXdr }).toString(),
@@ -267,23 +291,29 @@ export async function addUsdcTrustline(): Promise<"present" | "cancelled"> {
   }
 }
 
-function createRpcServer(): rpc.Server {
-  if (!STELLAR_RPC_URL) {
+function createRpcServer(config: RuntimeConfig = getConfig()): rpc.Server {
+  if (!config.rpcUrl) {
     throw new WalletServiceError(
       "CONFIGURATION",
       "Stellar RPC is not configured for this network.",
     );
   }
 
-  return new rpc.Server(STELLAR_RPC_URL, { timeout: RPC_TIMEOUT_MS });
+  return new rpc.Server(config.rpcUrl, { timeout: RPC_TIMEOUT_MS });
 }
 
-function validateConfiguration(): void {
-  if (STELLAR_VAULT_CONFIG.error) {
-    throw new WalletServiceError("CONFIGURATION", STELLAR_VAULT_CONFIG.error);
+function validateConfiguration(config: RuntimeConfig): void {
+  const vaultConfig = resolveVaultConfig({
+    network: config.network,
+    envContractId: config.vaultContractId,
+    testnetDefault: "",
+    source: "runtime",
+  });
+  if (vaultConfig.error) {
+    throw new WalletServiceError("CONFIGURATION", vaultConfig.error);
   }
 
-  if (!STELLAR_RPC_URL) {
+  if (!config.rpcUrl) {
     throw new WalletServiceError(
       "CONFIGURATION",
       "Stellar RPC is not configured for this network.",
@@ -352,32 +382,76 @@ async function waitForConfirmation(
  */
 export async function preflightVaultDeposit(
   address: string,
+  config: RuntimeConfig = getConfig(),
 ): Promise<VaultDepositPreflight> {
-  validateConfiguration();
-  return readVaultDepositPreflight(address);
+  validateConfiguration(config);
+  return readVaultDepositPreflight(address, config);
+}
+
+function verifyPreparedVaultDeposit(
+  xdrOrTx: string | Transaction,
+  expectedAddress: string,
+  expectedAmountStroops: bigint,
+  config: RuntimeConfig,
+): InvokeTransactionSummary {
+  let summary: InvokeTransactionSummary;
+  try {
+    summary = summarizeInvokeTransaction(xdrOrTx, {
+      passphrase: networkPassphraseFor(config.network),
+    });
+  } catch {
+    throw new WalletServiceError(
+      "TRANSACTION_MISMATCH",
+      "Prepared deposit transaction could not be verified. Signing was aborted.",
+    );
+  }
+
+  const depositorMatches = summary.args[0]?.value === expectedAddress;
+  const amountMatches =
+    summary.amountStroops === expectedAmountStroops &&
+    summary.args[1]?.value === expectedAmountStroops;
+
+  if (
+    summary.contractId !== config.vaultContractId ||
+    summary.functionName !== "deposit" ||
+    summary.args.length !== 2 ||
+    !depositorMatches ||
+    !amountMatches
+  ) {
+    throw new WalletServiceError(
+      "TRANSACTION_MISMATCH",
+      "Prepared deposit transaction does not match the requested vault deposit. Signing was aborted.",
+    );
+  }
+
+  return summary;
 }
 
 /**
- * Build, sign, submit, and confirm a Callora Soroban vault deposit.
- * `onSubmitted` receives only the hash returned by Stellar RPC after submission.
+ * Build, simulate, assemble, and verify a Callora Soroban vault deposit
+ * transaction without prompting Freighter to sign.
  */
-export async function submitVaultDeposit(
+export async function prepareVaultDeposit(
   amount: string | number,
-  onSubmitted?: OnSubmitted,
-): Promise<SubmittedDeposit> {
-  if (walletStore.getSnapshot().isNetworkMismatch) {
+  config: RuntimeConfig = getConfig(),
+): Promise<PreparedVaultDeposit> {
+  const expectedPassphrase = networkPassphraseFor(config.network);
+  const wallet = walletStore.getSnapshot();
+  if (wallet.networkPassphrase
+    ? wallet.networkPassphrase !== expectedPassphrase
+    : wallet.isNetworkMismatch) {
     throw new WalletServiceError(
       "NETWORK_MISMATCH",
-      `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[STELLAR_NETWORK]} and try again.`,
+      `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[config.network]} and try again.`,
     );
   }
 
   const amountStroops = toUsdcStroops(amount);
-  validateConfiguration();
+  validateConfiguration(config);
 
-  validateUsdcConfiguration();
-  const address = await getWalletAddress();
-  const trustline = await hasUsdcTrustline(address);
+  validateUsdcConfiguration(config);
+  const address = await getWalletAddress(config);
+  const trustline = await hasUsdcTrustline(address, config);
   if (trustline === "missing" || trustline === "unfunded-account") {
     throw new WalletServiceError(
       trustline === "missing" ? "TRUSTLINE_MISSING" : "UNFUNDED_ACCOUNT",
@@ -386,7 +460,7 @@ export async function submitVaultDeposit(
         : "Fund this Stellar account with XLM before depositing.",
     );
   }
-  const server = createRpcServer();
+  const server = createRpcServer(config);
   let sourceAccount;
   try {
     sourceAccount = await server.getAccount(address);
@@ -396,10 +470,10 @@ export async function submitVaultDeposit(
 
   const transaction = new TransactionBuilder(sourceAccount, {
     fee: BASE_FEE,
-    networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+    networkPassphrase: expectedPassphrase,
   })
     .addOperation(
-      new Contract(STELLAR_VAULT_CONTRACT_ID).call(
+      new Contract(config.vaultContractId).call(
         "deposit",
         new Address(address).toScVal(),
         nativeToScVal(amountStroops, { type: "i128" }),
@@ -428,17 +502,53 @@ export async function submitVaultDeposit(
     throw new WalletServiceError("CONTRACT_REJECTED", "The vault could not prepare this deposit. No funds were moved.");
   }
 
+  const summary = verifyPreparedVaultDeposit(
+    preparedTransaction,
+    address,
+    amountStroops,
+    config,
+  );
+
+  return {
+    transaction: preparedTransaction,
+    xdr: preparedTransaction.toXDR(),
+    summary,
+    address,
+    amountStroops,
+    config,
+  };
+}
+
+/**
+ * Re-verify a prepared deposit transaction, sign it with Freighter, submit it
+ * to Stellar RPC, and wait for ledger confirmation.
+ */
+export async function signAndSubmit(
+  prepared: PreparedVaultDeposit,
+  onSubmitted?: OnSubmitted,
+): Promise<SubmittedDeposit> {
+  const config = prepared.config;
+  verifyPreparedVaultDeposit(
+    prepared.xdr,
+    prepared.address,
+    prepared.amountStroops,
+    config,
+  );
+
+  const passphrase = networkPassphraseFor(config.network);
+  const server = createRpcServer(config);
+
   let signature;
   try {
-    signature = await signTransaction(preparedTransaction.toXDR(), {
-      networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
-      address,
+    signature = await signTransaction(prepared.xdr, {
+      networkPassphrase: passphrase,
+      address: prepared.address,
     });
   } catch (error) {
     throwWalletError(error);
   }
   if (signature.error) throwWalletError(signature.error);
-  if (!signature.signedTxXdr || signature.signerAddress !== address) {
+  if (!signature.signedTxXdr || signature.signerAddress !== prepared.address) {
     throw new WalletServiceError(
       "WALLET_ERROR",
       "Freighter did not sign the deposit with the connected account.",
@@ -448,7 +558,7 @@ export async function submitVaultDeposit(
   let submission;
   try {
     submission = await server.sendTransaction(
-      new Transaction(signature.signedTxXdr, STELLAR_NETWORK_PASSPHRASE),
+      new Transaction(signature.signedTxXdr, passphrase),
     );
   } catch (error) {
     const message = getErrorMessage(error).toLowerCase();
@@ -482,15 +592,31 @@ export async function submitVaultDeposit(
   return { hash: submission.hash };
 }
 
+/**
+ * Build, sign, submit, and confirm a Callora Soroban vault deposit.
+ * `onSubmitted` receives only the hash returned by Stellar RPC after submission.
+ */
+export async function submitVaultDeposit(
+  amount: string | number,
+  onSubmitted?: OnSubmitted,
+  config: RuntimeConfig = getConfig(),
+): Promise<SubmittedDeposit> {
+  const prepared = await prepareVaultDeposit(amount, config);
+  return signAndSubmit(prepared, onSubmitted);
+}
+
 export type DepositStatus = "SUCCESS" | "FAILED" | "NOT_FOUND" | "UNKNOWN";
 
 /**
  * Checks the status of a submitted deposit transaction via Stellar Soroban RPC.
  * Uses the configured RPC endpoint with the standard RPC_TIMEOUT_MS.
  */
-export async function checkDepositStatus(hash: string): Promise<DepositStatus> {
+export async function checkDepositStatus(
+  hash: string,
+  config: RuntimeConfig = getConfig(),
+): Promise<DepositStatus> {
   try {
-    const server = createRpcServer();
+    const server = createRpcServer(config);
     const transaction = await server.getTransaction(hash);
 
     if (transaction.status === rpc.Api.GetTransactionStatus.SUCCESS) {
@@ -506,4 +632,147 @@ export async function checkDepositStatus(hash: string): Promise<DepositStatus> {
   } catch {
     return "UNKNOWN";
   }
+}
+
+export interface SubmittedWithdraw {
+  hash: string;
+}
+
+/**
+ * Read-only check of whether the vault would accept a withdrawal from `address`.
+ * Assumption: vault exposes `withdraw(to: Address, amount: i128)`.
+ * Simulates only: nothing is signed or submitted, so Freighter is not prompted.
+ */
+export async function preflightVaultWithdraw(
+  address: string,
+  config: RuntimeConfig = getConfig(),
+): Promise<VaultDepositPreflight> {
+  validateConfiguration(config);
+  return readVaultDepositPreflight(address, config);
+}
+
+/**
+ * Build, sign, submit, and confirm a Callora Soroban vault withdrawal.
+ *
+ * Assumption: the vault contract exposes `withdraw(to: Address, amount: i128)`.
+ * This mirrors the deposit path byte-for-byte; the only differences are:
+ *  - no USDC trustline check (the wallet receives USDC, not sends it)
+ *  - calls "withdraw" instead of "deposit"
+ *  - uses withdraw-specific error messages
+ *
+ * `onSubmitted` receives only the hash returned by Stellar RPC after submission.
+ */
+export async function submitVaultWithdraw(
+  amount: string | number,
+  onSubmitted?: OnSubmitted,
+  config: RuntimeConfig = getConfig(),
+): Promise<SubmittedWithdraw> {
+  const expectedPassphrase = networkPassphraseFor(config.network);
+  const wallet = walletStore.getSnapshot();
+  if (wallet.networkPassphrase
+    ? wallet.networkPassphrase !== expectedPassphrase
+    : wallet.isNetworkMismatch) {
+    throw new WalletServiceError(
+      "NETWORK_MISMATCH",
+      `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[config.network]} and try again.`,
+    );
+  }
+
+  const amountStroops = toUsdcStroops(amount);
+  validateConfiguration(config);
+
+  const address = await getWalletAddress(config);
+  const server = createRpcServer(config);
+
+  let sourceAccount;
+  try {
+    sourceAccount = await server.getAccount(address);
+  } catch (error) {
+    throw mapRpcError(error);
+  }
+
+  const transaction = new TransactionBuilder(sourceAccount, {
+    fee: BASE_FEE,
+    networkPassphrase: expectedPassphrase,
+  })
+    .addOperation(
+      new Contract(config.vaultContractId).call(
+        "withdraw",
+        new Address(address).toScVal(),
+        nativeToScVal(amountStroops, { type: "i128" }),
+      ),
+    )
+    .setTimeout(TRANSACTION_TIMEOUT_SECONDS)
+    .build();
+
+  let simulation;
+  try {
+    simulation = await server.simulateTransaction(transaction);
+  } catch (error) {
+    throw mapRpcError(error);
+  }
+  if (rpc.Api.isSimulationError(simulation)) {
+    const decoded = decodeVaultError(simulation, "withdraw");
+    logError("vault-withdraw", "CONTRACT_REJECTED", { contractErrorCode: decoded.code });
+    throw new WalletServiceError("CONTRACT_REJECTED", decoded.message, false, decoded.code);
+  }
+  let preparedTransaction;
+  try {
+    preparedTransaction = rpc.assembleTransaction(transaction, simulation).build();
+  } catch {
+    throw new WalletServiceError("CONTRACT_REJECTED", "The vault could not prepare this withdrawal. No funds were moved.");
+  }
+
+  let signature;
+  try {
+    signature = await signTransaction(preparedTransaction.toXDR(), {
+      networkPassphrase: expectedPassphrase,
+      address,
+    });
+  } catch (error) {
+    throwWalletError(error);
+  }
+  if (signature.error) throwWalletError(signature.error);
+  if (!signature.signedTxXdr || signature.signerAddress !== address) {
+    throw new WalletServiceError(
+      "WALLET_ERROR",
+      "Freighter did not sign the withdrawal with the connected account.",
+    );
+  }
+
+  let submission;
+  try {
+    submission = await server.sendTransaction(
+      new Transaction(signature.signedTxXdr, expectedPassphrase),
+    );
+  } catch (error) {
+    const message = getErrorMessage(error).toLowerCase();
+    throw new WalletServiceError(
+      "NETWORK_TIMEOUT",
+      message.includes("timeout") || message.includes("timed out")
+        ? "Stellar did not return a submission result. The transaction may still be processing; check your wallet activity before retrying."
+        : "The connection failed while submitting. The transaction may still be processing; check your wallet activity before retrying.",
+      true,
+    );
+  }
+
+  if (submission.status === "ERROR" || submission.status === "TRY_AGAIN_LATER") {
+    throw new WalletServiceError(
+      "TRANSACTION_FAILED",
+      "Stellar did not accept the withdrawal transaction. No funds were moved from the vault.",
+    );
+  }
+
+  if (!submission.hash) {
+    throw new WalletServiceError(
+      "NETWORK_TIMEOUT",
+      "Stellar accepted the request without returning a transaction hash. Check your wallet activity before retrying.",
+      true,
+    );
+  }
+
+  onSubmitted?.(submission.hash);
+  await waitForConfirmation(server, submission.hash);
+
+  return { hash: submission.hash };
 }

@@ -22,10 +22,10 @@
 import { RotationRequest } from "./KeyRotationService";
 import {
   redactSensitiveData,
-  classifyHttpError,
   logError,
   getSafeErrorMessage,
 } from "./SecureErrorHandler";
+import { apiClient, isApiError } from "../api/apiClient";
 import {
   generateIdempotencyKey,
   createInFlightGuard,
@@ -132,47 +132,54 @@ async function performRotation(
   idempotencyKey: string,
   signal: AbortSignal,
 ): Promise<KeyRotationApiResponse> {
-  const response = await fetch(ROTATE_KEY_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${sessionToken}`,
-      "Idempotency-Key": idempotencyKey,
-    },
-    body: JSON.stringify({
-      keyId: rotationRequest.keyId,
-      confirmationToken: rotationRequest.confirmationToken,
-      context: rotationRequest.context,
-    }),
-    signal,
-  });
-
-  if (!response.ok) {
-    const errorClassification = classifyHttpError(response.status);
-    const data = await response.json().catch(() => ({}));
-
-    logError("KeyRotationApi.rotateKeyWithToken", data, {
-      status: response.status,
-      endpoint: ROTATE_KEY_ENDPOINT,
-    });
-
-    const code = data?.error?.code
-      ? String(data.error.code)
-      : errorClassification.retryable
-        ? "ROTATION_FAILED"
-        : "AUTHORIZATION_FAILED";
-
-    throw new RotationApiError(
-      redactSensitiveData(data?.error?.message || "Failed to rotate API key."),
+  let data: { newKey?: string; rotatedAt?: string };
+  try {
+    data = await apiClient.post<{ newKey?: string; rotatedAt?: string }>(
+      ROTATE_KEY_ENDPOINT,
       {
-        code,
-        status: response.status,
-        retryable: errorClassification.retryable,
+        auth: false,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: {
+          keyId: rotationRequest.keyId,
+          confirmationToken: rotationRequest.confirmationToken,
+          context: rotationRequest.context,
+        },
+        signal,
       },
     );
-  }
+  } catch (err) {
+    if (isApiError(err) && err.status > 0) {
+      logError("KeyRotationApi.rotateKeyWithToken", err.data ?? {}, {
+        status: err.status,
+        endpoint: ROTATE_KEY_ENDPOINT,
+      });
 
-  const data = await response.json();
+      const code =
+        err.code && err.code !== "CLIENT_ERROR" && err.code !== "SERVER_ERROR" && err.code !== "CONFLICT"
+          ? err.code
+          : err.retryable
+            ? "ROTATION_FAILED"
+            : "AUTHORIZATION_FAILED";
+
+      const nestedMsg =
+        typeof err.data === "object" &&
+        err.data !== null &&
+        typeof (err.data as { error?: { message?: unknown } }).error?.message === "string"
+          ? (err.data as { error: { message: string } }).error.message
+          : "Failed to rotate API key.";
+
+      throw new RotationApiError(redactSensitiveData(nestedMsg), {
+        code,
+        status: err.status,
+        retryable: err.retryable,
+      });
+    }
+    throw err;
+  }
 
   if (data?.newKey) {
     return {
@@ -259,33 +266,44 @@ export async function getRotationToken(
   };
 }> {
   try {
-    const response = await fetch(`${ROTATE_KEY_ENDPOINT}/token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${sessionToken}`,
+    const data = await apiClient.post<{ token?: string; expiresIn?: number }>(
+      `${ROTATE_KEY_ENDPOINT}/token`,
+      {
+        auth: false,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        body: { keyId },
+        timeoutMs: 10000,
       },
-      body: JSON.stringify({ keyId }),
-      signal: AbortSignal.timeout(10000),
-    });
+    );
 
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
+    return {
+      token: data.token,
+      expiresIn: data.expiresIn,
+    };
+  } catch (error) {
+    if (isApiError(error) && error.status > 0) {
+      const data =
+        typeof error.data === "object" && error.data !== null
+          ? (error.data as { error?: { code?: string; message?: string } })
+          : undefined;
       let code = data?.error?.code;
       if (!code) {
-        if (response.status === 401) code = "UNAUTHORIZED";
-        else if (response.status === 403) code = "FORBIDDEN";
-        else if (response.status === 429) code = "TOO_MANY_REQUESTS";
+        if (error.status === 401) code = "UNAUTHORIZED";
+        else if (error.status === 403) code = "FORBIDDEN";
+        else if (error.status === 429) code = "TOO_MANY_REQUESTS";
         else code = "TOKEN_REQUEST_FAILED";
       }
 
       const rawMessage =
         data?.error?.message ||
-        (response.status === 401
+        (error.status === 401
           ? "Unauthorized"
-          : response.status === 403
+          : error.status === 403
             ? "Forbidden"
-            : response.status === 429
+            : error.status === 429
               ? "Too many requests"
               : "Failed to request rotation token.");
 
@@ -297,12 +315,6 @@ export async function getRotationToken(
       };
     }
 
-    const data = await response.json();
-    return {
-      token: data.token,
-      expiresIn: data.expiresIn,
-    };
-  } catch (error) {
     const isTimeout =
       (error instanceof Error &&
         (error.name === "TimeoutError" || error.name === "AbortError")) ||

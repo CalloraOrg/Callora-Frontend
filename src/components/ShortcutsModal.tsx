@@ -14,10 +14,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
 
   // Group shortcuts by category
   const groupedShortcuts = SHORTCUTS.reduce((acc, shortcut) => {
-    if (!acc[shortcut.category]) {
-      acc[shortcut.category] = [];
-    }
-    acc[shortcut.category].push(shortcut);
+    (acc[shortcut.category] ??= []).push(shortcut);
     return acc;
   }, {} as Record<string, typeof SHORTCUTS>);
 

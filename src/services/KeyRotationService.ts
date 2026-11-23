@@ -157,10 +157,16 @@ export function validateRotationRequest(
   }
 
   // 2. Parse and validate the token
-  let tokenPayload: any;
+  interface ConfirmationTokenPayload {
+    timestamp: number;
+    userId?: string;
+    tenantId?: string;
+    sessionId?: string;
+  }
+  let tokenPayload: ConfirmationTokenPayload;
   try {
     const decoded = atob(request.confirmationToken);
-    tokenPayload = JSON.parse(decoded);
+    tokenPayload = JSON.parse(decoded) as ConfirmationTokenPayload;
   } catch {
     return {
       valid: false,

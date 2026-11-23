@@ -1,4 +1,3 @@
-import React from "react";
 
 /**
  * SortMenu page used for printing tests.

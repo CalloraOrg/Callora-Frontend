@@ -10,10 +10,10 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import {
-  STELLAR_NETWORK_PASSPHRASE,
-  STELLAR_RPC_URL,
-  STELLAR_VAULT_CONTRACT_ID,
-} from "../config/constants";
+  getConfig,
+  networkPassphraseFor,
+  type RuntimeConfig,
+} from "../config/runtimeConfig";
 
 /**
  * Read-only Soroban balance lookups for the Callora vault.
@@ -60,27 +60,30 @@ const RPC_TIMEOUT_MS = 8_000;
 const SIMULATION_TIMEOUT_SECONDS = 60;
 
 /** True when a vault contract id and Soroban RPC endpoint are usable. */
-export function isVaultReadConfigured(): boolean {
+export function isVaultReadConfigured(config: RuntimeConfig = getConfig()): boolean {
   return (
-    STELLAR_VAULT_CONTRACT_ID !== "" &&
-    StrKey.isValidContract(STELLAR_VAULT_CONTRACT_ID) &&
-    STELLAR_RPC_URL !== ""
+    config.vaultContractId !== "" &&
+    StrKey.isValidContract(config.vaultContractId) &&
+    config.rpcUrl !== ""
   );
 }
 
-let rpcServer: rpc.Server | null = null;
+const rpcServers = new Map<string, rpc.Server>();
 
-function getServer(): rpc.Server {
-  if (!STELLAR_RPC_URL) {
+function getServer(config: RuntimeConfig): rpc.Server {
+  if (!config.rpcUrl) {
     throw new VaultReadError(
       "NOT_CONFIGURED",
       "Stellar RPC is not configured for this network.",
     );
   }
-  if (!rpcServer) {
-    rpcServer = new rpc.Server(STELLAR_RPC_URL, { timeout: RPC_TIMEOUT_MS });
+  const key = `${config.network}:${config.rpcUrl}`;
+  let server = rpcServers.get(key);
+  if (!server) {
+    server = new rpc.Server(config.rpcUrl, { timeout: RPC_TIMEOUT_MS });
+    rpcServers.set(key, server);
   }
-  return rpcServer;
+  return server;
 }
 
 /** At most one read per key is in flight; concurrent callers share the promise. */
@@ -109,6 +112,7 @@ function describeError(error: unknown): string {
 }
 
 async function simulate(
+  config: RuntimeConfig,
   contractId: string,
   func: string,
   args: xdr.ScVal[],
@@ -118,7 +122,7 @@ async function simulate(
     new Account(resolveSource(sourceAddress), "0"),
     {
       fee: BASE_FEE,
-      networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+      networkPassphrase: networkPassphraseFor(config.network),
     },
   )
     .addOperation(new Contract(contractId).call(func, ...args))
@@ -127,7 +131,7 @@ async function simulate(
 
   let simulation;
   try {
-    simulation = await getServer().simulateTransaction(transaction);
+    simulation = await getServer(config).simulateTransaction(transaction);
   } catch (error) {
     throw new VaultReadError(
       "NETWORK_ERROR",
@@ -148,7 +152,7 @@ async function simulate(
     );
   }
   // In stellar-sdk v12+, the result is in simulation.result.retval
-  const simResult = (simulation as any).result;
+  const simResult = simulation.result;
   if (!simResult?.retval) {
     throw new VaultReadError(
       "BAD_RESPONSE",
@@ -194,11 +198,15 @@ function notConfiguredError(): VaultReadError {
  *   source; falls back to {@link SIMULATION_SOURCE_ACCOUNT} when unknown.
  * @returns The vault balance in stroops (`i128`).
  */
-export async function readVaultBalance(sourceAddress?: string): Promise<bigint> {
-  if (!isVaultReadConfigured()) throw notConfiguredError();
-  return dedupe(`vault-balance:${STELLAR_VAULT_CONTRACT_ID}`, async () => {
+export async function readVaultBalance(
+  sourceAddress?: string,
+  config: RuntimeConfig = getConfig(),
+): Promise<bigint> {
+  if (!isVaultReadConfigured(config)) throw notConfiguredError();
+  return dedupe(`vault-balance:${config.network}:${config.rpcUrl}:${config.vaultContractId}`, async () => {
     const retval = await simulate(
-      STELLAR_VAULT_CONTRACT_ID,
+      config,
+      config.vaultContractId,
       "balance",
       [],
       sourceAddress,
@@ -207,13 +215,14 @@ export async function readVaultBalance(sourceAddress?: string): Promise<bigint> 
   });
 }
 
-let usdcTokenAddress: string | null = null;
-let usdcTokenInflight: Promise<string> | null = null;
+const usdcTokenAddresses = new Map<string, string>();
+const usdcTokenInflight = new Map<string, Promise<string>>();
 
 /** Forget the cached USDC token address and any in-flight read (tests / reset). */
 export function resetVaultReadCaches(): void {
-  usdcTokenAddress = null;
-  usdcTokenInflight = null;
+  usdcTokenAddresses.clear();
+  usdcTokenInflight.clear();
+  rpcServers.clear();
   inflight.clear();
 }
 
@@ -223,14 +232,21 @@ export function resetVaultReadCaches(): void {
  *
  * @returns The Stellar Asset Contract address backing the vault's USDC.
  */
-export async function readUsdcToken(sourceAddress?: string): Promise<string> {
-  if (!isVaultReadConfigured()) throw notConfiguredError();
-  if (usdcTokenAddress) return usdcTokenAddress;
-  if (usdcTokenInflight) return usdcTokenInflight;
+export async function readUsdcToken(
+  sourceAddress?: string,
+  config: RuntimeConfig = getConfig(),
+): Promise<string> {
+  if (!isVaultReadConfigured(config)) throw notConfiguredError();
+  const cacheKey = `${config.network}:${config.rpcUrl}:${config.vaultContractId}`;
+  const cachedAddress = usdcTokenAddresses.get(cacheKey);
+  if (cachedAddress) return cachedAddress;
+  const pendingRequest = usdcTokenInflight.get(cacheKey);
+  if (pendingRequest) return pendingRequest;
 
   const request = (async () => {
     const retval = await simulate(
-      STELLAR_VAULT_CONTRACT_ID,
+      config,
+      config.vaultContractId,
       "get_usdc_token",
       [],
       sourceAddress,
@@ -245,12 +261,15 @@ export async function readUsdcToken(sourceAddress?: string): Promise<string> {
     return token;
   })();
 
-  usdcTokenInflight = request;
+  usdcTokenInflight.set(cacheKey, request);
   try {
-    usdcTokenAddress = await request;
-    return usdcTokenAddress;
+    const token = await request;
+    usdcTokenAddresses.set(cacheKey, token);
+    return token;
   } finally {
-    usdcTokenInflight = null;
+    if (usdcTokenInflight.get(cacheKey) === request) {
+      usdcTokenInflight.delete(cacheKey);
+    }
   }
 }
 
@@ -261,17 +280,21 @@ export async function readUsdcToken(sourceAddress?: string): Promise<string> {
  *   simulation source.
  * @returns The wallet's USDC balance in stroops.
  */
-export async function readWalletUsdcBalance(address: string): Promise<bigint> {
-  if (!isVaultReadConfigured()) throw notConfiguredError();
+export async function readWalletUsdcBalance(
+  address: string,
+  config: RuntimeConfig = getConfig(),
+): Promise<bigint> {
+  if (!isVaultReadConfigured(config)) throw notConfiguredError();
   if (!StrKey.isValidEd25519PublicKey(address)) {
     throw new VaultReadError(
       "BAD_RESPONSE",
       "A valid Stellar account address is required to read a wallet USDC balance.",
     );
   }
-  const token = await readUsdcToken(address);
-  return dedupe(`wallet-balance:${token}:${address}`, async () => {
+  const token = await readUsdcToken(address, config);
+  return dedupe(`wallet-balance:${config.network}:${config.rpcUrl}:${token}:${address}`, async () => {
     const retval = await simulate(
+      config,
       token,
       "balance",
       [new Address(address).toScVal()],
@@ -293,19 +316,21 @@ export type VaultDepositPreflight = {
  */
 export async function readVaultDepositPreflight(
   address: string,
+  config: RuntimeConfig = getConfig(),
 ): Promise<VaultDepositPreflight> {
-  if (!isVaultReadConfigured()) throw notConfiguredError();
+  if (!isVaultReadConfigured(config)) throw notConfiguredError();
   if (!StrKey.isValidEd25519PublicKey(address)) {
     throw new VaultReadError(
       "BAD_RESPONSE",
       "A valid Stellar account address is required to check vault deposits.",
     );
   }
-  return dedupe(`deposit-preflight:${STELLAR_VAULT_CONTRACT_ID}:${address}`, async () => {
+  return dedupe(`deposit-preflight:${config.network}:${config.rpcUrl}:${config.vaultContractId}:${address}`, async () => {
     const [pausedVal, allowlistedVal] = await Promise.all([
-      simulate(STELLAR_VAULT_CONTRACT_ID, "is_paused", [], address),
+      simulate(config, config.vaultContractId, "is_paused", [], address),
       simulate(
-        STELLAR_VAULT_CONTRACT_ID,
+        config,
+        config.vaultContractId,
         "is_authorized_depositor",
         [new Address(address).toScVal()],
         address,

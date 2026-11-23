@@ -53,11 +53,14 @@ function buildLcsTable(a: string[], b: string[]): number[][] {
   );
 
   for (let i = 1; i <= m; i++) {
+    const row = dp[i];
+    const prevRow = dp[i - 1];
+    if (!row || !prevRow) continue;
     for (let j = 1; j <= n; j++) {
       if (a[i - 1] === b[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
+        row[j] = (prevRow[j - 1] ?? 0) + 1;
       } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        row[j] = Math.max(prevRow[j] ?? 0, row[j - 1] ?? 0);
       }
     }
   }
@@ -88,21 +91,26 @@ function walkLcs(
   const reversed: Omit<DiffLine, 'lineA' | 'lineB'>[] = [];
 
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
-      reversed.push({ type: 'unchanged', value: a[i - 1] });
+    const lineA = i > 0 ? a[i - 1] : undefined;
+    const lineB = j > 0 ? b[j - 1] : undefined;
+    if (i > 0 && j > 0 && lineA !== undefined && lineA === lineB) {
+      reversed.push({ type: 'unchanged', value: lineA });
       i--;
       j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      reversed.push({ type: 'added', value: b[j - 1] });
+    } else if (j > 0 && lineB !== undefined && (i === 0 || (dp[i]?.[j - 1] ?? 0) >= (dp[i - 1]?.[j] ?? 0))) {
+      reversed.push({ type: 'added', value: lineB });
       j--;
+    } else if (i > 0 && lineA !== undefined) {
+      reversed.push({ type: 'removed', value: lineA });
+      i--;
     } else {
-      reversed.push({ type: 'removed', value: a[i - 1] });
-      i--;
+      break;
     }
   }
 
   for (let k = reversed.length - 1; k >= 0; k--) {
-    out.push(reversed[k]);
+    const item = reversed[k];
+    if (item) out.push(item);
   }
 }
 

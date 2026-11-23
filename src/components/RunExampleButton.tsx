@@ -5,7 +5,7 @@
  * Sends a mock request to the example endpoint and displays the response.
  */
 
-import React, { useId, useState } from 'react';
+import { useId, useState } from 'react';
 
 export interface RunExampleConfig {
   endpoint: string;

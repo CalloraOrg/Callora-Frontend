@@ -143,7 +143,8 @@ export default function CodeExample({
 
     if (nextIndex !== null) {
       e.preventDefault();
-      setActiveLanguage(languages[nextIndex]);
+      const nextLang = languages[nextIndex];
+      if (nextLang) setActiveLanguage(nextLang);
 
       // Move DOM focus to the newly selected tab
       const tabs = tablistRef.current?.querySelectorAll("[role=\"tab\"]");

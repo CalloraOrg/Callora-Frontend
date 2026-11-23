@@ -26,6 +26,7 @@ export const APP_ROUTES = {
   webhookDeliveries: "/webhooks/deliveries",
   onboarding: "/onboarding",
   endpointSummary: "/endpoints",
+  notifications: "/notifications",
 } as const;
 
 export type AppRouteKey = keyof typeof APP_ROUTES;
@@ -49,11 +50,13 @@ const routePrefetchers: Record<string, () => Promise<unknown>> = {
   "/apis/my-apis": () => import("../pages/MyApis"),
   "/apis/plan-badge": () => import("../pages/PlanBadge"),
   "/billing/history": () => import("../pages/BillingHistory"),
+  "/billing/subscriptions": () => import("../pages/Subscriptions"),
   "/theme-playground": () => import("../pages/ThemePlayground"),
   "/design-system/docs": () => import("../pages/DesignSystemDocs"),
   "/a11y-audit": () => import("../pages/A11yAudit"),
   "/webhooks/deliveries": () => import("../pages/WebhookDeliveries"),
   "/endpoints": () => import("../pages/EndpointSummary"),
+  "/notifications": () => import("../pages/NotificationCenter"),
 };
 
 export function prefetchRoute(path: string): void {

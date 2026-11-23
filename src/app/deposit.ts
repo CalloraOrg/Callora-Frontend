@@ -1,10 +1,9 @@
 import {
-  EXPLORER_BASE_URL,
   PENDING_DEPOSIT_STORAGE_KEY,
-  STELLAR_NETWORK,
-  STELLAR_VAULT_CONTRACT_ID,
   type StellarNetwork,
 } from "../config/constants";
+import { StrKey } from "@stellar/stellar-sdk";
+import { getConfig } from "../config/runtimeConfig";
 
 export type DepositStage = "input" | "approving" | "pending" | "confirmed" | "failed";
 
@@ -14,6 +13,7 @@ export interface PendingDepositRecord {
   submittedAt: number;
   network: StellarNetwork;
   contractId: string;
+  rpcUrl?: string;
 }
 
 export function readPendingDeposit(): PendingDepositRecord | null {
@@ -26,10 +26,24 @@ export function readPendingDeposit(): PendingDepositRecord | null {
       typeof parsed.hash === "string" &&
       typeof parsed.amount === "number" &&
       typeof parsed.submittedAt === "number" &&
-      parsed.network === STELLAR_NETWORK &&
-      parsed.contractId === STELLAR_VAULT_CONTRACT_ID
+      ["testnet", "mainnet", "futurenet"].includes(parsed.network) &&
+      typeof parsed.contractId === "string" &&
+      StrKey.isValidContract(parsed.contractId)
     ) {
-      return parsed as PendingDepositRecord;
+      let rpcUrl = parsed.rpcUrl;
+      if (typeof rpcUrl === "string") {
+        const endpoint = new URL(rpcUrl);
+        if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password) return null;
+      } else if (
+        parsed.network === getConfig().network &&
+        parsed.contractId === getConfig().vaultContractId
+      ) {
+        rpcUrl = getConfig().rpcUrl;
+      } else {
+        return null;
+      }
+      if (!rpcUrl) return null;
+      return { ...parsed, rpcUrl } as PendingDepositRecord;
     }
     return null;
   } catch {
@@ -61,8 +75,9 @@ export const STAGE_LABELS: Record<DepositStage, string> = {
   failed: "Failed",
 };
 
-export function buildExplorerLink(hash: string): string {
-  return `${EXPLORER_BASE_URL}${hash}`;
+export function buildExplorerLink(hash: string, network: StellarNetwork = getConfig().network): string {
+  const explorerNetwork = network === "mainnet" ? "public" : network;
+  return `https://stellar.expert/explorer/${explorerNetwork}/tx/${hash}`;
 }
 
 export function getStageLabel(stage: DepositStage, hasValidAmount: boolean): string {

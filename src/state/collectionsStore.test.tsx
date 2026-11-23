@@ -20,14 +20,22 @@
 
 import React from "react";
 import { cleanup, render, screen, act } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   reducer,
   CollectionsProvider,
   useCollections,
+  storageKey,
+  LEGACY_STORAGE_KEY,
   type Collection,
   type CollectionsState,
 } from "./collectionsStore";
+
+// Mock useAccountId so we control which account the provider sees.
+let mockAccountId: string | null = "acct-1";
+vi.mock("../hooks/useAccount", () => ({
+  useAccountId: () => mockAccountId,
+}));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -47,6 +55,7 @@ function makeState(collections: Collection[] = []): CollectionsState {
 
 beforeEach(() => {
   localStorage.clear();
+  mockAccountId = "acct-1";
 });
 
 afterEach(() => {
@@ -561,7 +570,7 @@ describe("CollectionsProvider – localStorage loading", () => {
 
   it("loads valid collections from localStorage on mount", () => {
     localStorage.setItem(
-      "callora_collections",
+      storageKey("acct-1"),
       JSON.stringify({
         collections: [
           { id: "pre-1", name: "Pre-loaded", endpointIds: ["ep-1"] },
@@ -580,7 +589,7 @@ describe("CollectionsProvider – localStorage loading", () => {
   });
 
   it("falls back to empty state when localStorage contains invalid JSON", () => {
-    localStorage.setItem("callora_collections", "not valid json {{");
+    localStorage.setItem(storageKey("acct-1"), "not valid json {{");
 
     render(
       <CollectionsProvider>
@@ -593,7 +602,7 @@ describe("CollectionsProvider – localStorage loading", () => {
 
   it("falls back to empty state when stored object has no 'collections' array", () => {
     localStorage.setItem(
-      "callora_collections",
+      storageKey("acct-1"),
       JSON.stringify({ something: "unexpected" })
     );
 
@@ -608,7 +617,7 @@ describe("CollectionsProvider – localStorage loading", () => {
 
   it("falls back to empty state when 'collections' field is not an array", () => {
     localStorage.setItem(
-      "callora_collections",
+      storageKey("acct-1"),
       JSON.stringify({ collections: null })
     );
 
@@ -645,7 +654,7 @@ describe("CollectionsProvider – localStorage persistence", () => {
       screen.getByText("create").click();
     });
 
-    const raw = localStorage.getItem("callora_collections");
+    const raw = localStorage.getItem(storageKey("acct-1"));
     expect(raw).not.toBeNull();
     const parsed = JSON.parse(raw!);
     expect(parsed.collections).toHaveLength(1);
@@ -660,7 +669,7 @@ describe("CollectionsProvider – localStorage persistence", () => {
 describe("CollectionsProvider – derived values", () => {
   it("isEndpointSaved returns true only when the endpoint exists in a collection", () => {
     localStorage.setItem(
-      "callora_collections",
+      storageKey("acct-1"),
       JSON.stringify({
         collections: [{ id: "c1", name: "A", endpointIds: ["ep-1"] }],
       })
@@ -686,7 +695,7 @@ describe("CollectionsProvider – derived values", () => {
 
   it("collectionIdsForEndpoint returns set of collection ids containing the endpoint", () => {
     localStorage.setItem(
-      "callora_collections",
+      storageKey("acct-1"),
       JSON.stringify({
         collections: [
           { id: "c1", name: "A", endpointIds: ["ep-1"] },
@@ -709,7 +718,7 @@ describe("CollectionsProvider – derived values", () => {
 
   it("totalSavedCount counts distinct endpoint ids across all collections", () => {
     localStorage.setItem(
-      "callora_collections",
+      storageKey("acct-1"),
       JSON.stringify({
         collections: [
           { id: "c1", name: "A", endpointIds: ["ep-1", "ep-2"] },
@@ -750,5 +759,109 @@ describe("useCollections – outside provider", () => {
     );
 
     consoleSpy.mockRestore();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CollectionsProvider – per-account storage scoping
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("CollectionsProvider – per-account storage scoping", () => {
+  it("stores collections under the account-scoped key, not the legacy key", () => {
+    function Creator() {
+      const { createCollection } = useCollections();
+      return <button onClick={() => createCollection("Mine")}>create</button>;
+    }
+
+    mockAccountId = "acct-99";
+    render(<CollectionsProvider><Creator /></CollectionsProvider>);
+    act(() => { screen.getByText("create").click(); });
+
+    // Written under account-scoped key
+    expect(localStorage.getItem(storageKey("acct-99"))).not.toBeNull();
+    // Not under the legacy global key
+    expect(localStorage.getItem(LEGACY_STORAGE_KEY)).toBeNull();
+    cleanup();
+  });
+
+  it("two accounts see independent collections", () => {
+    localStorage.setItem(
+      storageKey("acct-A"),
+      JSON.stringify({ collections: [{ id: "c1", name: "Account A col", endpointIds: [] }] }),
+    );
+    localStorage.setItem(
+      storageKey("acct-B"),
+      JSON.stringify({ collections: [{ id: "c2", name: "Account B col", endpointIds: [] }] }),
+    );
+
+    // Render with account A
+    mockAccountId = "acct-A";
+    const { rerender } = render(
+      <CollectionsProvider>
+        <Inspector />
+      </CollectionsProvider>,
+    );
+    expect(screen.getByTestId("count").textContent).toBe("1");
+    expect(screen.getByTestId("first-name").textContent).toBe("Account A col");
+
+    // Switch to account B by updating mockAccountId and re-rendering
+    mockAccountId = "acct-B";
+    rerender(
+      <CollectionsProvider>
+        <Inspector />
+      </CollectionsProvider>,
+    );
+
+    expect(screen.getByTestId("count").textContent).toBe("1");
+    expect(screen.getByTestId("first-name").textContent).toBe("Account B col");
+  });
+
+  it("migrates legacy callora_collections to the first account key (once)", () => {
+    localStorage.setItem(
+      LEGACY_STORAGE_KEY,
+      JSON.stringify({ collections: [{ id: "leg1", name: "Legacy col", endpointIds: ["ep-x"] }] }),
+    );
+
+    mockAccountId = "acct-migrate";
+    render(<CollectionsProvider><Inspector /></CollectionsProvider>);
+
+    // Legacy data appears under the new account
+    expect(screen.getByTestId("count").textContent).toBe("1");
+    expect(screen.getByTestId("first-name").textContent).toBe("Legacy col");
+
+    // Legacy key is removed
+    expect(localStorage.getItem(LEGACY_STORAGE_KEY)).toBeNull();
+
+    // Data is now stored under the account-scoped key
+    expect(localStorage.getItem(storageKey("acct-migrate"))).not.toBeNull();
+    cleanup();
+  });
+
+  it("anonymous key used when no account is active", () => {
+    mockAccountId = null;
+
+    function Creator() {
+      const { createCollection } = useCollections();
+      return <button onClick={() => createCollection("Anon")}>create</button>;
+    }
+
+    render(<CollectionsProvider><Creator /></CollectionsProvider>);
+    act(() => { screen.getByText("create").click(); });
+
+    expect(localStorage.getItem(storageKey(null))).not.toBeNull();
+    expect(localStorage.getItem(storageKey(null))).toContain("Anon");
+    cleanup();
+  });
+
+  it("corrupt legacy JSON does not crash on migration", () => {
+    localStorage.setItem(LEGACY_STORAGE_KEY, "{{not json");
+    mockAccountId = "acct-corrupt";
+
+    expect(() =>
+      render(<CollectionsProvider><Inspector /></CollectionsProvider>)
+    ).not.toThrow();
+
+    expect(screen.getByTestId("count").textContent).toBe("0");
+    cleanup();
   });
 });

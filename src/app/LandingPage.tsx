@@ -1,4 +1,3 @@
-import React from "react";
 import { NavLink } from "react-router-dom";
 import ExternalLink from "../components/ExternalLink";
 import { EXTERNAL_LINKS } from "../config/constants";

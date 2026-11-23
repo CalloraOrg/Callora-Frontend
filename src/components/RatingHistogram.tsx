@@ -26,7 +26,7 @@ export type RatingHistogramPlacement = "top" | "top-start" | "top-end";
 export interface RatingHistogramProps {
   /** Average rating, 0–5. */
   rating: number;
-  /** Per-star counts keyed by star value (1–5). Falls back to a derived mock when omitted. */
+  /** Per-star counts keyed by star value (1–5). When omitted, the tooltip shows "No rating breakdown yet". */
   distribution?: Record<number, number>;
   /** Trigger content (typically the inline rating display). */
   children?: React.ReactNode;
@@ -50,8 +50,9 @@ export default function RatingHistogram({
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tooltipId = useId();
 
-  const dist = distribution ?? generateMockDistribution(rating);
-  const total = Object.values(dist).reduce((sum, v) => sum + v, 0);
+  const dist = distribution;
+  const total = dist ? Object.values(dist).reduce((sum, v) => sum + v, 0) : 0;
+  const hasBreakdown = dist !== undefined && total > 0;
 
   useEffect(() => {
     return () => {
@@ -125,8 +126,8 @@ export default function RatingHistogram({
         ? { left: 0 }
         : { left: "50%", transform: "translateX(-50%)" };
 
-  const ratingLabel = `Rating ${rating.toFixed(1)} out of 5${
-    total > 0 ? `, ${total} reviews` : ""
+  const ratingLabel = `Rating ${Number.isFinite(rating) ? rating.toFixed(1) : "0.0"} out of 5${
+    hasBreakdown ? `, ${total} reviews` : ""
   }`;
 
   return (
@@ -192,7 +193,7 @@ export default function RatingHistogram({
             <div style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
               out of 5
             </div>
-            {total > 0 && (
+            {hasBreakdown ? (
               <div
                 style={{
                   marginLeft: "auto",
@@ -203,98 +204,83 @@ export default function RatingHistogram({
               >
                 {total} {total === 1 ? "review" : "reviews"}
               </div>
-            )}
+            ) : null}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {[5, 4, 3, 2, 1].map((star) => {
-              const count = dist[star] ?? 0;
-              const percent = total > 0 ? (count / total) * 100 : 0;
-              return (
-                <div
-                  key={star}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    fontSize: "0.75rem",
-                  }}
-                  aria-label={`${star} star${star === 1 ? "" : "s"}: ${count} ${count === 1 ? "review" : "reviews"}`}
-                >
+          {hasBreakdown ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {[5, 4, 3, 2, 1].map((star) => {
+                const count = dist![star] ?? 0;
+                const percent = (count / total) * 100;
+                return (
                   <div
+                    key={star}
                     style={{
-                      width: "32px",
-                      textAlign: "right",
-                      color: "var(--text)",
-                      whiteSpace: "nowrap",
-                      fontVariantNumeric: "tabular-nums",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "0.75rem",
                     }}
-                  >
-                    {star} ★
-                  </div>
-                  <div
-                    style={{
-                      flex: 1,
-                      height: "8px",
-                      background: "var(--surface-soft)",
-                      borderRadius: "999px",
-                      overflow: "hidden",
-                    }}
+                    aria-label={`${star} star${star === 1 ? "" : "s"}: ${count} ${count === 1 ? "review" : "reviews"}`}
                   >
                     <div
                       style={{
-                        width: `${percent}%`,
-                        height: "100%",
-                        background: "var(--accent)",
-                        borderRadius: "999px",
-                        transition: "width var(--transition-speed) ease",
+                        width: "32px",
+                        textAlign: "right",
+                        color: "var(--text)",
+                        whiteSpace: "nowrap",
+                        fontVariantNumeric: "tabular-nums",
                       }}
-                    />
+                    >
+                      {star} ★
+                    </div>
+                    <div
+                      style={{
+                        flex: 1,
+                        height: "8px",
+                        background: "var(--surface-soft)",
+                        borderRadius: "999px",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${percent}%`,
+                          height: "100%",
+                          background: "var(--accent)",
+                          borderRadius: "999px",
+                          transition: "width var(--transition-speed) ease",
+                        }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        width: "28px",
+                        textAlign: "right",
+                        color: "var(--muted)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {count}
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      width: "28px",
-                      textAlign: "right",
-                      color: "var(--muted)",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {count}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div
+              style={{
+                color: "var(--muted)",
+                fontSize: "0.82rem",
+                textAlign: "center",
+                padding: "8px 0",
+              }}
+            >
+              No rating breakdown yet
+            </div>
+          )}
         </div>
       )}
     </span>
   );
-}
-
-// Mock distribution used when an API has no concrete rating breakdown yet.
-// Skews higher for higher averages so the preview "looks right" alongside
-// the average rating.
-function generateMockDistribution(rating: number): Record<number, number> {
-  const total = 124;
-  const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  if (rating >= 4.5) {
-    dist[5] = Math.floor(total * 0.7);
-    dist[4] = Math.floor(total * 0.2);
-    dist[3] = Math.floor(total * 0.05);
-    dist[2] = Math.floor(total * 0.03);
-    dist[1] = total - dist[5] - dist[4] - dist[3] - dist[2];
-  } else if (rating >= 4.0) {
-    dist[5] = Math.floor(total * 0.4);
-    dist[4] = Math.floor(total * 0.4);
-    dist[3] = Math.floor(total * 0.1);
-    dist[2] = Math.floor(total * 0.05);
-    dist[1] = total - dist[5] - dist[4] - dist[3] - dist[2];
-  } else {
-    dist[5] = Math.floor(total * 0.2);
-    dist[4] = Math.floor(total * 0.3);
-    dist[3] = Math.floor(total * 0.3);
-    dist[2] = Math.floor(total * 0.15);
-    dist[1] = total - dist[5] - dist[4] - dist[3] - dist[2];
-  }
-  return dist;
 }

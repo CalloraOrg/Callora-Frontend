@@ -7,9 +7,11 @@ import useDocumentTitle from "./hooks/useDocumentTitle";
 import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut, formatUsdcStroops, normalizeUsdcAmountInput, stroopsToUsdcAmount, usdcAmountToStroops, USDC_DECIMALS } from "./utils/format";
-import { useNetworkFee } from "./components/DepositPreview";
-import { ENABLE_DEMO_OUTCOME, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR, STELLAR_VAULT_CONFIG, STELLAR_VAULT_CONTRACT_ID, TRANSACTION_TIMEOUT_SECONDS } from "./config/constants";
-import type { WalletServiceErrorCode, UsdcTrustlineStatus } from "./services/walletService";
+import { useNetworkFee, formatStroops, TransactionSummaryDetails } from "./components/DepositPreview";
+import { MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, TESTNET_DEPLOYMENT, testnetContractUrl, TRANSACTION_TIMEOUT_SECONDS } from "./config/constants";
+import { useRuntimeConfig, usdcConfigurationError } from "./config/runtimeConfig";
+import { resolveVaultConfig } from "./services/vaultConfig";
+import type { WalletServiceErrorCode, UsdcTrustlineStatus, PreparedVaultDeposit } from "./services/walletService";
 import { useVaultBalances } from "./hooks/useVaultBalances";
 import BalanceReadout from "./components/BalanceReadout";
 import LiveRegion from "./components/LiveRegion";
@@ -21,6 +23,8 @@ import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import CommandPalette from "./components/CommandPalette";
 import { useSessionExpiry } from "./hooks/useSessionExpiry";
+import { useNotifications, NotificationsContext } from "./hooks/useNotifications";
+import { isSignedIn } from "./services/authService";
 import SessionExpiryBanner from "./components/SessionExpiryBanner";
 import WalletStatus from "./components/WalletStatus";
 import { useWalletStore } from "./state/walletStore";
@@ -40,7 +44,9 @@ import {
 import LandingPage from "./app/LandingPage";
 import StatusPage from "./app/StatusPage";
 import WalletSignInButton from "./app/WalletSignInButton";
+import RequireAuth from "./components/RequireAuth";
 import AccountSwitcher from "./app/AccountSwitcher";
+import WithdrawModal from "./components/WithdrawModal";
 
 // Re-export public API
 export { prefetchRoute } from "./app/routes";
@@ -68,6 +74,7 @@ const BillingHistory = lazy(() => import("./pages/BillingHistory"));
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const WebhookDeliveries = lazy(() => import("./pages/WebhookDeliveries"));
 const EndpointSummary = lazy(() => import("./pages/EndpointSummary"));
+const NotificationCenter = lazy(() => import("./pages/NotificationCenter"));
 const BillingInvoiceSection = lazy(() => import("./pages/InvoiceCard").then(m => ({ default: m.BillingInvoiceSection })));
 
 type DemoOutcome = "confirmed" | "failed";
@@ -95,6 +102,30 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const wallet = useWalletStore();
+  const runtimeConfig = useRuntimeConfig();
+  const vaultConfig = resolveVaultConfig({
+    network: runtimeConfig.network,
+    envContractId: runtimeConfig.vaultContractId,
+    testnetDefault: "",
+    source: "runtime",
+  });
+  const issuerConfigurationError = usdcConfigurationError(runtimeConfig);
+  const { isExpired: isSessionExpired } = useSessionExpiry();
+  const notifications = useNotifications({
+    enabled: isSignedIn() && !isSessionExpired,
+  });
+  const unreadBadgeText =
+    notifications.unreadCount > 9 ? "9+" : String(notifications.unreadCount);
+  const notificationBellLabel =
+    notifications.unreadCount === 0
+      ? "Notifications (0 unread)"
+      : `Notifications (${unreadBadgeText} unread)`;
+  const notificationAnnouncement = notifications.isSignedIn
+    ? notifications.unreadCount === 0
+      ? "No unread notifications."
+      : `${notifications.unreadCount === 1 ? "1 unread notification" : `${unreadBadgeText} unread notifications`}.`
+    : "";
+  const { showToast } = useToast();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
@@ -105,6 +136,7 @@ function App() {
     "/api-usage": "API Usage – Callora",
     [APP_ROUTES.landing]: "Callora",
     [APP_ROUTES.endpointSummary]: "Endpoint Summary – Callora",
+    [APP_ROUTES.notifications]: "Notifications – Callora",
   };
   const routeDescriptionMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Explore APIs on the Callora marketplace, discover and integrate APIs for your applications.",
@@ -115,21 +147,18 @@ function App() {
     "/api-usage": "Monitor API usage, request stats, and view call history.",
     [APP_ROUTES.landing]: "Callora - Programmable API Access, pay-per-call billing, and on-chain settlement.",
     [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
+    [APP_ROUTES.notifications]: "View your Callora notifications, usage alerts, billing updates, and campaigns.",
   };
   const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
   useDocumentTitle(currentTitle, currentDescription);
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [amountInput, setAmountInput] = useState("50");
   const [selectedPreset, setSelectedPreset] = useState<number | "custom">(50);
-
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
-  useEffect(() => {
-    setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
-  }, []);
 
   // Handle global shortcuts
   const handleGlobalKeyDown = useCallback(
@@ -206,6 +235,8 @@ function App() {
   const [checkDepositStatusMessage, setCheckDepositStatusMessage] = useState("");
   const [validityTimeRemaining, setValidityTimeRemaining] = useState<number | null>(null);
   const [amountHint, setAmountHint] = useState<string | null>(null);
+  const [preparedDeposit, setPreparedDeposit] = useState<PreparedVaultDeposit | null>(null);
+  const [isPreparingDeposit, setIsPreparingDeposit] = useState(false);
 
   const {
     vault: vaultStroops,
@@ -278,7 +309,6 @@ function App() {
 
   const parsedAmount = Number(amountInput);
   const hasAmount = amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
-  const activeAmount = submittedAmount ?? (hasAmount ? parsedAmount : 0);
   const amountStroops =
     usdcAmountToStroops(submittedAmount !== null ? String(submittedAmount) : amountInput);
   const previewVaultStroops = submittedStartingBalance ?? shownVaultStroops;
@@ -286,9 +316,12 @@ function App() {
     previewVaultStroops === null || amountStroops === null
       ? null
       : previewVaultStroops + amountStroops;
-  const isBusy = isAddingTrustline || depositStage === "approving" || depositStage === "pending";
+  const isBusy = isAddingTrustline || isPreparingDeposit || depositStage === "approving" || depositStage === "pending";
   const hasUnconfirmedDeposit = depositRequiresReconciliation;
-  const { networkFee, isEstimated: isNetworkFeeEstimated } = useNetworkFee(NETWORK_FEE, isDepositOpen);
+  const { networkFee, isEstimated: isNetworkFeeEstimated } = useNetworkFee(NETWORK_FEE, isDepositOpen && !preparedDeposit);
+  const assembledNetworkFee = preparedDeposit ? formatStroops(preparedDeposit.summary.feeStroops) : null;
+  const displayedNetworkFee = assembledNetworkFee ?? networkFee;
+  const displayedNetworkFeeEstimated = assembledNetworkFee ? false : isNetworkFeeEstimated;
   const balanceDelta = formatUsdc(submittedAmount ?? (hasAmount ? parsedAmount : 0));
 
   let validationMessage = "";
@@ -309,7 +342,7 @@ function App() {
 
   const hasValidAmount = validationMessage.length === 0;
   const stageLabel = getStageLabel(depositStage, hasValidAmount);
-  const vaultBlockReason = STELLAR_VAULT_CONFIG.error ?? (vaultPreflight.status === "blocked" ? vaultPreflight.message : null);
+  const vaultBlockReason = vaultConfig.error ?? (vaultPreflight.status === "blocked" ? vaultPreflight.message : null);
   const pendingHashLabel = txHash ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : null;
 
   useEffect(() => {
@@ -326,13 +359,13 @@ function App() {
         if (!isCurrent) return;
         setWalletAvailability(available ? "available" : "missing");
         if (!available) return;
-        if (STELLAR_USDC_CONFIGURATION_ERROR) throw new Error(STELLAR_USDC_CONFIGURATION_ERROR);
-        const address = await getWalletAddress();
+        if (issuerConfigurationError) throw new Error(issuerConfigurationError);
+        const address = await getWalletAddress(runtimeConfig);
         if (!isCurrent) return;
         setWalletAddress(address);
-        if (!STELLAR_VAULT_CONFIG.error) {
+        if (!vaultConfig.error) {
           setVaultPreflight({ status: "checking", message: "" });
-          preflightVaultDeposit(address)
+          preflightVaultDeposit(address, runtimeConfig)
             .then((result) => {
               if (!isCurrent) return;
               if (result.paused) {
@@ -347,7 +380,7 @@ function App() {
               if (isCurrent) setVaultPreflight({ status: "unverified", message: "Could not verify vault status. You can still try the deposit." });
             });
         }
-        const status = await hasUsdcTrustline(address);
+        const status = await hasUsdcTrustline(address, runtimeConfig);
         if (isCurrent) setTrustlineStatus(status);
       })
       .catch((error) => {
@@ -359,7 +392,7 @@ function App() {
     return () => {
       isCurrent = false;
     };
-  }, [isDepositOpen, trustlineCheckVersion]);
+  }, [isDepositOpen, trustlineCheckVersion, runtimeConfig, vaultConfig.error, issuerConfigurationError]);
 
   useEffect(() => {
     if (location.pathname !== APP_ROUTES.billing && isDepositOpen) {
@@ -384,6 +417,8 @@ function App() {
     setDepositFailureCode(null);
     setDepositRequiresReconciliation(false);
     setAmountHint(null);
+    setPreparedDeposit(null);
+    setIsPreparingDeposit(false);
     setStatusMessage("Deposit funds to keep premium calls and AI workflows funded without leaving the dashboard.");
   };
 
@@ -419,6 +454,8 @@ function App() {
   const closeDeposit = () => {
     if (isBusy) return;
     setIsDepositOpen(false);
+    setPreparedDeposit(null);
+    setIsPreparingDeposit(false);
 
     // Clean up url parameter if it exists
     const url = new URL(window.location.href);
@@ -461,9 +498,60 @@ function App() {
     }
   };
 
-  const handleApproveTransaction = async () => {
+  const handlePrepareDeposit = async () => {
     if (!hasValidAmount || isBusy || hasUnconfirmedDeposit || walletAvailability !== "available" || (trustlineStatus !== "present" && trustlineStatus !== "unknown")) return;
 
+    const depositConfig = runtimeConfig;
+    setTxHash("");
+    setCopied(false);
+    setDepositFailureCode(null);
+    setDepositRequiresReconciliation(false);
+    setPreparedDeposit(null);
+    setIsPreparingDeposit(true);
+    setStatusMessage("Preparing and verifying your Soroban deposit transaction...");
+
+    let isWalletServiceError:
+      | ((error: unknown) => error is WalletServiceFailure)
+      | undefined;
+
+    try {
+      const walletService = await import("./services/walletService");
+      isWalletServiceError = (error): error is WalletServiceFailure =>
+        error instanceof walletService.WalletServiceError;
+
+      const prepared = await walletService.prepareVaultDeposit(amountInput, depositConfig);
+      setPreparedDeposit(prepared);
+      setStatusMessage("Review the decoded Soroban transaction below, then confirm to sign in Freighter.");
+    } catch (error) {
+      const walletError = isWalletServiceError?.(error) ? error : null;
+      const failureCode = walletError?.code ?? "NETWORK_ERROR";
+      if (failureCode === "TRUSTLINE_MISSING" || failureCode === "UNFUNDED_ACCOUNT") {
+        setTrustlineStatus(failureCode === "TRUSTLINE_MISSING" ? "missing" : "unfunded-account");
+        setTrustlineCheckVersion((version) => version + 1);
+        setDepositStage("input");
+        setSubmittedAmount(null);
+        setSubmittedStartingBalance(null);
+        setStatusMessage("Complete the wallet setup below before depositing.");
+        return;
+      }
+      setDepositFailureCode(failureCode);
+      setDepositContractErrorCode(walletError?.contractErrorCode ?? null);
+      setDepositRequiresReconciliation(false);
+      setDepositStage("failed");
+      setStatusMessage(
+        walletError
+          ? walletError.message
+          : "Could not prepare the deposit. Check your wallet and Stellar network, then try again.",
+      );
+    } finally {
+      setIsPreparingDeposit(false);
+    }
+  };
+
+  const handleConfirmSign = async () => {
+    if (!preparedDeposit || isBusy || hasUnconfirmedDeposit) return;
+
+    const depositConfig = preparedDeposit.config;
     const approvedAmount = parsedAmount;
     const startingBalance = shownVaultStroops;
     setSubmittedAmount(approvedAmount);
@@ -485,7 +573,7 @@ function App() {
       isWalletServiceError = (error): error is WalletServiceFailure =>
         error instanceof walletService.WalletServiceError;
 
-      const submittedDeposit = await walletService.submitVaultDeposit(amountInput, (hash) => {
+      const submittedDeposit = await walletService.signAndSubmit(preparedDeposit, (hash) => {
         capturedHash = hash;
         setTxHash(hash);
         setDepositStage("pending");
@@ -495,6 +583,7 @@ function App() {
       const confirmedHash = submittedDeposit.hash || capturedHash;
       clearPendingDeposit();
       setPendingDeposit(null);
+      setPreparedDeposit(null);
       setTxHash(confirmedHash);
       // Optimistic value until the re-read lands; the revision guard clears it.
       const approvedStroops = usdcAmountToStroops(amountInput);
@@ -508,6 +597,7 @@ function App() {
     } catch (error) {
       const walletError = isWalletServiceError?.(error) ? error : null;
       const failureCode = walletError?.code ?? "NETWORK_ERROR";
+      setPreparedDeposit(null);
       if (failureCode === "TRUSTLINE_MISSING" || failureCode === "UNFUNDED_ACCOUNT") {
         setTrustlineStatus(failureCode === "TRUSTLINE_MISSING" ? "missing" : "unfunded-account");
         setTrustlineCheckVersion((version) => version + 1);
@@ -527,8 +617,9 @@ function App() {
           hash: finalHash,
           amount: approvedAmount,
           submittedAt: Date.now(),
-          network: STELLAR_NETWORK,
-          contractId: STELLAR_VAULT_CONTRACT_ID,
+          network: depositConfig.network,
+          contractId: depositConfig.vaultContractId,
+          rpcUrl: depositConfig.rpcUrl,
         };
         writePendingDeposit(record);
         setPendingDeposit(record);
@@ -549,7 +640,7 @@ function App() {
     setTrustlineMessage("Approve the USDC trustline in Freighter. Waiting for Stellar confirmation.");
     try {
       const { addUsdcTrustline } = await import("./services/walletService");
-      const result = await addUsdcTrustline();
+      const result = await addUsdcTrustline(runtimeConfig);
       if (result === "cancelled") {
         setTrustlineMessage("Trustline signature cancelled. You can add the USDC trustline when you are ready.");
       } else {
@@ -577,10 +668,12 @@ function App() {
     setCopied(false);
     setDepositFailureCode(null);
     setDepositRequiresReconciliation(false);
+    setPreparedDeposit(null);
+    setIsPreparingDeposit(false);
     setStatusMessage("Review the transaction details and approve again.");
   };
 
-  const handleCheckDepositStatus = async (auto = false) => {
+  const handleCheckDepositStatus = async () => {
     const record = pendingDeposit ?? readPendingDeposit();
     const hashToCheck = record?.hash || txHash;
     if (!hashToCheck || isCheckingDepositStatus) return;
@@ -589,7 +682,15 @@ function App() {
     setCheckDepositStatusMessage("Checking transaction status...");
     try {
       const { checkDepositStatus } = await import("./services/walletService");
-      const status = await checkDepositStatus(hashToCheck);
+      const statusConfig = record
+        ? {
+            ...runtimeConfig,
+            network: record.network,
+            vaultContractId: record.contractId,
+            rpcUrl: record.rpcUrl ?? runtimeConfig.rpcUrl,
+          }
+        : runtimeConfig;
+      const status = await checkDepositStatus(hashToCheck, statusConfig);
 
       if (status === "SUCCESS") {
         clearPendingDeposit();
@@ -663,7 +764,7 @@ function App() {
       setDepositRequiresReconciliation(true);
       setDepositStage("failed");
       setStatusMessage("You have an unconfirmed deposit. Check transaction status before retrying.");
-      handleCheckDepositStatus(true);
+      handleCheckDepositStatus();
     }
   }, []);
 
@@ -689,6 +790,7 @@ function App() {
   };
 
   return (
+    <NotificationsContext.Provider value={notifications}>
       <div className="app-shell">
         <a href="#main-content" className="skip-link">
           Skip to main content
@@ -718,6 +820,62 @@ function App() {
               ))}
             </nav>
             <AccountSwitcher />
+            {notifications.isSignedIn && (
+              <NavLink
+                to={APP_ROUTES.notifications}
+                className={({ isActive }) =>
+                  isActive ? "link-nav active notification-bell-link" : "link-nav notification-bell-link"
+                }
+                aria-label={notificationBellLabel}
+                onMouseEnter={() => prefetchRoute(APP_ROUTES.notifications)}
+                onFocus={() => prefetchRoute(APP_ROUTES.notifications)}
+                style={{
+                  position: "relative",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "6px 8px",
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {notifications.unreadCount > 0 && (
+                  <span
+                    className="notification-bell-badge"
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      right: 0,
+                      minWidth: "16px",
+                      height: "16px",
+                      padding: "0 4px",
+                      borderRadius: "999px",
+                      background: "var(--accent, #4e85ff)",
+                      color: "#fff",
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      lineHeight: "16px",
+                      textAlign: "center",
+                    }}
+                  >
+                    {unreadBadgeText}
+                  </span>
+                )}
+              </NavLink>
+            )}
             <WalletSignInButton />
             <WalletStatus />
             <ThemeToggle />
@@ -727,6 +885,7 @@ function App() {
         <main id="main-content" role="main" className="page">
           <AppSessionExpiryBanner />
           <LiveRegion message={balanceAnnouncement} />
+          <LiveRegion message={notificationAnnouncement} regionId="notifications-unread" />
           <RouteErrorBoundary
             resetKey={location.pathname}
             onGoHome={() => navigate(APP_ROUTES.dashboard)}
@@ -738,7 +897,7 @@ function App() {
               element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} onTakeTour={() => navigate(APP_ROUTES.onboarding)} />}
             />
 
-            <Route path={APP_ROUTES.publish} element={<PublishApi />} />
+            <Route path={APP_ROUTES.publish} element={<RequireAuth><PublishApi /></RequireAuth>} />
 
             <Route path={APP_ROUTES.onboarding} element={<OnboardingTour onComplete={() => navigate(APP_ROUTES.dashboard)} />} />
 
@@ -771,9 +930,9 @@ function App() {
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
 
             {/* ── My APIs ─────────────────────────────────────────────── */}
-            <Route path={APP_ROUTES.myApis} element={<MyApis />} />
+            <Route path={APP_ROUTES.myApis} element={<RequireAuth><MyApis /></RequireAuth>} />
             
-            <Route path={APP_ROUTES.webhookDeliveries} element={<WebhookDeliveries />} />
+            <Route path={APP_ROUTES.webhookDeliveries} element={<RequireAuth><WebhookDeliveries /></RequireAuth>} />
 
             {/* ── Plan Badge (issue #529) ──────────────────────────────── */}
             <Route path={APP_ROUTES.planBadge} element={<PlanBadgePage />} />
@@ -781,6 +940,7 @@ function App() {
             <Route
               path={APP_ROUTES.billing}
               element={
+                <RequireAuth>
                 <section className="billing-layout">
                   <div className="surface billing-panel">
                     {hasUnconfirmedDeposit && !isDepositOpen && (
@@ -799,9 +959,24 @@ function App() {
                         <p className="eyebrow">Deposit USDC to Vault</p>
                         <h1>Review every number before you approve.</h1>
                       </div>
-                      <button className="primary-button no-print" onClick={() => openDeposit()}>
-                        Open deposit modal
-                      </button>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button className="primary-button no-print" onClick={() => openDeposit()}>
+                          Open deposit modal
+                        </button>
+                        <button
+                          className="ghost-button no-print"
+                          onClick={() => setIsWithdrawOpen(true)}
+                          disabled={
+                            !walletAddress ||
+                            wallet.isNetworkMismatch ||
+                            vaultStroops === null ||
+                            vaultStroops === 0n
+                          }
+                          aria-label="Open withdrawal modal"
+                        >
+                          Withdraw
+                        </button>
+                      </div>
                     </div>
 
                     <div className="vault-grid">
@@ -886,7 +1061,7 @@ function App() {
                       <NavLink to={APP_ROUTES.billingHistory}>Billing History</NavLink>.
                       {" "}<NavLink to={APP_ROUTES.subscriptions}>Manage subscriptions</NavLink>.
                     </p>
-                    {ENABLE_DEMO_OUTCOME && (
+                    {runtimeConfig.enableDemoOutcome && (
                       <>
                         <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
                           <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
@@ -903,6 +1078,7 @@ function App() {
                     )}
                   </aside>
                 </section>
+                </RequireAuth>
               }
             />
 
@@ -923,6 +1099,7 @@ function App() {
             <Route path={APP_ROUTES.legacyRateLimit} element={<LegacyRateLimitRedirect />} />
 
             <Route path={APP_ROUTES.endpointSummary} element={<EndpointSummary />} />
+            <Route path={APP_ROUTES.notifications} element={<NotificationCenter />} />
 
             {/* ── Billing History (FWC26) ──────────────────────────────── */}
             <Route path={APP_ROUTES.billingHistory} element={<BillingHistory />} />
@@ -1026,7 +1203,7 @@ function App() {
                     {trustlineStatus === "unfunded-account" && (
                       <>
                         <p>This Stellar account is not funded. Fund it with XLM, then check again before adding the USDC trustline.</p>
-                        {STELLAR_NETWORK === "testnet" && (
+                        {runtimeConfig.network === "testnet" && (
                           <ExternalLink href={`https://friendbot.stellar.org/?addr=${encodeURIComponent(walletAddress)}`} ariaLabel="Fund testnet account with Friendbot">
                             Fund testnet account with Friendbot
                           </ExternalLink>
@@ -1155,15 +1332,19 @@ function App() {
                       <div className="preview-row">
                         <span>Network fee</span>
                         <strong>
-                          <span>{networkFee}</span>
-                          {isNetworkFeeEstimated && <span> (estimated)</span>}
+                          <span>{displayedNetworkFee}</span>
+                          {displayedNetworkFeeEstimated && <span> (estimated)</span>}
                         </strong>
                       </div>
 
                       <div className="preview-row total">
                         <span>Total cost</span>
-                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${networkFee}` : `0.00 USDC + ${networkFee}`}</strong>
+                        <strong>{hasAmount || submittedAmount ? `${balanceDelta} USDC + ${displayedNetworkFee}` : `0.00 USDC + ${displayedNetworkFee}`}</strong>
                       </div>
+
+                      {preparedDeposit && (
+                        <TransactionSummaryDetails summary={preparedDeposit.summary} />
+                      )}
                     </article>
 
                     {(depositStage === "pending" || depositStage === "confirmed" || depositStage === "failed") && txHash && (
@@ -1174,7 +1355,7 @@ function App() {
                         </div>
 
                         <div className="hash-actions">
-                          <a href={buildExplorerLink(txHash)} target="_blank" rel="noreferrer">
+                          <a href={buildExplorerLink(txHash, runtimeConfig.network)} target="_blank" rel="noreferrer">
                             View on Stellar Explorer
                           </a>
                           <button onClick={handleCopyHash}>{copied ? "Copied" : "Copy hash"}</button>
@@ -1258,9 +1439,18 @@ function App() {
                   </button>
                 ) : vaultPreflight.status === "checking" && depositStage === "input" ? (
                   <button className="primary-button" disabled>Checking vault...</button>
+                ) : preparedDeposit && depositStage === "input" ? (
+                  <button
+                    className="primary-button"
+                    onClick={handleConfirmSign}
+                    disabled={isBusy}
+                    aria-label="Confirm and sign deposit transaction"
+                  >
+                    Confirm &amp; Sign in Freighter
+                  </button>
                 ) : (
-                  <button className="primary-button" onClick={handleApproveTransaction} disabled={!hasValidAmount || isBusy || vaultBlockReason !== null} aria-describedby={vaultBlockReason ? "vault-preflight-status" : undefined} aria-label={depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
-                    {depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
+                  <button className="primary-button" onClick={handlePrepareDeposit} disabled={!hasValidAmount || isBusy || vaultBlockReason !== null} aria-describedby={vaultBlockReason ? "vault-preflight-status" : undefined} aria-label={isPreparingDeposit ? "Preparing deposit transaction" : depositStage === "approving" ? "Approve deposit in wallet" : depositStage === "pending" ? "Transaction submitted, waiting for confirmation" : "Approve deposit transaction"}>
+                    {isPreparingDeposit ? "Preparing transaction..." : depositStage === "approving" ? "Approve in wallet..." : depositStage === "pending" ? "Transaction submitted..." : "Approve Transaction"}
                   </button>
                 )}
 
@@ -1277,7 +1467,16 @@ function App() {
             </section>
           </div>
         )}
+        {isWithdrawOpen && (
+          <WithdrawModal
+            vaultStroops={vaultStroops}
+            onRefreshBalances={() => void refreshBalances()}
+            onShowSuccessToast={(message) => showToast(message, "success")}
+            onClose={() => setIsWithdrawOpen(false)}
+          />
+        )}
       </div>
+    </NotificationsContext.Provider>
   );
 }
 
