@@ -12,6 +12,8 @@ export function useAccountId(): string | null {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
+
+
 export function useSwitchAccount(): (accountId: string) => void {
   return useCallback((accountId: string) => {
     const current = getCurrentAccountId();
