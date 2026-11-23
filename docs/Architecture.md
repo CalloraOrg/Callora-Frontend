@@ -24,3 +24,13 @@ The application shell in `src/App.tsx` delegates route definitions, marketing se
 | `src/app/StatusPage.tsx` | System operational status route component shown at `/status` |
 | `src/app/WalletSignInButton.tsx` | Topbar Freighter wallet sign-in / sign-out button managing self-contained auth states |
 | `src/app/AccountSwitcher.tsx` | Multi-account selector dropdown with rename, add, and remove capabilities |
+
+## Shared HTTP client (`src/api/apiClient.ts`)
+
+All backend HTTP calls should go through `apiClient` (`src/api/apiClient.ts`) rather than calling `fetch` directly:
+
+- **Methods:** `apiClient.get/post/put/delete<T>(path, options)`
+- **Auth:** Routes through `authFetch` by default (`auth: true`, single-flight 401 refresh); pass `auth: false` for public endpoints (e.g. `catalogApi`) or custom `fetchImpl` for tests.
+- **Timeouts & cancellation:** Wraps requests with `runWithTimeout` (`timeoutMs` override) and forwards `AbortSignal`.
+- **Errors:** Non-2xx responses throw `ApiError { status, code, retryable, message }` classified via `classifyHttpError`, with sensitive tokens redacted.
+- **Validation & normalisers:** Pass `parse: (raw) => T` to run module-specific normalisers (e.g. `normalizeCatalog`, `validateInvoicesResponse`) and wrap `ApiError` into domain errors when keeping existing public error types stable.
