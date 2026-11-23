@@ -14,6 +14,7 @@ export const APP_ROUTES = {
   apiUsage: "/api-usage",
   billing: "/billing",
   billingHistory: "/billing/history",
+  subscriptions: "/billing/subscriptions",
   documentation: "/documentation",
   status: "/status",
   themePlayground: "/theme-playground",

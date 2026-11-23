@@ -796,6 +796,7 @@ export default function ApiUsage() {
                 value={apiKey}
                 readOnly
                 className="api-key-input"
+                aria-label="API key"
               />
               <button
                 className="ghost-button"
@@ -828,8 +829,9 @@ export default function ApiUsage() {
         <h2>Test API Call</h2>
         <div className="test-call-form">
           <div className="form-row">
-            <label>Endpoint</label>
+            <label htmlFor="api-usage-endpoint">Endpoint</label>
             <select
+              id="api-usage-endpoint"
               value={selectedEndpoint.id}
               onChange={(e) => {
                 const endpoint = MOCK_ENDPOINTS.find(
@@ -996,6 +998,7 @@ export default function ApiUsage() {
                 { id: "error", label: "Error" },
               ]}
               activeTab={statusFilter}
+              tabPanelId={() => "call-history-panel"}
               onChange={(id) => {
                 const nextStatus = id as "all" | "success" | "error";
                 setStatusFilter(nextStatus);
@@ -1065,14 +1068,21 @@ export default function ApiUsage() {
           {liveStatusMessage}
         </p>
 
-        <VirtualizedCallHistory
-          calls={filteredCallHistory}
-          isLoading={isTableLoading}
-          expandedCallId={expandedCall}
-          onToggleExpand={(id) =>
-            setExpandedCall(expandedCall === id ? null : id)
-          }
-        />
+        <div
+          id="call-history-panel"
+          role="tabpanel"
+          aria-labelledby={`tab-${statusFilter}`}
+          tabIndex={0}
+        >
+          <VirtualizedCallHistory
+            calls={filteredCallHistory}
+            isLoading={isTableLoading}
+            expandedCallId={expandedCall}
+            onToggleExpand={(id) =>
+              setExpandedCall(expandedCall === id ? null : id)
+            }
+          />
+        </div>
       </div>
 
       {/* Integration Guide */}
