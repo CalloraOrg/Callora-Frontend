@@ -9,6 +9,10 @@ import ParamsBuilder from "../components/ParamsBuilder";
 import UsageChart from "../components/UsageChart";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import { useQuota } from "../hooks/useQuota";
+import { useQuotaStore } from "../hooks/useQuotaStore";
+import { quotaStore } from "../state/quotaStore";
+import QuotaManager from "../components/QuotaManager";
+import QuotaBanner, { type QuotaStatus } from "./QuotaBanner";
 import PlanNudge from "../components/PlanNudge";
 import CallsHeatmap from "../components/CallsHeatmap";
 import Tabs from "../components/Tabs";
@@ -57,8 +61,8 @@ export type CallRecord = {
   status: "success" | "error" | "unknown";
   responseTime: number | null;
   cost: number;
-  request?: any;
-  response?: any;
+  request?: unknown;
+  response?: unknown;
 };
 
 type UsageStats = {
@@ -211,10 +215,11 @@ export default function ApiUsage() {
   const [apiKey, setApiKey] = useState("ck_live_4e85ff1ed6a4ff73893a0bf73f2bb");
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [selectedEndpoint, setSelectedEndpoint] = useState(MOCK_ENDPOINTS[0]);
+  // Safe: MOCK_ENDPOINTS is a non-empty static array.
+  const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint>(MOCK_ENDPOINTS[0]!);
   const [requestParams, setRequestParams] = useState("{}");
   const [isLoading, setIsLoading] = useState(false);
-  const [apiResponse, setApiResponse] = useState<any>(null);
+  const [apiResponse, setApiResponse] = useState<unknown>(null);
   const [responseStatus, setResponseStatus] = useState<number | null>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
@@ -526,6 +531,39 @@ export default function ApiUsage() {
   }, [selectedRange]);
 
   const { isDismissed, dismiss } = useQuota(usagePercent);
+  const quotaState = useQuotaStore(quotaStore);
+  const quotaAccountId = currentAccountId ?? "default";
+  const quotaSlice =
+    quotaState.slices[quotaAccountId] ?? quotaStore.getSlice(quotaAccountId);
+
+  const quotaBannerStatus: QuotaStatus =
+    usagePercent >= 100 ? "danger" : usagePercent >= 80 ? "warn" : "ok";
+  const showQuotaEmptyState =
+    quotaSlice.loadStatus === "ready" &&
+    (quotaSlice.value === null || quotaSlice.value === 0);
+  const quotaBannerStatusLabel =
+    quotaSlice.loadStatus === "loading" && quotaSlice.value === null
+      ? "Loading…"
+      : quotaSlice.loadStatus === "error"
+        ? "Error"
+        : quotaSlice.loadStatus === "stale"
+          ? "Stale"
+          : quotaSlice.pendingStatus === "error"
+            ? "Action needed"
+            : undefined;
+  const quotaBannerExtraInfo =
+    quotaSlice.pendingStatus === "error" && quotaSlice.pendingError
+      ? quotaSlice.pendingError
+      : quotaSlice.loadStatus === "error" && quotaSlice.loadError
+        ? quotaSlice.loadError
+        : quotaSlice.loadStatus === "stale"
+          ? "Quota updated in another tab. Refresh to review the latest value."
+          : quotaSlice.loadStatus === "loading" && quotaSlice.value === null
+            ? "Loading authoritative quota…"
+            : "Authoritative quota synced with your account.";
+  const handleSetupQuota = () => {
+    document.getElementById("quota-manager-input")?.focus();
+  };
 
   // Whether any call-history filter differs from its default value.
   const filtersAreActive =
@@ -658,7 +696,8 @@ export default function ApiUsage() {
     (entry: HistoryEntry) => {
       setSelectedEndpoint(
         MOCK_ENDPOINTS.find((ep) => ep.id === entry.endpointId) ??
-          MOCK_ENDPOINTS[0],
+          // Safe: MOCK_ENDPOINTS is a non-empty static array.
+          MOCK_ENDPOINTS[0]!,
       );
       setRequestParams(entry.requestParams);
       setApiResponse(entry.response);
@@ -793,6 +832,29 @@ export default function ApiUsage() {
       </div>
 
       <KbdHint shortcuts={API_USAGE_SHORTCUTS} />
+
+      {/* Quota Management Section */}
+      <div className="surface quota-management-section">
+        <QuotaBanner
+          title="API Quota"
+          status={quotaBannerStatus}
+          statusLabel={quotaBannerStatusLabel}
+          value={quotaSlice.value !== null ? String(quotaSlice.value) : ""}
+          hint="Current authoritative requests-per-window quota"
+          extraInfo={quotaBannerExtraInfo}
+          statusOptions={
+            quotaSlice.loadStatus === "error" ||
+            quotaSlice.pendingStatus === "error"
+              ? "error"
+              : quotaSlice.loadStatus === "ready"
+                ? "success"
+                : "idle"
+          }
+          showEmptyState={showQuotaEmptyState}
+          onSetupQuota={handleSetupQuota}
+        />
+        <QuotaManager store={quotaStore} accountId={quotaAccountId} />
+      </div>
 
       {/* API Key Section */}
       <div className="surface api-key-section">

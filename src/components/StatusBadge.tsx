@@ -27,7 +27,6 @@
  *   patternStyle — "default" | "dense" | "high-contrast" (default: "default")
  */
 
-import React from "react";
 import "../styles/patterns.css";
 
 /** All supported status variants. */

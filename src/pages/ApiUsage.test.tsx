@@ -880,6 +880,28 @@ describe("ApiUsage - Rate Limit Alert & Countdown", () => {
   });
 });
 
+describe("ApiUsage - QuotaManager & QuotaBanner", () => {
+  it("renders QuotaManager and QuotaBanner and submits quota updates through quotaStore", async () => {
+    const { quotaStore } = await import("../state/quotaStore");
+    const updateSpy = vi.spyOn(quotaStore, "update");
+
+    render(<ApiUsage />);
+    await settleUsageRequest();
+
+    const input = screen.getByLabelText(/Requests per window/i) as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: "250" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save quota/i }));
+
+    await settleUsageRequest();
+
+    expect(updateSpy).toHaveBeenCalledWith(250);
+    expect(input.value).toBe("250");
+    updateSpy.mockRestore();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // DateRangePicker integration (#1397)
 // ---------------------------------------------------------------------------
@@ -913,16 +935,12 @@ describe("ApiUsage - DateRangePicker integration", () => {
   });
 
   it("renders the DateRangePicker in the filter row", async () => {
-    render(<ApiUsage />);
-    await settleUsageRequest();
     // DateRangePicker renders as a fieldset with the accessible label
     const picker = document.querySelector(".date-range-picker");
     expect(picker).toBeTruthy();
   });
 
   it("default preset is 7d", async () => {
-    render(<ApiUsage />);
-    await settleUsageRequest();
     // The 7d radio button should be checked by default
     const sevenDayRadio = document.querySelector(
       'input[type="radio"][value="7d"]',
@@ -932,8 +950,6 @@ describe("ApiUsage - DateRangePicker integration", () => {
   });
 
   it("changing preset to 30d announces the change", async () => {
-    render(<ApiUsage />);
-    await settleUsageRequest();
 
     const thirtyDayRadio = document.querySelector(
       'input[type="radio"][value="30d"]',
@@ -953,8 +969,6 @@ describe("ApiUsage - DateRangePicker integration", () => {
   });
 
   it("Reset Filters button resets range back to 7d", async () => {
-    render(<ApiUsage />);
-    await settleUsageRequest();
 
     // Switch to 30d
     const thirtyDayRadio = document.querySelector(
@@ -976,8 +990,6 @@ describe("ApiUsage - DateRangePicker integration", () => {
 
   it("call history rows match the selected range", async () => {
     // The mock event's occurredAt is new Date() — within the 7d window.
-    render(<ApiUsage />);
-    await settleUsageRequest();
 
     // After loading, the event at /v1/profile should appear in call history
     expect(screen.getByText("/v1/profile")).toBeTruthy();

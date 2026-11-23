@@ -63,6 +63,41 @@ in development, because a silently wrong network is worse than a loud warning.
 Resolve it through `resolveStellarNetwork()` rather than reading the raw
 variable.
 
+### `VITE_STELLAR_RPC_URL`
+
+Soroban RPC endpoint used for wallet deposits, trustline checks, and vault
+reads. Default: the selected network's public RPC —
+`https://soroban-testnet.stellar.org` on `testnet` and
+`https://rpc-futurenet.stellar.org` on `futurenet`. **Mainnet has no public
+default**, so a mainnet deployment must set this explicitly.
+
+Surrounding whitespace and trailing slashes are stripped by
+`normalizeBaseUrl`, so `https://rpc.example.com/` and `https://rpc.example.com`
+are equivalent. The resolved value is exported as `STELLAR_RPC_URL`.
+
+When the value is empty, deposits and vault reads fail before any network call
+with `Stellar RPC is not configured for this network.` (`isVaultReadConfigured()`
+returns `false`), rather than silently talking to the wrong chain. Keep this
+pointed at the same network as `VITE_STELLAR_NETWORK` and the connected wallet.
+
+### `VITE_STELLAR_VAULT_CONTRACT_ID`
+
+The deployed Callora vault contract (a `C…` Soroban contract address) that
+receives USDC deposits. Default: the reference testnet vault
+`CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ` when
+`VITE_STELLAR_NETWORK=testnet`. **Mainnet and futurenet have no default** and
+require an explicit contract ID.
+
+The value is trimmed and validated with `StrKey.isValidContract`. If it is
+missing on mainnet/futurenet, deposits are blocked with "The Callora vault
+contract is not configured for this network."; if it is present but not a valid
+contract address (an account address, for example), deposits are blocked with
+"The configured Callora vault contract ID is not a valid contract address."
+Both errors surface in the deposit modal before a signature is requested and
+before any vault read. The resolved contract ID is exported as
+`STELLAR_VAULT_CONTRACT_ID`; `STELLAR_VAULT_CONFIG` also carries the `source`
+(`"env"`, `"testnet-default"`, or `"missing"`) and any `error`.
+
 ### `VITE_STELLAR_USDC_ISSUER`
 
 Classic issuer public key for the `USDC` asset backing the configured vault's
@@ -80,7 +115,23 @@ request. Validation uses `StrKey.isValidEd25519PublicKey`.
 `STELLAR_HORIZON_URL` follows `STELLAR_NETWORK`: testnet uses
 `https://horizon-testnet.stellar.org`, mainnet uses `https://horizon.stellar.org`,
 and futurenet uses `https://horizon-futurenet.stellar.org`.
+`.env.example` intentionally leaves `VITE_STELLAR_USDC_ISSUER` commented out:
+uncommenting it with the testnet value changes nothing on testnet, and on other
+networks it is the place to put that network's issuer.
 See [Deposit flow](Deposit-Flow.md) for the trustline and funding steps.
+
+### `VITE_ENABLE_DEMO_OUTCOME`
+
+Shows the deposit demo-outcome toggle, which lets a developer force a simulated
+success or failure result while exercising the deposit flow. Default: `false`
+(toggle hidden).
+
+It is enabled only when both conditions hold: the value is exactly `true`
+(case-sensitive; `1` or `TRUE` do not enable it), and the app is running on the
+Vite dev server (`import.meta.env.DEV`). Production builds
+always resolve `ENABLE_DEMO_OUTCOME` to `false`, even if the variable is set at
+build time, so the toggle cannot appear on a deployed site. Anything other than
+`"true"` leaves it off; there is no invalid-value error.
 
 ### `VITE_DEV_API_PROXY_TARGET`
 

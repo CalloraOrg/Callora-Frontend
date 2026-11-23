@@ -90,6 +90,11 @@ export const ROUTE_CATALOGUE: RouteCatalogueEntry[] = [
     path: "/onboarding",
     keywords: ["onboarding", "tour", "getting started"],
   },
+  {
+    label: "Notifications",
+    path: "/notifications",
+    keywords: ["notifications", "alerts", "inbox", "updates", "bell"],
+  },
 ];
 
 export type RouteMatch = {

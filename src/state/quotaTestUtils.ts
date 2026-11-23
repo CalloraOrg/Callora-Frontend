@@ -91,22 +91,22 @@ export function makeFakeApi(initial: Record<string, number> = {}): FakeApiHandle
       server.set(accountId, { accountId, value, version, updatedAt: 1 });
     },
     resolveFetch(index, record) {
-      fetchCalls[index].deferred.resolve(record);
+      fetchCalls[index]?.deferred.resolve(record);
     },
     resolveLastFetch(record) {
       this.resolveFetch(fetchCalls.length - 1, record);
     },
     rejectFetch(index, err) {
-      fetchCalls[index].deferred.reject(err);
+      fetchCalls[index]?.deferred.reject(err);
     },
     resolveUpdate(index, record) {
-      updateCalls[index].deferred.resolve(record);
+      updateCalls[index]?.deferred.resolve(record);
     },
     resolveLastUpdate(record) {
       this.resolveUpdate(updateCalls.length - 1, record);
     },
     rejectUpdate(index, err) {
-      updateCalls[index].deferred.reject(err);
+      updateCalls[index]?.deferred.reject(err);
     },
     rejectLastUpdateConflict(serverVersion, accountId) {
       this.rejectUpdate(

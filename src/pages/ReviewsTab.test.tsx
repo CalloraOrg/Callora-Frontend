@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ReviewsTab, { type Review } from "./ReviewsTab";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -267,5 +267,162 @@ describe("ReviewsTab – onWriteReview callback", () => {
     const btn = screen.getByRole("button", { name: /Write a Review/i });
     const header = btn.closest(".api-detail-reviews-header");
     expect(header?.classList.contains("no-print")).toBe(true);
+  });
+});
+
+describe("ReviewsTab – eligibility and optimistic submission", () => {
+  it.each([
+    ["not_authenticated" as const, /Sign in to write a review/i],
+    ["not_subscribed" as const, /Subscribe to this API to write a review/i],
+    ["already_reviewed" as const, /You have already reviewed this API/i],
+  ])(
+    "disables 'Write a Review' and shows helper text when %s",
+    (reason, expectedText) => {
+      render(
+        <ReviewsTab
+          reviews={BASE_REVIEWS}
+          averageRating={3.7}
+          eligibility={{ eligible: false, reason }}
+          onSubmitReview={vi.fn()}
+        />,
+      );
+
+      const btn = screen.getByRole("button", { name: /Write a Review/i });
+      expect(btn).toBeDisabled();
+      expect(screen.getByText(expectedText)).toBeInTheDocument();
+      expect(btn).toHaveAttribute("aria-describedby");
+    },
+  );
+
+  it("inserts an optimistic Pending review and replaces it on success", async () => {
+    let resolveSubmit!: (review: Review) => void;
+    const onSubmitReview = vi.fn(
+      () =>
+        new Promise<Review>((resolve) => {
+          resolveSubmit = resolve;
+        }),
+    );
+    const onNotify = vi.fn();
+
+    const { container } = render(
+      <ReviewsTab
+        reviews={BASE_REVIEWS}
+        averageRating={3.7}
+        eligibility={{ eligible: true }}
+        onSubmitReview={onSubmitReview}
+        onNotify={onNotify}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Write a Review/i }));
+    fireEvent.click(screen.getByRole("radio", { name: "5 stars" }));
+    fireEvent.change(screen.getByLabelText(/Your review/i), {
+      target: { value: "Fantastic uptime and super clear documentation." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Submit Review/i }));
+
+    // Immediately visible at top of list marked Pending
+    const cardsDuringPending = container.querySelectorAll(".reviews-tab__card");
+    expect(cardsDuringPending.length).toBe(BASE_REVIEWS.length + 1);
+    expect(cardsDuringPending[0].textContent).toContain("Pending");
+    expect(cardsDuringPending[0].textContent).toContain(
+      "Fantastic uptime and super clear documentation.",
+    );
+
+    // Resolve with server record
+    resolveSubmit({
+      id: "r-server-1",
+      author: "Dana",
+      rating: 5,
+      date: "2026-11-23T00:00:00.000Z",
+      body: "Fantastic uptime and super clear documentation.",
+      verified: true,
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Dana")).toBeInTheDocument();
+    expect(onNotify).toHaveBeenCalledWith(
+      "Your review has been published.",
+      "success",
+    );
+  });
+
+  it("rolls back optimistic review, reverts average, and restores draft on server error", async () => {
+    const onSubmitReview = vi
+      .fn()
+      .mockRejectedValue(new Error("Server rejected review."));
+    const onNotify = vi.fn();
+
+    const { container } = render(
+      <ReviewsTab
+        reviews={BASE_REVIEWS}
+        averageRating={3.7}
+        eligibility={{ eligible: true }}
+        onSubmitReview={onSubmitReview}
+        onNotify={onNotify}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Write a Review/i }));
+    fireEvent.click(screen.getByRole("radio", { name: "5 stars" }));
+    fireEvent.change(screen.getByLabelText(/Your review/i), {
+      target: { value: "My draft review text that must be preserved." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Submit Review/i }));
+
+    await waitFor(() => {
+      expect(onNotify).toHaveBeenCalledWith("Server rejected review.", "error");
+    });
+
+    // Optimistic card removed
+    expect(container.querySelectorAll(".reviews-tab__card").length).toBe(
+      BASE_REVIEWS.length,
+    );
+    expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+
+    // Form reopened with preserved draft
+    expect(screen.getByLabelText(/Your review/i)).toHaveValue(
+      "My draft review text that must be preserved.",
+    );
+    expect(screen.getByRole("radio", { name: "5 stars" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
+
+  it("aborts in-flight submission signal on unmount", () => {
+    let capturedSignal: AbortSignal | undefined;
+    const onSubmitReview = vi.fn(
+      (_draft, options?: { signal?: AbortSignal }) => {
+        capturedSignal = options?.signal;
+        return new Promise<Review>(() => {
+          // never resolves
+        });
+      },
+    );
+
+    const { unmount } = render(
+      <ReviewsTab
+        reviews={BASE_REVIEWS}
+        averageRating={3.7}
+        eligibility={{ eligible: true }}
+        onSubmitReview={onSubmitReview}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Write a Review/i }));
+    fireEvent.click(screen.getByRole("radio", { name: "4 stars" }));
+    fireEvent.change(screen.getByLabelText(/Your review/i), {
+      target: { value: "Testing abort on unmount behavior here." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Submit Review/i }));
+
+    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal?.aborted).toBe(false);
+
+    unmount();
+    expect(capturedSignal?.aborted).toBe(true);
   });
 });

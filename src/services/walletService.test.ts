@@ -50,12 +50,25 @@ vi.mock("../config/constants", async (importOriginal) => ({
   get STELLAR_USDC_CONFIGURATION_ERROR() { return mocks.configurationError; },
 }));
 
-import { Account, Asset, Transaction, xdr } from "@stellar/stellar-sdk";
+import {
+  Account,
+  Address,
+  Asset,
+  BASE_FEE,
+  Contract,
+  Operation,
+  Transaction,
+  TransactionBuilder,
+  nativeToScVal,
+  xdr,
+} from "@stellar/stellar-sdk";
 import { STELLAR_USDC_ASSET, STELLAR_NETWORK_PASSPHRASE } from "../config/constants";
 const walletAddress = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 import {
   hasUsdcTrustline, addUsdcTrustline, getWalletAddress,
   isWalletAvailable,
+  prepareVaultDeposit,
+  signAndSubmit,
   submitVaultDeposit,
   checkDepositStatus,
 } from "./walletService";
@@ -449,6 +462,90 @@ describe("walletService", () => {
       mocks.server.getTransaction.mockResolvedValueOnce({ status: "SOME_OTHER_STATUS" });
       const status = await checkDepositStatus("test-hash");
       expect(status).toBe("UNKNOWN");
+    });
+  });
+
+  describe("prepareVaultDeposit & transaction verification", () => {
+    const VAULT_ID = "CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ";
+    const OTHER_CONTRACT_ID = "CAC7CFZ42L3LTTZCI4C3XI6UF7AHS2PYTNJ5QEG2PSLRGDGMWRQOZOT5";
+
+    function buildTamperedTx(opts: {
+      contractId?: string;
+      fn?: string;
+      amountStroops?: bigint;
+      extraOp?: boolean;
+    }) {
+      const builder = new TransactionBuilder(new Account(walletAddress, "123"), {
+        fee: BASE_FEE,
+        networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+      }).addOperation(
+        new Contract(opts.contractId ?? VAULT_ID).call(
+          opts.fn ?? "deposit",
+          new Address(walletAddress).toScVal(),
+          nativeToScVal(opts.amountStroops ?? 123_400_000n, { type: "i128" }),
+        ),
+      );
+      if (opts.extraOp) {
+        builder.addOperation(
+          Operation.payment({
+            destination: walletAddress,
+            asset: Asset.native(),
+            amount: "1",
+          }),
+        );
+      }
+      return builder.setTimeout(120).build();
+    }
+
+    it("prepares and summarizes a valid deposit without calling signTransaction", async () => {
+      const prepared = await prepareVaultDeposit("12.34");
+      expect(prepared.summary.contractId).toBe(VAULT_ID);
+      expect(prepared.summary.functionName).toBe("deposit");
+      expect(prepared.summary.amountStroops).toBe(123_400_000n);
+      expect(prepared.summary.network).toBe("Testnet");
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when contract id is tampered", async () => {
+      const tampered = buildTamperedTx({ contractId: OTHER_CONTRACT_ID });
+      mocks.assembleTransaction.mockReturnValueOnce({ build: () => tampered });
+
+      await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when amount is tampered", async () => {
+      const tampered = buildTamperedTx({ amountStroops: 999_999_999n });
+      mocks.assembleTransaction.mockReturnValueOnce({ build: () => tampered });
+
+      await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when function is tampered", async () => {
+      const tampered = buildTamperedTx({ fn: "withdraw" });
+      mocks.assembleTransaction.mockReturnValueOnce({ build: () => tampered });
+
+      await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when prepared.xdr is tampered before signAndSubmit", async () => {
+      const prepared = await prepareVaultDeposit("12.34");
+      const tampered = buildTamperedTx({ amountStroops: 500_000_000n });
+
+      await expect(
+        signAndSubmit({ ...prepared, xdr: tampered.toXDR() }),
+      ).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
     });
   });
 });
