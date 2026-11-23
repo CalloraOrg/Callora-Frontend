@@ -47,6 +47,7 @@ Details in [docs/Configuration.md](docs/Configuration.md).
 | `npm run preview` | Serve the production build locally |
 | `npm run typecheck` | `tsc --noEmit` on the app sources |
 | `npm test` | Vitest in watch mode (`npx vitest run` for one pass) |
+| `npm run e2e` | Run the Playwright browser smoke suite against a production build |
 | `npm run test:coverage` | Single pass with coverage |
 
 ## Architecture
@@ -65,6 +66,20 @@ The app is a static Vite SPA deployed on Vercel. `vercel.json` rewrites all non-
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Before opening a PR run `npm run typecheck && npm run build && npx vitest run`.
+
+## Running browser smoke tests
+
+Install the Chromium browser once, then run the Playwright suite:
+
+```bash
+npx playwright install chromium
+npm run e2e
+```
+
+The suite builds and serves the production app on `http://localhost:4173`. Its
+Freighter provider, Callora API routes, and Stellar Horizon/Soroban RPC
+responses are stubbed, so it does not require wallet extensions, credentials,
+or access to external services.
 
 ---
 
