@@ -10,6 +10,7 @@
     { "id": "FiltersSidebar", "name": "FiltersSidebar", "status": "needs-work" },
     { "id": "MethodChip", "name": "MethodChip", "status": "audited" },
     { "id": "NotFound", "name": "NotFound", "status": "n/a" },
+    { "id": "OfflineBanner", "name": "OfflineBanner", "status": "audited" },
     { "id": "OpenAPIImport", "name": "OpenAPIImport", "status": "needs-work" },
     { "id": "RouteProgressBar", "name": "RouteProgressBar", "status": "audited" },
     { "id": "SearchBar", "name": "SearchBar", "status": "audited" },

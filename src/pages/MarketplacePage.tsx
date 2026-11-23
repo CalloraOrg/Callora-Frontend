@@ -19,6 +19,7 @@ import type { APIItem } from "../data/mockApis";
 import { API_BASE } from "../config/constants";
 import { useDebounce } from "../hooks/useDebounce";
 import { useFetchTracker } from "../hooks/useFetchTracker";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import {
   CATALOG_CACHE_KEY,
   buildCacheKey,
@@ -97,6 +98,7 @@ export default function MarketplacePage(): JSX.Element {
   // failed. The list is still rendered — an outage should not blank the page —
   // but it is labelled so nobody mistakes it for fresh data.
   const [isShowingStaleData, setIsShowingStaleData] = useState(false);
+  const { lastReconnectedAt } = useOnlineStatus();
 
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
   const isInitialMount = useRef(true);
@@ -236,6 +238,19 @@ export default function MarketplacePage(): JSX.Element {
 
   const handleRetryFetch = () =>
     startCatalogFetch(API_BASE ? serverParams : {});
+
+  // Refresh a stale catalogue exactly once when connectivity returns. The refs
+  // keep the effect keyed only on `lastReconnectedAt`, so unrelated re-renders
+  // cannot trigger an extra fetch.
+  const staleDataRef = useRef(isShowingStaleData);
+  staleDataRef.current = isShowingStaleData;
+  const retryFetchRef = useRef(handleRetryFetch);
+  retryFetchRef.current = handleRetryFetch;
+
+  useEffect(() => {
+    if (lastReconnectedAt === null || !staleDataRef.current) return;
+    void retryFetchRef.current();
+  }, [lastReconnectedAt]);
 
   // Tag facets are derived from the loaded catalogue so a newly published API's
   // tags are selectable the moment it appears.

@@ -22,6 +22,8 @@ import { ShortcutsModal } from "./components/ShortcutsModal";
 import CommandPalette from "./components/CommandPalette";
 import { useSessionExpiry } from "./hooks/useSessionExpiry";
 import SessionExpiryBanner from "./components/SessionExpiryBanner";
+import OfflineBanner from "./components/OfflineBanner";
+import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import WalletStatus from "./components/WalletStatus";
 import { useWalletStore } from "./state/walletStore";
 import { useToast } from "./components/Toast";
@@ -95,6 +97,15 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const wallet = useWalletStore();
+  const { isOnline, lastReconnectedAt } = useOnlineStatus();
+  const [connectivityAnnouncement, setConnectivityAnnouncement] = useState("");
+
+  useEffect(() => {
+    if (lastReconnectedAt === null) return;
+    setConnectivityAnnouncement("You are back online. Refreshing data.");
+    const timer = setTimeout(() => setConnectivityAnnouncement(""), 3000);
+    return () => clearTimeout(timer);
+  }, [lastReconnectedAt]);
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
@@ -726,7 +737,9 @@ function App() {
 
         <main id="main-content" role="main" className="page">
           <AppSessionExpiryBanner />
+          <OfflineBanner isOnline={isOnline} />
           <LiveRegion message={balanceAnnouncement} />
+          <LiveRegion message={connectivityAnnouncement} regionId="connectivity" />
           <RouteErrorBoundary
             resetKey={location.pathname}
             onGoHome={() => navigate(APP_ROUTES.dashboard)}
