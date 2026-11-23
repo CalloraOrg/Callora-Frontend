@@ -37,3 +37,13 @@ Routes that require an authenticated Freighter session are wrapped in `RequireAu
 | `/webhooks/deliveries` | `src/App.tsx` | `WebhookDeliveries` |
 
 When a visitor is signed out (or their session expires mid-session), `RequireAuth` renders a sign-in prompt instead of the protected page so no protected API calls are issued. It stores the requested path (including query string and hash) after validating it as a same-origin relative path to prevent open redirects (falling back to `/dashboard`), and navigates back after a successful Freighter sign-in. Public routes (landing `/`, `/marketplace`, `/details/:id`, `/docs`) remain accessible without authentication.
+
+## Shared HTTP client (`src/api/apiClient.ts`)
+
+All backend HTTP calls should go through `apiClient` (`src/api/apiClient.ts`) rather than calling `fetch` directly:
+
+- **Methods:** `apiClient.get/post/put/delete<T>(path, options)`
+- **Auth:** Routes through `authFetch` by default (`auth: true`, single-flight 401 refresh); pass `auth: false` for public endpoints (e.g. `catalogApi`) or custom `fetchImpl` for tests.
+- **Timeouts & cancellation:** Wraps requests with `runWithTimeout` (`timeoutMs` override) and forwards `AbortSignal`.
+- **Errors:** Non-2xx responses throw `ApiError { status, code, retryable, message }` classified via `classifyHttpError`, with sensitive tokens redacted.
+- **Validation & normalisers:** Pass `parse: (raw) => T` to run module-specific normalisers (e.g. `normalizeCatalog`, `validateInvoicesResponse`) and wrap `ApiError` into domain errors when keeping existing public error types stable.

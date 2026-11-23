@@ -25,6 +25,7 @@ import { API_BASE, API_BASE_URL, apiUrl } from "../config/constants";
 import MOCK_APIS, { type APIItem, type ApiEndpointItem } from "../data/mockApis";
 import { onAccountCacheInvalidated } from "../utils/offlineApiCache";
 import type { HealthStatus } from "../components/HealthTimeline";
+import { apiClient, isApiAbortError, isApiError } from "./apiClient";
 
 /** Path the marketplace catalogue is read from. */
 export const CATALOG_PATH = "/api/apis";
@@ -482,38 +483,54 @@ export function createCatalogApi(
         throw abortError();
       }
 
+      const query: Record<string, string | undefined> = {
+        search: params.search?.trim() || undefined,
+        category: params.category?.trim() || undefined,
+      };
       const searchParams = new URLSearchParams();
-      if (params.search?.trim()) {
-        searchParams.set("search", params.search.trim());
-      }
-      if (params.category?.trim()) {
-        searchParams.set("category", params.category.trim());
-      }
-
+      if (query.search) searchParams.set("search", query.search);
+      if (query.category) searchParams.set("category", query.category);
       const queryString = searchParams.toString();
       const pathWithQuery = queryString ? `${CATALOG_PATH}?${queryString}` : CATALOG_PATH;
 
+      const etag = cachedEtags.get(pathWithQuery);
       const headers: Record<string, string> = {
         Accept: "application/json",
+        ...(etag ? { "If-None-Match": etag } : {}),
       };
-      const etag = cachedEtags.get(pathWithQuery);
-      if (etag) {
-        headers["If-None-Match"] = etag;
-      }
 
-      const base = resolveBase();
-      const targetUrl = base ? `${base}${pathWithQuery}` : apiUrl(pathWithQuery);
-
-      let response: Response;
+      let items: APIItem[];
       try {
-        response = await fetchImpl(targetUrl, {
-          method: "GET",
+        items = await apiClient.get<APIItem[]>(CATALOG_PATH, {
+          auth: false,
+          query,
           headers,
           signal,
+          baseUrl: options.baseUrl,
+          fetchImpl: options.fetchImpl,
+          onResponse: (response) => {
+            const newEtag = response.headers.get("etag") ?? response.headers.get("ETag");
+            if (newEtag) {
+              cachedEtags.set(pathWithQuery, newEtag);
+            }
+          },
+          parse: normalizeCatalog,
         });
       } catch (err) {
-        if (signal?.aborted || isCatalogAbortError(err)) {
+        if (signal?.aborted || isApiAbortError(err) || isCatalogAbortError(err)) {
           throw abortError();
+        }
+        if (isApiError(err)) {
+          if (err.status === 304) {
+            return cachedLists.get(pathWithQuery) ?? [];
+          }
+          if (err.code === "NETWORK_ERROR") {
+            throw new CatalogFetchError("Could not reach the marketplace service.");
+          }
+          if (err.code === "INVALID_RESPONSE") {
+            throw new CatalogFetchError("The marketplace service returned an unreadable response.");
+          }
+          throw new CatalogFetchError(`Failed to fetch catalog: ${err.status}`, err.status);
         }
         throw new CatalogFetchError("Could not reach the marketplace service.");
       }
@@ -522,39 +539,6 @@ export function createCatalogApi(
         throw abortError();
       }
 
-      if (response.status === 304) {
-        return cachedLists.get(pathWithQuery) ?? [];
-      }
-
-      if (!response.ok) {
-        throw new CatalogFetchError(
-          `Failed to fetch catalog: ${response.statusText || response.status}`,
-          response.status,
-        );
-      }
-
-      const newEtag = response.headers.get("etag") ?? response.headers.get("ETag");
-      if (newEtag) {
-        cachedEtags.set(pathWithQuery, newEtag);
-      }
-
-      let payload: unknown;
-      try {
-        payload = await response.json();
-      } catch (err) {
-        if (signal?.aborted || isCatalogAbortError(err)) {
-          throw abortError();
-        }
-        throw new CatalogFetchError(
-          "The marketplace service returned an unreadable response.",
-        );
-      }
-
-      if (signal?.aborted) {
-        throw abortError();
-      }
-
-      const items = normalizeCatalog(payload);
       cachedLists.set(pathWithQuery, items);
       for (const item of items) {
         resolvedById.set(item.id, item);
@@ -569,20 +553,34 @@ export function createCatalogApi(
         throw abortError();
       }
 
-      const base = resolveBase();
       const path = `${CATALOG_PATH}/${encodeURIComponent(id)}`;
-      const targetUrl = base ? `${base}${path}` : apiUrl(path);
-
-      let response: Response;
+      let item: APIItem | null;
       try {
-        response = await fetchImpl(targetUrl, {
-          method: "GET",
+        item = await apiClient.get<APIItem | null>(path, {
+          auth: false,
           headers: { Accept: "application/json" },
           signal,
+          baseUrl: options.baseUrl,
+          fetchImpl: options.fetchImpl,
+          parse: normalizeApiDetail,
         });
       } catch (err) {
-        if (signal?.aborted || isCatalogAbortError(err)) {
+        if (signal?.aborted || isApiAbortError(err) || isCatalogAbortError(err)) {
           throw abortError();
+        }
+        if (isApiError(err)) {
+          if (err.status === 404 || err.status === 400) {
+            resolvedNotFound.add(id);
+            resolvedById.delete(id);
+            return { status: "not-found", kind: "not-found" };
+          }
+          if (err.code === "NETWORK_ERROR") {
+            throw new CatalogFetchError("Could not reach the marketplace service.");
+          }
+          if (err.code === "INVALID_RESPONSE") {
+            throw new CatalogFetchError("The marketplace service returned an unreadable response.");
+          }
+          throw new CatalogFetchError("The marketplace service is unavailable right now.", err.status);
         }
         throw new CatalogFetchError("Could not reach the marketplace service.");
       }
@@ -591,40 +589,8 @@ export function createCatalogApi(
         throw abortError();
       }
 
-      if (response.status === 404 || response.status === 400) {
-        resolvedNotFound.add(id);
-        resolvedById.delete(id);
-        return { status: "not-found", kind: "not-found" };
-      }
-
-      if (!response.ok) {
-        throw new CatalogFetchError(
-          "The marketplace service is unavailable right now.",
-          response.status,
-        );
-      }
-
-      let payload: unknown;
-      try {
-        payload = await response.json();
-      } catch (err) {
-        if (signal?.aborted || isCatalogAbortError(err)) {
-          throw abortError();
-        }
-        throw new CatalogFetchError(
-          "The marketplace service returned an unreadable response.",
-        );
-      }
-
-      if (signal?.aborted) {
-        throw abortError();
-      }
-
-      const item = normalizeApiDetail(payload);
       if (!item) {
-        throw new CatalogFetchError(
-          "The marketplace service returned an unreadable response.",
-        );
+        throw new CatalogFetchError("The marketplace service returned an unreadable response.");
       }
       resolvedById.set(id, item);
       resolvedNotFound.delete(id);
