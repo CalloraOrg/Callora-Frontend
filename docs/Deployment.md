@@ -26,6 +26,37 @@ vercel --prod --yes          # add --archive=tgz if you hit the upload rate limi
 
 Set `VITE_*` variables (see `.env.example`) with `vercel env add`. They are inlined at build time and are public: never put secrets in them.
 
+## Security headers
+
+`vercel.json` defines a global `"source": "/(.*)"` headers rule that Vercel merges with the `/assets/(.*)` immutable cache rule. Every response includes:
+
+| Header | Value | Purpose |
+| --- | --- | --- |
+| `Content-Security-Policy` | See directive table below | Restricts script, style, image, frame, and network origins. |
+| `X-Content-Type-Options` | `nosniff` | Prevents MIME-type sniffing. |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Sends only the origin on cross-origin navigations and requests. |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=()` | Disables unused browser sensor and payment APIs. |
+
+### Content-Security-Policy directives
+
+| Directive | Value | Notes |
+| --- | --- | --- |
+| `default-src` | `'self'` | Fallback for any resource type without a more specific directive. |
+| `script-src` | `'self'` | Only same-origin scripts may execute. Pre-paint theme resolution is served from `public/theme-init.js` rather than an inline `<script>` so no `'unsafe-inline'` or hash is needed. |
+| `style-src` | `'self' 'unsafe-inline'` | `'unsafe-inline'` is required because several components (such as `FormField.tsx` and `SessionExpiryBanner.tsx`) inject `<style>` tags at runtime and some elements use inline `style` attributes. |
+| `img-src` | `'self' data:` | Allows same-origin images plus `data:` SVG backgrounds used in `src/styles/patterns.css` and `src/index.css`. |
+| `connect-src` | `'self'` + Callora API + Stellar Horizon, Soroban RPC, and Friendbot origins | Allows browser `fetch`/XHR calls to `https://api.callora.com`, Stellar Horizon (`horizon-testnet.stellar.org`, `horizon.stellar.org`, `horizon-futurenet.stellar.org`), Soroban RPC (`soroban-testnet.stellar.org`, `rpc-futurenet.stellar.org`), and `https://friendbot.stellar.org`. |
+| `frame-ancestors` | `'none'` | Blocks the app from being embedded in `<iframe>`, `<frame>`, or `<object>` elements (clickjacking protection). |
+| `base-uri` | `'self'` | Prevents `<base>` tag injection from redirecting relative URLs. |
+| `object-src` | `'none'` | Disables legacy plugin content (`<object>`, `<embed>`, `<applet>`). |
+
+### Extending `connect-src` for custom origins
+
+Because `Content-Security-Policy` is evaluated by the browser at runtime, any new origin the frontend calls must be added to the `connect-src` directive in `vercel.json`:
+
+- **Custom or staging Callora API (`VITE_API_BASE_URL`):** If you deploy against a non-default backend (for example `https://staging-api.callora.com`), append that origin to `connect-src` in `vercel.json`.
+- **Mainnet Soroban RPC (`VITE_STELLAR_RPC_URL`):** Stellar mainnet has no default public Soroban RPC endpoint in `src/config/constants.ts`. When building for mainnet with a custom `VITE_STELLAR_RPC_URL` host, add that RPC origin to `connect-src` in `vercel.json` so wallet balance reads and deposit submissions are not blocked.
+
 ## Demo mode
 
 When `VITE_API_BASE_URL` is empty the app runs in static demo mode: the
