@@ -82,10 +82,10 @@ function useMediaQuery(query: string, maxPixelThreshold?: number): boolean {
     let mql: MediaQueryList | null = null;
     if (typeof window.matchMedia === "function") {
       mql = window.matchMedia(query);
-      if (mql.addEventListener) {
+      if (typeof mql.addEventListener === "function") {
         mql.addEventListener("change", update);
-      } else if ((mql as any).addListener) {
-        (mql as any).addListener(update);
+      } else if (typeof mql.addListener === "function") {
+        mql.addListener(update);
       }
     }
 
@@ -93,10 +93,10 @@ function useMediaQuery(query: string, maxPixelThreshold?: number): boolean {
 
     return () => {
       if (mql) {
-        if (mql.removeEventListener) {
+        if (typeof mql.removeEventListener === "function") {
           mql.removeEventListener("change", update);
-        } else if ((mql as any).removeListener) {
-          (mql as any).removeListener(update);
+        } else if (typeof mql.removeListener === "function") {
+          mql.removeListener(update);
         }
       }
       window.removeEventListener("resize", update);

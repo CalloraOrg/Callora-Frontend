@@ -67,7 +67,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     removeAccount(accountId);
     if (isCurrent) {
       const remaining = getKnownAccounts();
-      if (remaining.length > 0) {
+      if (remaining[0]) {
         invalidateAccountCache(accountId);
         switchAccountHandler(remaining[0].id);
       }

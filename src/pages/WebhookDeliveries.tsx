@@ -231,8 +231,9 @@ export default function WebhookDeliveries({ fetcher }: WebhookDeliveriesProps = 
     try {
       await retryDelivery(id);
       showToast('Retry triggered successfully');
-    } catch (err: any) {
-      showToast({ message: `Retry failed: ${err.message}`, variant: 'error', persistent: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      showToast({ message: `Retry failed: ${message}`, variant: 'error', persistent: true });
     }
   };
 
@@ -260,7 +261,7 @@ export default function WebhookDeliveries({ fetcher }: WebhookDeliveriesProps = 
           Status
           <select
             value={filter.status}
-            onChange={(e) => setFilter((f) => ({ ...f, status: e.target.value as any, page: 1 }))}
+            onChange={(e) => setFilter((f) => ({ ...f, status: e.target.value as typeof f.status, page: 1 }))}
           >
             <option value="all">All</option>
             <option value="delivered">Delivered</option>

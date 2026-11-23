@@ -1,6 +1,12 @@
-import { useCallback, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Icons } from '../utils/icons';
-import { parseOpenApiSpec } from '../utils/openapi-parse';
+import {
+  parseOpenApiInWorker,
+  nextGeneration,
+  currentGeneration,
+  OPENAPI_MAX_FILE_BYTES,
+} from '../utils/openapi-parse.client';
+import type { ParseProgressPhase } from '../utils/openapi-parse.client';
 import type { ParsedEndpoint, ParsedSpecSource, ParseError } from '../utils/openapi-parse';
 import { fetchSpecFromUrl } from '../utils/fetchSpec';
 
@@ -20,7 +26,7 @@ export type OpenAPIImportProps = {
 type ImportState =
   | { kind: 'idle' }
   | { kind: 'dragging' }
-  | { kind: 'loading' }
+  | { kind: 'loading'; phase?: ParseProgressPhase }
   | { kind: 'loading-url'; controller: AbortController }
   | {
       kind: 'preview';
@@ -147,9 +153,31 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
     });
   }, []);
 
+  /**
+   * AbortController for the current in-flight parse.
+   * Replaced every time a new file starts processing; calling .abort()
+   * terminates the worker (or is a no-op if the parse has already finished).
+   */
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Terminate any running worker when the component unmounts.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
   // ── File processing ────────────────────────────────────────────────────
 
   const processFile = useCallback(async (file: File) => {
+    // Cancel any currently-running parse before starting a new one.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // Advance the generation so stale results from the previous parse are ignored.
+    const generation = nextGeneration();
+
     // Validate extension before reading.
     const lower = file.name.toLowerCase();
     const accepted = ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
@@ -167,6 +195,22 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
       return;
     }
 
+    // Enforce size limit before reading the file content.
+    if (file.size > OPENAPI_MAX_FILE_BYTES) {
+      const limitMB = (OPENAPI_MAX_FILE_BYTES / (1024 * 1024)).toFixed(0);
+      const fileMB = (file.size / (1024 * 1024)).toFixed(1);
+      setState({
+        kind: 'error',
+        filename: file.name,
+        errors: [
+          {
+            message: `"${file.name}" is too large (${fileMB} MB). The maximum supported size is ${limitMB} MB.`,
+          },
+        ],
+      });
+      return;
+    }
+
     setState({ kind: 'loading' });
 
     // Yield to the event loop so the loading UI renders before parsing.
@@ -176,6 +220,7 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
     try {
       text = await readFileAsText(file);
     } catch {
+      if (generation !== currentGeneration()) return;
       setState({
         kind: 'error',
         filename: file.name,
@@ -184,6 +229,30 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
       return;
     }
 
+    let result;
+    try {
+      result = await parseOpenApiInWorker(text, file.name, {
+        signal: controller.signal,
+        onProgress: (phase) => {
+          // Only update state for the active generation.
+          if (generation !== currentGeneration()) return;
+          setState({ kind: 'loading', phase });
+        },
+      });
+    } catch (err) {
+      // AbortError means the user cancelled or a newer file was chosen.
+      if ((err as { name?: string })?.name === 'AbortError') return;
+      if (generation !== currentGeneration()) return;
+      setState({
+        kind: 'error',
+        filename: file.name,
+        errors: [{ message: `An unexpected error occurred while parsing "${file.name}".` }],
+      });
+      return;
+    }
+
+    // Discard stale results from a superseded parse.
+    if (generation !== currentGeneration()) return;
     handleParseResult(text, file.name);
   }, [handleParseResult]);
 
@@ -251,9 +320,9 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0) {
-        processFile(files[0]);
+      const file = e.dataTransfer?.files?.[0];
+      if (file) {
+        processFile(file);
       } else {
         setState({ kind: 'idle' });
       }
@@ -290,6 +359,9 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
   }, []);
 
   const reset = useCallback(() => {
+    // Cancel any in-flight parse before resetting to idle.
+    abortRef.current?.abort();
+    abortRef.current = null;
     setState((prev) => {
       if (prev.kind === 'loading-url') prev.controller.abort();
       return { kind: 'idle' };
@@ -403,8 +475,20 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
           <div className="oai-loading" aria-live="polite" aria-label="Parsing file">
             <Spinner />
             <p className="oai-loading-text">
-              {state.kind === 'loading-url' ? 'Fetching specification…' : 'Parsing specification…'}
+              {state.kind === 'loading' && state.phase === 'read' && 'Reading file…'}
+              {state.kind === 'loading' && state.phase === 'resolve-refs' && 'Resolving references…'}
+              {state.kind === 'loading' && state.phase === 'build-endpoints' && 'Building endpoints…'}
+              {state.kind === 'loading' && !state.phase && 'Parsing specification…'}
             </p>
+            <button
+              type="button"
+              className="oai-action-secondary"
+              onClick={reset}
+              aria-label="Cancel parsing"
+            >
+              Cancel
+            </button>
+              {state.kind === 'loading-url' ? 'Fetching specification…' : 'Parsing specification…'}
             {state.kind === 'loading-url' && (
               <button
                 type="button"

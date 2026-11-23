@@ -148,7 +148,7 @@ async function simulate(
     );
   }
   // In stellar-sdk v12+, the result is in simulation.result.retval
-  const simResult = (simulation as any).result;
+  const simResult = simulation.result;
   if (!simResult?.retval) {
     throw new VaultReadError(
       "BAD_RESPONSE",

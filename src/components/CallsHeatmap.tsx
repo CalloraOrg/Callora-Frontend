@@ -7,7 +7,14 @@ type DayData = {
   isFuture: boolean;
 };
 
-export default function CallsHeatmap() {
+export interface CallsHeatmapProps {
+  /** Optional start of the date range to highlight (inclusive). */
+  from?: Date;
+  /** Optional end of the date range to highlight (inclusive). */
+  to?: Date;
+}
+
+export default function CallsHeatmap({ from: _from, to: _to }: CallsHeatmapProps = {}) {
   const grid = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -49,10 +56,12 @@ export default function CallsHeatmap() {
     const monthLabels: { label: string; colIndex: number }[] = [];
     let lastMonth = -1;
     grid.forEach((col, idx) => {
-      const month = col[0].date.getMonth();
+      const firstCell = col[0];
+      if (!firstCell) return;
+      const month = firstCell.date.getMonth();
       if (month !== lastMonth) {
         monthLabels.push({
-          label: col[0].date.toLocaleString('default', { month: 'short' }),
+          label: firstCell.date.toLocaleString('default', { month: 'short' }),
           colIndex: idx,
         });
         lastMonth = month;
