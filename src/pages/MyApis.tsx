@@ -5,7 +5,7 @@ import Skeleton from "../components/Skeleton";
 import { StatusBadge, apiStatusToVariant } from "../components/StatusBadge";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { formatPrice } from "../utils/format";
-import { MOCK_APIS } from "../data/mockApis";
+import { apiUrl } from "../config/constants";
 import type { APIItem } from "../data/mockApis";
 
 // ---------------------------------------------------------------------------
@@ -49,37 +49,22 @@ function reducer(_state: FetchState, action: Action): FetchState {
 // once the backend endpoint is available.
 // ---------------------------------------------------------------------------
 
-const PROVIDER_ID = "acme-labs"; // placeholder — swap for authed user id
-
-/** Returns the subset of MOCK_APIS belonging to the current provider. */
-function fetchProviderApis(
+/** Returns the published APIs belonging to the current provider from GET /api/provider/apis. */
+async function fetchProviderApis(
   signal: AbortSignal,
 ): Promise<PublishedApiItem[]> {
-  return new Promise((resolve, reject) => {
-    // Simulate a ~300 ms network round-trip so loading states are visible.
-    const timer = setTimeout(() => {
-      if (signal.aborted) return;
-      try {
-        const myApis: PublishedApiItem[] = MOCK_APIS
-          .filter(
-            (api) =>
-              api.provider.name.toLowerCase().replace(/\s+/g, "-") === PROVIDER_ID,
-          )
-          .map((api, i) => ({
-            ...api,
-            // Spread representative publish statuses across the mock rows.
-            publishStatus: (["live", "pending", "rejected"] as PublishStatus[])[
-              i % 3
-            ],
-          }));
-        resolve(myApis);
-      } catch (err) {
-        reject(err instanceof Error ? err : new Error(String(err)));
-      }
-    }, 300);
-
-    signal.addEventListener("abort", () => clearTimeout(timer));
+  const url = apiUrl("/api/provider/apis");
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    signal,
   });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load your APIs: ${response.status}`);
+  }
+
+  return (await response.json()) as PublishedApiItem[];
 }
 
 // ---------------------------------------------------------------------------

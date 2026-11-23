@@ -51,6 +51,14 @@ Trailing slashes and surrounding whitespace are stripped automatically by
 `src/config/constants.ts` to build request paths so this normalisation is
 applied consistently.
 
+### `VITE_DEMO_MODE`
+
+Enables Mock Service Worker (MSW) in the browser for demo builds and standalone evaluation without a backend. Default: **false**.
+
+- When set to `"true"`, MSW starts in the browser (`src/mocks/browser.ts`) and intercepts `/api/*` endpoints with realistic fixtures.
+- When `false` (default), MSW is not initialized and requests proceed normally over the network.
+- MSW is loaded via dynamic import so production builds without demo mode do not include MSW code in the primary bundle chunk.
+
 ### `VITE_STELLAR_NETWORK`
 
 Stellar network the UI is pointed at. One of `testnet`, `mainnet`,

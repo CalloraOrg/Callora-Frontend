@@ -346,15 +346,23 @@ export function normalizeApiDetail(payload: unknown): APIItem | null {
 export function createCatalogApi(
   options: CreateCatalogApiOptions = {},
 ): CatalogApi {
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const getFetch = () => options.fetchImpl ?? globalThis.fetch;
 
   const cachedEtags = new Map<string, string>();
   const cachedLists = new Map<string, APIItem[]>();
 
-  const resolveBase = (): string =>
-    options.baseUrl !== undefined
-      ? options.baseUrl.replace(/\/+$/, "")
-      : "";
+  const resolveBase = (): string => {
+    if (options.baseUrl !== undefined) {
+      return options.baseUrl.replace(/\/+$/, "");
+    }
+    if (API_BASE) {
+      return API_BASE;
+    }
+    if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
+      return window.location.origin.replace(/\/+$/, "");
+    }
+    return "";
+  };
 
   return {
     async fetchCatalog(signal, params = {}) {
@@ -386,7 +394,7 @@ export function createCatalogApi(
 
       let response: Response;
       try {
-        response = await fetchImpl(targetUrl, {
+        response = await getFetch()(targetUrl, {
           method: "GET",
           headers,
           signal,
@@ -395,7 +403,21 @@ export function createCatalogApi(
         if (signal?.aborted || isCatalogAbortError(err)) {
           throw abortError();
         }
-        throw new CatalogFetchError("Could not reach the marketplace service.");
+        if (err instanceof TypeError && err.message.includes("AbortSignal")) {
+          try {
+            response = await getFetch()(targetUrl, {
+              method: "GET",
+              headers,
+            });
+          } catch (innerErr) {
+            if (signal?.aborted || isCatalogAbortError(innerErr)) {
+              throw abortError();
+            }
+            throw new CatalogFetchError("Could not reach the marketplace service.");
+          }
+        } else {
+          throw new CatalogFetchError("Could not reach the marketplace service.");
+        }
       }
 
       if (signal?.aborted) {
@@ -451,7 +473,7 @@ export function createCatalogApi(
 
       let response: Response;
       try {
-        response = await fetchImpl(targetUrl, {
+        response = await getFetch()(targetUrl, {
           method: "GET",
           headers: { Accept: "application/json" },
           signal,
@@ -460,7 +482,21 @@ export function createCatalogApi(
         if (signal?.aborted || isCatalogAbortError(err)) {
           throw abortError();
         }
-        throw new CatalogFetchError("Could not reach the marketplace service.");
+        if (err instanceof TypeError && err.message.includes("AbortSignal")) {
+          try {
+            response = await getFetch()(targetUrl, {
+              method: "GET",
+              headers: { Accept: "application/json" },
+            });
+          } catch (innerErr) {
+            if (signal?.aborted || isCatalogAbortError(innerErr)) {
+              throw abortError();
+            }
+            throw new CatalogFetchError("Could not reach the marketplace service.");
+          }
+        } else {
+          throw new CatalogFetchError("Could not reach the marketplace service.");
+        }
       }
 
       if (signal?.aborted) {
@@ -521,12 +557,6 @@ export async function fetchCatalog(
   signal?: AbortSignal,
   params?: CatalogParams,
 ): Promise<APIItem[]> {
-  // No backend configured (static demo deployment): use the bundled sample
-  // catalogue instead of firing a request that can only fail.
-  if (!API_BASE) return MOCK_APIS;
-
-  // When API_BASE is configured, errors must reject so the UI surfaces its
-  // error or stale-data states rather than hiding failures behind mock data.
   return await catalogApi.fetchCatalog(signal, params);
 }
 
@@ -539,13 +569,6 @@ export async function fetchApiDetail(
 ): Promise<ApiDetailResult> {
   if (signal?.aborted) {
     throw abortError();
-  }
-
-  if (!API_BASE) {
-    const found = MOCK_APIS.find((api) => api.id === id);
-    return found
-      ? { status: "ready", kind: "ready", api: found }
-      : { status: "not-found", kind: "not-found" };
   }
 
   return await catalogApi.fetchApiDetail(id, signal);

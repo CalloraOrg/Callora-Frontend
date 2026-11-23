@@ -18,5 +18,16 @@ window.addEventListener("popstate", () => {
   void renderRoute(root, currentPathname());
 });
 
-// Initial application render
-void renderRoute(root, currentPathname());
+async function enableMocking(): Promise<void> {
+  if (import.meta.env.VITE_DEMO_MODE === "true") {
+    const { worker } = await import("./mocks/browser");
+    await worker.start({
+      onUnhandledRequest: "bypass",
+    });
+  }
+}
+
+// Initial application render after mock worker setup if in demo mode
+void enableMocking().then(() => {
+  void renderRoute(root, currentPathname());
+});
