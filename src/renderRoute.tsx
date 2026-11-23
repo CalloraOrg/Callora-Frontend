@@ -63,8 +63,8 @@ export async function renderRoute(
   const wrap = (children: React.ReactNode, withShell = false) => (
     <React.StrictMode>
       <ThemeProvider>
-        <CollectionsProvider>
-          <AccountProvider>
+        <AccountProvider>
+          <CollectionsProvider>
             <BrowserRouter>
               <RouteProgressBar />
               <ToastProvider>
@@ -77,8 +77,8 @@ export async function renderRoute(
                 )}
               </ToastProvider>
             </BrowserRouter>
-          </AccountProvider>
-        </CollectionsProvider>
+          </CollectionsProvider>
+        </AccountProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
@@ -139,14 +139,14 @@ export async function renderRoute(
     <React.StrictMode>
       <BrowserRouter>
         <ThemeProvider>
-          <CollectionsProvider>
-            <AccountProvider>
+          <AccountProvider>
+            <CollectionsProvider>
               <RouteProgressBar />
               <ToastProvider>
                 <App />
               </ToastProvider>
-            </AccountProvider>
-          </CollectionsProvider>
+            </CollectionsProvider>
+          </AccountProvider>
         </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,
