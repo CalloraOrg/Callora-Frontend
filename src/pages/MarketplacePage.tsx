@@ -6,7 +6,7 @@ import { useFavorites } from "../hooks/useFavorites";
 import { useMarketplaceUrlState } from "../hooks/useMarketplaceUrlState";
 import { useAccountContext } from "../hooks/useAccountContext";
 import SearchBar from "../components/SearchBar";
-import SortDropdown, { type SortValue } from "../components/SortDropdown";
+import SortDropdown from "../components/SortDropdown";
 
 import CategoryPills from "../components/CategoryPills";
 import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
@@ -20,7 +20,6 @@ import { API_BASE } from "../config/constants";
 import { useDebounce } from "../hooks/useDebounce";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import {
-  CATALOG_CACHE_KEY,
   buildCacheKey,
   fetchCatalog,
   isCatalogAbortError,
@@ -61,7 +60,6 @@ export default function MarketplacePage(): JSX.Element {
     query,
     queryDraft,
     commitQuery,
-    setQueryDraft,
     categories,
     setCategories,
     statuses,
@@ -81,7 +79,7 @@ export default function MarketplacePage(): JSX.Element {
     clearAll,
   } = useMarketplaceUrlState();
 
-  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+  const { favorites } = useFavorites();
 
   const [density, setDensity] = useState<DensityPreference>(
     getDensityPreference,
@@ -90,7 +88,7 @@ export default function MarketplacePage(): JSX.Element {
 
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isPageLoading, setIsPageLoading] = useState(false);
+  const [, setIsPageLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<APIItem[]>([]);
   // True when `catalog` came from the offline cache because the live request

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import type { APIItem } from "../data/mockApis";
 import { formatPrice } from "../utils/format";

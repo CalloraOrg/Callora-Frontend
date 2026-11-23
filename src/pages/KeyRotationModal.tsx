@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useToast } from '../components/Toast';
 import {
   RotationContext,
-  type RotationRequest,
 } from '../services/KeyRotationService';
 import { rotateKeyWithToken, getRotationToken } from '../services/KeyRotationApi';
 import { logError, formatErrorForUI } from '../services/SecureErrorHandler';
@@ -73,7 +72,7 @@ export default function KeyRotationModal({
   const [isKeyVisible, setIsKeyVisible] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const [rotationError, setRotationError] = useState<string | null>(null);
-  const [lastErrorCode, setLastErrorCode] = useState<string | null>(null);
+  const [, setLastErrorCode] = useState<string | null>(null);
   const [canRetry, setCanRetry] = useState(false);
 
   // Track the key that was showing before the optimistic update started,

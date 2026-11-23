@@ -29,7 +29,7 @@ import type { APIItem } from "../data/mockApis";
 function resolveEndpointLabel(endpointId: string, apis: readonly APIItem[]): string {
   for (const api of apis) {
     if (api.id === endpointId) return api.name;
-    const ep = (api.endpoints ?? []).find((e: any) => e.id === endpointId);
+    const ep = (api.endpoints ?? []).find((e) => e.id === endpointId);
     if (ep) return `${api.name} – ${ep.title ?? ep.id}`;
   }
   return endpointId;

@@ -151,6 +151,6 @@ export function getWalletNetworkLabel(networkPassphrase: string | null): string 
     return "Futurenet";
   }
   return networkPassphrase === STELLAR_NETWORK_PASSPHRASE
-    ? STELLAR_NETWORK[0].toUpperCase() + STELLAR_NETWORK.slice(1)
+    ? STELLAR_NETWORK.charAt(0).toUpperCase() + STELLAR_NETWORK.slice(1)
     : "Unknown network";
 }

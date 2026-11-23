@@ -7,9 +7,9 @@ function toBase64(obj: object): string {
 }
 
 function parseHost(baseUrl: string): string[] {
-  return baseUrl
+  return (baseUrl
     .replace(/^https?:\/\//, "")
-    .split("/")[0]
+    .split("/")[0] ?? "")
     .split(".");
 }
 

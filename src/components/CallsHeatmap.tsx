@@ -49,10 +49,12 @@ export default function CallsHeatmap() {
     const monthLabels: { label: string; colIndex: number }[] = [];
     let lastMonth = -1;
     grid.forEach((col, idx) => {
-      const month = col[0].date.getMonth();
+      const firstCell = col[0];
+      if (!firstCell) return;
+      const month = firstCell.date.getMonth();
       if (month !== lastMonth) {
         monthLabels.push({
-          label: col[0].date.toLocaleString('default', { month: 'short' }),
+          label: firstCell.date.toLocaleString('default', { month: 'short' }),
           colIndex: idx,
         });
         lastMonth = month;

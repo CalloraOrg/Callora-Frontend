@@ -275,6 +275,7 @@ function parseYamlToMap(text: string): { root: YamlMap | null; errors: ParseErro
 
   for (let i = 0; i < rawLines.length; i++) {
     const raw = rawLines[i];
+    if (raw === undefined) continue;
     const lineNumber = i + 1;
     const stripped = raw.trim();
 
@@ -383,6 +384,7 @@ function parseYamlToMap(text: string): { root: YamlMap | null; errors: ParseErro
   for (const line of parsedLines) {
     while (stack.length > 1) {
       const top = stack[stack.length - 1];
+      if (!top) break;
       if (top.indent < line.indent) break;
       // For sequence frames, pop when indent goes back to or above the `-` indent.
       if (top.kind === 'seq' && top.indent === line.indent && line.isSequenceItem) {
@@ -396,6 +398,7 @@ function parseYamlToMap(text: string): { root: YamlMap | null; errors: ParseErro
     }
 
     const parent = stack[stack.length - 1];
+    if (!parent) continue;
 
     if (line.isSequenceItem) {
       // Ensure parent has an array for this sequence.
@@ -468,7 +471,7 @@ function parseYamlToMap(text: string): { root: YamlMap | null; errors: ParseErro
       // Sequence item that was a single-key with nested block already pushed a map frame.
       stack.pop();
       const newParent = stack[stack.length - 1];
-      if (newParent.kind === 'map' && line.key !== null) {
+      if (newParent && newParent.kind === 'map' && line.key !== null) {
         if (line.value === null) {
           const nested: YamlMap = {};
           newParent.obj[line.key] = nested;
@@ -502,7 +505,7 @@ function parseYamlKeyValue(
   trimmed: string,
 ): { key: string; rawValue: string | null } | null {
   if (trimmed.startsWith('"') || trimmed.startsWith("'")) {
-    const quote = trimmed[0];
+    const quote = trimmed.charAt(0);
     const closeIdx = trimmed.indexOf(quote, 1);
     if (closeIdx === -1) return null;
 

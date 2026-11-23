@@ -11,7 +11,7 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import EmptyState from "../components/EmptyState";
 import { formatPrice, formatEstimatedCost, formatCount, formatDateShort } from "../utils/format";
 import { Icons } from "../utils/icons";
-import { API_BASE_URL, LOADING_DELAY_MS } from "../config/constants";
+import { API_BASE_URL } from "../config/constants";
 import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
 import EndpointPreview from "../components/EndpointPreview";
 import RatingHistogram from "../components/RatingHistogram";
@@ -172,7 +172,7 @@ function deriveEndpointGroupLabel(endpoint: ApiEndpoint): string {
 
   if (endpoint.title?.trim()) {
     const words = endpoint.title.trim().split(/\s+/);
-    if (words.length > 1 && GENERIC_ENDPOINT_VERBS.has(words[0].toLowerCase())) {
+    if (words.length > 1 && GENERIC_ENDPOINT_VERBS.has(words[0]?.toLowerCase() ?? "")) {
       return words.slice(1).join(" ");
     }
     return endpoint.title.trim();
@@ -325,10 +325,10 @@ function EndpointSaveButton({
         const last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
-          last.focus();
+          last?.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
           e.preventDefault();
-          first.focus();
+          first?.focus();
         }
       }
     };

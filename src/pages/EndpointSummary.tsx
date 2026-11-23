@@ -177,7 +177,7 @@ export default function EndpointSummary(): JSX.Element {
                           </tr>
                         </thead>
                         <tbody>
-                          {ep.params.map((p: any) => (
+                          {ep.params.map((p) => (
                             <tr key={p.name}>
                               <td className="endpoint-param-name">{p.name}</td>
                               <td>
@@ -192,7 +192,7 @@ export default function EndpointSummary(): JSX.Element {
 
                     {/* Mobile definition list view */}
                     <dl className="endpoint-params-dl">
-                      {ep.params.map((p: any) => (
+                      {ep.params.map((p) => (
                         <div key={p.name} className="endpoint-params-dl-item">
                           <dt className="endpoint-params-dl-name">{p.name}</dt>
                           <dd className="endpoint-params-dl-meta">

@@ -42,7 +42,7 @@ Example: `git checkout -b feature/api-search-filters`
 
 Before opening a pull request, confirm:
 
-- [ ] `npm run build` passes with no TypeScript errors.
+- [ ] `npm run build` passes with no TypeScript errors (`tsconfig.json` enforces `strict`, `noUnusedLocals`, `noUnusedParameters`, and `noUncheckedIndexedAccess`; avoid explicit `any`).
 - [ ] Tests pass (`npm test -- --run`).
 - [ ] Any new component added to `src/components/` has a matching entry in
       [`src/data/a11y-manifest.json`](src/data/a11y-manifest.json)
