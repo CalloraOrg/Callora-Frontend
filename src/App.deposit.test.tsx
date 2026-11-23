@@ -29,6 +29,8 @@ import { normalizeUsdcAmountInput, USDC_DECIMALS } from "./utils/format";
 // approving → pending → confirmed / failed transitions deterministically.
 const walletMocks = vi.hoisted(() => ({
   isWalletAvailable: vi.fn(),
+  prepareVaultDeposit: vi.fn(),
+  signAndSubmit: vi.fn(),
   submitVaultDeposit: vi.fn(),
   checkDepositStatus: vi.fn(),
   getWalletAddress: vi.fn(),
@@ -95,6 +97,8 @@ vi.mock("./services/walletService", async (importOriginal) => {
     ...actual,
     WalletServiceError,
     isWalletAvailable: walletMocks.isWalletAvailable,
+    prepareVaultDeposit: walletMocks.prepareVaultDeposit,
+    signAndSubmit: walletMocks.signAndSubmit,
     submitVaultDeposit: walletMocks.submitVaultDeposit,
     checkDepositStatus: walletMocks.checkDepositStatus,
     getWalletAddress: walletMocks.getWalletAddress,
@@ -130,6 +134,25 @@ beforeEach(() => {
     fee_charged: { mode: "100" },
   }) });
   walletMocks.isWalletAvailable.mockReset().mockResolvedValue(true);
+  walletMocks.prepareVaultDeposit.mockReset().mockImplementation(async (amount: string) => ({
+    transaction: {} as never,
+    xdr: "MOCK_PREPARED_XDR",
+    address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    amountStroops: BigInt(Math.round(Number(amount) * 1e7)),
+    summary: {
+      contractId: STELLAR_VAULT_CONTRACT_ID,
+      functionName: "deposit",
+      args: [
+        { type: "scvAddress", value: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" },
+        { type: "scvI128", value: BigInt(Math.round(Number(amount) * 1e7)) },
+      ],
+      amountStroops: BigInt(Math.round(Number(amount) * 1e7)),
+      sourceAccount: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      feeStroops: 25_000n,
+      network: "Testnet",
+    },
+  }));
+  walletMocks.signAndSubmit.mockReset();
   walletMocks.submitVaultDeposit.mockReset();
   walletMocks.preflightVaultDeposit.mockReset().mockResolvedValue({ paused: false, allowlisted: true });
   walletMocks.checkDepositStatus.mockReset();
@@ -411,8 +434,8 @@ describe("App deposit modal timed transitions", () => {
   it("drives approving to pending to confirmed and updates the vault balance", async () => {
     let reportSubmitted!: (hash: string) => void;
     let confirmDeposit!: (result: { hash: string }) => void;
-    walletMocks.submitVaultDeposit.mockImplementation(
-      (_amount: string, onSubmitted: (hash: string) => void) => {
+    walletMocks.signAndSubmit.mockImplementation(
+      (_prepared: unknown, onSubmitted: (hash: string) => void) => {
         reportSubmitted = onSubmitted;
         return new Promise((resolve) => {
           confirmDeposit = resolve;
@@ -426,8 +449,21 @@ describe("App deposit modal timed transitions", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" }));
     });
+    expect(walletMocks.prepareVaultDeposit).toHaveBeenCalledWith("50");
+    expect(walletMocks.signAndSubmit).not.toHaveBeenCalled();
+
+    // Decoded Soroban transaction summary and assembled fee are shown before signing
+    const summaryList = screen.getByLabelText("Soroban transaction summary");
+    expect(summaryList.textContent).toContain("deposit");
+    expect(summaryList.textContent).toContain("50.00 USDC");
+    expect(summaryList.textContent).toContain("0.0025 XLM");
+    expect(summaryList.textContent).toContain("Testnet");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Confirm and sign deposit transaction" }));
+    });
     expect(screen.getAllByText("Approve in wallet...").length).toBeGreaterThan(0);
-    expect(walletMocks.submitVaultDeposit).toHaveBeenCalledWith("50", expect.any(Function));
+    expect(walletMocks.signAndSubmit).toHaveBeenCalledWith(expect.objectContaining({ xdr: "MOCK_PREPARED_XDR" }), expect.any(Function));
 
     const hash = "A".repeat(64);
     act(() => {
@@ -475,7 +511,7 @@ describe("App deposit modal timed transitions", () => {
     const { WalletServiceError } = await import("./services/walletService");
     const error = new WalletServiceError("CONTRACT_REJECTED", "This wallet is not on the vault's deposit allowlist.");
     Object.assign(error, { contractErrorCode: 44 });
-    walletMocks.submitVaultDeposit.mockRejectedValueOnce(error);
+    walletMocks.prepareVaultDeposit.mockRejectedValueOnce(error);
     const { amountInput } = await renderModalReady();
     setAmount(amountInput, "80");
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" })); });
@@ -487,7 +523,7 @@ describe("App deposit modal timed transitions", () => {
 
   it("shows failure and retry restores the submitted amount", async () => {
     const { WalletServiceError } = await import("./services/walletService");
-    walletMocks.submitVaultDeposit.mockRejectedValue(
+    walletMocks.signAndSubmit.mockRejectedValue(
       new WalletServiceError("SIGNATURE_REJECTED", "The deposit signature was rejected in Freighter."),
     );
 
@@ -496,6 +532,9 @@ describe("App deposit modal timed transitions", () => {
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Confirm and sign deposit transaction" }));
     });
 
     expect(screen.getAllByText("Transaction failed").length).toBeGreaterThan(0);
@@ -509,7 +548,7 @@ describe("App deposit modal timed transitions", () => {
 
   it("shows enabled Check status action while a submitted deposit needs reconciliation", async () => {
     const { WalletServiceError } = await import("./services/walletService");
-    walletMocks.submitVaultDeposit.mockRejectedValue(
+    walletMocks.signAndSubmit.mockRejectedValue(
       new WalletServiceError("NETWORK_TIMEOUT", "Check your wallet activity before retrying.", true),
     );
 
@@ -518,6 +557,9 @@ describe("App deposit modal timed transitions", () => {
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Approve deposit transaction" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Confirm and sign deposit transaction" }));
     });
 
     expect(screen.getByText("Deposit failed")).toBeTruthy();
@@ -605,8 +647,9 @@ describe("USDC trustline step (#1316)", () => {
     expect(approve).toBeEnabled();
     expect(screen.getByText(/USDC trustline ready/)).toBeVisible();
     expect(walletMocks.signTransaction).toHaveBeenCalledOnce();
-    walletMocks.submitVaultDeposit.mockResolvedValue({ hash: "A".repeat(64) });
+    walletMocks.signAndSubmit.mockResolvedValue({ hash: "A".repeat(64) });
     fireEvent.click(approve);
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm and sign deposit transaction" }));
     await screen.findByText("Your updated vault balance is 334.62 USDC and ready for usage.");
   });
 
@@ -639,7 +682,7 @@ describe("USDC trustline step (#1316)", () => {
 
   it("returns to the appropriate step if the wallet changes before deposit simulation", async () => {
     const { WalletServiceError } = await import("./services/walletService");
-    walletMocks.submitVaultDeposit.mockRejectedValue(new WalletServiceError("TRUSTLINE_MISSING", "Add trustline"));
+    walletMocks.prepareVaultDeposit.mockRejectedValueOnce(new WalletServiceError("TRUSTLINE_MISSING", "Add trustline"));
     renderDepositModal();
     const approve = await screen.findByRole("button", { name: "Approve deposit transaction" });
     mockMissingTrustline();
@@ -658,7 +701,7 @@ describe("USDC trustline step (#1316)", () => {
   describe("deposit reconciliation (issue #1175 / unconfirmed deposit)", () => {
     it("scenario 1: confirmation timeout shows locked state with enabled 'Check status'", async () => {
       const { WalletServiceError } = await import("./services/walletService");
-      walletMocks.submitVaultDeposit.mockImplementation(async (_amount: string, onSubmitted?: (h: string) => void) => {
+      walletMocks.signAndSubmit.mockImplementation(async (_prepared: unknown, onSubmitted?: (h: string) => void) => {
         onSubmitted?.("0xdeadbeef1234");
         throw new WalletServiceError("NETWORK_TIMEOUT", "Confirmation timed out", true);
       });
@@ -666,6 +709,7 @@ describe("USDC trustline step (#1316)", () => {
       renderDepositModal();
       const approve = await screen.findByRole("button", { name: "Approve deposit transaction" });
       fireEvent.click(approve);
+      fireEvent.click(await screen.findByRole("button", { name: "Confirm and sign deposit transaction" }));
 
       const checkButton = await screen.findByRole("button", { name: "Check status" });
       expect(checkButton).toBeEnabled();
@@ -674,7 +718,7 @@ describe("USDC trustline step (#1316)", () => {
 
     it("scenario 2: check returns SUCCESS -> confirmed state and pending record cleared", async () => {
       const { WalletServiceError } = await import("./services/walletService");
-      walletMocks.submitVaultDeposit.mockImplementation(async (_amount: string, onSubmitted?: (h: string) => void) => {
+      walletMocks.signAndSubmit.mockImplementation(async (_prepared: unknown, onSubmitted?: (h: string) => void) => {
         onSubmitted?.("0xsuccesshash");
         throw new WalletServiceError("NETWORK_TIMEOUT", "Confirmation timed out", true);
       });
@@ -682,6 +726,7 @@ describe("USDC trustline step (#1316)", () => {
 
       renderDepositModal();
       fireEvent.click(await screen.findByRole("button", { name: "Approve deposit transaction" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Confirm and sign deposit transaction" }));
 
       const checkButton = await screen.findByRole("button", { name: "Check status" });
       fireEvent.click(checkButton);
@@ -694,7 +739,7 @@ describe("USDC trustline step (#1316)", () => {
 
     it("scenario 3: check returns FAILED -> failed state and Retry enabled", async () => {
       const { WalletServiceError } = await import("./services/walletService");
-      walletMocks.submitVaultDeposit.mockImplementation(async (_amount: string, onSubmitted?: (h: string) => void) => {
+      walletMocks.signAndSubmit.mockImplementation(async (_prepared: unknown, onSubmitted?: (h: string) => void) => {
         onSubmitted?.("0xfailedhash");
         throw new WalletServiceError("NETWORK_TIMEOUT", "Confirmation timed out", true);
       });
@@ -702,6 +747,7 @@ describe("USDC trustline step (#1316)", () => {
 
       renderDepositModal();
       fireEvent.click(await screen.findByRole("button", { name: "Approve deposit transaction" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Confirm and sign deposit transaction" }));
 
       const checkButton = await screen.findByRole("button", { name: "Check status" });
       fireEvent.click(checkButton);
@@ -787,7 +833,7 @@ describe("USDC trustline step (#1316)", () => {
 
     it("scenario 8: sessionStorage.setItem throws -> flow still works in memory without crash", async () => {
       const { WalletServiceError } = await import("./services/walletService");
-      walletMocks.submitVaultDeposit.mockImplementation(async (_amount: string, onSubmitted?: (h: string) => void) => {
+      walletMocks.signAndSubmit.mockImplementation(async (_prepared: unknown, onSubmitted?: (h: string) => void) => {
         onSubmitted?.("0xquotafull");
         throw new WalletServiceError("NETWORK_TIMEOUT", "Timeout", true);
       });
@@ -800,6 +846,7 @@ describe("USDC trustline step (#1316)", () => {
         renderDepositModal();
         const approve = await screen.findByRole("button", { name: "Approve deposit transaction" });
         fireEvent.click(approve);
+        fireEvent.click(await screen.findByRole("button", { name: "Confirm and sign deposit transaction" }));
 
         const checkBtn = await screen.findByRole("button", { name: "Check status" });
         expect(checkBtn).toBeEnabled();
@@ -810,7 +857,7 @@ describe("USDC trustline step (#1316)", () => {
 
     it("scenario 9: check RPC error -> stays locked with error status", async () => {
       const { WalletServiceError } = await import("./services/walletService");
-      walletMocks.submitVaultDeposit.mockImplementation(async (_amount: string, onSubmitted?: (h: string) => void) => {
+      walletMocks.signAndSubmit.mockImplementation(async (_prepared: unknown, onSubmitted?: (h: string) => void) => {
         onSubmitted?.("0xrpcerrorhash");
         throw new WalletServiceError("NETWORK_TIMEOUT", "Timeout", true);
       });
@@ -818,6 +865,7 @@ describe("USDC trustline step (#1316)", () => {
 
       renderDepositModal();
       fireEvent.click(await screen.findByRole("button", { name: "Approve deposit transaction" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Confirm and sign deposit transaction" }));
 
       const checkButton = await screen.findByRole("button", { name: "Check status" });
       fireEvent.click(checkButton);
