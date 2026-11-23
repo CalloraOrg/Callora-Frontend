@@ -1,5 +1,6 @@
 import ReactDOM from "react-dom/client";
 import { renderRoute } from "./renderRoute";
+import { registerServiceWorker } from "./utils/registerServiceWorker";
 import "./styles/tokens.css";
 import "./index.css";
 import "./styles/typography.css";
@@ -20,3 +21,7 @@ window.addEventListener("popstate", () => {
 
 // Initial application render
 void renderRoute(root, currentPathname());
+
+if (import.meta.env.PROD) {
+  registerServiceWorker();
+}
