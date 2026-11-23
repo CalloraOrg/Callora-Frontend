@@ -26,6 +26,10 @@ vercel --prod --yes          # add --archive=tgz if you hit the upload rate limi
 
 Set `VITE_*` variables (see `.env.example`) with `vercel env add`. They are inlined at build time and are public: never put secrets in them.
 
+## Crawlers and indexing
+
+`public/robots.txt` is copied verbatim to `dist/robots.txt` (served before the Vercel SPA rewrite) and disallows wallet-gated and error routes (`/billing`, `/apis/my-apis`, `/webhooks`, `/500`). Note that `robots.txt` rules are advisory—they are not an access-control boundary—and `useDocumentTitle` also injects `<meta name="robots" content="noindex, nofollow">` on those routes to cover crawlers that ignore `robots.txt`.
+
 ## Demo mode
 
 When `VITE_API_BASE_URL` is empty the app runs in static demo mode: the
