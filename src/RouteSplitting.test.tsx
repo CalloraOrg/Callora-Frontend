@@ -1,13 +1,22 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import App, { prefetchRoute } from './App';
 import { AccountProvider } from './hooks/useAccountContext';
 import { ThemeProvider } from './ThemeContext';
 import { CollectionsProvider } from './state/collectionsStore';
 import { ToastProvider } from './components/Toast';
+
+vi.mock('./services/authService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./services/authService')>();
+  return {
+    ...actual,
+    isSignedIn: () => true,
+    useIsSignedIn: () => true,
+  };
+});
 
 function renderApp(initialPath = '/') {
   return render(

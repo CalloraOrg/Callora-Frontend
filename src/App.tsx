@@ -42,6 +42,7 @@ import {
 import LandingPage from "./app/LandingPage";
 import StatusPage from "./app/StatusPage";
 import WalletSignInButton from "./app/WalletSignInButton";
+import RequireAuth from "./components/RequireAuth";
 import AccountSwitcher from "./app/AccountSwitcher";
 
 // Re-export public API
@@ -816,7 +817,7 @@ function App() {
               element={<LandingPage onStartUsingApis={() => navigate(APP_ROUTES.marketplace)} onPublishApi={() => navigate(APP_ROUTES.publish)} onTakeTour={() => navigate(APP_ROUTES.onboarding)} />}
             />
 
-            <Route path={APP_ROUTES.publish} element={<PublishApi />} />
+            <Route path={APP_ROUTES.publish} element={<RequireAuth><PublishApi /></RequireAuth>} />
 
             <Route path={APP_ROUTES.onboarding} element={<OnboardingTour onComplete={() => navigate(APP_ROUTES.dashboard)} />} />
 
@@ -849,9 +850,9 @@ function App() {
             <Route path={APP_ROUTES.themePlayground} element={<ThemePlayground />} />
 
             {/* ── My APIs ─────────────────────────────────────────────── */}
-            <Route path={APP_ROUTES.myApis} element={<MyApis />} />
+            <Route path={APP_ROUTES.myApis} element={<RequireAuth><MyApis /></RequireAuth>} />
             
-            <Route path={APP_ROUTES.webhookDeliveries} element={<WebhookDeliveries />} />
+            <Route path={APP_ROUTES.webhookDeliveries} element={<RequireAuth><WebhookDeliveries /></RequireAuth>} />
 
             {/* ── Plan Badge (issue #529) ──────────────────────────────── */}
             <Route path={APP_ROUTES.planBadge} element={<PlanBadgePage />} />
@@ -859,6 +860,7 @@ function App() {
             <Route
               path={APP_ROUTES.billing}
               element={
+                <RequireAuth>
                 <section className="billing-layout">
                   <div className="surface billing-panel">
                     {hasUnconfirmedDeposit && !isDepositOpen && (
@@ -981,6 +983,7 @@ function App() {
                     )}
                   </aside>
                 </section>
+                </RequireAuth>
               }
             />
 
