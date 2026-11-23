@@ -33,6 +33,8 @@ import { runTestCall } from "../services/testCall";
 import { useRateLimit } from "../hooks/useRateLimit";
 import RateLimitAlert from "../components/RateLimitAlert";
 import { formatCountdown } from "../utils/format";
+import { DateRangePicker } from "../components/DateRangePicker";
+import type { DateRange as DateRangePickerRange } from "../components/DateRangePicker";
 
 type ApiEndpoint = {
   id: string;
@@ -92,12 +94,6 @@ type UsageApiResponse = {
   };
   usagePercent?: number;
   quota?: { usagePercent?: number };
-};
-
-type DateRange = {
-  preset: "24h" | "7d" | "30d" | "custom";
-  from?: Date;
-  to?: Date;
 };
 
 const MOCK_ENDPOINTS: ApiEndpoint[] = [
@@ -381,29 +377,8 @@ export default function ApiUsage() {
     (isUsageLoading || usageRequestAccountId !== currentAccountId);
   const isTableLoading = isPageLoading;
 
-  const {
-    status: exportStatus,
-    format: exportFormat,
-    progress: exportProgress,
-    totalRecords: exportTotalRecords,
-    processedRecords: exportProcessedRecords,
-    error: exportError,
-    downloadUrl: exportDownloadUrl,
-    fileName: exportFileName,
-    lastFailedFormat: exportLastFailedFormat,
-    isExporting,
-    isFailed: isExportFailed,
-    isCompleted: isExportCompleted,
-    isCancelled: isExportCancelled,
-    startExport,
-    cancelExport,
-    retryLastFailedExport,
-    recoverDownload,
-    resetExport,
-  } = useExportHistory(callHistory, { accountId: currentAccountId ?? undefined });
-
-  const [selectedRange, setSelectedRange] = useState<DateRange>({
-    preset: "24h",
+  const [selectedRange, setSelectedRange] = useState<DateRangePickerRange>({
+    preset: "7d",
   });
   const [selectedLanguage, setSelectedLanguage] = useState<
     "javascript" | "python" | "curl"
@@ -482,10 +457,44 @@ export default function ApiUsage() {
       : callHistory.filter((call) => call.status === statusFilter),
   );
 
+  // Export uses the range-filtered history so the downloaded file matches what
+  // is shown in the table. The filename includes the preset for traceability.
+  const exportRangeLabel = selectedRange.preset === "custom"
+    ? (selectedRange.from && selectedRange.to
+        ? `${selectedRange.from.toISOString().slice(0, 10)}_to_${selectedRange.to.toISOString().slice(0, 10)}`
+        : "custom")
+    : selectedRange.preset;
+
+  const {
+    status: exportStatus,
+    format: exportFormat,
+    progress: exportProgress,
+    totalRecords: exportTotalRecords,
+    processedRecords: exportProcessedRecords,
+    error: exportError,
+    downloadUrl: exportDownloadUrl,
+    fileName: exportFileName,
+    lastFailedFormat: exportLastFailedFormat,
+    isExporting,
+    isFailed: isExportFailed,
+    isCompleted: isExportCompleted,
+    isCancelled: isExportCancelled,
+    startExport: startExportBase,
+    cancelExport,
+    retryLastFailedExport,
+    recoverDownload,
+    resetExport,
+  } = useExportHistory(filteredCallHistory, { accountId: currentAccountId ?? undefined });
+
+  const startExport = useCallback(
+    (format: "csv" | "json") => startExportBase(format),
+    [startExportBase],
+  );
+
   // Initialize selected range from URL query on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const preset = params.get("range") as DateRange["preset"] | null;
+    const preset = params.get("range") as DateRangePickerRange["preset"] | null;
     const from = params.get("from");
     const to = params.get("to");
     if (preset && ["24h", "7d", "30d", "custom"].includes(preset)) {
@@ -501,7 +510,7 @@ export default function ApiUsage() {
   // Sync selected range to URL query whenever it changes
   useEffect(() => {
     const params = new URLSearchParams();
-    if (selectedRange.preset !== "24h") {
+    if (selectedRange.preset !== "7d") {
       params.set("range", selectedRange.preset);
       if (
         selectedRange.preset === "custom" &&
@@ -520,7 +529,7 @@ export default function ApiUsage() {
 
   // Whether any call-history filter differs from its default value.
   const filtersAreActive =
-    statusFilter !== "all" || selectedRange.preset !== "24h";
+    statusFilter !== "all" || selectedRange.preset !== "7d";
 
   const announceStatus = useCallback((message: string) => {
     setLiveStatusMessage("");
@@ -540,8 +549,8 @@ export default function ApiUsage() {
   // to assistive technology via the aria-live region below.
   const handleResetFilters = () => {
     setStatusFilter("all");
-    setSelectedRange({ preset: "24h" });
-    announceStatus("Filters reset. Showing all calls from the last 24 hours.");
+    setSelectedRange({ preset: "7d" });
+    announceStatus("Filters reset. Showing all calls from the last 7 days.");
   };
 
   const handleCopyApiKey = async () => {
@@ -976,10 +985,12 @@ export default function ApiUsage() {
 
         <div className="mini-chart">
           <h3>Calls Over Time</h3>
-          <CallsHeatmap />
+          <CallsHeatmap from={selectedRange.from} to={selectedRange.to} />
           <UsageChart
             title="API Call Trends"
             alt="Usage statistics chart showing API call trends over time"
+            from={selectedRange.from}
+            to={selectedRange.to}
           />
         </div>
       </div>
@@ -989,6 +1000,20 @@ export default function ApiUsage() {
         <div className="section-header">
           <h2>Call History</h2>
           <div className="history-actions">
+            <DateRangePicker
+              selectedRange={selectedRange}
+              onChange={(range) => {
+                setSelectedRange(range);
+                announceStatus(
+                  range.preset === "custom"
+                    ? "Custom date range selected."
+                    : `Showing calls from the last ${range.preset}.`,
+                );
+              }}
+              label="Time range"
+              maxDate={new Date()}
+              id="api-usage-date-range"
+            />
             <Tabs
               tabs={[
                 { id: "all", label: "All Status" },

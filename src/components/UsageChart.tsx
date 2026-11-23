@@ -7,6 +7,10 @@ export interface UsageChartProps {
   title?: string;
   /** Alt text for the chart image */
   alt?: string;
+  /** Optional start of the date range being displayed. */
+  from?: Date;
+  /** Optional end of the date range being displayed. */
+  to?: Date;
 }
 
 /**
@@ -19,6 +23,8 @@ export default function UsageChart({
   label = 'Usage Chart',
   title = 'Usage Statistics',
   alt = 'Usage statistics chart showing API call trends',
+  from: _from,
+  to: _to,
 }: UsageChartProps) {
   return (
     <div className="usage-chart" aria-label={label}>
