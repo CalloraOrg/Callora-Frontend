@@ -132,6 +132,7 @@ export default function FiltersSidebar({
   selectedStatuses = new Set<string>(),
   toggleStatus = () => {},
   resultCount,
+  categoryCounts,
 }: {
   selectedCategories: Set<string>;
   toggleCategory: (c: string) => void;
@@ -147,6 +148,11 @@ export default function FiltersSidebar({
   selectedStatuses?: Set<string>;
   toggleStatus?: (s: string) => void;
   resultCount?: number;
+  /**
+   * Result count per category, computed from the catalogue filtered by the
+   * other facets. Omit to render the plain labels (previous behaviour).
+   */
+  categoryCounts?: Record<string, number>;
 }) {
   const prefersReducedMotion = usePrefersReducedMotion();
 
@@ -287,26 +293,43 @@ export default function FiltersSidebar({
         <div className="filter-options" style={{ display: "grid", gap: "var(--mkt-space-md, 8px)" }}>
           {ALL_CATEGORIES.map((c) => {
             const id = `category-${c.replace(/\s+/g, "-").toLowerCase()}`;
+            const count = categoryCounts ? (categoryCounts[c] ?? 0) : undefined;
+            const isSelected = selectedCategories.has(c);
+            // A zero-count category stays visible (and selectable while
+            // selected, so it can always be deselected) but is muted and
+            // announced as disabled.
+            const isEmpty = count === 0 && !isSelected;
+            const countId = `${id}-count`;
             return (
               <div
                 key={c}
-                className="filter-option"
+                className={`filter-option${isEmpty ? " filter-option--empty" : ""}`}
                 style={{ display: "flex", gap: "var(--mkt-space-md, 8px)", alignItems: "center" }}
               >
                 <input
                   id={id}
                   type="checkbox"
                   className="filter-checkbox"
-                  checked={selectedCategories.has(c)}
-                  onChange={() => toggleCategory(c)}
+                  checked={isSelected}
+                  onChange={() => {
+                    if (isEmpty) return;
+                    toggleCategory(c);
+                  }}
+                  aria-describedby={count === undefined ? undefined : countId}
+                  aria-disabled={isEmpty || undefined}
                 />
-                <label
-                  htmlFor={id}
-                  className="filter-label"
-                  style={{ color: "var(--text)" }}
-                >
+                <label htmlFor={id} className="filter-label">
                   {c}
                 </label>
+                {count !== undefined && (
+                  <span
+                    id={countId}
+                    className="filter-count numeric-tabular"
+                    data-testid={`category-count-${id}`}
+                  >
+                    ({count})
+                  </span>
+                )}
               </div>
             );
           })}
