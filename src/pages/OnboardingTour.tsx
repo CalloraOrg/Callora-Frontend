@@ -79,9 +79,9 @@ const TOUR_STEPS: TourStep[] = [
   },
 ];
 
-const TOTAL_STEPS = TOUR_STEPS.length;
+export const TOTAL_STEPS = TOUR_STEPS.length;
 
-const CHECKPOINT_KEY = "callora_onboarding_checkpoint";
+export const CHECKPOINT_KEY = "callora_onboarding_checkpoint";
 
 interface TourProgress {
   completed: boolean;

@@ -8,7 +8,9 @@ import NotFound from "./components/NotFound";
 import { startRouteLoading, stopRouteLoading } from "./hooks/useRouteLoading";
 import { formatUsdc, formatUsdShortcut, formatUsdcStroops, normalizeUsdcAmountInput, stroopsToUsdcAmount, usdcAmountToStroops, USDC_DECIMALS } from "./utils/format";
 import { useNetworkFee, formatStroops, TransactionSummaryDetails } from "./components/DepositPreview";
-import { ENABLE_DEMO_OUTCOME, MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, TESTNET_DEPLOYMENT, testnetContractUrl, STELLAR_NETWORK, STELLAR_USDC_CONFIGURATION_ERROR, STELLAR_VAULT_CONFIG, STELLAR_VAULT_CONTRACT_ID, TRANSACTION_TIMEOUT_SECONDS } from "./config/constants";
+import { MIN_DEPOSIT, NETWORK_FEE, PRESET_AMOUNTS, TESTNET_DEPLOYMENT, testnetContractUrl, TRANSACTION_TIMEOUT_SECONDS } from "./config/constants";
+import { useRuntimeConfig, usdcConfigurationError } from "./config/runtimeConfig";
+import { resolveVaultConfig } from "./services/vaultConfig";
 import type { WalletServiceErrorCode, UsdcTrustlineStatus, PreparedVaultDeposit } from "./services/walletService";
 import { useVaultBalances } from "./hooks/useVaultBalances";
 import BalanceReadout from "./components/BalanceReadout";
@@ -112,6 +114,14 @@ function App() {
     return () => clearTimeout(timer);
   }, [lastReconnectedAt]);
 
+  const runtimeConfig = useRuntimeConfig();
+  const vaultConfig = resolveVaultConfig({
+    network: runtimeConfig.network,
+    envContractId: runtimeConfig.vaultContractId,
+    testnetDefault: "",
+    source: "runtime",
+  });
+  const issuerConfigurationError = usdcConfigurationError(runtimeConfig);
   const { isExpired: isSessionExpired } = useSessionExpiry();
   const notifications = useNotifications({
     enabled: isSignedIn() && !isSessionExpired,
@@ -161,11 +171,6 @@ function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [amountInput, setAmountInput] = useState("50");
   const [selectedPreset, setSelectedPreset] = useState<number | "custom">(50);
-
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
-  useEffect(() => {
-    setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
-  }, []);
 
   // Handle global shortcuts
   const handleGlobalKeyDown = useCallback(
@@ -316,7 +321,6 @@ function App() {
 
   const parsedAmount = Number(amountInput);
   const hasAmount = amountInput.trim().length > 0 && Number.isFinite(parsedAmount);
-  const activeAmount = submittedAmount ?? (hasAmount ? parsedAmount : 0);
   const amountStroops =
     usdcAmountToStroops(submittedAmount !== null ? String(submittedAmount) : amountInput);
   const previewVaultStroops = submittedStartingBalance ?? shownVaultStroops;
@@ -350,7 +354,7 @@ function App() {
 
   const hasValidAmount = validationMessage.length === 0;
   const stageLabel = getStageLabel(depositStage, hasValidAmount);
-  const vaultBlockReason = STELLAR_VAULT_CONFIG.error ?? (vaultPreflight.status === "blocked" ? vaultPreflight.message : null);
+  const vaultBlockReason = vaultConfig.error ?? (vaultPreflight.status === "blocked" ? vaultPreflight.message : null);
   const pendingHashLabel = txHash ? `${txHash.slice(0, 10)}...${txHash.slice(-8)}` : null;
 
   useEffect(() => {
@@ -367,13 +371,13 @@ function App() {
         if (!isCurrent) return;
         setWalletAvailability(available ? "available" : "missing");
         if (!available) return;
-        if (STELLAR_USDC_CONFIGURATION_ERROR) throw new Error(STELLAR_USDC_CONFIGURATION_ERROR);
-        const address = await getWalletAddress();
+        if (issuerConfigurationError) throw new Error(issuerConfigurationError);
+        const address = await getWalletAddress(runtimeConfig);
         if (!isCurrent) return;
         setWalletAddress(address);
-        if (!STELLAR_VAULT_CONFIG.error) {
+        if (!vaultConfig.error) {
           setVaultPreflight({ status: "checking", message: "" });
-          preflightVaultDeposit(address)
+          preflightVaultDeposit(address, runtimeConfig)
             .then((result) => {
               if (!isCurrent) return;
               if (result.paused) {
@@ -388,7 +392,7 @@ function App() {
               if (isCurrent) setVaultPreflight({ status: "unverified", message: "Could not verify vault status. You can still try the deposit." });
             });
         }
-        const status = await hasUsdcTrustline(address);
+        const status = await hasUsdcTrustline(address, runtimeConfig);
         if (isCurrent) setTrustlineStatus(status);
       })
       .catch((error) => {
@@ -400,7 +404,7 @@ function App() {
     return () => {
       isCurrent = false;
     };
-  }, [isDepositOpen, trustlineCheckVersion]);
+  }, [isDepositOpen, trustlineCheckVersion, runtimeConfig, vaultConfig.error, issuerConfigurationError]);
 
   useEffect(() => {
     if (location.pathname !== APP_ROUTES.billing && isDepositOpen) {
@@ -509,6 +513,7 @@ function App() {
   const handlePrepareDeposit = async () => {
     if (!hasValidAmount || isBusy || hasUnconfirmedDeposit || walletAvailability !== "available" || (trustlineStatus !== "present" && trustlineStatus !== "unknown")) return;
 
+    const depositConfig = runtimeConfig;
     setTxHash("");
     setCopied(false);
     setDepositFailureCode(null);
@@ -526,7 +531,7 @@ function App() {
       isWalletServiceError = (error): error is WalletServiceFailure =>
         error instanceof walletService.WalletServiceError;
 
-      const prepared = await walletService.prepareVaultDeposit(amountInput);
+      const prepared = await walletService.prepareVaultDeposit(amountInput, depositConfig);
       setPreparedDeposit(prepared);
       setStatusMessage("Review the decoded Soroban transaction below, then confirm to sign in Freighter.");
     } catch (error) {
@@ -558,6 +563,7 @@ function App() {
   const handleConfirmSign = async () => {
     if (!preparedDeposit || isBusy || hasUnconfirmedDeposit) return;
 
+    const depositConfig = preparedDeposit.config;
     const approvedAmount = parsedAmount;
     const startingBalance = shownVaultStroops;
     setSubmittedAmount(approvedAmount);
@@ -623,8 +629,9 @@ function App() {
           hash: finalHash,
           amount: approvedAmount,
           submittedAt: Date.now(),
-          network: STELLAR_NETWORK,
-          contractId: STELLAR_VAULT_CONTRACT_ID,
+          network: depositConfig.network,
+          contractId: depositConfig.vaultContractId,
+          rpcUrl: depositConfig.rpcUrl,
         };
         writePendingDeposit(record);
         setPendingDeposit(record);
@@ -645,7 +652,7 @@ function App() {
     setTrustlineMessage("Approve the USDC trustline in Freighter. Waiting for Stellar confirmation.");
     try {
       const { addUsdcTrustline } = await import("./services/walletService");
-      const result = await addUsdcTrustline();
+      const result = await addUsdcTrustline(runtimeConfig);
       if (result === "cancelled") {
         setTrustlineMessage("Trustline signature cancelled. You can add the USDC trustline when you are ready.");
       } else {
@@ -678,7 +685,7 @@ function App() {
     setStatusMessage("Review the transaction details and approve again.");
   };
 
-  const handleCheckDepositStatus = async (auto = false) => {
+  const handleCheckDepositStatus = async () => {
     const record = pendingDeposit ?? readPendingDeposit();
     const hashToCheck = record?.hash || txHash;
     if (!hashToCheck || isCheckingDepositStatus) return;
@@ -687,7 +694,15 @@ function App() {
     setCheckDepositStatusMessage("Checking transaction status...");
     try {
       const { checkDepositStatus } = await import("./services/walletService");
-      const status = await checkDepositStatus(hashToCheck);
+      const statusConfig = record
+        ? {
+            ...runtimeConfig,
+            network: record.network,
+            vaultContractId: record.contractId,
+            rpcUrl: record.rpcUrl ?? runtimeConfig.rpcUrl,
+          }
+        : runtimeConfig;
+      const status = await checkDepositStatus(hashToCheck, statusConfig);
 
       if (status === "SUCCESS") {
         clearPendingDeposit();
@@ -761,7 +776,7 @@ function App() {
       setDepositRequiresReconciliation(true);
       setDepositStage("failed");
       setStatusMessage("You have an unconfirmed deposit. Check transaction status before retrying.");
-      handleCheckDepositStatus(true);
+      handleCheckDepositStatus();
     }
   }, []);
 
@@ -1060,7 +1075,7 @@ function App() {
                       <NavLink to={APP_ROUTES.billingHistory}>Billing History</NavLink>.
                       {" "}<NavLink to={APP_ROUTES.subscriptions}>Manage subscriptions</NavLink>.
                     </p>
-                    {ENABLE_DEMO_OUTCOME && (
+                    {runtimeConfig.enableDemoOutcome && (
                       <>
                         <div className="outcome-toggle" role="radiogroup" aria-label="Demo outcome">
                           <button role="radio" aria-checked={demoOutcome === "confirmed"} className={demoOutcome === "confirmed" ? "active" : ""} onClick={() => setDemoOutcome("confirmed")}>
@@ -1202,7 +1217,7 @@ function App() {
                     {trustlineStatus === "unfunded-account" && (
                       <>
                         <p>This Stellar account is not funded. Fund it with XLM, then check again before adding the USDC trustline.</p>
-                        {STELLAR_NETWORK === "testnet" && (
+                        {runtimeConfig.network === "testnet" && (
                           <ExternalLink href={`https://friendbot.stellar.org/?addr=${encodeURIComponent(walletAddress)}`} ariaLabel="Fund testnet account with Friendbot">
                             Fund testnet account with Friendbot
                           </ExternalLink>
@@ -1354,7 +1369,7 @@ function App() {
                         </div>
 
                         <div className="hash-actions">
-                          <a href={buildExplorerLink(txHash)} target="_blank" rel="noreferrer">
+                          <a href={buildExplorerLink(txHash, runtimeConfig.network)} target="_blank" rel="noreferrer">
                             View on Stellar Explorer
                           </a>
                           <button onClick={handleCopyHash}>{copied ? "Copied" : "Copy hash"}</button>

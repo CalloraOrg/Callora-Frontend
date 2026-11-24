@@ -25,6 +25,7 @@ import LatencyChart from "./pages/LatencyChart";
 import StandaloneShell from "./components/StandaloneShell";
 import RequireAuth from "./components/RequireAuth";
 import { isMarketplaceSubpage } from "./routeMatchers";
+import RuntimeConfigBanner from "./components/RuntimeConfigBanner";
 
 /**
  * The slice of a React 18 root that routing needs. Keeping it structural lets
@@ -70,6 +71,7 @@ export async function renderRoute(
           <CollectionsProvider>
             <BrowserRouter>
               <RouteProgressBar />
+              <RuntimeConfigBanner />
               <ToastProvider>
                 {withShell ? (
                   <StandaloneShell>

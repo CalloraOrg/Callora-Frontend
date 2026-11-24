@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   configurationError: null as string | null,
   serverConstructor: vi.fn(),
+  contractConstructor: vi.fn(),
   server: {
     getAccount: vi.fn(),
     prepareTransaction: vi.fn(),
@@ -30,7 +31,15 @@ vi.mock("@stellar/freighter-api", () => ({
 
 vi.mock("@stellar/stellar-sdk", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@stellar/stellar-sdk")>();
-  return { ...actual, rpc: { ...actual.rpc, assembleTransaction: mocks.assembleTransaction, Server: class {
+  return {
+    ...actual,
+    Contract: class extends actual.Contract {
+      constructor(contractId: string) {
+        mocks.contractConstructor(contractId);
+        super(contractId);
+      }
+    },
+    rpc: { ...actual.rpc, assembleTransaction: mocks.assembleTransaction, Server: class {
     constructor(...args: unknown[]) {
       mocks.serverConstructor(...args);
       return mocks.server;
@@ -63,6 +72,8 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import { STELLAR_USDC_ASSET, STELLAR_NETWORK_PASSPHRASE } from "../config/constants";
+import { getConfig, setRuntimeConfig } from "../config/runtimeConfig";
+const buildTimeConfig = getConfig();
 const walletAddress = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 import {
   hasUsdcTrustline, addUsdcTrustline, getWalletAddress,
@@ -76,6 +87,7 @@ import {
 describe("walletService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setRuntimeConfig(buildTimeConfig);
     mocks.walletSnapshot.mockReturnValue({ isNetworkMismatch: false });
     mocks.configurationError = null;
     vi.stubGlobal("fetch", mocks.fetch);
@@ -126,7 +138,6 @@ describe("walletService", () => {
     await expect(submitVaultDeposit("12.34", onSubmitted)).resolves.toEqual({
       hash: "HASH_RETURNED_BY_STELLAR",
     });
-
     expect(onSubmitted).toHaveBeenCalledWith("HASH_RETURNED_BY_STELLAR");
     expect(mocks.signTransaction).toHaveBeenCalledWith(
       expect.any(String),
@@ -136,6 +147,48 @@ describe("walletService", () => {
     expect(mocks.server.getTransaction).toHaveBeenCalledWith(
       "HASH_RETURNED_BY_STELLAR",
     );
+  });
+
+  it("uses the config snapshot captured when a deposit starts", async () => {
+    const originalConfig = getConfig();
+    const replacementConfig = {
+      ...originalConfig,
+      rpcUrl: "https://replacement-rpc.example",
+      vaultContractId: "CB4BUGCX5LFS5KYWAO2J4ZQTALOQSGXFFAOVKKGAS32OFZLU7O7YYGHS",
+    };
+
+    const deposit = submitVaultDeposit("12.34");
+    setRuntimeConfig(replacementConfig);
+    try {
+      await expect(deposit).resolves.toHaveProperty("hash", "HASH_RETURNED_BY_STELLAR");
+      expect(mocks.serverConstructor).toHaveBeenCalledWith(
+        originalConfig.rpcUrl,
+        expect.any(Object),
+      );
+      expect(mocks.contractConstructor).toHaveBeenCalledWith(originalConfig.vaultContractId);
+    } finally {
+      setRuntimeConfig(originalConfig);
+    }
+  });
+
+  it("targets a vault contract supplied by the active runtime config", async () => {
+    const originalConfig = getConfig();
+    const runtimeConfig = {
+      ...originalConfig,
+      rpcUrl: "https://runtime-rpc.example",
+      vaultContractId: "CB4BUGCX5LFS5KYWAO2J4ZQTALOQSGXFFAOVKKGAS32OFZLU7O7YYGHS",
+    };
+    setRuntimeConfig(runtimeConfig);
+    try {
+      await expect(submitVaultDeposit("12.34")).resolves.toHaveProperty("hash");
+      expect(mocks.serverConstructor).toHaveBeenCalledWith(
+        runtimeConfig.rpcUrl,
+        expect.any(Object),
+      );
+      expect(mocks.contractConstructor).toHaveBeenCalledWith(runtimeConfig.vaultContractId);
+    } finally {
+      setRuntimeConfig(originalConfig);
+    }
   });
 
   it("maps a rejected signature to a distinct failure", async () => {
