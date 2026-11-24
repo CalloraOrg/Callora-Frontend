@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  isVaultReadConfigured,
-  readVaultBalance,
-  readWalletUsdcBalance,
-} from "../services/vaultReads";
-import { useRuntimeConfig } from "../config/runtimeConfig";
+import { getConfig, useRuntimeConfig, type RuntimeConfig } from "../config/runtimeConfig";
+import { isValidContractId } from "../utils/stellarAddress";
+
+function isVaultReadConfigured(config: RuntimeConfig = getConfig()): boolean {
+  return (
+    config.vaultContractId !== "" &&
+    isValidContractId(config.vaultContractId) &&
+    config.rpcUrl !== ""
+  );
+}
 
 /**
  * Lifecycle of the on-chain balance reads.
@@ -134,6 +138,7 @@ export function useVaultBalances(
 
     try {
       const knownAddress = addressRef.current;
+      const { readVaultBalance, readWalletUsdcBalance } = await import("../services/vaultReads");
       const [vaultResult, walletResult] = await Promise.allSettled([
         readVaultBalance(knownAddress, config),
         knownAddress ? readWalletUsdcBalance(knownAddress, config) : Promise.resolve(null),

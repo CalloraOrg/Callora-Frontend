@@ -1,4 +1,4 @@
-import { StrKey } from "@stellar/stellar-sdk";
+import { isValidEd25519PublicKey } from "../utils/stellarAddress";
 import { resolveVaultConfig } from "../services/vaultConfig";
 
 /**
@@ -218,7 +218,7 @@ export const STELLAR_USDC_ASSET = {
 // Keep the app usable with bad configuration; wallet actions surface this
 // error before making any Horizon request or asking for a signature.
 export const STELLAR_USDC_CONFIGURATION_ERROR =
-  StrKey.isValidEd25519PublicKey(STELLAR_USDC_ASSET.issuer)
+  isValidEd25519PublicKey(STELLAR_USDC_ASSET.issuer)
     ? null
     : "Configure VITE_STELLAR_USDC_ISSUER with a valid Stellar Ed25519 public key for this network.";
 
@@ -264,5 +264,11 @@ export const EXPLORER_BASE_URL = `https://stellar.expert/explorer/${
  */
 export function apiUrl(path: string): string {
   const suffix = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE}${suffix}`;
+  if (API_BASE) {
+    return `${API_BASE}${suffix}`;
+  }
+  if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
+    return `${window.location.origin}${suffix}`;
+  }
+  return suffix;
 }

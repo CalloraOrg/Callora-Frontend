@@ -1,4 +1,4 @@
-import { StrKey } from "@stellar/stellar-sdk";
+import { isValidContractId } from "../utils/stellarAddress";
 
 export type VaultConfigSource = "env" | "runtime" | "testnet-default" | "missing";
 
@@ -38,7 +38,7 @@ export function resolveVaultConfig(env: {
     };
   }
 
-  if (!StrKey.isValidContract(contractId)) {
+  if (!isValidContractId(contractId)) {
     return {
       contractId: "",
       source,

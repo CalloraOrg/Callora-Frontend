@@ -118,38 +118,41 @@ export function useRecentActivity(accountId: string | null): UseRecentActivityRe
     [],
   );
 
-  // retryRef lets the retry callback always call the latest `load` without
-  // needing to be recreated on every render.
-  const retryRef = useRef<() => void>(() => {});
+  // The controller for the request currently in flight, so a retry cancels
+  // its predecessor and unmount cancels the live one.
+  const controllerRef = useRef<AbortController | null>(null);
+
+  const start = useCallback(
+    (id: string) => {
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      load(id, controller.signal);
+    },
+    [load],
+  );
 
   useEffect(() => {
     if (!accountId) {
       // No account selected — nothing to fetch.
+      controllerRef.current?.abort();
       setItems([]);
       setStatus('success');
       setError(null);
       return;
     }
 
-    const controller = new AbortController();
-
-    retryRef.current = () => {
-      // Re-run load with a fresh AbortController so the retry is cancellable.
-      const retryController = new AbortController();
-      retryRef.current = () => retryController.abort();
-      load(accountId, retryController.signal);
-    };
-
-    load(accountId, controller.signal);
+    start(accountId);
 
     return () => {
-      controller.abort();
+      controllerRef.current?.abort();
     };
-  }, [accountId, load]);
+  }, [accountId, start]);
 
   const retry = useCallback(() => {
-    retryRef.current();
-  }, []);
+    if (!accountId) return;
+    start(accountId);
+  }, [accountId, start]);
 
   return { items, status, error, retry };
 }

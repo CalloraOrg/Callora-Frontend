@@ -1,6 +1,6 @@
 {
   "components": [
-    { "id": "ApiCard", "name": "ApiCard", "status": "audited" },
+    { "id": "ApiCard", "name": "ApiCard", "status": "needs-work" },
     { "id": "BillingSortSelect", "name": "BillingSortSelect", "status": "audited" },
     { "id": "Breadcrumb", "name": "Breadcrumb", "status": "needs-work" },
     { "id": "CodeExample", "name": "CodeExample", "status": "audited" },
@@ -10,6 +10,7 @@
     { "id": "FiltersSidebar", "name": "FiltersSidebar", "status": "needs-work" },
     { "id": "MethodChip", "name": "MethodChip", "status": "audited" },
     { "id": "NotFound", "name": "NotFound", "status": "n/a" },
+    { "id": "OfflineBanner", "name": "OfflineBanner", "status": "audited" },
     { "id": "OpenAPIImport", "name": "OpenAPIImport", "status": "needs-work" },
     { "id": "RouteProgressBar", "name": "RouteProgressBar", "status": "audited" },
     { "id": "SearchBar", "name": "SearchBar", "status": "audited" },
