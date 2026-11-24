@@ -1,3 +1,5 @@
+import { clearServiceWorkerApiCache } from "./registerServiceWorker";
+
 const CACHE_PREFIX = "callora_api_cache";
 const META_PREFIX = "callora_api_cache_meta";
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
@@ -82,6 +84,7 @@ export function setCache<T = unknown>(accountId: string, cacheKey: string, data:
 }
 
 export function invalidateAccountCache(accountId: string): void {
+  clearServiceWorkerApiCache();
   for (const listener of invalidationListeners) {
     try {
       listener(accountId);

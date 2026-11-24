@@ -1,12 +1,14 @@
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import MarketplacePage from "./MarketplacePage";
 import { ToastProvider } from "../components/Toast";
 import { CollectionsProvider } from "../state/collectionsStore";
 import * as catalogApiModule from "../api/catalogApi";
 import * as constants from "../config/constants";
+import { setCache } from "../utils/offlineApiCache";
 import type { APIItem } from "../data/mockApis";
 
 vi.mock("../hooks/useDocumentTitle", () => ({
@@ -285,5 +287,74 @@ describe("MarketplacePage backend catalogue integration (Issue #1327 & #1328)", 
       expect(within(grid).getByText("Live Blockchain Indexer")).toBeInTheDocument();
       expect(within(grid).getByText("Enterprise KYC Verifier")).toBeInTheDocument();
     });
+  });
+});
+
+describe("Offline reconnect (Issue #1403)", () => {
+  const originalOnLine = navigator.onLine;
+
+  function setOnline(value: boolean) {
+    Object.defineProperty(navigator, "onLine", {
+      configurable: true,
+      value,
+    });
+  }
+
+  afterEach(() => {
+    setOnline(originalOnLine);
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it("refetches a stale catalogue once connectivity returns", async () => {
+    vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
+    setCache("marketplace", catalogApiModule.buildCacheKey({}), TEST_BACKEND_APIS);
+    setOnline(false);
+
+    const fetchCatalogSpy = vi
+      .spyOn(catalogApiModule, "fetchCatalog")
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValue(TEST_BACKEND_APIS);
+
+    renderMarketplace();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Showing saved results/i)).toBeInTheDocument();
+    });
+    expect(fetchCatalogSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      setOnline(true);
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await waitFor(() => {
+      expect(fetchCatalogSpy).toHaveBeenCalledTimes(2);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/Showing saved results/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not refetch when the catalogue was never stale", async () => {
+    vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
+    setOnline(false);
+
+    const fetchCatalogSpy = vi
+      .spyOn(catalogApiModule, "fetchCatalog")
+      .mockResolvedValue(TEST_BACKEND_APIS);
+
+    renderMarketplace();
+    await waitFor(() => expect(fetchCatalogSpy).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      setOnline(true);
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Live Blockchain Indexer").length).toBeGreaterThan(0);
+    });
+    expect(fetchCatalogSpy).toHaveBeenCalledTimes(1);
   });
 });

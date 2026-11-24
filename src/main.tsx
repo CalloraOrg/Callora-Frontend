@@ -25,22 +25,36 @@ window.addEventListener("popstate", () => {
   void renderRoute(root, currentPathname());
 });
 
-// Runtime config gets a short head start; the app renders with build-time
-// defaults after the budget and applies a later successful response live.
-const CONFIG_RENDER_BUDGET_MS = 1_500;
-const configRequest = loadRuntimeConfig()
-  .then(setRuntimeConfig)
-  .catch(() => {
-    markRuntimeConfigFallback();
-    console.warn("[config] Runtime config unavailable; using build-time configuration.");
-  });
-let renderBudgetTimer: ReturnType<typeof setTimeout> | undefined;
-const renderBudget = new Promise<void>((resolve) => {
-  renderBudgetTimer = globalThis.setTimeout(resolve, CONFIG_RENDER_BUDGET_MS);
-});
+async function enableMocking(): Promise<void> {
+  if (import.meta.env.VITE_DEMO_MODE === "true") {
+    const { worker } = await import("./mocks/browser");
+    await worker.start({
+      onUnhandledRequest: "bypass",
+    });
+  }
+}
 
-void Promise.race([configRequest, renderBudget]).then(() => {
+async function startApp(): Promise<void> {
+  await enableMocking();
+
+  // Runtime config gets a short head start; the app renders with build-time
+  // defaults after the budget and applies a later successful response live.
+  const CONFIG_RENDER_BUDGET_MS = 1_500;
+  const configRequest = loadRuntimeConfig()
+    .then(setRuntimeConfig)
+    .catch(() => {
+      markRuntimeConfigFallback();
+      console.warn("[config] Runtime config unavailable; using build-time configuration.");
+    });
+  let renderBudgetTimer: ReturnType<typeof setTimeout> | undefined;
+  const renderBudget = new Promise<void>((resolve) => {
+    renderBudgetTimer = globalThis.setTimeout(resolve, CONFIG_RENDER_BUDGET_MS);
+  });
+
+  await Promise.race([configRequest, renderBudget]);
   if (renderBudgetTimer !== undefined) globalThis.clearTimeout(renderBudgetTimer);
   hasInitialRenderStarted = true;
   void renderRoute(root, currentPathname());
-});
+}
+
+void startApp();

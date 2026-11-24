@@ -258,5 +258,11 @@ export const EXPLORER_BASE_URL = `https://stellar.expert/explorer/${
  */
 export function apiUrl(path: string): string {
   const suffix = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE}${suffix}`;
+  if (API_BASE) {
+    return `${API_BASE}${suffix}`;
+  }
+  if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
+    return `${window.location.origin}${suffix}`;
+  }
+  return suffix;
 }
