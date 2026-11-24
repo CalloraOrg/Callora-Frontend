@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { useCompareStore, compareStore } from "../state/compareStore";
 import type { APIItem } from "../data/mockApis";
 import { formatPrice } from "../utils/format";
+import { copyToClipboard } from "../utils/postman";
+import { buildCompareShareUrl } from "../utils/compareUrl";
 import RatingHistogram from "./RatingHistogram";
 import "./CompareDrawer.css";
 
@@ -60,7 +62,17 @@ function StatusBadge({ status }: { status?: APIItem["status"] }) {
 export default function CompareDrawer() {
   const { apis, isOpen } = useCompareStore();
   const [announcement, setAnnouncement] = useState("");
+  const [copied, setCopied] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const copyTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== null) {
+        window.clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
 
   // Handle ESC to close
   useEffect(() => {
@@ -84,6 +96,30 @@ export default function CompareDrawer() {
     compareStore.clear();
     setAnnouncement("Cleared all comparison items.");
     setTimeout(() => setAnnouncement(""), 3000);
+  };
+
+  const handleCopyLink = async () => {
+    if (apis.length === 0) return;
+    const url = buildCompareShareUrl(
+      apis.map((api) => api.id),
+      window.location.origin,
+    );
+    const ok = await copyToClipboard(url);
+    if (copyTimerRef.current !== null) {
+      window.clearTimeout(copyTimerRef.current);
+    }
+    if (ok) {
+      setCopied(true);
+      setAnnouncement("Comparison link copied to clipboard.");
+    } else {
+      setCopied(false);
+      setAnnouncement("Failed to copy comparison link.");
+    }
+    copyTimerRef.current = window.setTimeout(() => {
+      setCopied(false);
+      setAnnouncement("");
+      copyTimerRef.current = null;
+    }, 3000);
   };
 
   if (!isOpen) return null;
@@ -133,6 +169,15 @@ export default function CompareDrawer() {
               Compare APIs
             </h2>
             <div className="compare-drawer-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => void handleCopyLink()}
+                disabled={apis.length === 0}
+                aria-label="Copy comparison link"
+              >
+                {copied ? "Copied!" : "Copy link"}
+              </button>
               <button
                 className="ghost-button"
                 onClick={handleClear}

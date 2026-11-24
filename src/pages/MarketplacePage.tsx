@@ -8,6 +8,7 @@ import { useMarketplaceUrlState } from "../hooks/useMarketplaceUrlState";
 import { useAccountContext } from "../hooks/useAccountContext";
 import SearchBar from "../components/SearchBar";
 import SortDropdown from "../components/SortDropdown";
+import ActiveFilterChips from "../components/ActiveFilterChips";
 
 import CategoryPills from "../components/CategoryPills";
 import ApiTagFilter, { getAllUniqueTags } from "./ApiTagFilter";
@@ -20,6 +21,7 @@ import type { APIItem } from "../data/mockApis";
 import { API_BASE } from "../config/constants";
 import { useDebounce } from "../hooks/useDebounce";
 import { useFetchTracker } from "../hooks/useFetchTracker";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import {
   buildCacheKey,
   fetchCatalog,
@@ -101,8 +103,11 @@ export default function MarketplacePage(): JSX.Element {
   // failed. The list is still rendered — an outage should not blank the page —
   // but it is labelled so nobody mistakes it for fresh data.
   const [isShowingStaleData, setIsShowingStaleData] = useState(false);
+  const { lastReconnectedAt } = useOnlineStatus();
 
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
+  const resultsHeadingRef = useRef<HTMLHeadingElement>(null);
+  const pendingRemovedFilterRef = useRef<string | null>(null);
   const isInitialMount = useRef(true);
   // Monotonic sequence that guards the loading transition: only the latest
   // in-flight load may flip `isLoading` off, so a stale response from an
@@ -240,6 +245,19 @@ export default function MarketplacePage(): JSX.Element {
 
   const handleRetryFetch = () =>
     startCatalogFetch(API_BASE ? serverParams : {});
+
+  // Refresh a stale catalogue exactly once when connectivity returns. The refs
+  // keep the effect keyed only on `lastReconnectedAt`, so unrelated re-renders
+  // cannot trigger an extra fetch.
+  const staleDataRef = useRef(isShowingStaleData);
+  staleDataRef.current = isShowingStaleData;
+  const retryFetchRef = useRef(handleRetryFetch);
+  retryFetchRef.current = handleRetryFetch;
+
+  useEffect(() => {
+    if (lastReconnectedAt === null || !staleDataRef.current) return;
+    void retryFetchRef.current();
+  }, [lastReconnectedAt]);
 
   // Tag facets are derived from the loaded catalogue so a newly published API's
   // tags are selectable the moment it appears.
@@ -424,6 +442,17 @@ export default function MarketplacePage(): JSX.Element {
   const prevFilteredCount = useRef(0);
   const isFirstFilterRender = useRef(true);
   useEffect(() => {
+    if (pendingRemovedFilterRef.current !== null) {
+      const filterName = pendingRemovedFilterRef.current;
+      pendingRemovedFilterRef.current = null;
+      const count = filtered.length;
+      announce(
+        `Removed filter ${filterName}. ${count} ${count === 1 ? "result" : "results"}`
+      );
+      prevFilteredCount.current = filtered.length;
+      return;
+    }
+
     if (isFirstFilterRender.current) {
       isFirstFilterRender.current = false;
       return;
@@ -437,7 +466,7 @@ export default function MarketplacePage(): JSX.Element {
       }
       prevFilteredCount.current = filtered.length;
     }
-  }, [filtered.length, announce]);
+  }, [filtered, announce]);
 
   const prevTag = useRef<string | null>(null);
   useEffect(() => {
@@ -445,7 +474,7 @@ export default function MarketplacePage(): JSX.Element {
     if (tag !== prev) {
       if (tag) {
         announce(`Filtering by tag: ${tag}`);
-      } else {
+      } else if (pendingRemovedFilterRef.current === null) {
         announce("Tag filter removed.");
       }
       prevTag.current = tag;
@@ -457,6 +486,61 @@ export default function MarketplacePage(): JSX.Element {
   };
 
   // Handlers
+  const handleRemoveCategory = (c: string) => {
+    pendingRemovedFilterRef.current = `Category ${c}`;
+    resetCursor();
+    const copy = new Set(categories);
+    copy.delete(c);
+    setCategories(copy);
+  };
+
+  const handleRemoveStatus = (s: string) => {
+    const statusLabel = s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+    pendingRemovedFilterRef.current = `Status ${statusLabel}`;
+    resetCursor();
+    const copy = new Set(statuses);
+    copy.delete(s);
+    setStatuses(copy);
+  };
+
+  const handleRemoveTag = () => {
+    if (tag) {
+      pendingRemovedFilterRef.current = `Tag ${tag}`;
+      resetCursor();
+      setTag(null);
+    }
+  };
+
+  const handleRemoveMinPrice = () => {
+    pendingRemovedFilterRef.current = "Min price";
+    resetCursor();
+    setMinPrice(null);
+  };
+
+  const handleRemoveMaxPrice = () => {
+    pendingRemovedFilterRef.current = "Max price";
+    resetCursor();
+    setMaxPrice(null);
+  };
+
+  const handleRemovePopularity = () => {
+    pendingRemovedFilterRef.current = "Popularity";
+    resetCursor();
+    setPopularity("any");
+  };
+
+  const handleRemoveFavoritesOnly = () => {
+    pendingRemovedFilterRef.current = "Favorites only";
+    resetCursor();
+    setFavoritesOnly(false);
+  };
+
+  const handleClearAllChips = () => {
+    clearAll();
+    resetCursor();
+    announce("All filters cleared. Showing all APIs.");
+  };
+
   const toggleCategory = (c: string) => {
     const copy = new Set(categories);
     if (copy.has(c)) copy.delete(c);
@@ -612,6 +696,13 @@ export default function MarketplacePage(): JSX.Element {
           }
         >
           <div className="marketplace-toolbar">
+            <h2
+              ref={resultsHeadingRef}
+              tabIndex={-1}
+              className="sr-only"
+            >
+              Marketplace results
+            </h2>
             <div className="marketplace-count">
               {filtered.length === 0 ? (
                 <>
@@ -673,6 +764,25 @@ export default function MarketplacePage(): JSX.Element {
             onTagChange={setTag}
             apis={catalog}
             counts={facetCounts.tags}
+          />
+
+          <ActiveFilterChips
+            categories={categories}
+            statuses={statuses}
+            tag={tag}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            popularity={popularity}
+            favoritesOnly={favoritesOnly}
+            onRemoveCategory={handleRemoveCategory}
+            onRemoveStatus={handleRemoveStatus}
+            onRemoveTag={handleRemoveTag}
+            onRemoveMinPrice={handleRemoveMinPrice}
+            onRemoveMaxPrice={handleRemoveMaxPrice}
+            onRemovePopularity={handleRemovePopularity}
+            onRemoveFavoritesOnly={handleRemoveFavoritesOnly}
+            onClearAll={handleClearAllChips}
+            resultsHeadingRef={resultsHeadingRef}
           />
 
           {isShowingStaleData && (

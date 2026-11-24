@@ -1,11 +1,8 @@
 import { useSyncExternalStore } from "react";
 import {
-  WatchWalletChanges,
-  getAddress,
-  getNetworkDetails,
-  isAllowed,
-  isConnected,
-} from "@stellar/freighter-api";
+  getSelectedWallet,
+  subscribeSelectedWallet,
+} from "../services/wallets";
 import {
   getConfig,
   networkPassphraseFor,
@@ -28,7 +25,9 @@ const emptyState: WalletState = {
 
 const listeners = new Set<() => void>();
 let state = emptyState;
-let activeWatcher: WatchWalletChanges | null = null;
+let activeWatcher: (() => void) | null = null;
+let watcherCallback: (() => void) | null = null;
+let unsubscribeWalletSelection: (() => void) | null = null;
 let lastWatcherError = "";
 
 function emitChange() {
@@ -79,58 +78,69 @@ export const walletStore = {
   },
 
   async refresh() {
-    const connection = await isConnected();
-    if (connection.error) throw connection.error;
-    if (!connection.isConnected) {
-      setState(emptyState);
+    const adapter = getSelectedWallet();
+    const isAvailable = await adapter.isAvailable();
+    if (!isAvailable) {
+      setState({ ...emptyState, status: "unavailable" });
       return;
     }
 
-    const permission = await isAllowed();
-    if (permission.error) throw permission.error;
-    if (!permission.isAllowed) {
+    const address = await adapter.getAddress();
+    if (!address) {
       setState({ ...emptyState, status: "disconnected" });
       return;
     }
 
-    const [account, network] = await Promise.all([
-      getAddress(),
-      getNetworkDetails(),
-    ]);
-    if (account.error) throw account.error;
-    if (network.error) throw network.error;
-    setWallet(account.address || null, network.networkPassphrase || null);
+    const network = await adapter.getNetwork();
+    setWallet(address, network.networkPassphrase);
   },
 
   startWatching() {
-    if (activeWatcher) return () => {};
-
-    const watcher = new WatchWalletChanges();
-    activeWatcher = watcher;
-    const result = watcher.watch((wallet) => {
-      if (wallet.error) {
-        const message = apiErrorMessage(wallet.error);
-        if (message !== lastWatcherError) {
-          lastWatcherError = message;
-          console.error("Freighter wallet watcher failed", wallet.error);
+    const stopWatcher = () => {
+      activeWatcher?.();
+      activeWatcher = null;
+    };
+    const watchSelectedWallet = () => {
+      stopWatcher();
+      const adapter = getSelectedWallet();
+      if (!adapter.watch) return;
+      activeWatcher = adapter.watch((wallet) => {
+        if (wallet.error) {
+          const message = apiErrorMessage(wallet.error);
+          if (message !== lastWatcherError) {
+            lastWatcherError = message;
+            console.error(`${adapter.name} wallet watcher failed`, wallet.error);
+          }
+          return;
         }
-        return;
-      }
 
-      lastWatcherError = "";
-      setWallet(wallet.address || null, wallet.networkPassphrase || null);
-    });
-
-    if (result.error) {
-      console.error("Could not start Freighter wallet watcher", result.error);
+        lastWatcherError = "";
+        setWallet(wallet.address, wallet.networkPassphrase);
+      });
+    };
+    if (!watcherCallback) {
+      watcherCallback = () => watchSelectedWallet();
+      unsubscribeWalletSelection = subscribeSelectedWallet(watcherCallback);
     }
+    watchSelectedWallet();
 
     return () => {
-      watcher.stop();
-      if (activeWatcher === watcher) activeWatcher = null;
+      stopWatcher();
+      if (watcherCallback) {
+        unsubscribeWalletSelection?.();
+        unsubscribeWalletSelection = null;
+        watcherCallback = null;
+      }
     };
   },
 };
+
+subscribeSelectedWallet(() => {
+  setState(emptyState);
+  void walletStore.refresh().catch((error: unknown) => {
+    console.error("Could not read wallet status", error);
+  });
+});
 
 subscribeConfig(() => {
   if (state.address) setWallet(state.address, state.networkPassphrase);
