@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { useWalletStore } from "../state/walletStore";
-import { fetchDepositEvents } from "../services/vaultEvents";
 import type { BillingTransaction } from "../pages/BillingHistory";
 import { useRuntimeConfig } from "../config/runtimeConfig";
 
@@ -57,7 +56,10 @@ export function useDepositHistory(): DepositHistory {
     setLoaded(null);
     setLoadingMore(false);
     setLoadMoreError(null);
-    fetchDepositEvents({ address, signal: controller.signal, config })
+    import("../services/vaultEvents")
+      .then(({ fetchDepositEvents }) =>
+        fetchDepositEvents({ address, signal: controller.signal, config }),
+      )
       .then((page) => {
         if (controller.signal.aborted) return;
         setLoaded({
@@ -82,7 +84,8 @@ export function useDepositHistory(): DepositHistory {
     const cursor = current.nextCursor;
     setLoadingMore(true);
     setLoadMoreError(null);
-    fetchDepositEvents({ address, cursor, config })
+    import("../services/vaultEvents")
+      .then(({ fetchDepositEvents }) => fetchDepositEvents({ address, cursor, config }))
       .then((page) => {
         setLoaded((prev) => {
           if (!prev || prev.address !== address) return prev;
