@@ -349,3 +349,86 @@ describe("FiltersSidebar", () => {
     });
   });
 });
+
+describe("FiltersSidebar category counts", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    mockMatchMedia(false);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("renders (n) after each label and describes the checkbox", () => {
+    renderSidebar({ categoryCounts: { Finance: 3, Security: 0 } });
+
+    expect(
+      screen.getByTestId("category-count-category-finance").textContent,
+    ).toBe("(3)");
+    expect(
+      screen.getByTestId("category-count-category-finance").className,
+    ).toContain("numeric-tabular");
+
+    const finance = screen.getByLabelText("Finance");
+    expect(finance.getAttribute("aria-describedby")).toBe(
+      "category-finance-count",
+    );
+    expect(finance.hasAttribute("aria-disabled")).toBe(false);
+  });
+
+  it("treats categories missing from the counts as zero", () => {
+    renderSidebar({ categoryCounts: { Finance: 3 } });
+
+    expect(
+      screen.getByTestId("category-count-category-security").textContent,
+    ).toBe("(0)");
+    expect(
+      screen.getByLabelText("Security").getAttribute("aria-disabled"),
+    ).toBe("true");
+  });
+
+  it("mutes zero-count categories and blocks selecting them", async () => {
+    const user = userEvent.setup();
+    const { props } = renderSidebar({ categoryCounts: { Security: 0 } });
+
+    const security = screen.getByLabelText("Security") as HTMLInputElement;
+    expect(security.getAttribute("aria-disabled")).toBe("true");
+    expect(
+      security.closest(".filter-option")?.classList.contains("filter-option--empty"),
+    ).toBe(true);
+
+    await user.click(security);
+    expect(props.toggleCategory).not.toHaveBeenCalled();
+  });
+
+  it("keeps a selected zero-count category deselectable", async () => {
+    const user = userEvent.setup();
+    const { props } = renderSidebar({
+      categoryCounts: { Security: 0 },
+      selectedCategories: new Set(["Security"]),
+    });
+
+    const security = screen.getByLabelText("Security") as HTMLInputElement;
+    expect(security.hasAttribute("aria-disabled")).toBe(false);
+    expect(
+      security.closest(".filter-option")?.classList.contains("filter-option--empty"),
+    ).toBe(false);
+
+    await user.click(security);
+    expect(props.toggleCategory).toHaveBeenCalledWith("Security");
+  });
+
+  it("renders exactly as before without the categoryCounts prop", () => {
+    renderSidebar();
+
+    expect(screen.queryByText(/^\(\d+\)$/)).toBeNull();
+    expect(
+      screen.getByLabelText("Finance").hasAttribute("aria-describedby"),
+    ).toBe(false);
+    expect(
+      screen.getByLabelText("Finance").hasAttribute("aria-disabled"),
+    ).toBe(false);
+  });
+});

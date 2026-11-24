@@ -1,9 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { http, HttpResponse } from "msw";
+import { server } from "../mocks/server";
 import {
   adaptBackendApi,
   buildCacheKey,
   clearCatalogCache,
   createCatalogApi,
+  fetchApiDetail,
   fetchApiHealth,
   fetchCatalog,
   isCatalogAbortError,
@@ -11,11 +14,9 @@ import {
   normalizeCatalog,
   CatalogFetchError,
 } from "./catalogApi";
-import * as constants from "../config/constants";
 import MOCK_APIS from "../data/mockApis";
 import { invalidateAccountCache } from "../utils/offlineApiCache";
 
-const originalFetch = globalThis.fetch;
 const originalSessionStorage = globalThis.sessionStorage;
 
 const mockSessionStorage: Record<string, string> = {};
@@ -48,7 +49,6 @@ describe("catalogApi module", () => {
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
     globalThis.sessionStorage = originalSessionStorage;
   });
 
@@ -357,24 +357,34 @@ describe("catalogApi module", () => {
     });
   });
 
-  describe("fetchCatalog fallback policy", () => {
-    it("returns MOCK_APIS when API_BASE is empty (Scenario 4)", async () => {
-      vi.spyOn(constants, "API_BASE", "get").mockReturnValue("");
-
-      const result = await fetchCatalog();
-      expect(result).toBe(MOCK_APIS);
+  describe("fetchCatalog and fetchApiDetail with MSW handlers", () => {
+    it("fetches the catalogue using the shared MSW handler", async () => {
+      const items = await fetchCatalog();
+      expect(items.length).toBeGreaterThan(0);
+      expect(items[0]?.id).toBe(MOCK_APIS[0]?.id);
     });
 
-    it("rejects when API_BASE is set and backend returns 500 (Scenario 3)", async () => {
-      vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
-      vi.spyOn(constants, "apiUrl").mockImplementation((p) => `https://api.callora.com${p}`);
-
-      const mockFetch = vi.fn().mockResolvedValue(
-        new Response("Internal Server Error", { status: 500 }),
+    it("rejects when backend returns 500 using per-test server.use override", async () => {
+      server.use(
+        http.get("*/api/apis", () => {
+          return new HttpResponse(null, { status: 500 });
+        }),
       );
-      globalThis.fetch = mockFetch;
 
       await expect(fetchCatalog()).rejects.toThrow(CatalogFetchError);
+    });
+
+    it("fetches single API detail using the shared MSW handler", async () => {
+      const result = await fetchApiDetail("weather-001");
+      expect(result.status).toBe("ready");
+      if (result.status === "ready") {
+        expect(result.api.id).toBe("weather-001");
+      }
+    });
+
+    it("returns not-found for an unknown API id", async () => {
+      const result = await fetchApiDetail("unknown-999");
+      expect(result.status).toBe("not-found");
     });
   });
 
@@ -636,14 +646,9 @@ describe("catalogApi module", () => {
       await expect(promise).rejects.toSatisfy(isCatalogAbortError);
     });
 
-    it("returns an empty array in demo mode (no API_BASE) without throwing", async () => {
-      const spy = vi.spyOn(constants, "API_BASE", "get").mockReturnValue("");
-      try {
-        const result = await fetchApiHealth("geocode-01");
-        expect(result).toEqual([]);
-      } finally {
-        spy.mockRestore();
-      }
+    it("fetches health status for an API using MSW handler", async () => {
+      const result = await fetchApiHealth("weather-001");
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 });

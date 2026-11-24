@@ -1,7 +1,7 @@
 /**
  * authService — wallet-based authentication for Callora.
  *
- * Signs in by requesting a Freighter signature over a challenge message that
+ * Signs in by requesting a wallet signature over a challenge message that
  * binds the domain, wallet address, timestamp and a random nonce, then POSTs
  * the result to POST /api/auth/wallet.
  *
@@ -17,9 +17,13 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { requestAccess, signMessage } from "@stellar/freighter-api";
 import { apiUrl } from "../config/constants";
 import { clearSessionExpiry } from "./sessionExpiry";
+import {
+  clearSelectedWallet,
+  getSelectedWallet,
+} from "./wallets";
+import { WalletAdapterError } from "./wallets/WalletAdapter";
 
 // ─── In-memory token store ────────────────────────────────────────────────────
 
@@ -105,7 +109,7 @@ export type SignInResult = {
 };
 
 /**
- * Sign in with Freighter.
+ * Sign in with the selected Stellar wallet.
  *
  * 1. Request wallet access (prompts the user to connect if not already).
  * 2. Build a message that includes the app origin, wallet address, ISO
@@ -118,14 +122,25 @@ export type SignInResult = {
  */
 export async function signIn(): Promise<SignInResult> {
   // Step 1 – connect wallet.
-  const access = await requestAccess();
-  if (access.error) {
-    throw new AuthServiceError("WALLET_UNAVAILABLE", "Freighter is not installed or available.");
+  const adapter = getSelectedWallet();
+  let access: { address: string };
+  try {
+    access = await adapter.connect();
+  } catch (error) {
+    if (error instanceof WalletAdapterError && error.code === "USER_REJECTED") {
+      throw new AuthServiceError("SIGNATURE_REJECTED", "Wallet connection rejected by the user.");
+    }
+    throw new AuthServiceError(
+      "WALLET_UNAVAILABLE",
+      error instanceof Error
+        ? error.message
+        : `${adapter.name} is not installed or available.`,
+    );
   }
   if (!access.address) {
     throw new AuthServiceError(
       "WALLET_UNAVAILABLE",
-      "Freighter did not return an address. Connect an account and try again.",
+      `${adapter.name} did not return an address. Connect an account and try again.`,
     );
   }
   const walletAddress = access.address;
@@ -151,26 +166,30 @@ export async function signIn(): Promise<SignInResult> {
     `Nonce: ${nonce}`,
   ].join("\n");
 
-  // Step 3 – sign with Freighter.
-  let signResult: Awaited<ReturnType<typeof signMessage>>;
+  // Step 3 – sign with the selected wallet.
+  let signature: string;
   try {
-    signResult = await signMessage(message, { address: walletAddress });
+    if (!adapter.signMessage) {
+      throw new AuthServiceError(
+        "WALLET_ERROR",
+        `${adapter.name} does not support message signing for sign-in.`,
+      );
+    }
+    signature = await adapter.signMessage(message, { address: walletAddress });
   } catch (err) {
-    if (isUserRejection(err)) {
+    if (err instanceof AuthServiceError) throw err;
+    if (
+      isUserRejection(err) ||
+      (err instanceof WalletAdapterError && err.code === "USER_REJECTED")
+    ) {
       throw new AuthServiceError("SIGNATURE_REJECTED", "Signature rejected by the user.");
     }
-    throw new AuthServiceError("WALLET_ERROR", "Freighter could not sign the message.");
-  }
-
-  if (signResult.error) {
-    if (isUserRejection(signResult.error)) {
-      throw new AuthServiceError("SIGNATURE_REJECTED", "Signature rejected by the user.");
-    }
-    throw new AuthServiceError("WALLET_ERROR", "Freighter could not sign the message.");
-  }
-
-  if (!signResult.signedMessage) {
-    throw new AuthServiceError("WALLET_ERROR", "Freighter returned an empty signature.");
+    throw new AuthServiceError(
+      "WALLET_ERROR",
+      err instanceof Error
+        ? err.message
+        : `${adapter.name} could not sign the message.`,
+    );
   }
 
   // Step 4 – exchange for tokens.
@@ -182,7 +201,7 @@ export async function signIn(): Promise<SignInResult> {
       // Never log the body; it contains a signature.
       body: JSON.stringify({
         walletAddress,
-        signature: signResult.signedMessage,
+        signature,
         message,
       }),
     });
@@ -295,6 +314,7 @@ export async function signOut(): Promise<void> {
 
   _accessToken = null;
   clearRefreshToken();
+  clearSelectedWallet();
   notifyAuthChange();
 }
 

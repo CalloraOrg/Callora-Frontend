@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /billing
+Disallow: /apis/my-apis
+Disallow: /webhooks
+Disallow: /500
+Allow: /
