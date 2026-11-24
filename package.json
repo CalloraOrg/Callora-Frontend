@@ -14,6 +14,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@albedo-link/intent": "^0.13.0",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^17.2.0",
     "lucide-react": "^1.21.0",
