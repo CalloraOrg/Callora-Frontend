@@ -19,6 +19,7 @@ import CompareDrawer from "./components/CompareDrawer";
 import CompareTray from "./components/CompareTray";
 import ExternalLink from "./components/ExternalLink";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import { useCompareUrlSync } from "./hooks/useCompareUrlSync";
 import OnboardingTour from "./pages/OnboardingTour";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import CommandPalette from "./components/CommandPalette";
@@ -138,6 +139,7 @@ function App() {
       : `${notifications.unreadCount === 1 ? "1 unread notification" : `${unreadBadgeText} unread notifications`}.`
     : "";
   const { showToast } = useToast();
+  useCompareUrlSync();
   const routeTitleMap: Record<string, string> = {
     [APP_ROUTES.marketplace]: "Marketplace – Callora",
     [APP_ROUTES.dashboard]: "Dashboard – Callora",
