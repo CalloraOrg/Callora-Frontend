@@ -1,6 +1,6 @@
 {
   "components": [
-    { "id": "ApiCard", "name": "ApiCard", "status": "audited" },
+    { "id": "ApiCard", "name": "ApiCard", "status": "needs-work" },
     { "id": "BillingSortSelect", "name": "BillingSortSelect", "status": "audited" },
     { "id": "Breadcrumb", "name": "Breadcrumb", "status": "needs-work" },
     { "id": "CodeExample", "name": "CodeExample", "status": "audited" },
