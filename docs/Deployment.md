@@ -75,6 +75,10 @@ Because `Content-Security-Policy` is evaluated by the browser at runtime, any ne
 - **Custom or staging Callora API (`VITE_API_BASE_URL`):** If you deploy against a non-default backend (for example `https://staging-api.callora.com`), append that origin to `connect-src` in `vercel.json`.
 - **Mainnet Soroban RPC (`VITE_STELLAR_RPC_URL`):** Stellar mainnet has no default public Soroban RPC endpoint in `src/config/constants.ts`. When building for mainnet with a custom `VITE_STELLAR_RPC_URL` host, add that RPC origin to `connect-src` in `vercel.json` so wallet balance reads and deposit submissions are not blocked.
 
+## Crawlers and indexing
+
+`public/robots.txt` is copied verbatim to `dist/robots.txt` (served before the Vercel SPA rewrite) and disallows wallet-gated and error routes (`/billing`, `/apis/my-apis`, `/webhooks`, `/500`). Note that `robots.txt` rules are advisory—they are not an access-control boundary—and `useDocumentTitle` also injects `<meta name="robots" content="noindex, nofollow">` on those routes to cover crawlers that ignore `robots.txt`.
+
 ## Demo mode
 
 Demo mode provides a complete, standalone preview of the Callora marketplace, detail pages, provider APIs, usage analytics, billing invoices, and webhook deliveries without needing a live backend service or Stellar wallet.

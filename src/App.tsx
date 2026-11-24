@@ -163,9 +163,13 @@ function App() {
     [APP_ROUTES.endpointSummary]: "Quick reference list of all API endpoints on Callora.",
     [APP_ROUTES.notifications]: "View your Callora notifications, usage alerts, billing updates, and campaigns.",
   };
+  const NOINDEX_PREFIXES = ["/billing", "/apis/my-apis", "/webhooks", "/500"] as const;
   const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
-  useDocumentTitle(currentTitle, currentDescription);
+  const shouldNoindex = NOINDEX_PREFIXES.some(
+    (prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`),
+  );
+  useDocumentTitle(currentTitle, currentDescription, shouldNoindex ? { noindex: true } : undefined);
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
