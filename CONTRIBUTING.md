@@ -105,6 +105,22 @@ Conventions:
   with `vi.useRealTimers()` afterwards; note that Testing Library's `waitFor`
   can hang under fake timers.
 
+## Bundle size budget
+
+`npm run build` writes `dist/`; `npm run check:bundle` compares the gzip size of
+every emitted JavaScript and CSS asset with the limits in `bundle-budget.json`
+and exits non-zero when one is exceeded.
+
+- `entry` — the JavaScript chunk referenced by `dist/index.html`.
+- `chunk` — every other JavaScript chunk (lazy route and component chunks).
+- `css` — all CSS assets, including the entry stylesheet.
+
+Limits are KiB (1024 bytes) after gzip. The current values sit a few percent
+above the measured sizes. When a change legitimately grows a bundle, update the
+matching limit in the same pull request and explain why in the description.
+Do not raise a limit just to make CI pass. Run
+`npm run check:bundle -- --json` for machine-readable output.
+
 ## Formatting
 
 The repository ships an [EditorConfig](.editorconfig), a Prettier config
