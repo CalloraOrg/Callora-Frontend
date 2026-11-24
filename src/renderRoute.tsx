@@ -23,7 +23,9 @@ import MarketplacePageSkeleton from "./pages/MarketplacePage.skeleton";
 import ApiDetailPageSkeleton from "./pages/ApiDetailPage.skeleton";
 import LatencyChart from "./pages/LatencyChart";
 import StandaloneShell from "./components/StandaloneShell";
+import RequireAuth from "./components/RequireAuth";
 import { isMarketplaceSubpage } from "./routeMatchers";
+import RuntimeConfigBanner from "./components/RuntimeConfigBanner";
 
 /**
  * The slice of a React 18 root that routing needs. Keeping it structural lets
@@ -59,14 +61,17 @@ export async function renderRoute(
   root: RouteRenderTarget,
   pathname: string,
 ): Promise<void> {
-  // Helper to wrap components in the necessary Router context for hooks like useLocation/useNavigate
+  // Helper to wrap components in the necessary Router context for hooks like useLocation/useNavigate.
+  // Pages rendered inside StandaloneShell supply their own <main> landmark via the shell,
+  // so the shell is the single source of the main landmark on these routes.
   const wrap = (children: React.ReactNode, withShell = false) => (
     <React.StrictMode>
       <ThemeProvider>
-        <CollectionsProvider>
-          <AccountProvider>
+        <AccountProvider>
+          <CollectionsProvider>
             <BrowserRouter>
               <RouteProgressBar />
+              <RuntimeConfigBanner />
               <ToastProvider>
                 {withShell ? (
                   <StandaloneShell>
@@ -77,8 +82,8 @@ export async function renderRoute(
                 )}
               </ToastProvider>
             </BrowserRouter>
-          </AccountProvider>
-        </CollectionsProvider>
+          </CollectionsProvider>
+        </AccountProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
@@ -86,7 +91,7 @@ export async function renderRoute(
   if (pathname.startsWith("/publish")) {
     const mod = await import("./pages/PublishApi");
     const PublishApi = mod.default;
-    root.render(wrap(<PublishApi />, true));
+    root.render(wrap(<RequireAuth><PublishApi /></RequireAuth>, true));
     return;
   }
 
@@ -139,14 +144,14 @@ export async function renderRoute(
     <React.StrictMode>
       <BrowserRouter>
         <ThemeProvider>
-          <CollectionsProvider>
-            <AccountProvider>
+          <AccountProvider>
+            <CollectionsProvider>
               <RouteProgressBar />
               <ToastProvider>
                 <App />
               </ToastProvider>
-            </AccountProvider>
-          </CollectionsProvider>
+            </CollectionsProvider>
+          </AccountProvider>
         </ThemeProvider>
       </BrowserRouter>
     </React.StrictMode>,

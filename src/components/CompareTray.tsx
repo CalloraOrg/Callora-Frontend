@@ -1,6 +1,4 @@
-import React from 'react';
 import { useCompareStore, compareStore } from '../state/compareStore';
-import type { APIItem } from '../data/mockApis';
 import './CompareTray.css';
 
 export default function CompareTray() {

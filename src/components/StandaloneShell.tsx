@@ -20,6 +20,9 @@ export default function StandaloneShell({ children }: { children: ReactNode }) {
   const path = typeof window === "undefined" ? "" : window.location.pathname;
   return (
     <div className="app-shell standalone-shell">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <div className="ambient ambient-a" aria-hidden="true" />
       <div className="ambient ambient-b" aria-hidden="true" />
       <header className="topbar standalone-topbar no-print" role="banner">
@@ -42,7 +45,9 @@ export default function StandaloneShell({ children }: { children: ReactNode }) {
           <ThemeToggle />
         </div>
       </header>
-      <div className="standalone-main">{children}</div>
+      <main id="main-content" className="standalone-main">
+        {children}
+      </main>
       <footer className="standalone-footer no-print" role="contentinfo">
         <span>Callora · pay-per-call APIs settled in USDC</span>
         <a href={testnetContractUrl(TESTNET_DEPLOYMENT.vault)} target="_blank" rel="noopener noreferrer" className="footer-chain-link">

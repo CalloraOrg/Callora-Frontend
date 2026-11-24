@@ -79,9 +79,9 @@ const TOUR_STEPS: TourStep[] = [
   },
 ];
 
-const TOTAL_STEPS = TOUR_STEPS.length;
+export const TOTAL_STEPS = TOUR_STEPS.length;
 
-const CHECKPOINT_KEY = "callora_onboarding_checkpoint";
+export const CHECKPOINT_KEY = "callora_onboarding_checkpoint";
 
 interface TourProgress {
   completed: boolean;
@@ -151,13 +151,6 @@ export default function OnboardingTour({
   const clearCheckpoint = useCallback(() => {
     setProgress({ completed: true, lastStep: 0 });
   }, [setProgress]);
-
-  const setActiveStep = useCallback(
-    (step: number) => {
-      persistStep(step);
-    },
-    [persistStep],
-  );
 
   /** Move to the next step, or complete the tour on the last step. */
   const handleNext = useCallback(() => {
@@ -682,16 +675,20 @@ export default function OnboardingTour({
               className="onboarding-tour__panel"
               data-testid="tour-panel"
             >
-              <p
-                className="onboarding-tour__icon"
-                aria-hidden="true"
-              >
-                {step.icon}
-              </p>
-              <h2 className="onboarding-tour__step-title">{step.title}</h2>
-              <p className="onboarding-tour__step-body">{step.description}</p>
-              {step.hint && (
-                <p className="onboarding-tour__hint">{step.hint}</p>
+              {step && (
+                <>
+                  <p
+                    className="onboarding-tour__icon"
+                    aria-hidden="true"
+                  >
+                    {step.icon}
+                  </p>
+                  <h2 className="onboarding-tour__step-title">{step.title}</h2>
+                  <p className="onboarding-tour__step-body">{step.description}</p>
+                  {step.hint && (
+                    <p className="onboarding-tour__hint">{step.hint}</p>
+                  )}
+                </>
               )}
             </div>
 

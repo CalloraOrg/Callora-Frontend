@@ -4,6 +4,7 @@ import {
   readVaultBalance,
   readWalletUsdcBalance,
 } from "../services/vaultReads";
+import { useRuntimeConfig } from "../config/runtimeConfig";
 
 /**
  * Lifecycle of the on-chain balance reads.
@@ -84,7 +85,8 @@ export function useVaultBalances(
   options: UseVaultBalancesOptions = {},
 ): VaultBalances {
   const address = options.address;
-  const configured = isVaultReadConfigured();
+  const config = useRuntimeConfig();
+  const configured = isVaultReadConfigured(config);
   const [state, setState] = useState<BalanceState>(INITIAL_STATE);
 
   const versionRef = useRef(0);
@@ -133,8 +135,8 @@ export function useVaultBalances(
     try {
       const knownAddress = addressRef.current;
       const [vaultResult, walletResult] = await Promise.allSettled([
-        readVaultBalance(knownAddress),
-        knownAddress ? readWalletUsdcBalance(knownAddress) : Promise.resolve(null),
+        readVaultBalance(knownAddress, config),
+        knownAddress ? readWalletUsdcBalance(knownAddress, config) : Promise.resolve(null),
       ]);
       if (version !== versionRef.current) return; // superseded: ignore
 
@@ -158,7 +160,7 @@ export function useVaultBalances(
         vault,
         wallet,
         status: failures.length > 0 ? "error" : "ready",
-        error: failures.length > 0 ? failures[0] : null,
+        error: failures[0] ?? null,
         updatedAt: failures.length > 0 ? prev.updatedAt : Date.now(),
         revision: failures.length > 0 ? prev.revision : prev.revision + 1,
       }));
@@ -183,7 +185,7 @@ export function useVaultBalances(
       }
       flushRefreshResolvers();
     }
-  }, [flushRefreshResolvers]);
+  }, [config, flushRefreshResolvers]);
 
   const loadRef = useRef(load);
   loadRef.current = load;
@@ -204,7 +206,7 @@ export function useVaultBalances(
         timerRef.current = null;
       }
     };
-  }, [configured, address]);
+  }, [config, configured, address]);
 
   useEffect(
     () => () => {
@@ -214,7 +216,7 @@ export function useVaultBalances(
   );
 
   const refresh = useCallback((): Promise<void> => {
-    if (!isVaultReadConfigured()) return Promise.resolve();
+    if (!isVaultReadConfigured(config)) return Promise.resolve();
     return new Promise<void>((resolve) => {
       refreshResolversRef.current.push(resolve);
       if (timerRef.current !== null) clearTimeout(timerRef.current);
@@ -223,7 +225,7 @@ export function useVaultBalances(
         void load();
       }, BALANCE_REFRESH_DEBOUNCE_MS);
     });
-  }, [load]);
+  }, [config, load]);
 
   return {
     vault: state.vault,

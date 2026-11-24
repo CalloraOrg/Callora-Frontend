@@ -20,7 +20,7 @@ import Skeleton from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
 import BalanceReadout from '../components/BalanceReadout';
-import { formatUsdc, formatPrice, formatTimeString, formatUsdcStroops } from '../utils/format';
+import { formatUsdc, formatPrice, formatTimeString } from '../utils/format';
 import { usePinnedApis, pinnedApisStore } from '../state/pinnedApis';
 import { useAccountId } from '../hooks/useAccount';
 import { useRecentActivity } from '../hooks/useRecentActivity';
@@ -96,9 +96,6 @@ export function DashboardOverview({
   const vaultBalanceForMath = balances?.vaultText !== null && balances?.vaultText !== undefined
     ? parseFloat(balances.vaultText.replace(/,/g, ''))
     : vaultBalance;
-  const walletBalanceForMath = balances?.walletText !== null && balances?.walletText !== undefined
-    ? parseFloat(balances.walletText.replace(/,/g, ''))
-    : walletBalance;
 
   // Vault preview data
   const vaultPreviewData: PreviewCardData = {
@@ -267,7 +264,7 @@ export function DashboardOverview({
                   subtitle: api.provider?.name ?? 'Callora Verified',
                   category: api.category ?? 'Data API',
                   description: api.description,
-                  status: (api.status as any) ?? 'operational',
+                  status: api.status ?? 'operational',
                   price: `$${formatPrice(api.pricePerCall ?? api.pricePerRequest)}`,
                   tags: api.tags,
                   metrics: [

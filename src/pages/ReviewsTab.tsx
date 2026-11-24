@@ -34,8 +34,16 @@
  *  (including the forced-light print override) work automatically.
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef, useId } from "react";
 import RatingHistogram from "../components/RatingHistogram";
+import ReviewForm, { type ReviewDraft } from "../components/ReviewForm";
+import {
+  fetchEligibility,
+  submitReview,
+  ReviewApiError,
+  isReviewAbortError,
+  type ReviewEligibility,
+} from "../api/reviewsApi";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,6 +54,7 @@ export interface Review {
   date: string;
   body: string;
   verified?: boolean;
+  pending?: boolean;
 }
 
 type ReviewSort = "newest" | "highest" | "lowest";
@@ -57,9 +66,42 @@ export interface ReviewsTabProps {
   averageRating: number;
   /** Callback for the "Write a Review" button.  No-op by default. */
   onWriteReview?: () => void;
+  /** API identifier used to check eligibility and submit reviews. */
+  apiId?: string;
+  /** Optional external eligibility state (skips fetchEligibility when provided). */
+  eligibility?: ReviewEligibility | null;
+  /** Optional custom submission handler (defaults to submitReview(apiId, draft)). */
+  onSubmitReview?: (
+    draft: ReviewDraft,
+    options?: { signal?: AbortSignal },
+  ) => Promise<Review>;
+  /** Optional notification callback (e.g. toast) for success/error feedback. */
+  onNotify?: (message: string, variant: "success" | "error" | "warning") => void;
+  /** Optional callback when the reviews list or average rating changes. */
+  onReviewsChange?: (reviews: Review[], averageRating: number) => void;
 }
 
-// ── Helper: star row ──────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function computeAverageRating(list: Review[]): number {
+  if (list.length === 0) return 0;
+  const sum = list.reduce((acc, r) => acc + r.rating, 0);
+  return Math.round((sum / list.length) * 10) / 10;
+}
+
+function defaultIneligibleMessage(eligibility: ReviewEligibility): string {
+  if (eligibility.message) return eligibility.message;
+  switch (eligibility.reason) {
+    case "not_authenticated":
+      return "Sign in to write a review.";
+    case "not_subscribed":
+      return "Subscribe to this API to write a review.";
+    case "already_reviewed":
+      return "You have already reviewed this API.";
+    default:
+      return "You are not currently eligible to review this API.";
+  }
+}
 
 function StarRow({ rating }: { rating: number }) {
   return (
@@ -86,8 +128,6 @@ function StarRow({ rating }: { rating: number }) {
     </span>
   );
 }
-
-// ── Helper: verified badge ────────────────────────────────────────────────────
 
 function VerifiedBadge() {
   return (
@@ -133,53 +173,297 @@ function VerifiedBadge() {
   );
 }
 
+function PendingBadge() {
+  return (
+    <span
+      aria-label="Pending confirmation"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "2px 8px",
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 600,
+        lineHeight: "18px",
+        background: "rgba(245, 158, 11, 0.14)",
+        color: "var(--warning, #d97706)",
+        border: "1px solid rgba(245, 158, 11, 0.35)",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+      }}
+    >
+      Pending
+    </span>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
-/**
- * ReviewsTab renders the developer-feedback panel for an API detail page.
- *
- * Print-safe design
- * ─────────────────
- * Elements that carry `no-print` are suppressed in `@media print`.
- * The sort control, action button, and empty-state CTA use this class.
- * Everything else (histogram, review cards, text) prints as-is.
- *
- * The outer `<section>` carries the class `reviews-tab` which the print
- * stylesheet uses to:
- *   1. Insert a decorative heading via `::before` (see print.css).
- *   2. Force all `.reviews-tab__card` children to `break-inside: avoid`.
- */
 const ReviewsTab: React.FC<ReviewsTabProps> = ({
   reviews,
   averageRating,
   onWriteReview,
+  apiId,
+  eligibility: eligibilityProp,
+  onSubmitReview,
+  onNotify,
+  onReviewsChange,
 }) => {
   const [reviewSort, setReviewSort] = useState<ReviewSort>("newest");
+  const [localReviews, setLocalReviews] = useState<Review[]>(reviews);
+  const [localAverage, setLocalAverage] = useState<number>(averageRating);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draft, setDraft] = useState<ReviewDraft>({ rating: 0, body: "" });
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<string>("");
+  const [fetchedEligibility, setFetchedEligibility] =
+    useState<ReviewEligibility | null>(null);
+  const [eligibilityLoading, setEligibilityLoading] = useState(false);
+
+  const submitControllerRef = useRef<AbortController | null>(null);
+  const submittingRef = useRef(false);
+  const helperId = useId();
+
+  const hasSubmissionCapability = Boolean(apiId || onSubmitReview);
+  const effectiveEligibility: ReviewEligibility | null =
+    eligibilityProp !== undefined ? eligibilityProp : fetchedEligibility;
+
+  // Keep local state in sync when parent props change
+  useEffect(() => {
+    setLocalReviews(reviews);
+    setLocalAverage(averageRating);
+  }, [reviews, averageRating]);
+
+  // Fetch eligibility when apiId is provided and eligibility is not controlled by parent
+  useEffect(() => {
+    if (!apiId || eligibilityProp !== undefined) return;
+    const controller = new AbortController();
+    setEligibilityLoading(true);
+    fetchEligibility(apiId, { signal: controller.signal })
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setFetchedEligibility(result);
+        }
+      })
+      .catch((err) => {
+        if (controller.signal.aborted || isReviewAbortError(err)) return;
+        setFetchedEligibility({
+          eligible: false,
+          reason: "unknown",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Unable to verify review eligibility.",
+        });
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setEligibilityLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [apiId, eligibilityProp]);
+
+  // Abort any in-flight submission on unmount
+  useEffect(() => {
+    return () => {
+      submitControllerRef.current?.abort();
+    };
+  }, []);
+
+  const isIneligible =
+    effectiveEligibility !== null && !effectiveEligibility.eligible;
+  const ineligibleHelperText = isIneligible
+    ? defaultIneligibleMessage(effectiveEligibility)
+    : null;
+  const writeButtonDisabled =
+    isSubmitting || eligibilityLoading || isIneligible;
+
+  const handleWriteClick = () => {
+    onWriteReview?.();
+    if (!hasSubmissionCapability) return;
+    if (writeButtonDisabled) return;
+    setServerError(null);
+    setIsFormOpen((prev) => !prev);
+  };
+
+  const handleFormCancel = () => {
+    setIsFormOpen(false);
+    setServerError(null);
+  };
+
+  const handleFormSubmit = async (submittedDraft: ReviewDraft) => {
+    if (submittingRef.current) return;
+    if (!onSubmitReview && !apiId) return;
+
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    setServerError(null);
+
+    const previousReviews = localReviews;
+    const previousAverage = localAverage;
+    const tempId = `pending-review-${Date.now()}`;
+    const optimisticReview: Review = {
+      id: tempId,
+      author: "You",
+      rating: submittedDraft.rating,
+      date: new Date().toISOString(),
+      body: submittedDraft.body,
+      verified: true,
+      pending: true,
+    };
+
+    const optimisticReviews = [optimisticReview, ...previousReviews];
+    const optimisticAverage = computeAverageRating(optimisticReviews);
+
+    setLocalReviews(optimisticReviews);
+    setLocalAverage(optimisticAverage);
+    setIsFormOpen(false);
+    setLiveStatus("Submitting your review...");
+    onReviewsChange?.(optimisticReviews, optimisticAverage);
+
+    const controller = new AbortController();
+    submitControllerRef.current = controller;
+
+    try {
+      const confirmed = onSubmitReview
+        ? await onSubmitReview(submittedDraft, { signal: controller.signal })
+        : await submitReview(apiId!, submittedDraft, {
+            signal: controller.signal,
+          });
+
+      if (controller.signal.aborted) return;
+
+      const confirmedReview: Review = { ...confirmed, pending: false };
+      const finalReviews = optimisticReviews.map((r) =>
+        r.id === tempId ? confirmedReview : r,
+      );
+      const finalAverage = computeAverageRating(finalReviews);
+
+      setLocalReviews(finalReviews);
+      setLocalAverage(finalAverage);
+      setDraft({ rating: 0, body: "" });
+      setFetchedEligibility({
+        eligible: false,
+        reason: "already_reviewed",
+        message: "You have already reviewed this API.",
+      });
+      setLiveStatus("Your review has been published.");
+      onNotify?.("Your review has been published.", "success");
+      onReviewsChange?.(finalReviews, finalAverage);
+    } catch (err) {
+      if (controller.signal.aborted || isReviewAbortError(err)) return;
+
+      // Roll back optimistic insert and restore draft
+      setLocalReviews(previousReviews);
+      setLocalAverage(previousAverage);
+      setDraft(submittedDraft);
+      setIsFormOpen(true);
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to submit review. Please try again.";
+      setServerError(message);
+      setLiveStatus(message);
+
+      if (err instanceof ReviewApiError && err.code === "already_reviewed") {
+        setFetchedEligibility({
+          eligible: false,
+          reason: "already_reviewed",
+          message,
+        });
+      }
+
+      onNotify?.(message, "error");
+      onReviewsChange?.(previousReviews, previousAverage);
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+      if (submitControllerRef.current === controller) {
+        submitControllerRef.current = null;
+      }
+    }
+  };
 
   // Derive rating distribution for the histogram
   const ratingDistribution = useMemo<Record<number, number> | undefined>(() => {
-    if (reviews.length === 0) return undefined;
+    if (localReviews.length === 0) return undefined;
     const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    reviews.forEach((r) => {
+    localReviews.forEach((r) => {
       const star = Math.min(5, Math.max(1, Math.round(r.rating)));
       dist[star] = (dist[star] ?? 0) + 1;
     });
     return dist;
-  }, [reviews]);
+  }, [localReviews]);
 
-  // Stable sort – returns a new array so the original prop is never mutated
+  // Stable sort – pending reviews stay at the top immediately
   const sortedReviews = useMemo(() => {
-    return [...reviews].sort((a, b) => {
+    return [...localReviews].sort((a, b) => {
+      if (a.pending && !b.pending) return -1;
+      if (!a.pending && b.pending) return 1;
       if (reviewSort === "highest") return b.rating - a.rating;
       if (reviewSort === "lowest") return a.rating - b.rating;
-      // "newest" – fall back to lexicographic ISO-date comparison
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [reviews, reviewSort]);
+  }, [localReviews, reviewSort]);
+
+  const renderHeader = () => (
+    <div className="api-detail-reviews-header no-print">
+      <h3 style={{ margin: 0 }}>Developer Feedback</h3>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+        <button
+          type="button"
+          className="secondary-button no-print"
+          onClick={handleWriteClick}
+          disabled={writeButtonDisabled}
+          aria-describedby={ineligibleHelperText ? helperId : undefined}
+          aria-expanded={hasSubmissionCapability ? isFormOpen : undefined}
+        >
+          {isFormOpen ? "Close Review Form" : "Write a Review"}
+        </button>
+        {ineligibleHelperText && (
+          <span
+            id={helperId}
+            style={{
+              fontSize: 12,
+              color: "var(--muted)",
+            }}
+          >
+            {ineligibleHelperText}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderLiveRegion = () => (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="sr-only"
+      style={{
+        position: "absolute",
+        width: 1,
+        height: 1,
+        padding: 0,
+        margin: -1,
+        overflow: "hidden",
+        clip: "rect(0, 0, 0, 0)",
+        whiteSpace: "nowrap",
+        border: 0,
+      }}
+    >
+      {liveStatus}
+    </div>
+  );
 
   // ── Empty state ────────────────────────────────────────────────────────────
 
-  if (reviews.length === 0) {
+  if (localReviews.length === 0) {
     return (
       <section
         id="panel-reviews"
@@ -187,18 +471,21 @@ const ReviewsTab: React.FC<ReviewsTabProps> = ({
         aria-labelledby="tab-reviews"
         tabIndex={0}
         className="reviews-tab"
+        data-reviews-section
       >
-        {/* Header: hidden when printing (no reviews = nothing to print) */}
-        <div className="api-detail-reviews-header no-print">
-          <h3 style={{ margin: 0 }}>Developer Feedback</h3>
-          <button
-            type="button"
-            className="secondary-button no-print"
-            onClick={onWriteReview}
-          >
-            Write a Review
-          </button>
-        </div>
+        {renderLiveRegion()}
+        {renderHeader()}
+
+        {isFormOpen && (
+          <ReviewForm
+            initialRating={draft.rating}
+            initialBody={draft.body}
+            isSubmitting={isSubmitting}
+            serverError={serverError}
+            onSubmit={handleFormSubmit}
+            onCancel={handleFormCancel}
+          />
+        )}
 
         {/* Empty placeholder – also hidden in print (no useful content) */}
         <div
@@ -229,43 +516,31 @@ const ReviewsTab: React.FC<ReviewsTabProps> = ({
       aria-labelledby="tab-reviews"
       tabIndex={0}
       className="reviews-tab"
+      data-reviews-section
     >
-      {/* ── Section header ──────────────────────────────────────────────── */}
-      {/*
-       * The entire header row (title + CTA button) is hidden when printing.
-       * The print stylesheet inserts a plain text heading via CSS ::before on
-       * .reviews-tab so the printed page still has a visible section label.
-       */}
-      <div className="api-detail-reviews-header no-print">
-        <h3 style={{ margin: 0 }}>Developer Feedback</h3>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={onWriteReview}
-        >
-          Write a Review
-        </button>
-      </div>
+      {renderLiveRegion()}
+      {renderHeader()}
+
+      {isFormOpen && (
+        <ReviewForm
+          initialRating={draft.rating}
+          initialBody={draft.body}
+          isSubmitting={isSubmitting}
+          serverError={serverError}
+          onSubmit={handleFormSubmit}
+          onCancel={handleFormCancel}
+        />
+      )}
 
       {/* ── Rating histogram ─────────────────────────────────────────────── */}
-      {/*
-       * The histogram is intentionally left printable so readers can see the
-       * rating distribution without needing access to the live page.
-       */}
       <div style={{ marginTop: 16 }}>
         <RatingHistogram
-          rating={averageRating}
+          rating={localAverage}
           distribution={ratingDistribution}
         />
       </div>
 
       {/* ── Sort control ─────────────────────────────────────────────────── */}
-      {/*
-       * The sort <select> is interactive-only chrome; it is hidden in print
-       * via `no-print`.  On screen it sits inside `.reviews-tab__sort-row`
-       * which the print stylesheet also targets with `display: none` for extra
-       * specificity.
-       */}
       <div
         className="reviews-tab__sort-row no-print"
         style={{
@@ -303,18 +578,17 @@ const ReviewsTab: React.FC<ReviewsTabProps> = ({
       </div>
 
       {/* ── Review cards ─────────────────────────────────────────────────── */}
-      {/*
-       * Each card carries `.reviews-tab__card` so the print stylesheet can
-       * apply `break-inside: avoid` and force a white background with a
-       * visible border for readability on paper.
-       */}
       <div className="reviews-tab__list" style={{ display: "grid", gap: 16 }}>
         {sortedReviews.map((review) => (
           <article
             key={review.id}
             className="preview-card reviews-tab__card"
-            style={{ padding: 20 }}
+            style={{
+              padding: 20,
+              opacity: review.pending ? 0.8 : 1,
+            }}
             aria-label={`Review by ${review.author}`}
+            data-pending={review.pending ? "true" : undefined}
           >
             {/* Author row */}
             <div
@@ -347,6 +621,7 @@ const ReviewsTab: React.FC<ReviewsTabProps> = ({
                   {review.author}
                 </span>
                 {review.verified && <VerifiedBadge />}
+                {review.pending && <PendingBadge />}
               </div>
 
               {/* Rating + date */}

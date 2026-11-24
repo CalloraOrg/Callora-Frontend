@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   configurationError: null as string | null,
   serverConstructor: vi.fn(),
+  contractConstructor: vi.fn(),
   server: {
     getAccount: vi.fn(),
     prepareTransaction: vi.fn(),
@@ -30,7 +31,15 @@ vi.mock("@stellar/freighter-api", () => ({
 
 vi.mock("@stellar/stellar-sdk", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@stellar/stellar-sdk")>();
-  return { ...actual, rpc: { ...actual.rpc, assembleTransaction: mocks.assembleTransaction, Server: class {
+  return {
+    ...actual,
+    Contract: class extends actual.Contract {
+      constructor(contractId: string) {
+        mocks.contractConstructor(contractId);
+        super(contractId);
+      }
+    },
+    rpc: { ...actual.rpc, assembleTransaction: mocks.assembleTransaction, Server: class {
     constructor(...args: unknown[]) {
       mocks.serverConstructor(...args);
       return mocks.server;
@@ -50,12 +59,27 @@ vi.mock("../config/constants", async (importOriginal) => ({
   get STELLAR_USDC_CONFIGURATION_ERROR() { return mocks.configurationError; },
 }));
 
-import { Account, Asset, Transaction, xdr } from "@stellar/stellar-sdk";
+import {
+  Account,
+  Address,
+  Asset,
+  BASE_FEE,
+  Contract,
+  Operation,
+  Transaction,
+  TransactionBuilder,
+  nativeToScVal,
+  xdr,
+} from "@stellar/stellar-sdk";
 import { STELLAR_USDC_ASSET, STELLAR_NETWORK_PASSPHRASE } from "../config/constants";
+import { getConfig, setRuntimeConfig } from "../config/runtimeConfig";
+const buildTimeConfig = getConfig();
 const walletAddress = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 import {
   hasUsdcTrustline, addUsdcTrustline, getWalletAddress,
   isWalletAvailable,
+  prepareVaultDeposit,
+  signAndSubmit,
   submitVaultDeposit,
   checkDepositStatus,
 } from "./walletService";
@@ -63,6 +87,7 @@ import {
 describe("walletService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setRuntimeConfig(buildTimeConfig);
     mocks.walletSnapshot.mockReturnValue({ isNetworkMismatch: false });
     mocks.configurationError = null;
     vi.stubGlobal("fetch", mocks.fetch);
@@ -113,7 +138,6 @@ describe("walletService", () => {
     await expect(submitVaultDeposit("12.34", onSubmitted)).resolves.toEqual({
       hash: "HASH_RETURNED_BY_STELLAR",
     });
-
     expect(onSubmitted).toHaveBeenCalledWith("HASH_RETURNED_BY_STELLAR");
     expect(mocks.signTransaction).toHaveBeenCalledWith(
       expect.any(String),
@@ -123,6 +147,48 @@ describe("walletService", () => {
     expect(mocks.server.getTransaction).toHaveBeenCalledWith(
       "HASH_RETURNED_BY_STELLAR",
     );
+  });
+
+  it("uses the config snapshot captured when a deposit starts", async () => {
+    const originalConfig = getConfig();
+    const replacementConfig = {
+      ...originalConfig,
+      rpcUrl: "https://replacement-rpc.example",
+      vaultContractId: "CB4BUGCX5LFS5KYWAO2J4ZQTALOQSGXFFAOVKKGAS32OFZLU7O7YYGHS",
+    };
+
+    const deposit = submitVaultDeposit("12.34");
+    setRuntimeConfig(replacementConfig);
+    try {
+      await expect(deposit).resolves.toHaveProperty("hash", "HASH_RETURNED_BY_STELLAR");
+      expect(mocks.serverConstructor).toHaveBeenCalledWith(
+        originalConfig.rpcUrl,
+        expect.any(Object),
+      );
+      expect(mocks.contractConstructor).toHaveBeenCalledWith(originalConfig.vaultContractId);
+    } finally {
+      setRuntimeConfig(originalConfig);
+    }
+  });
+
+  it("targets a vault contract supplied by the active runtime config", async () => {
+    const originalConfig = getConfig();
+    const runtimeConfig = {
+      ...originalConfig,
+      rpcUrl: "https://runtime-rpc.example",
+      vaultContractId: "CB4BUGCX5LFS5KYWAO2J4ZQTALOQSGXFFAOVKKGAS32OFZLU7O7YYGHS",
+    };
+    setRuntimeConfig(runtimeConfig);
+    try {
+      await expect(submitVaultDeposit("12.34")).resolves.toHaveProperty("hash");
+      expect(mocks.serverConstructor).toHaveBeenCalledWith(
+        runtimeConfig.rpcUrl,
+        expect.any(Object),
+      );
+      expect(mocks.contractConstructor).toHaveBeenCalledWith(runtimeConfig.vaultContractId);
+    } finally {
+      setRuntimeConfig(originalConfig);
+    }
   });
 
   it("maps a rejected signature to a distinct failure", async () => {
@@ -449,6 +515,90 @@ describe("walletService", () => {
       mocks.server.getTransaction.mockResolvedValueOnce({ status: "SOME_OTHER_STATUS" });
       const status = await checkDepositStatus("test-hash");
       expect(status).toBe("UNKNOWN");
+    });
+  });
+
+  describe("prepareVaultDeposit & transaction verification", () => {
+    const VAULT_ID = "CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ";
+    const OTHER_CONTRACT_ID = "CAC7CFZ42L3LTTZCI4C3XI6UF7AHS2PYTNJ5QEG2PSLRGDGMWRQOZOT5";
+
+    function buildTamperedTx(opts: {
+      contractId?: string;
+      fn?: string;
+      amountStroops?: bigint;
+      extraOp?: boolean;
+    }) {
+      const builder = new TransactionBuilder(new Account(walletAddress, "123"), {
+        fee: BASE_FEE,
+        networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+      }).addOperation(
+        new Contract(opts.contractId ?? VAULT_ID).call(
+          opts.fn ?? "deposit",
+          new Address(walletAddress).toScVal(),
+          nativeToScVal(opts.amountStroops ?? 123_400_000n, { type: "i128" }),
+        ),
+      );
+      if (opts.extraOp) {
+        builder.addOperation(
+          Operation.payment({
+            destination: walletAddress,
+            asset: Asset.native(),
+            amount: "1",
+          }),
+        );
+      }
+      return builder.setTimeout(120).build();
+    }
+
+    it("prepares and summarizes a valid deposit without calling signTransaction", async () => {
+      const prepared = await prepareVaultDeposit("12.34");
+      expect(prepared.summary.contractId).toBe(VAULT_ID);
+      expect(prepared.summary.functionName).toBe("deposit");
+      expect(prepared.summary.amountStroops).toBe(123_400_000n);
+      expect(prepared.summary.network).toBe("Testnet");
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when contract id is tampered", async () => {
+      const tampered = buildTamperedTx({ contractId: OTHER_CONTRACT_ID });
+      mocks.assembleTransaction.mockReturnValueOnce({ build: () => tampered });
+
+      await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when amount is tampered", async () => {
+      const tampered = buildTamperedTx({ amountStroops: 999_999_999n });
+      mocks.assembleTransaction.mockReturnValueOnce({ build: () => tampered });
+
+      await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when function is tampered", async () => {
+      const tampered = buildTamperedTx({ fn: "withdraw" });
+      mocks.assembleTransaction.mockReturnValueOnce({ build: () => tampered });
+
+      await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when prepared.xdr is tampered before signAndSubmit", async () => {
+      const prepared = await prepareVaultDeposit("12.34");
+      const tampered = buildTamperedTx({ amountStroops: 500_000_000n });
+
+      await expect(
+        signAndSubmit({ ...prepared, xdr: tampered.toXDR() }),
+      ).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
     });
   });
 });

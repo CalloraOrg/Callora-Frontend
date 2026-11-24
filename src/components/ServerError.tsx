@@ -24,7 +24,7 @@ export default function ServerError({
   requestId,
   title,
   description,
-  onGoHome,
+  onGoHome: _onGoHome,
   resetAt,
   remaining,
   limit,

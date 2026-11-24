@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer, useCallback, useRef, useState } from "react";
+import { useEffect, useReducer, useCallback, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import EmptyState from "../components/EmptyState";
 import Skeleton from "../components/Skeleton";

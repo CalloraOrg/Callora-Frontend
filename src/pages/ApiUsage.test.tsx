@@ -128,7 +128,7 @@ describe("ApiUsage - Filter Reset", () => {
     const srAnnouncements = screen.getAllByRole("status");
     const srAnnouncement = srAnnouncements.find((node) =>
       node.textContent?.includes(
-        "Filters reset. Showing all calls from the last 24 hours.",
+        "Filters reset. Showing all calls from the last 7 days.",
       ),
     );
     expect(srAnnouncement).toBeTruthy();
@@ -877,5 +877,131 @@ describe("ApiUsage - Rate Limit Alert & Countdown", () => {
 
     unmount();
     expect(clearIntervalSpy).toHaveBeenCalled();
+  });
+});
+
+describe("ApiUsage - QuotaManager & QuotaBanner", () => {
+  it("renders QuotaManager and QuotaBanner and submits quota updates through quotaStore", async () => {
+    const { quotaStore } = await import("../state/quotaStore");
+    const updateSpy = vi.spyOn(quotaStore, "update");
+
+    render(<ApiUsage />);
+    await settleUsageRequest();
+
+    const input = screen.getByLabelText(/Requests per window/i) as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: "250" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save quota/i }));
+
+    await settleUsageRequest();
+
+    expect(updateSpy).toHaveBeenCalledWith(250);
+    expect(input.value).toBe("250");
+    updateSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DateRangePicker integration (#1397)
+// ---------------------------------------------------------------------------
+
+describe("ApiUsage - DateRangePicker integration", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(window, "location", {
+      value: { search: "", pathname: "/api-usage" },
+      writable: true,
+    });
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    writeTextMock.mockResolvedValue(undefined);
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("renders the DateRangePicker in the filter row", async () => {
+    // DateRangePicker renders as a fieldset with the accessible label
+    const picker = document.querySelector(".date-range-picker");
+    expect(picker).toBeTruthy();
+  });
+
+  it("default preset is 7d", async () => {
+    // The 7d radio button should be checked by default
+    const sevenDayRadio = document.querySelector(
+      'input[type="radio"][value="7d"]',
+    ) as HTMLInputElement | null;
+    expect(sevenDayRadio).toBeTruthy();
+    expect(sevenDayRadio?.checked).toBe(true);
+  });
+
+  it("changing preset to 30d announces the change", async () => {
+
+    const thirtyDayRadio = document.querySelector(
+      'input[type="radio"][value="30d"]',
+    ) as HTMLInputElement | null;
+    expect(thirtyDayRadio).toBeTruthy();
+    fireEvent.click(thirtyDayRadio!);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const srAnnouncements = screen.getAllByRole("status");
+    const announcement = srAnnouncements.find((node) =>
+      node.textContent?.includes("30d"),
+    );
+    expect(announcement).toBeTruthy();
+  });
+
+  it("Reset Filters button resets range back to 7d", async () => {
+
+    // Switch to 30d
+    const thirtyDayRadio = document.querySelector(
+      'input[type="radio"][value="30d"]',
+    ) as HTMLInputElement | null;
+    fireEvent.click(thirtyDayRadio!);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    const resetButton = screen.getByRole("button", { name: /Reset Filters/i });
+    expect(resetButton.disabled).toBe(false);
+    fireEvent.click(resetButton);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    const sevenDayRadio = document.querySelector(
+      'input[type="radio"][value="7d"]',
+    ) as HTMLInputElement | null;
+    expect(sevenDayRadio?.checked).toBe(true);
+  });
+
+  it("call history rows match the selected range", async () => {
+    // The mock event's occurredAt is new Date() — within the 7d window.
+
+    // After loading, the event at /v1/profile should appear in call history
+    expect(screen.getByText("/v1/profile")).toBeTruthy();
+
+    // Switch to 24h — the event is still today, so still visible
+    const twentyFourHrRadio = document.querySelector(
+      'input[type="radio"][value="24h"]',
+    ) as HTMLInputElement | null;
+    fireEvent.click(twentyFourHrRadio!);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    // The event was just now, so it still appears
+    expect(screen.getByText("/v1/profile")).toBeTruthy();
   });
 });

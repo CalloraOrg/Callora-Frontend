@@ -24,11 +24,13 @@
  */
 
 import {
+  createHttpQuotaApi,
   createQuotaApi,
   QuotaApi,
   QuotaConflictError,
   QuotaRecord,
 } from "../api/quotaApi";
+import { API_BASE } from "../config/constants";
 
 export type LoadStatus = "loading" | "ready" | "stale" | "error";
 export type PendingStatus = "idle" | "submitting" | "error";
@@ -471,8 +473,16 @@ export class QuotaStore {
   }
 }
 
+/**
+ * Selects the HTTP quota client when `API_BASE` is configured, falling back to
+ * the in-memory fake for demo mode and unit tests.
+ */
+export function createDefaultQuotaApi(apiBase: string = API_BASE): QuotaApi {
+  return apiBase ? createHttpQuotaApi() : createQuotaApi();
+}
+
 /** Shared singleton used by the UI (one per app instance / tab). */
 export const quotaStore = new QuotaStore({
-  api: createQuotaApi(),
+  api: createDefaultQuotaApi(),
   channel: createQuotaChannel(),
 });

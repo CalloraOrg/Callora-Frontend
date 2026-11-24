@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BillingTransaction } from '../pages/BillingHistory';
+import { apiClient, isApiAbortError } from '../api/apiClient';
 
 export type ActivityStatus = 'loading' | 'success' | 'error';
 
@@ -94,25 +95,19 @@ export function useRecentActivity(accountId: string | null): UseRecentActivityRe
       setError(null);
 
       try {
-        const url = `/api/activity?accountId=${encodeURIComponent(id)}&limit=${ACTIVITY_LIMIT}`;
-        const response = await fetch(url, { signal });
+        const data = await apiClient.get<BillingTransaction[]>('/api/activity', {
+          query: { accountId: id, limit: ACTIVITY_LIMIT },
+          signal,
+        });
 
         // Guard: discard if a newer request has already superseded this one.
-        if (reqId !== reqCounterRef.current) return;
-
-        if (!response.ok) {
-          throw new Error(`Request failed: ${response.status} ${response.statusText}`);
-        }
-
-        const data: BillingTransaction[] = await response.json();
-
         if (reqId !== reqCounterRef.current) return;
 
         setItems(data.map(txToActivityItem));
         setStatus('success');
       } catch (err: unknown) {
         if (reqId !== reqCounterRef.current) return;
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (isApiAbortError(err)) return;
 
         const message =
           err instanceof Error ? err.message : 'Failed to load recent activity';

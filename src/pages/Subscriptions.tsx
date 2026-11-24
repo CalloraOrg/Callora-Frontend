@@ -14,7 +14,7 @@ const date = (value: string | null) => value ? new Intl.DateTimeFormat(undefined
 
 function tiersFor(subscription: Subscription): PricingTier[] {
   return PRICING_PLANS.map((plan) => ({
-    name: plan.id[0].toUpperCase() + plan.id.slice(1), tier: plan.id,
+    name: plan.id.charAt(0).toUpperCase() + plan.id.slice(1), tier: plan.id,
     price: `${money(plan.monthlyBaseUsd)} / month`,
     description: plan.id === "enterprise" ? "Custom plans and dedicated support." : `${plan.includedRequests.toLocaleString()} requests included each month.`,
     features: [{ label: `${plan.includedRequests.toLocaleString()} requests included`, included: true }],
