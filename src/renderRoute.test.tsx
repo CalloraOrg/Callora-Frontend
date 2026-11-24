@@ -194,4 +194,56 @@ describe("renderRoute — routing dispatcher and deep-link exclusions", () => {
       consoleErrorSpy.mockRestore();
     }
   });
+
+  it("renders /embed/api/:id chromelessly with ?theme=dark and without persisting theme", async () => {
+    window.localStorage.removeItem("callora_pref_theme");
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+    try {
+      let renderedTree: React.ReactNode = null;
+      const root: RouteRenderTarget = {
+        render: vi.fn((node) => {
+          renderedTree = node;
+        }),
+      };
+
+      await renderRoute(root, "/embed/api/geocode-01?theme=dark");
+      expect(renderedTree).not.toBeNull();
+
+      render(<>{renderedTree}</>);
+
+      expect(screen.queryByRole("banner")).toBeNull();
+      expect(screen.queryByRole("navigation")).toBeNull();
+
+      await waitFor(() => {
+        expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+      });
+
+      const themeWrites = setItemSpy.mock.calls.filter(([key]) =>
+        String(key).includes("theme"),
+      );
+      expect(themeWrites).toHaveLength(0);
+    } finally {
+      setItemSpy.mockRestore();
+    }
+  });
+
+  it("falls back to system theme when /embed/api/:id has an invalid ?theme= value", async () => {
+    let renderedTree: React.ReactNode = null;
+    const root: RouteRenderTarget = {
+      render: vi.fn((node) => {
+        renderedTree = node;
+      }),
+    };
+
+    await renderRoute(root, "/embed/api/geocode-01?theme=invalid-theme");
+    expect(renderedTree).not.toBeNull();
+
+    render(<>{renderedTree}</>);
+
+    // matchMedia mock in beforeEach returns matches: false -> system resolves to "light"
+    await waitFor(() => {
+      expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    });
+  });
 });

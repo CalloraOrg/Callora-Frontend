@@ -16,6 +16,7 @@ npm run build   # tsc type-check + vite build -> dist/
 - Framework `vite`, output `dist`.
 - A single rewrite sends every path except `/api/*` and `/assets/*` to `index.html`, so client-side routes survive a refresh. `/api/*` is deliberately excluded so a missing backend returns a real 404 (the app then switches to mock data) rather than HTML.
 - Hashed files under `/assets/` get immutable caching.
+- Frame headers: `/embed/(.*)` sends `Content-Security-Policy: frame-ancestors *` (with `X-Frame-Options` omitted) so the embeddable API widget can be framed from any origin; all other routes send `Content-Security-Policy: frame-ancestors 'self'`.
 
 Deploy with the CLI:
 
