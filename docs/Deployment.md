@@ -88,6 +88,7 @@ Instead of ad-hoc per-page fallbacks, demo mode is powered by a unified [Mock Se
 ### Enabling demo mode
 
 Set `VITE_DEMO_MODE=true` in `.env.local` or inline when running the dev server or build:
+| Latency chart | [`src/pages/LatencyChart.tsx`](../src/pages/LatencyChart.tsx), [`src/api/latencyApi.ts`](../src/api/latencyApi.ts) | **Configured:** `authFetch('/api/apis/:apiId/latency?range=24h')` for the `?api=<id>` query param; shows an empty state when no API is selected.<br>**Demo:** no request; `getDemoLatencyData()` is rendered instead. | Error empty state with retry. No fixture fallback. | **Sample data** badge beside the title in demo mode; stale opacity + live-region notice while refetching; error empty state with retry on failure. |
 
 ```bash
 # Start dev server with MSW demo mode
