@@ -91,7 +91,8 @@ Trailing slashes and surrounding whitespace are stripped automatically by
 `normalizeBaseUrl`, so `https://api.callora.com/` and
 `https://api.callora.com` are equivalent. Use `apiUrl()` from
 `src/config/constants.ts` to build request paths so this normalisation is
-applied consistently.
+applied consistently. `src/config/constants.ts` is the single source of truth
+and the only place in the codebase that reads `VITE_API_BASE_URL`.
 
 ### `VITE_STELLAR_NETWORK`
 
@@ -242,6 +243,7 @@ Key contract details and adapter behavior:
 | Export | Purpose |
 | --- | --- |
 | `API_BASE` | normalised `VITE_API_BASE_URL`, empty by default |
+| `IS_BACKEND_MODE` | boolean flag indicating whether `API_BASE` is configured |
 | `STELLAR_NETWORK` | validated `VITE_STELLAR_NETWORK` |
 | `DEFAULT_STELLAR_NETWORK` | `"testnet"` |
 | `StellarNetwork` | union type of valid networks |

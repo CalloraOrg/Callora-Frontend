@@ -17,7 +17,7 @@ import { SHORTCUTS } from "../hooks/useGlobalShortcuts";
 import EmptyState from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
 import type { APIItem } from "../data/mockApis";
-import { API_BASE } from "../config/constants";
+import { IS_BACKEND_MODE } from "../config/constants";
 import { useDebounce } from "../hooks/useDebounce";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import {
@@ -195,17 +195,17 @@ export default function MarketplacePage(): JSX.Element {
   // debounced search or single-category selection changes.
   // In demo mode (!API_BASE), fetch only once on mount with no query params.
   useEffect(() => {
-    void startCatalogFetch(API_BASE ? serverParams : {});
+    void startCatalogFetch(IS_BACKEND_MODE ? serverParams : {});
     return () => {
       abortRef.current?.abort();
       abortRef.current = null;
     };
   }, [
     startCatalogFetch,
-    Boolean(API_BASE),
-    API_BASE ? serverParams.search : undefined,
-    API_BASE ? serverParams.category : undefined,
-    API_BASE ? categories.size : 0,
+    IS_BACKEND_MODE,
+    IS_BACKEND_MODE ? serverParams.search : undefined,
+    IS_BACKEND_MODE ? serverParams.category : undefined,
+    IS_BACKEND_MODE ? categories.size : 0,
   ]);
 
   useEffect(() => {
@@ -234,7 +234,7 @@ export default function MarketplacePage(): JSX.Element {
     (statuses.size > 0 ? 1 : 0);
 
   const handleRetryFetch = () =>
-    startCatalogFetch(API_BASE ? serverParams : {});
+    startCatalogFetch(IS_BACKEND_MODE ? serverParams : {});
 
   // Tag facets are derived from the loaded catalogue so a newly published API's
   // tags are selectable the moment it appears.
@@ -552,7 +552,7 @@ export default function MarketplacePage(): JSX.Element {
       <div className="marketplace-header">
         <h1>
           API Marketplace
-          {!API_BASE && (
+          {!IS_BACKEND_MODE && (
             <span
               className="marketplace-sample-data-badge"
               style={{
