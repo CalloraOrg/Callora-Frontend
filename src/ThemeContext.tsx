@@ -20,9 +20,21 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+interface ThemeProviderProps {
+  children: React.ReactNode;
+  /** Optional initial theme override (e.g. from `?theme=` on embed routes). */
+  initialTheme?: Theme;
+  /** Whether theme changes should be persisted to user preferences. Defaults to true. */
+  persist?: boolean;
+}
+
+export function ThemeProvider({
+  children,
+  initialTheme,
+  persist = true,
+}: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
-    return getPref('theme');
+    return initialTheme ?? getPref('theme');
   });
 
   const [actualTheme, setActualTheme] = useState<'light' | 'dark'>(() => {
@@ -45,7 +57,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setPref('theme', theme);
+    if (persist) {
+      setPref('theme', theme);
+    }
 
     const root = window.document.documentElement;
 
@@ -84,7 +98,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       cleanupTimer = applyTheme(theme);
       return () => window.clearTimeout(cleanupTimer);
     }
-  }, [theme]);
+  }, [theme, persist]);
 
   return (
     <ThemeContext.Provider value={{ theme, actualTheme, setTheme, isTransitioning }}>

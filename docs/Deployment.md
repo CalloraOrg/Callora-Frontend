@@ -34,6 +34,7 @@ Production builds register `public/sw.js` (via `src/utils/registerServiceWorker.
 - Cache names are versioned at the top of `public/sw.js` (`SHELL_CACHE = "callora-shell-v1"`, `CATALOG_CACHE = "callora-catalog-v1"`).
 - To force a full cache bust on deploy, bump the version suffix (e.g. `v1` -> `v2`). On `activate`, the service worker automatically deletes any caches whose names are not in `CURRENT_CACHES` and claims active clients.
 - Because `/sw.js` is served with `Cache-Control: no-cache`, browsers detect the updated script on the next navigation and install the new version automatically.
+- Frame headers: `/embed/(.*)` sends `Content-Security-Policy: frame-ancestors *` (with `X-Frame-Options` omitted) so the embeddable API widget can be framed from any origin; all other routes send `Content-Security-Policy: frame-ancestors 'self'`.
 
 Deploy with the CLI:
 
