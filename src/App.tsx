@@ -47,6 +47,8 @@ import WalletSignInButton from "./app/WalletSignInButton";
 import RequireAuth from "./components/RequireAuth";
 import AccountSwitcher from "./app/AccountSwitcher";
 import WithdrawModal from "./components/WithdrawModal";
+import ConsentBanner, { AnalyticsToggle } from "./components/ConsentBanner";
+import { analytics } from "./services/AnalyticsService";
 
 // Re-export public API
 export { prefetchRoute } from "./app/routes";
@@ -152,6 +154,17 @@ function App() {
   const currentTitle = routeTitleMap[location.pathname] ?? "Callora";
   const currentDescription = routeDescriptionMap[location.pathname];
   useDocumentTitle(currentTitle, currentDescription);
+
+  const lastTrackedPathRef = useRef<string | null>(null);
+  useEffect(() => {
+    const path = location.pathname;
+    if (lastTrackedPathRef.current === path) return;
+    lastTrackedPathRef.current = path;
+    analytics.trackEvent({
+      eventName: "route_view",
+      payload: { path },
+    });
+  }, [location.pathname]);
 
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
@@ -538,6 +551,10 @@ function App() {
       setDepositContractErrorCode(walletError?.contractErrorCode ?? null);
       setDepositRequiresReconciliation(false);
       setDepositStage("failed");
+      analytics.trackEvent({
+        eventName: "deposit_failed",
+        payload: { network: depositConfig.network, reason: failureCode },
+      });
       setStatusMessage(
         walletError
           ? walletError.message
@@ -561,6 +578,10 @@ function App() {
     setDepositFailureCode(null);
     setDepositRequiresReconciliation(false);
     setDepositStage("approving");
+    analytics.trackEvent({
+      eventName: "deposit_started",
+      payload: { network: depositConfig.network },
+    });
     setStatusMessage("Approve this USDC deposit in your wallet to continue.");
 
     let isWalletServiceError:
@@ -577,6 +598,10 @@ function App() {
         capturedHash = hash;
         setTxHash(hash);
         setDepositStage("pending");
+        analytics.trackEvent({
+          eventName: "deposit_signed",
+          payload: { network: depositConfig.network },
+        });
         setStatusMessage("Transaction submitted to Stellar. Waiting for ledger confirmation.");
       });
 
@@ -592,6 +617,10 @@ function App() {
         setOptimisticVault(startingBalance + approvedStroops);
       }
       setDepositStage("confirmed");
+      analytics.trackEvent({
+        eventName: "deposit_confirmed",
+        payload: { network: depositConfig.network },
+      });
       setStatusMessage(`${formatUsdShortcut(approvedAmount)} reached the vault. Your balance is updated and ready for API usage.`);
       void refreshBalances();
     } catch (error) {
@@ -626,6 +655,10 @@ function App() {
         setTxHash(finalHash);
       }
       setDepositStage("failed");
+      analytics.trackEvent({
+        eventName: "deposit_failed",
+        payload: { network: depositConfig.network, reason: failureCode },
+      });
       setStatusMessage(
         walletError
           ? walletError.message
@@ -698,6 +731,10 @@ function App() {
         setDepositRequiresReconciliation(false);
         setValidityTimeRemaining(null);
         setDepositStage("confirmed");
+        analytics.trackEvent({
+          eventName: "deposit_confirmed",
+          payload: { network: statusConfig.network },
+        });
         const msg = "Deposit confirmed on Stellar! Your vault balance has been updated.";
         setStatusMessage(msg);
         setCheckDepositStatusMessage(msg);
@@ -711,6 +748,10 @@ function App() {
         setDepositRequiresReconciliation(false);
         setValidityTimeRemaining(null);
         setDepositStage("failed");
+        analytics.trackEvent({
+          eventName: "deposit_failed",
+          payload: { network: statusConfig.network, reason: "LEDGER_FAILED" },
+        });
         const msg = "Transaction failed on Stellar. You may retry your deposit.";
         setStatusMessage(msg);
         setCheckDepositStatusMessage(msg);
@@ -723,6 +764,10 @@ function App() {
           setDepositRequiresReconciliation(false);
           setValidityTimeRemaining(0);
           setDepositStage("failed");
+          analytics.trackEvent({
+            eventName: "deposit_failed",
+            payload: { network: statusConfig.network, reason: "EXPIRED" },
+          });
           const msg = "Transaction not found and its validity window has expired. You may retry your deposit.";
           setStatusMessage(msg);
           setCheckDepositStatusMessage(msg);
@@ -878,6 +923,7 @@ function App() {
             )}
             <WalletSignInButton />
             <WalletStatus />
+            <AnalyticsToggle />
             <ThemeToggle />
           </div>
         </header>
@@ -1155,6 +1201,7 @@ function App() {
 
         <CompareTray />
         <CompareDrawer />
+        <ConsentBanner />
         {isDepositOpen && (
           <div className="modal-backdrop" role="presentation" onClick={closeDeposit}>
             <section className="deposit-modal" role="dialog" aria-modal="true" aria-labelledby="deposit-title" onClick={(event) => event.stopPropagation()}>

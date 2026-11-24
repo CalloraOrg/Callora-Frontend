@@ -388,3 +388,32 @@ Key properties:
 | `src/services/sessionExpiry.ts` | Signal bus for session expiry events |
 | `src/hooks/useSessionExpiry.ts` | React hook wrapping the signal bus |
 | `src/components/SessionExpiryBanner.tsx` | UI banner shown on expiry |
+
+## Analytics and privacy
+
+Callora includes a privacy-first, opt-in analytics client (`src/services/AnalyticsService.ts`).
+
+### Privacy stance
+
+- **Opt-in by default:** `analyticsConsent` defaults to `false` in `callora.prefs`. No events are queued and no network requests are made until the user explicitly clicks **Accept** in the consent banner (`src/components/ConsentBanner.tsx`) or enables the **Analytics** toggle in the header.
+- **Persistent decision:** Both `analyticsConsent` and `analyticsConsentDecided` are stored in `localStorage` under `callora.prefs`. Choosing **Decline** sets `analyticsConsent: false` and `analyticsConsentDecided: true` so the banner does not re-prompt.
+- **Immediate revocation:** Revoking consent via the header toggle (or `setPref('analyticsConsent', false)`) immediately drops and clears the in-memory event queue and cancels any pending flush timer.
+- **Zero PII / financial data:** Payloads never include wallet addresses, deposit amounts, tokens, transaction hashes, or URL query strings. Every payload is also recursively scrubbed through `redactDeeply` before queuing.
+
+### Batching and transport
+
+- **Endpoint:** `POST /api/analytics/events` (resolved via `apiUrl()`).
+- **Queue & batching:** Events are buffered in memory and flushed when the queue reaches **10 events** or after **5 seconds**, whichever comes first.
+- **Transport:** Uses `navigator.sendBeacon` with `application/json` when available, falling back to `fetch(..., { method: 'POST', keepalive: true })`.
+- **Page unload:** Remaining queued events are flushed automatically on `pagehide` and `visibilitychange` (`hidden`).
+- **Retry cap:** Failed flushes are retried up to **3 times** before the batch is dropped to prevent unbounded memory growth.
+
+### Event catalog
+
+| Event name | Trigger | Payload fields |
+| --- | --- | --- |
+| `route_view` | Pathname change in `App.tsx` (deduplicated across re-renders) | `path` (`string`, pathname only — no query string or user IDs) |
+| `deposit_started` | User confirms deposit signing (`approving` stage) | `network` (`"testnet" \| "mainnet" \| "futurenet"`) |
+| `deposit_signed` | Wallet signs and submits transaction (`pending` stage) | `network` (`"testnet" \| "mainnet" \| "futurenet"`) |
+| `deposit_confirmed` | Deposit confirmed on ledger (`confirmed` stage) | `network` (`"testnet" \| "mainnet" \| "futurenet"`) |
+| `deposit_failed` | Deposit preparation, signing, or confirmation fails (`failed` stage) | `network` (`"testnet" \| "mainnet" \| "futurenet"`), `reason` (`string` error code) |
