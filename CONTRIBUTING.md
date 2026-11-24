@@ -2,8 +2,6 @@
 
 Thanks for contributing! Follow these guidelines to keep the codebase consistent.
 
-
-
 ## Prerequisites
 
 - Node.js 18+
@@ -44,6 +42,7 @@ Before opening a pull request, confirm:
 
 - [ ] `npm run build` passes with no TypeScript errors (`tsconfig.json` enforces `strict`, `noUnusedLocals`, `noUnusedParameters`, and `noUncheckedIndexedAccess`; avoid explicit `any`).
 - [ ] Tests pass (`npm test -- --run`).
+- [ ] `npm run format:changed` passes for the files you touched (see [Formatting](#formatting)).
 - [ ] Any new component added to `src/components/` has a matching entry in
       [`src/data/a11y-manifest.json`](src/data/a11y-manifest.json)
       (`{ "id", "name", "status" }`), and changed components have their `status`
@@ -55,6 +54,7 @@ Before opening a pull request, confirm:
 All UI changes must follow the [UI Design System](docs/UI-Design-System.md).
 
 Key rules:
+
 - **Use design tokens, not raw values.** `src/index.css` is the canonical source for app-wide design tokens; `src/styles/tokens.css` defines additional marketplace, API, and status tokens. Reference them via `var(--token-name)` — never use inline hex values or hardcoded pixel sizes.
 - **Reuse existing components.** Check `src/components/` before building something new. Components like `ApiCard`, `EmptyState`, `SearchBar`, `Skeleton`, and `Breadcrumb` are shared across views.
 - **Do not introduce a component library.** The project is intentionally dependency-light.
@@ -120,6 +120,35 @@ above the measured sizes. When a change legitimately grows a bundle, update the
 matching limit in the same pull request and explain why in the description.
 Do not raise a limit just to make CI pass. Run
 `npm run check:bundle -- --json` for machine-readable output.
+
+## Formatting
+
+The repository ships an [EditorConfig](.editorconfig), a Prettier config
+(`.prettierrc.json`) and a `format:check` script. Prettier is a development
+dependency, so `npm install` is all the setup you need.
+
+Before opening a pull request, run:
+
+```bash
+npm run format:changed
+```
+
+It checks only the files your branch changes relative to `origin/main` (falling
+back to `upstream/main`, then `main`, then the changes in your working tree), so
+you never need to reformat the whole repository. Fix any reported files with:
+
+```bash
+npx prettier --write <file>
+```
+
+Rules of thumb:
+
+- Format only files you touch; do not open drive-by reformatting PRs — they
+  conflict with every other open branch.
+- If your fork has no `origin/main` ref, run `git fetch origin main` (or
+  `git fetch upstream main`) first. Without a base ref the script still checks
+  the files you have changed locally.
+- `npm run format:check` is an alias for `format:changed`.
 
 ## Manual verification
 
