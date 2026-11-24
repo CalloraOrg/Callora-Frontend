@@ -1,4 +1,5 @@
 import { StrKey } from "@stellar/stellar-sdk";
+import { resolveVaultConfig } from "../services/vaultConfig";
 
 /**
  * Shared application constants.
@@ -44,6 +45,16 @@ export const NETWORK_FEE_CACHE_TTL_MS = 30_000;
 export const PRESET_AMOUNTS = [10, 50, 100, 500] as const;
 
 /**
+ * sessionStorage key for pending deposit reconciliation.
+ * Stores `{ hash, amount, submittedAt, network, contractId }` when reconciliation
+ * is required, keeping the pending deposit across reloads until verified.
+ */
+export const PENDING_DEPOSIT_STORAGE_KEY = "callora:deposit:pending";
+
+/** Stellar transaction validity window in seconds. */
+export const TRANSACTION_TIMEOUT_SECONDS = 120;
+
+/**
  * Simulated loading delay (ms) used by MarketplacePage, ApiDetailPage,
  * and Dashboard to mimic an async data fetch.
  */
@@ -57,14 +68,8 @@ export const EXTERNAL_LINKS = {
   privacy: "https://callora.org/privacy",
 } as const;
 
-/** Application route paths. */
-export const APP_ROUTES = {
-  home: "/",
-  marketplace: "/marketplace",
-  apiDetail: "/api/:id",
-  dashboard: "/dashboard",
-  endpointSummary: "/endpoints",
-} as const;
+/** Application route paths. Reconciled with src/app/routes.ts */
+export { APP_ROUTES } from "../app/routes";
 
 /**
  * Stellar networks the app can be pointed at.
@@ -134,10 +139,21 @@ export const API_BASE = normalizeBaseUrl(
   runtimeEnv.VITE_API_BASE_URL as string | undefined,
 );
 
+/** Human-readable labels for each supported Stellar network. */
+export const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
+  mainnet: "Mainnet",
+  testnet: "Testnet",
+  futurenet: "Futurenet",
+};
+
 /** Stellar network the UI is currently pointed at. */
 export const STELLAR_NETWORK: StellarNetwork = resolveStellarNetwork(
   runtimeEnv.VITE_STELLAR_NETWORK as string | undefined,
 );
+
+/** Human-readable label for the configured network (e.g. "Testnet"). */
+export const STELLAR_NETWORK_LABEL =
+  STELLAR_NETWORK_LABELS[STELLAR_NETWORK];
 
 // ─── Stellar wallet deposits ─────────────────────────────────────────────────
 // Declared after `STELLAR_NETWORK` because they derive from it.
@@ -164,10 +180,21 @@ export const STELLAR_RPC_URL =
   normalizeBaseUrl(runtimeEnv.VITE_STELLAR_RPC_URL as string | undefined) ||
   DEFAULT_STELLAR_RPC_URLS[STELLAR_NETWORK];
 
-/** Deployed Callora vault contract that receives deposits. */
-export const STELLAR_VAULT_CONTRACT_ID = String(
-  runtimeEnv.VITE_STELLAR_VAULT_CONTRACT_ID ?? "",
-).trim();
+/** Reference Callora vault deployed on Stellar testnet. */
+const TESTNET_VAULT_CONTRACT_ID =
+  "CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ";
+
+/**
+ * Deployed Callora vault contract that receives deposits. `testnet` defaults to
+ * the reference vault; mainnet and futurenet must set `VITE_STELLAR_VAULT_CONTRACT_ID`.
+ */
+export const STELLAR_VAULT_CONFIG = resolveVaultConfig({
+  network: STELLAR_NETWORK,
+  envContractId: runtimeEnv.VITE_STELLAR_VAULT_CONTRACT_ID as string | undefined,
+  testnetDefault: TESTNET_VAULT_CONTRACT_ID,
+});
+
+export const STELLAR_VAULT_CONTRACT_ID = STELLAR_VAULT_CONFIG.contractId;
 
 export const STELLAR_USDC_DECIMALS = 7;
 
@@ -203,7 +230,7 @@ export const STELLAR_HORIZON_URL = {
  */
 export const TESTNET_DEPLOYMENT = {
   network: "testnet",
-  vault: "CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ",
+  vault: TESTNET_VAULT_CONTRACT_ID,
   settlement: "CB4BUGCX5LFS5KYWAO2J4ZQTALOQSGXFFAOVKKGAS32OFZLU7O7YYGHS",
   revenuePool: "CC5KINWRSLKSSQG4ZOTP3EZIOUVC6ER7HL5GZALYY4LVE6ZIMX4PMCSE",
 } as const;

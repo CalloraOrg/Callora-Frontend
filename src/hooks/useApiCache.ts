@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useAccountId, useInvalidateCache } from "./useAccount";
-import { getCache, setCache, type CacheEntry } from "../utils/offlineApiCache";
+import { getCache, setCache } from "../utils/offlineApiCache";
 
 /**
  * Return interface for the {@link useApiCache} hook.

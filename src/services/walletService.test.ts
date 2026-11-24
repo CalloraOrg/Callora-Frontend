@@ -10,12 +10,16 @@ const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   configurationError: null as string | null,
   serverConstructor: vi.fn(),
+  contractConstructor: vi.fn(),
   server: {
     getAccount: vi.fn(),
     prepareTransaction: vi.fn(),
+    simulateTransaction: vi.fn(),
     sendTransaction: vi.fn(),
     getTransaction: vi.fn(),
   },
+  assembleTransaction: vi.fn((transaction: unknown) => ({ build: () => transaction })),
+  walletSnapshot: vi.fn(() => ({ isNetworkMismatch: false })),
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -27,13 +31,24 @@ vi.mock("@stellar/freighter-api", () => ({
 
 vi.mock("@stellar/stellar-sdk", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@stellar/stellar-sdk")>();
-  return { ...actual, rpc: { ...actual.rpc, Server: class {
+  return {
+    ...actual,
+    Contract: class extends actual.Contract {
+      constructor(contractId: string) {
+        mocks.contractConstructor(contractId);
+        super(contractId);
+      }
+    },
+    rpc: { ...actual.rpc, assembleTransaction: mocks.assembleTransaction, Server: class {
     constructor(...args: unknown[]) {
       mocks.serverConstructor(...args);
       return mocks.server;
     }
   } } };
 });
+vi.mock("../state/walletStore", () => ({
+  walletStore: { getSnapshot: mocks.walletSnapshot },
+}));
 vi.mock("../config/constants", async (importOriginal) => ({
   ...await importOriginal<typeof import("../config/constants")>(),
   STELLAR_NETWORK: "testnet",
@@ -44,18 +59,36 @@ vi.mock("../config/constants", async (importOriginal) => ({
   get STELLAR_USDC_CONFIGURATION_ERROR() { return mocks.configurationError; },
 }));
 
-import { Account, Asset, Transaction } from "@stellar/stellar-sdk";
+import {
+  Account,
+  Address,
+  Asset,
+  BASE_FEE,
+  Contract,
+  Operation,
+  Transaction,
+  TransactionBuilder,
+  nativeToScVal,
+  xdr,
+} from "@stellar/stellar-sdk";
 import { STELLAR_USDC_ASSET, STELLAR_NETWORK_PASSPHRASE } from "../config/constants";
+import { getConfig, setRuntimeConfig } from "../config/runtimeConfig";
+const buildTimeConfig = getConfig();
 const walletAddress = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 import {
   hasUsdcTrustline, addUsdcTrustline, getWalletAddress,
   isWalletAvailable,
+  prepareVaultDeposit,
+  signAndSubmit,
   submitVaultDeposit,
+  checkDepositStatus,
 } from "./walletService";
 
 describe("walletService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setRuntimeConfig(buildTimeConfig);
+    mocks.walletSnapshot.mockReturnValue({ isNetworkMismatch: false });
     mocks.configurationError = null;
     vi.stubGlobal("fetch", mocks.fetch);
     mocks.fetch.mockReset().mockResolvedValue({
@@ -69,6 +102,7 @@ describe("walletService", () => {
     });
     mocks.signTransaction.mockImplementation(async (xdr: string) => ({ signedTxXdr: xdr, signerAddress: walletAddress }));
     mocks.server.getAccount.mockImplementation(async () => new Account(walletAddress, "123"));
+    mocks.server.simulateTransaction.mockReset().mockResolvedValue({ _parsed: true, latestLedger: 1, events: [], result: {} });
     mocks.server.prepareTransaction.mockImplementation(async (transaction: Transaction) => transaction);
     mocks.server.sendTransaction.mockResolvedValue({
       status: "PENDING",
@@ -88,13 +122,22 @@ describe("walletService", () => {
     await expect(isWalletAvailable()).resolves.toBe(false);
   });
 
+  it("fails fast when the wallet store already knows the network is wrong", async () => {
+    mocks.walletSnapshot.mockReturnValue({ isNetworkMismatch: true });
+
+    await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+      code: "NETWORK_MISMATCH",
+    });
+    expect(mocks.requestAccess).not.toHaveBeenCalled();
+    expect(mocks.server.getAccount).not.toHaveBeenCalled();
+  });
+
   it("signs, submits, and waits for the network hash to confirm", async () => {
     const onSubmitted = vi.fn();
 
     await expect(submitVaultDeposit("12.34", onSubmitted)).resolves.toEqual({
       hash: "HASH_RETURNED_BY_STELLAR",
     });
-
     expect(onSubmitted).toHaveBeenCalledWith("HASH_RETURNED_BY_STELLAR");
     expect(mocks.signTransaction).toHaveBeenCalledWith(
       expect.any(String),
@@ -104,6 +147,48 @@ describe("walletService", () => {
     expect(mocks.server.getTransaction).toHaveBeenCalledWith(
       "HASH_RETURNED_BY_STELLAR",
     );
+  });
+
+  it("uses the config snapshot captured when a deposit starts", async () => {
+    const originalConfig = getConfig();
+    const replacementConfig = {
+      ...originalConfig,
+      rpcUrl: "https://replacement-rpc.example",
+      vaultContractId: "CB4BUGCX5LFS5KYWAO2J4ZQTALOQSGXFFAOVKKGAS32OFZLU7O7YYGHS",
+    };
+
+    const deposit = submitVaultDeposit("12.34");
+    setRuntimeConfig(replacementConfig);
+    try {
+      await expect(deposit).resolves.toHaveProperty("hash", "HASH_RETURNED_BY_STELLAR");
+      expect(mocks.serverConstructor).toHaveBeenCalledWith(
+        originalConfig.rpcUrl,
+        expect.any(Object),
+      );
+      expect(mocks.contractConstructor).toHaveBeenCalledWith(originalConfig.vaultContractId);
+    } finally {
+      setRuntimeConfig(originalConfig);
+    }
+  });
+
+  it("targets a vault contract supplied by the active runtime config", async () => {
+    const originalConfig = getConfig();
+    const runtimeConfig = {
+      ...originalConfig,
+      rpcUrl: "https://runtime-rpc.example",
+      vaultContractId: "CB4BUGCX5LFS5KYWAO2J4ZQTALOQSGXFFAOVKKGAS32OFZLU7O7YYGHS",
+    };
+    setRuntimeConfig(runtimeConfig);
+    try {
+      await expect(submitVaultDeposit("12.34")).resolves.toHaveProperty("hash");
+      expect(mocks.serverConstructor).toHaveBeenCalledWith(
+        runtimeConfig.rpcUrl,
+        expect.any(Object),
+      );
+      expect(mocks.contractConstructor).toHaveBeenCalledWith(runtimeConfig.vaultContractId);
+    } finally {
+      setRuntimeConfig(originalConfig);
+    }
   });
 
   it("maps a rejected signature to a distinct failure", async () => {
@@ -309,7 +394,7 @@ describe("walletService", () => {
   });
 
   it("does not request a deposit signature if simulation fails", async () => {
-    mocks.server.prepareTransaction.mockRejectedValueOnce(new Error("simulation failed"));
+    mocks.server.simulateTransaction.mockRejectedValueOnce(new Error("simulation failed"));
     await expect(submitVaultDeposit("50")).rejects.toMatchObject({ code: "NETWORK_ERROR" });
     expect(mocks.signTransaction).not.toHaveBeenCalled();
   });
@@ -338,5 +423,182 @@ describe("walletService", () => {
   it("reports a definitive failed deposit without requiring reconciliation", async () => {
     mocks.server.getTransaction.mockResolvedValueOnce({ status: "FAILED" });
     await expect(submitVaultDeposit("50")).rejects.toMatchObject({ code: "TRANSACTION_FAILED", requiresReconciliation: false });
+  });
+
+  it.each([4, 37, 8, 44, 99])("rejects contract simulation code %s before signing or submitting", async (code) => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.server.simulateTransaction.mockResolvedValueOnce({ error: `HostError: Error(Contract, #${code}) PRIVATE_XDR ${walletAddress}`, events: [] });
+    await expect(submitVaultDeposit("50")).rejects.toMatchObject({
+      code: "CONTRACT_REJECTED", contractErrorCode: code, requiresReconciliation: false,
+    });
+    expect(mocks.signTransaction).not.toHaveBeenCalled();
+    expect(mocks.server.sendTransaction).not.toHaveBeenCalled();
+    const payload = JSON.stringify(logged.mock.calls);
+    expect(payload).toContain(String(code));
+    expect(payload).not.toMatch(/PRIVATE_XDR|HostError/);
+    expect(payload).not.toContain(walletAddress);
+  });
+
+  it("preserves simulation timeout and unreachable-RPC messages", async () => {
+    for (const [error, expected] of [["timeout", "timed out before"], ["offline", "Could not reach Stellar RPC"]]) {
+      mocks.server.simulateTransaction.mockRejectedValueOnce(new Error(error));
+      await expect(submitVaultDeposit("50")).rejects.toMatchObject({ code: "NETWORK_ERROR", message: expect.stringContaining(expected), requiresReconciliation: false });
+    }
+    expect(mocks.signTransaction).not.toHaveBeenCalled();
+  });
+
+  it("does not classify a local assembly failure as a transport error", async () => {
+    mocks.assembleTransaction.mockImplementationOnce(() => { throw new Error("raw simulation XDR"); });
+    await expect(submitVaultDeposit("50")).rejects.toMatchObject({ code: "CONTRACT_REJECTED", requiresReconciliation: false });
+    expect(mocks.signTransaction).not.toHaveBeenCalled();
+  });
+
+  describe("preflightVaultDeposit", () => {
+    const simulatedBool = (value: boolean) => ({
+      _parsed: true, latestLedger: 1, events: [], transactionData: {}, result: { retval: xdr.ScVal.scvBool(value) },
+    });
+
+    it("reports paused and allowlist state from read-only simulations", async () => {
+      const { preflightVaultDeposit } = await import("./walletService");
+      mocks.server.simulateTransaction
+        .mockResolvedValueOnce(simulatedBool(true))
+        .mockResolvedValueOnce(simulatedBool(false));
+      await expect(preflightVaultDeposit(walletAddress)).resolves.toEqual({ paused: true, allowlisted: false });
+      expect(mocks.server.simulateTransaction).toHaveBeenCalledTimes(2);
+    });
+
+    it("never signs or submits while checking", async () => {
+      const { preflightVaultDeposit } = await import("./walletService");
+      mocks.server.simulateTransaction
+        .mockResolvedValueOnce(simulatedBool(false))
+        .mockResolvedValueOnce(simulatedBool(true));
+      await preflightVaultDeposit(walletAddress);
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+      expect(mocks.server.sendTransaction).not.toHaveBeenCalled();
+    });
+
+    it("surfaces RPC failures so the UI can leave Approve enabled", async () => {
+      const { preflightVaultDeposit } = await import("./walletService");
+      mocks.server.simulateTransaction.mockRejectedValueOnce(new Error("offline"));
+      await expect(preflightVaultDeposit(walletAddress)).rejects.toThrow();
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("checkDepositStatus", () => {
+    it("returns SUCCESS when getTransaction reports SUCCESS", async () => {
+      mocks.server.getTransaction.mockResolvedValueOnce({ status: "SUCCESS" });
+      const status = await checkDepositStatus("test-hash");
+      expect(status).toBe("SUCCESS");
+      expect(mocks.server.getTransaction).toHaveBeenCalledWith("test-hash");
+    });
+
+    it("returns FAILED when getTransaction reports FAILED", async () => {
+      mocks.server.getTransaction.mockResolvedValueOnce({ status: "FAILED" });
+      const status = await checkDepositStatus("test-hash");
+      expect(status).toBe("FAILED");
+    });
+
+    it("returns NOT_FOUND when getTransaction reports NOT_FOUND", async () => {
+      mocks.server.getTransaction.mockResolvedValueOnce({ status: "NOT_FOUND" });
+      const status = await checkDepositStatus("test-hash");
+      expect(status).toBe("NOT_FOUND");
+    });
+
+    it("returns UNKNOWN when getTransaction throws an RPC error", async () => {
+      mocks.server.getTransaction.mockRejectedValueOnce(new Error("RPC network down"));
+      const status = await checkDepositStatus("test-hash");
+      expect(status).toBe("UNKNOWN");
+    });
+
+    it("returns UNKNOWN when getTransaction returns an unexpected status", async () => {
+      mocks.server.getTransaction.mockResolvedValueOnce({ status: "SOME_OTHER_STATUS" });
+      const status = await checkDepositStatus("test-hash");
+      expect(status).toBe("UNKNOWN");
+    });
+  });
+
+  describe("prepareVaultDeposit & transaction verification", () => {
+    const VAULT_ID = "CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ";
+    const OTHER_CONTRACT_ID = "CAC7CFZ42L3LTTZCI4C3XI6UF7AHS2PYTNJ5QEG2PSLRGDGMWRQOZOT5";
+
+    function buildTamperedTx(opts: {
+      contractId?: string;
+      fn?: string;
+      amountStroops?: bigint;
+      extraOp?: boolean;
+    }) {
+      const builder = new TransactionBuilder(new Account(walletAddress, "123"), {
+        fee: BASE_FEE,
+        networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+      }).addOperation(
+        new Contract(opts.contractId ?? VAULT_ID).call(
+          opts.fn ?? "deposit",
+          new Address(walletAddress).toScVal(),
+          nativeToScVal(opts.amountStroops ?? 123_400_000n, { type: "i128" }),
+        ),
+      );
+      if (opts.extraOp) {
+        builder.addOperation(
+          Operation.payment({
+            destination: walletAddress,
+            asset: Asset.native(),
+            amount: "1",
+          }),
+        );
+      }
+      return builder.setTimeout(120).build();
+    }
+
+    it("prepares and summarizes a valid deposit without calling signTransaction", async () => {
+      const prepared = await prepareVaultDeposit("12.34");
+      expect(prepared.summary.contractId).toBe(VAULT_ID);
+      expect(prepared.summary.functionName).toBe("deposit");
+      expect(prepared.summary.amountStroops).toBe(123_400_000n);
+      expect(prepared.summary.network).toBe("Testnet");
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when contract id is tampered", async () => {
+      const tampered = buildTamperedTx({ contractId: OTHER_CONTRACT_ID });
+      mocks.assembleTransaction.mockReturnValueOnce({ build: () => tampered });
+
+      await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when amount is tampered", async () => {
+      const tampered = buildTamperedTx({ amountStroops: 999_999_999n });
+      mocks.assembleTransaction.mockReturnValueOnce({ build: () => tampered });
+
+      await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when function is tampered", async () => {
+      const tampered = buildTamperedTx({ fn: "withdraw" });
+      mocks.assembleTransaction.mockReturnValueOnce({ build: () => tampered });
+
+      await expect(submitVaultDeposit("12.34")).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
+
+    it("throws TRANSACTION_MISMATCH and never calls signTransaction when prepared.xdr is tampered before signAndSubmit", async () => {
+      const prepared = await prepareVaultDeposit("12.34");
+      const tampered = buildTamperedTx({ amountStroops: 500_000_000n });
+
+      await expect(
+        signAndSubmit({ ...prepared, xdr: tampered.toXDR() }),
+      ).rejects.toMatchObject({
+        code: "TRANSACTION_MISMATCH",
+      });
+      expect(mocks.signTransaction).not.toHaveBeenCalled();
+    });
   });
 });

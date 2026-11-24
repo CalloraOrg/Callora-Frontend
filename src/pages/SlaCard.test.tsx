@@ -3,40 +3,57 @@
 /**
  * SlaCard.test.tsx
  *
- * Focused tests for the SlaCard component (GrantFox FWC26, Issue #545).
+ * Comprehensive tests for the per-API SlaCard component.
  *
  * Test surface:
- *  1. Static rendering — card heading, all SLA fields are present.
- *  2. Copy buttons — each field has a copy button with the correct aria-label.
- *  3. Copy interaction — clicking a button calls clipboard.writeText with the
- *     right value and transitions to the "Copied!" state.
- *  4. Success feedback resets — after 2 seconds the button label reverts.
- *  5. Accessibility — aria-live region announces successful copy.
- *  6. Rapid re-copy — timer restarts on consecutive clicks.
- *  7. Independence — each button tracks its own copied state.
- *
- * Note on fake timers + async clipboard:
- *   We use `act(async () => { ... })` to flush the Promise microtask from
- *   `navigator.clipboard.writeText` before asserting state. Then we use
- *   `act(() => vi.advanceTimersByTime(...))` for timer-driven resets.
- *   `waitFor` is intentionally avoided because it uses `setTimeout` internally
- *   and would deadlock with `vi.useFakeTimers()`.
+ *  1. Per-API SLA rendering (geocode-01):
+ *     - Dynamic heading with API name ("GeoLocate")
+ *     - Breadcrumb trail linking back to /details/:id
+ *     - All contractual SLA fields rendered from api.sla + api.version
+ *     - Copy buttons for each field with accessible aria-labels
+ *  2. Copy interaction & accessibility:
+ *     - Clicking copy calls clipboard.writeText with the exact metric value
+ *     - Label transitions to "Copied!" and CheckIcon is displayed
+ *     - Aria-live region announces the copied field
+ *     - 2-second timeout resets the copied state
+ *     - Rapid re-copy extends the timeout
+ *     - Independent copied state per field button
+ *  3. API without SLA:
+ *     - Displays "This provider has not published an SLA" banner
+ *     - Shows observed historical metrics (uptime, latency) clearly labeled as observed
+ *     - Contractual SLA wording is not displayed
+ *  4. Unknown API ID:
+ *     - Not-found alert panel with link back to /marketplace
+ *  5. Loading state:
+ *     - Skeleton with aria-busy="true"
  */
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
 import SlaCard from "./SlaCard";
+import * as catalogApiModule from "../api/catalogApi";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Render SlaCard inside a MemoryRouter (Breadcrumb uses <Link> which needs a router). */
-function renderSlaCard() {
-  return render(
-    <MemoryRouter>
-      <SlaCard />
-    </MemoryRouter>,
-  );
+/** Render SlaCard inside MemoryRouter with route parameters. */
+async function renderSlaCard(initialPath = "/marketplace/geocode-01/sla") {
+  let view: any;
+  await act(async () => {
+    view = render(
+      <MemoryRouter initialEntries={[initialPath]}>
+        <Routes>
+          <Route path="/marketplace/:apiId/sla" element={<SlaCard />} />
+          <Route path="/marketplace" element={<div>Marketplace Mock</div>} />
+          <Route path="/details/:id" element={<div>Details Mock</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    // Flush microtasks for fetchCatalog promise resolution
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return view;
 }
 
 /**
@@ -46,7 +63,6 @@ function renderSlaCard() {
 async function clickCopy(btn: HTMLElement) {
   await act(async () => {
     fireEvent.click(btn);
-    // Let the clipboard.writeText promise resolve
     await Promise.resolve();
   });
 }
@@ -68,18 +84,33 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// ─── Static rendering ────────────────────────────────────────────────────────
+// ─── 1. API with SLA (Scenario 1) ─────────────────────────────────────────────
 
-describe("SlaCard — static rendering", () => {
-  it("renders the card heading", () => {
-    renderSlaCard();
-    expect(
-      screen.getByRole("heading", { name: /sla details/i }),
-    ).toBeTruthy();
+describe("SlaCard — API with SLA (geocode-01)", () => {
+  it("renders heading containing the API name 'GeoLocate'", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.textContent).toContain("GeoLocate");
+    expect(heading.textContent).toContain("SLA Details");
   });
 
-  it("renders all 8 SLA field labels", () => {
-    renderSlaCard();
+  it("updates document title to include the API name", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
+    expect(document.title).toContain("GeoLocate");
+    expect(document.title).toContain("SLA Details");
+  });
+
+  it("renders breadcrumb trail linking to Marketplace and API details", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
+    const marketplaceLink = screen.getByRole("link", { name: "Marketplace" });
+    expect(marketplaceLink.getAttribute("href")).toBe("/marketplace");
+
+    const detailsLink = screen.getByRole("link", { name: "GeoLocate" });
+    expect(detailsLink.getAttribute("href")).toBe("/details/geocode-01");
+  });
+
+  it("renders all contractual SLA field labels", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
     const expectedLabels = [
       "Uptime SLA",
       "P99 Response Time",
@@ -88,103 +119,89 @@ describe("SlaCard — static rendering", () => {
       "Support Tier",
       "Credit Threshold",
       "API Version",
-      "Contract ID",
     ];
     for (const label of expectedLabels) {
       expect(screen.getByText(label)).toBeTruthy();
     }
   });
 
-  it("renders all 8 SLA field values with the correct text content", () => {
-    renderSlaCard();
-    const fields: [string, string][] = [
+  it("renders all contractual SLA field values correctly", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
+    const expectedFields: [string, string][] = [
       ["uptime", "99.95%"],
       ["response-time", "≤ 250 ms"],
       ["incident-response", "< 15 minutes"],
       ["maintenance-window", "Sundays 02:00–04:00 UTC"],
       ["support-tier", "Priority (24/7)"],
       ["credit-threshold", "< 99.5% triggers SLA credit"],
-      ["api-version", "v2.4.1"],
-      ["contract-id", "FWC26-SLA-0042"],
+      ["api-version", "1.8.0"],
     ];
-    for (const [id, value] of fields) {
+    for (const [id, value] of expectedFields) {
       expect(screen.getByTestId(`sla-value-${id}`).textContent).toBe(value);
     }
   });
 
-  it("renders exactly 8 copy buttons (one per SLA field)", () => {
-    renderSlaCard();
+  it("renders copy buttons for each field with appropriate aria-labels", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
     const copyButtons = screen.getAllByRole("button", { name: /^Copy /i });
-    expect(copyButtons).toHaveLength(8);
-  });
+    expect(copyButtons).toHaveLength(7);
 
-  it("renders the GrantFox FWC26 subtitle", () => {
-    renderSlaCard();
-    expect(screen.getByText(/GrantFox Wave Compute API/)).toBeTruthy();
-  });
-
-  it("renders the card as a landmark section with the correct label", () => {
-    renderSlaCard();
-    expect(
-      screen.getByRole("region", { name: /sla details/i }),
-    ).toBeTruthy();
-  });
-});
-
-// ─── Copy button aria-labels ─────────────────────────────────────────────────
-
-describe("SlaCard — copy button aria-labels", () => {
-  it("includes the field label and value in each button's aria-label", () => {
-    renderSlaCard();
     expect(
       screen.getByRole("button", { name: /Copy Uptime SLA: 99\.95%/i }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: /Copy Contract ID: FWC26-SLA-0042/i }),
+      screen.getByRole("button", { name: /Copy P99 Response Time: ≤ 250 ms/i }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: /Copy API Version: v2\.4\.1/i }),
+      screen.getByRole("button", { name: /Copy API Version: 1\.8\.0/i }),
     ).toBeTruthy();
   });
 });
 
-// ─── Copy interaction ────────────────────────────────────────────────────────
+// ─── 2. Copy interaction & accessibility ──────────────────────────────────────
 
-describe("SlaCard — copy interaction", () => {
-  it("calls clipboard.writeText with the correct value on click", async () => {
+describe("SlaCard — copy interaction and clipboard feedback", () => {
+  it("calls clipboard.writeText with that API's value on click (Scenario 5)", async () => {
     const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>;
-    renderSlaCard();
+    await renderSlaCard("/marketplace/geocode-01/sla");
 
-    const btn = screen.getByTestId("sla-copy-btn-contract-id");
-    await clickCopy(btn);
+    const uptimeBtn = screen.getByTestId("sla-copy-btn-uptime");
+    await clickCopy(uptimeBtn);
 
-    expect(writeText).toHaveBeenCalledWith("FWC26-SLA-0042");
+    expect(writeText).toHaveBeenCalledWith("99.95%");
   });
 
-  it("shows 'Copied!' label after a successful copy", async () => {
-    renderSlaCard();
+  it("shows 'Copied!' label and green checkmark icon after click", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
 
     const btn = screen.getByTestId("sla-copy-btn-uptime");
     await clickCopy(btn);
 
     expect(btn.textContent).toContain("Copied!");
+    expect(btn.querySelector("svg")).toBeTruthy();
+    expect(btn.getAttribute("aria-label")).toBe("Uptime SLA copied");
   });
 
-  it("changes aria-label to '<Field> copied' after a successful copy", async () => {
-    renderSlaCard();
+  it("announces copy to screen readers via polite aria-live region", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
 
-    const btn = screen.getByTestId("sla-copy-btn-api-version");
-    await clickCopy(btn);
-
-    expect(btn.getAttribute("aria-label")).toBe("API Version copied");
-  });
-
-  it("resets button label back to 'Copy' after 2 seconds", async () => {
-    renderSlaCard();
+    const liveRegion = screen.getByTestId("sla-live-uptime");
+    expect(liveRegion.textContent).toBe("");
+    expect(liveRegion.getAttribute("aria-live")).toBe("polite");
 
     const btn = screen.getByTestId("sla-copy-btn-uptime");
     await clickCopy(btn);
 
+    expect(screen.getByTestId("sla-live-uptime").textContent).toBe(
+      "Uptime SLA copied to clipboard",
+    );
+  });
+
+  it("resets copied feedback after 2 seconds", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
+
+    const btn = screen.getByTestId("sla-copy-btn-uptime");
+    await clickCopy(btn);
     expect(btn.textContent).toContain("Copied!");
 
     act(() => {
@@ -193,164 +210,128 @@ describe("SlaCard — copy interaction", () => {
 
     expect(btn.textContent).toContain("Copy");
     expect(btn.textContent).not.toContain("Copied!");
-  });
-
-  it("restores default aria-label after the feedback window expires", async () => {
-    renderSlaCard();
-
-    const btn = screen.getByTestId("sla-copy-btn-support-tier");
-    await clickCopy(btn);
-
-    expect(btn.getAttribute("aria-label")).toBe("Support Tier copied");
-
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
-
-    expect(btn.getAttribute("aria-label")).toContain("Copy Support Tier");
-  });
-
-  it("renders the success CheckIcon while copied is true", async () => {
-    renderSlaCard();
-
-    const btn = screen.getByTestId("sla-copy-btn-response-time");
-    // Before click — should show the copy icon, button label is "Copy"
-    expect(btn.textContent).toContain("Copy");
-
-    await clickCopy(btn);
-
-    // After click — SVG should still be there (now it's the check icon)
-    const svg = btn.querySelector("svg");
-    expect(svg).toBeTruthy();
-    expect(btn.textContent).toContain("Copied!");
-  });
-
-  it("each copy button copies its own field's value", async () => {
-    const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>;
-    renderSlaCard();
-
-    // Copy P99 response time
-    await clickCopy(screen.getByTestId("sla-copy-btn-response-time"));
-    expect(writeText).toHaveBeenLastCalledWith("≤ 250 ms");
-
-    // Copy contract ID
-    await clickCopy(screen.getByTestId("sla-copy-btn-contract-id"));
-    expect(writeText).toHaveBeenLastCalledWith("FWC26-SLA-0042");
-
-    expect(writeText).toHaveBeenCalledTimes(2);
-  });
-});
-
-// ─── Accessibility (aria-live) ───────────────────────────────────────────────
-
-describe("SlaCard — accessibility (aria-live)", () => {
-  it("live region is empty before any copy action", () => {
-    renderSlaCard();
-    const live = screen.getByTestId("sla-live-uptime");
-    expect(live.textContent).toBe("");
-  });
-
-  it("live region announces copy for the correct field", async () => {
-    renderSlaCard();
-
-    const btn = screen.getByTestId("sla-copy-btn-contract-id");
-    await clickCopy(btn);
-
-    const live = screen.getByTestId("sla-live-contract-id");
-    expect(live.textContent).toBe("Contract ID copied to clipboard");
-  });
-
-  it("other fields' live regions remain empty when one field is copied", async () => {
-    renderSlaCard();
-
-    await clickCopy(screen.getByTestId("sla-copy-btn-uptime"));
-
-    // Only the uptime live region should be populated
-    const contractLive = screen.getByTestId("sla-live-contract-id");
-    expect(contractLive.textContent).toBe("");
-  });
-
-  it("live region resets to empty after 2 seconds", async () => {
-    renderSlaCard();
-
-    const btn = screen.getByTestId("sla-copy-btn-uptime");
-    await clickCopy(btn);
-
-    expect(screen.getByTestId("sla-live-uptime").textContent).toBe(
-      "Uptime SLA copied to clipboard",
-    );
-
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
-
     expect(screen.getByTestId("sla-live-uptime").textContent).toBe("");
   });
 
-  it("each live region has aria-live='polite' and aria-atomic='true'", () => {
-    renderSlaCard();
-    const live = screen.getByTestId("sla-live-uptime");
-    expect(live.getAttribute("aria-live")).toBe("polite");
-    expect(live.getAttribute("aria-atomic")).toBe("true");
-  });
-});
-
-// ─── Rapid re-copy ───────────────────────────────────────────────────────────
-
-describe("SlaCard — rapid re-copy", () => {
-  it("keeps copied state alive when button is clicked again before timer expires", async () => {
-    renderSlaCard();
+  it("restarts 2s timer on rapid re-copy", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
 
     const btn = screen.getByTestId("sla-copy-btn-uptime");
-
-    // First click
     await clickCopy(btn);
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
     expect(btn.textContent).toContain("Copied!");
 
-    // Advance 1 second (still within the 2s window)
-    act(() => { vi.advanceTimersByTime(1000); });
-
-    // Second click — timer resets
     await clickCopy(btn);
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    // 2s total from first click, but 1s from second click -> still copied
     expect(btn.textContent).toContain("Copied!");
 
-    // 1s after second click — still within the new 2s window
-    act(() => { vi.advanceTimersByTime(1000); });
-    expect(btn.textContent).toContain("Copied!");
-
-    // Full 2s from second click have now elapsed — should reset
-    act(() => { vi.advanceTimersByTime(1000); });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    // 2s after second click -> reset
     expect(btn.textContent).toContain("Copy");
+  });
+
+  it("tracks copy states independently across different buttons", async () => {
+    await renderSlaCard("/marketplace/geocode-01/sla");
+
+    const uptimeBtn = screen.getByTestId("sla-copy-btn-uptime");
+    const responseBtn = screen.getByTestId("sla-copy-btn-response-time");
+
+    await clickCopy(uptimeBtn);
+
+    expect(uptimeBtn.textContent).toContain("Copied!");
+    expect(responseBtn.textContent).toContain("Copy");
+    expect(responseBtn.textContent).not.toContain("Copied!");
   });
 });
 
-// ─── Independent copy state per button ───────────────────────────────────────
+// ─── 3. API without SLA (Scenario 2) ──────────────────────────────────────────
 
-describe("SlaCard — multiple independent copy buttons", () => {
-  it("only the clicked button shows 'Copied!' — others remain at default", async () => {
-    renderSlaCard();
+describe("SlaCard — API without SLA (Scenario 2)", () => {
+  it("renders 'This provider has not published an SLA' message and observed metrics", async () => {
+    await renderSlaCard("/marketplace/translate-01/sla");
 
-    const firstBtn = screen.getByTestId("sla-copy-btn-uptime");
-    const secondBtn = screen.getByTestId("sla-copy-btn-contract-id");
+    // Must show "not published" message
+    expect(
+      screen.getByText(/This provider has not published an SLA/i),
+    ).toBeTruthy();
 
-    await clickCopy(firstBtn);
+    // Must clearly label metrics as observed
+    expect(screen.getByText(/Observed Uptime/i)).toBeTruthy();
+    expect(screen.getByText(/Observed Average Latency/i)).toBeTruthy();
 
-    expect(firstBtn.textContent).toContain("Copied!");
-    // Second button must not be in the "copied" state
-    expect(secondBtn.textContent).toContain("Copy");
-    expect(secondBtn.textContent).not.toContain("Copied!");
+    // Assert wording explicitly mentions "observed and not contractual"
+    expect(
+      screen.getByText(/observed and not contractual/i),
+    ).toBeTruthy();
+
+    // Must NEVER present contractual "Uptime SLA" for this API
+    expect(screen.queryByText(/^Uptime SLA$/)).toBeNull();
   });
 
-  it("two buttons can be in 'copied' state independently at the same time", async () => {
-    renderSlaCard();
+  it("renders observed values and allows copying them", async () => {
+    const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>;
+    await renderSlaCard("/marketplace/translate-01/sla");
 
-    const firstBtn = screen.getByTestId("sla-copy-btn-uptime");
-    const secondBtn = screen.getByTestId("sla-copy-btn-contract-id");
+    // Translate-01 has uptime 99.9% and latency 240ms
+    expect(screen.getByTestId("sla-value-observed-uptime").textContent).toBe("99.9%");
+    expect(screen.getByTestId("sla-value-observed-latency").textContent).toBe("240 ms");
 
-    await clickCopy(firstBtn);
-    await clickCopy(secondBtn);
+    const copyUptime = screen.getByTestId("sla-copy-btn-observed-uptime");
+    await clickCopy(copyUptime);
+    expect(writeText).toHaveBeenCalledWith("99.9%");
+  });
+});
 
-    expect(firstBtn.textContent).toContain("Copied!");
-    expect(secondBtn.textContent).toContain("Copied!");
+// ─── 4. Unknown API ID (Scenario 3) ───────────────────────────────────────────
+
+describe("SlaCard — Unknown ID (Scenario 3)", () => {
+  it("renders not-found panel with Marketplace link and announces via role='alert'", async () => {
+    await renderSlaCard("/marketplace/unknown-api-999/sla");
+
+    const alertPanel = screen.getByRole("alert");
+    expect(alertPanel).toBeTruthy();
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.textContent).toContain("API Not Found");
+
+    const backLink = screen.getByRole("link", { name: /Back to Marketplace/i });
+    expect(backLink.getAttribute("href")).toBe("/marketplace");
+  });
+
+  it("renders not-found state when visiting old grantfox URL if not in catalogue", async () => {
+    await renderSlaCard("/marketplace/grantfox-wave-compute/sla");
+
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("API Not Found");
+  });
+});
+
+// ─── 5. Loading skeleton state (Scenario 4) ───────────────────────────────────
+
+describe("SlaCard — Catalogue loading (Scenario 4)", () => {
+  it("renders skeleton placeholder with aria-busy='true' while catalogue is loading", async () => {
+    // Return pending promise
+    vi.spyOn(catalogApiModule, "fetchCatalog").mockReturnValue(new Promise(() => {}));
+
+    render(
+      <MemoryRouter initialEntries={["/marketplace/geocode-01/sla"]}>
+        <Routes>
+          <Route path="/marketplace/:apiId/sla" element={<SlaCard />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const skeleton = screen.getByTestId("sla-skeleton");
+    expect(skeleton).toBeTruthy();
+    expect(skeleton.getAttribute("aria-busy")).toBe("true");
   });
 });

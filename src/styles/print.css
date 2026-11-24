@@ -23,6 +23,39 @@
     display: none !important;
   }
 
+  /* EndpointSummary print parity: keep parameter tables visible and expand cards */
+  .endpoint-summary-card {
+    break-inside: avoid;
+    border: 1px solid #ccc !important;
+    margin-bottom: 16px;
+  }
+
+  .endpoint-summary-chevron-wrap {
+    display: none !important;
+  }
+
+  .endpoint-summary-content,
+  .endpoint-summary-content--collapsed,
+  .endpoint-summary-content--expanded {
+    display: block !important;
+    visibility: visible !important;
+    padding: 8px 0 !important;
+    border-top: none !important;
+  }
+
+  .endpoint-table-wrap {
+    display: block !important;
+  }
+
+  .endpoint-table-wrap table {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .endpoint-params-dl {
+    display: none !important;
+  }
+
   /* Make printed text clear and use light color scheme for consistent prints */
   html, body {
     background: #fff !important;

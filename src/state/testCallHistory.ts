@@ -27,6 +27,7 @@ export interface HistoryEntry {
   requestParams: string;
   response: unknown;
   status: "success" | "error";
+  httpStatus?: number | null;
   responseTime: number;
   cost: number;
 }

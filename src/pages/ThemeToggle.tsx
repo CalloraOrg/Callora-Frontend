@@ -53,7 +53,7 @@ export function ThemeToggle() {
 
     const handleIntersection = (entries: IntersectionObserverEntry[]) => {
       const [entry] = entries;
-      setIsScrolled(!entry.isIntersecting);
+      if (entry) setIsScrolled(!entry.isIntersecting);
     };
 
     const observer = new IntersectionObserver(handleIntersection, {

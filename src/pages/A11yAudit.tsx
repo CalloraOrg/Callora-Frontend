@@ -70,8 +70,8 @@ export default function A11yAudit() {
           <div key={comp.id} className="surface a11y-card">
             <div className="a11y-card-header">
               <h3>
-                {'docs' in comp && (comp as any).docs ? (
-                  <a href={`${DOCS_BASE}/${(comp as any).docs}`} target="_blank" rel="noopener noreferrer" className="component-link">
+                {'docs' in comp && typeof comp.docs === 'string' && comp.docs ? (
+                  <a href={`${DOCS_BASE}/${comp.docs}`} target="_blank" rel="noopener noreferrer" className="component-link">
                     {comp.name}
                   </a>
                 ) : (

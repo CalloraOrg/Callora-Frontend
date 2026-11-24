@@ -1,12 +1,15 @@
-import React, { useEffect, useReducer, useCallback, useRef } from "react";
+import { useEffect, useReducer, useCallback, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import EmptyState from "../components/EmptyState";
 import Skeleton from "../components/Skeleton";
 import { StatusBadge, apiStatusToVariant } from "../components/StatusBadge";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { formatPrice } from "../utils/format";
-import { MOCK_APIS } from "../data/mockApis";
+import { fetchCatalog } from "../api/catalogApi";
 import type { APIItem } from "../data/mockApis";
+import { isSignedIn, getAccessToken } from "../services/authService";
+import KeyRotationModal from "./KeyRotationModal";
+import LiveRegion from "../components/LiveRegion";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,41 +48,29 @@ function reducer(_state: FetchState, action: Action): FetchState {
 
 // ---------------------------------------------------------------------------
 // Stub data fetcher
-// Simulates GET /api/provider/apis.  Replace the body with a real fetch() call
+// Simulates GET /api/provider/apis. Replace the body with a real fetch() call
 // once the backend endpoint is available.
 // ---------------------------------------------------------------------------
 
 const PROVIDER_ID = "acme-labs"; // placeholder — swap for authed user id
 
-/** Returns the subset of MOCK_APIS belonging to the current provider. */
-function fetchProviderApis(
+/** Returns the subset of catalogue APIs belonging to the current provider. */
+async function fetchProviderApis(
   signal: AbortSignal,
 ): Promise<PublishedApiItem[]> {
-  return new Promise((resolve, reject) => {
-    // Simulate a ~300 ms network round-trip so loading states are visible.
-    const timer = setTimeout(() => {
-      if (signal.aborted) return;
-      try {
-        const myApis: PublishedApiItem[] = MOCK_APIS
-          .filter(
-            (api) =>
-              api.provider.name.toLowerCase().replace(/\s+/g, "-") === PROVIDER_ID,
-          )
-          .map((api, i) => ({
-            ...api,
-            // Spread representative publish statuses across the mock rows.
-            publishStatus: (["live", "pending", "rejected"] as PublishStatus[])[
-              i % 3
-            ],
-          }));
-        resolve(myApis);
-      } catch (err) {
-        reject(err instanceof Error ? err : new Error(String(err)));
-      }
-    }, 300);
-
-    signal.addEventListener("abort", () => clearTimeout(timer));
-  });
+  const catalog = await fetchCatalog(signal);
+  return catalog
+    .filter(
+      (api) =>
+        api.provider.name.toLowerCase().replace(/\s+/g, "-") === PROVIDER_ID,
+    )
+    .map((api, i) => ({
+      ...api,
+      // Spread representative publish statuses across the rows.
+      publishStatus: (["live", "pending", "rejected"] as PublishStatus[])[
+        i % 3
+      ],
+    }));
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +108,17 @@ function PublishStatusPill({ status }: { status: PublishStatus }) {
   );
 }
 
-function ProviderApiRow({ api }: { api: PublishedApiItem }) {
+function ProviderApiRow({
+  api,
+  signedIn,
+  onRotate,
+  lastRotated,
+}: {
+  api: PublishedApiItem;
+  signedIn: boolean;
+  onRotate: (api: PublishedApiItem) => void;
+  lastRotated?: string;
+}) {
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;
 
   return (
@@ -125,6 +126,8 @@ function ProviderApiRow({ api }: { api: PublishedApiItem }) {
       style={{
         listStyle: "none",
         borderBottom: "1px solid var(--line)",
+        display: "flex",
+        alignItems: "center",
       }}
     >
       <Link
@@ -139,6 +142,8 @@ function ProviderApiRow({ api }: { api: PublishedApiItem }) {
           textDecoration: "none",
           color: "inherit",
           transition: "background 0.15s",
+          flex: 1,
+          minWidth: 0,
         }}
         onMouseEnter={(e) =>
           ((e.currentTarget as HTMLAnchorElement).style.background =
@@ -190,6 +195,11 @@ function ProviderApiRow({ api }: { api: PublishedApiItem }) {
           </div>
           <div style={{ fontSize: "0.8125rem", color: "var(--muted)", marginTop: 2 }}>
             {api.provider.name}
+            {lastRotated && (
+              <span style={{ marginLeft: 8, fontSize: "0.75rem", color: "var(--accent)" }}>
+                • Rotated: {lastRotated}
+              </span>
+            )}
           </div>
         </div>
 
@@ -228,6 +238,31 @@ function ProviderApiRow({ api }: { api: PublishedApiItem }) {
           ›
         </div>
       </Link>
+
+      {/* Action: Rotate Key */}
+      <div style={{ padding: "0 20px 0 0", flexShrink: 0 }}>
+        <button
+          type="button"
+          className="ghost-button"
+          onClick={() => onRotate(api)}
+          disabled={!signedIn}
+          title={signedIn ? "Rotate API key" : "Sign in to rotate API key"}
+          aria-label={
+            signedIn
+              ? `Rotate key for ${api.name}`
+              : `Rotate key for ${api.name} (sign in required)`
+          }
+          style={{
+            fontSize: "0.8125rem",
+            padding: "6px 12px",
+            whiteSpace: "nowrap",
+            opacity: signedIn ? 1 : 0.5,
+            cursor: signedIn ? "pointer" : "not-allowed",
+          }}
+        >
+          Rotate key
+        </button>
+      </div>
     </li>
   );
 }
@@ -282,8 +317,13 @@ export default function MyApis() {
 
   const [state, dispatch] = useReducer(reducer, { status: "loading" });
   // Incrementing this triggers a re-fetch without remounting the page.
-  const [retryKey, setRetryKey] = React.useState(0);
+  const [retryKey, setRetryKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+
+  const [activeRotatingApi, setActiveRotatingApi] = useState<PublishedApiItem | null>(null);
+  const [lastRotatedMap, setLastRotatedMap] = useState<Record<string, string>>({});
+  const [announceMessage, setAnnounceMessage] = useState<string>("");
+  const signedIn = isSignedIn();
 
   const load = useCallback(() => {
     abortRef.current?.abort();
@@ -396,6 +436,7 @@ export default function MyApis() {
               <div style={{ flexShrink: 0, minWidth: 68 }}>Review</div>
               <div style={{ flexShrink: 0, minWidth: 80, textAlign: "right" }}>Price</div>
               <div style={{ width: 16, flexShrink: 0 }} />
+              <div style={{ minWidth: 80, flexShrink: 0, textAlign: "right" }}>Actions</div>
             </div>
 
             <ul
@@ -404,12 +445,35 @@ export default function MyApis() {
               data-testid="my-apis-list"
             >
               {state.apis.map((api) => (
-                <ProviderApiRow key={api.id} api={api} />
+                <ProviderApiRow
+                  key={api.id}
+                  api={api}
+                  signedIn={signedIn}
+                  onRotate={setActiveRotatingApi}
+                  lastRotated={lastRotatedMap[api.id]}
+                />
               ))}
             </ul>
           </>
         )}
       </section>
+
+      {activeRotatingApi && (
+        <KeyRotationModal
+          isOpen={Boolean(activeRotatingApi)}
+          onClose={() => setActiveRotatingApi(null)}
+          keyId={activeRotatingApi.id}
+          sessionToken={getAccessToken() ?? ""}
+          onKeyChanged={(_newKey) => {
+            setLastRotatedMap((prev) => ({
+              ...prev,
+              [activeRotatingApi.id]: "Just now",
+            }));
+            setAnnounceMessage(`API key for ${activeRotatingApi.name} rotated successfully.`);
+          }}
+        />
+      )}
+      <LiveRegion message={announceMessage} />
     </div>
   );
 }

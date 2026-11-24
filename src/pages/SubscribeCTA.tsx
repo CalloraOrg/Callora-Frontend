@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import SubscribeButton from "../components/SubscribeButton";
 import Tooltip from "../components/Tooltip";
 import { formatPrice } from "../utils/format";
@@ -136,7 +136,7 @@ export default function SubscribeCTA({
     const observer = new IntersectionObserver(
       ([entry]) => {
         // Bar is visible when the main hero CTA is NOT in view
-        setIsVisible(!entry.isIntersecting);
+        if (entry) setIsVisible(!entry.isIntersecting);
       },
       { threshold: 0 }
     );

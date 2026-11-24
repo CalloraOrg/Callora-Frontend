@@ -1,8 +1,13 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL?: string;
   readonly VITE_STELLAR_NETWORK?: string;
   readonly VITE_STELLAR_RPC_URL?: string;
   readonly VITE_STELLAR_VAULT_CONTRACT_ID?: string;
   readonly VITE_ENABLE_DEMO_OUTCOME?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
 }

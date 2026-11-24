@@ -1,4 +1,3 @@
-import React from 'react';
 import { WarningIcon } from './icons/WarningIcon';
 import { CheckIcon } from './icons/CheckIcon';
 import KbdHint from './KbdHint';

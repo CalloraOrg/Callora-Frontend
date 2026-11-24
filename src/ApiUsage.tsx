@@ -20,8 +20,8 @@ type CallRecord = {
   status: 'success' | 'error';
   responseTime: number;
   cost: number;
-  request?: any;
-  response?: any;
+  request?: unknown;
+  response?: unknown;
 };
 
 type UsageStats = {
@@ -136,10 +136,11 @@ export default function ApiUsage() {
   const [apiKey, setApiKey] = useState('ck_live_4e85ff1ed6a4ff73893a0bf73f2bb');
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [selectedEndpoint, setSelectedEndpoint] = useState(MOCK_ENDPOINTS[0]);
+  // Safe: MOCK_ENDPOINTS is a non-empty static array.
+  const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint>(MOCK_ENDPOINTS[0]!);
   const [requestParams, setRequestParams] = useState('{}');
   const [isLoading, setIsLoading] = useState(false);
-  const [apiResponse, setApiResponse] = useState<any>(null);
+  const [apiResponse, setApiResponse] = useState<unknown>(null);
   const [responseTime, setResponseTime] = useState<number | null>(null);
   const [callCost, setCallCost] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>(
@@ -210,14 +211,14 @@ export default function ApiUsage() {
         // Simulate rate limit response if checkbox is enabled
         if (shouldSimulateRateLimit) {
           const resetTime = new Date(Date.now() + 30000); // Reset in 30 seconds
-          const mockErrorResponse = {
+          const mockErrorResponse = new Response(null, {
             status: 429,
-            headers: new Headers({
+            headers: {
               'X-RateLimit-Limit': '100',
               'X-RateLimit-Remaining': '0',
               'X-RateLimit-Reset': resetTime.toISOString(),
-            }),
-          } as any;
+            },
+          });
 
           setError('Rate limited. Too many requests.');
           updateFromResponse(mockErrorResponse);

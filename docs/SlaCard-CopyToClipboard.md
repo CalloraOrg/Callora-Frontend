@@ -1,15 +1,15 @@
-# SlaCard — Copy-to-Clipboard (Issue #545, FWC26 campaign)
+# SlaCard — Copy-to-Clipboard (Issue #545, Per-API SLA)
 
-Added per-value copy-to-clipboard buttons to the GrantFox Wave Compute API SLA
-details page, backed by the new `useCopy` hook.
+Per-value copy-to-clipboard buttons on the Service-Level Agreement (SLA)
+details page, backed by the `useCopy` hook and dynamically resolved per API.
 
 ## Route
 
 ```
-/marketplace/grantfox-wave-compute/sla
+/marketplace/:apiId/sla
 ```
 
-## What was added
+## What was added / updated
 
 ### `src/hooks/useCopy.ts`
 
@@ -59,23 +59,26 @@ import { useCopy } from "../hooks/useCopy";       // named
 
 ### `src/pages/SlaCard.tsx`
 
-The SLA details page for the GrantFox Wave Compute API – Stellar Edition.
+The SLA details page resolves the selected API from the catalogue using `fetchCatalog`.
 
-Each of the 8 SLA metrics is displayed as a `<dt>` / `<dd>` pair inside a
-`<dl>`. The `<dd>` contains both the value text and a copy button.
+#### Page States
 
-**SLA fields:**
+1. **Loading**: Displays a skeleton placeholder with `aria-busy="true"`.
+2. **Not Found**: When an invalid or unknown `apiId` is visited, an alert panel announces the not-found state with a link back to `/marketplace`.
+3. **No Published SLA**: When an API does not define contractual SLA terms, a notice banner informs the user ("This provider has not published an SLA") and surfaces observed historical telemetry (Observed Uptime, Observed Average Latency) clearly labelled as observed and not contractual.
+4. **Contractual SLA**: When an API defines an `sla` object in `APIItem`, contractual metrics are displayed inside a `<dl>` definition list with copy-to-clipboard buttons per value.
 
-| Field | Value |
-|-------|-------|
-| Uptime SLA | `99.95%` |
-| P99 Response Time | `≤ 250 ms` |
-| Incident Response | `< 15 minutes` |
-| Maintenance Window | `Sundays 02:00–04:00 UTC` |
-| Support Tier | `Priority (24/7)` |
-| Credit Threshold | `< 99.5% triggers SLA credit` |
-| API Version | `v2.4.1` |
-| Contract ID | `FWC26-SLA-0042` |
+**Dynamic SLA fields (when defined):**
+
+| Field | Source | Example Value |
+|-------|--------|---------------|
+| Uptime SLA | `api.sla.uptimeTargetPct` | `99.95%` |
+| P99 Response Time | `api.sla.p99LatencyMs` | `≤ 250 ms` |
+| Incident Response | `api.sla.incidentResponseMinutes` | `< 15 minutes` |
+| Maintenance Window | `api.sla.maintenanceWindow` | `Sundays 02:00–04:00 UTC` |
+| Support Tier | `api.sla.supportTier` | `Priority (24/7)` |
+| Credit Threshold | `api.sla.creditThresholdPct` | `< 99.5% triggers SLA credit` |
+| API Version | `api.version` | `v1.8.0` |
 
 **Copy interaction:**
 
@@ -95,11 +98,11 @@ Each of the 8 SLA metrics is displayed as a `<dt>` / `<dd>` pair inside a
 
 | WCAG criterion | Implementation |
 |----------------|----------------|
-| 1.3.1 Info and Relationships | Values in a `<dl>` semantic structure. |
-| 2.4.7 Focus Visible | `:focus-visible` outline uses `--accent` design token (2 px, 3 px offset). |
+| 1.3.1 Info and Relationships | Values in a `<dl>` semantic structure; distinct observed vs contractual labels. |
+| 2.4.7 Focus Visible | `:focus-visible` outline uses `--accent` design token (2 px, 2 px offset). |
 | 2.5.5 Target Size | Copy buttons have `min-height: 36px`; touch area ≥ 44 px via `padding`. |
 | 4.1.2 Name, Role, Value | Each button has `aria-label="Copy <Field>: <Value>"`, changing to `"<Field> copied"` after success. |
-| 4.1.3 Status Messages | `aria-live="polite" aria-atomic="true"` region per row announces copy outcome. |
+| 4.1.3 Status Messages | `aria-live="polite" aria-atomic="true"` region per row announces copy outcome; not-found state announced via `role="alert"`. |
 
 ---
 
@@ -111,38 +114,15 @@ Each of the 8 SLA metrics is displayed as a `<dt>` / `<dd>` pair inside a
 | `--muted` | Label text, idle copy button |
 | `--surface` | Card background |
 | `--border` | Card and row separator |
-| `--accent` | Focus ring |
+| `--accent` | Focus ring, back button |
 | `--success` | "Copied!" button / CheckIcon colour |
 
 No hardcoded hex values — dark and light themes work automatically.
 
 ---
 
-## Tests
+## Route and Navigation Integration
 
-| File | Count | What is covered |
-|------|-------|-----------------|
-| `src/hooks/__tests__/useCopy.test.ts` | 7 | Initial state, clipboard write, `copied` true after copy, 2 s reset, `execCommand` fallback, unmount cleanup, rapid re-copy timer restart |
-| `src/pages/SlaCard.test.tsx` | 22 | Static rendering (heading, all 8 labels and values, 8 copy buttons, subtitle, region landmark), aria-labels, copy interaction, aria-live announcements, rapid re-copy, independent state per button |
-
-Run with:
-
-```bash
-npx vitest run src/hooks/__tests__/useCopy.test.ts src/pages/SlaCard.test.tsx
-```
-
----
-
-## `src/App.tsx` changes
-
-- Added `import SlaCard from "./pages/SlaCard"`.
-- Added `slaCard: "/marketplace/grantfox-wave-compute/sla"` to `APP_ROUTES`.
-- Added `<Route path={APP_ROUTES.slaCard} element={<SlaCard />} />`.
-
----
-
-## `src/components/EmptyState.tsx` changes
-
-`EmptyState` previously used the old `useCopy` API (`copy` + `supported`).
-Updated to use `handleCopy` (renamed) while keeping the `supported` guard so
-the copy button is hidden when neither clipboard mechanism is available.
+- `src/App.tsx`: Added `slaCard: "/marketplace/:apiId/sla"` route mapping to `<SlaCard />`.
+- `src/renderRoute.tsx`: The `/sla` exclusion in the custom router permits `/marketplace/:apiId/sla` for any API ID to pass through to `App.tsx` while preserving `/marketplace` standalone rendering.
+- `src/pages/ApiDetailPage.tsx`: Added links pointing directly to `/marketplace/:id/sla`.

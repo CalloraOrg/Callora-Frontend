@@ -20,18 +20,35 @@ import React, {
   useState,
 } from "react";
 import { useCollections } from "../state/collectionsStore";
-import MOCK_APIS from "../data/mockApis";
+import { useApisByIds } from "../hooks/useApisByIds";
+import type { APIItem } from "../data/mockApis";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Look up a human-readable label for a saved endpoint id. */
-function resolveEndpointLabel(endpointId: string): string {
-  for (const api of MOCK_APIS) {
+function resolveEndpointLabel(endpointId: string, apis: readonly APIItem[]): string {
+  for (const api of apis) {
     if (api.id === endpointId) return api.name;
-    const ep = (api.endpoints ?? []).find((e: any) => e.id === endpointId);
-    if (ep) return `${api.name} – ${ep.title ?? ep.id}`;
+    const ep = (api.endpoints ?? []).find(
+      (e: { id?: unknown }) => e.id === endpointId,
+    );
+    if (ep) return `${api.name} – ${(ep as { title?: string; id: string }).title ?? ep.id}`;
+    const ep = (api.endpoints ?? []).find((e) => e.id === endpointId);
   }
   return endpointId;
+}
+
+/**
+ * Returns the API id that owns this endpoint id, or null when not found.
+ * Used to build the link to the API detail page from a saved endpoint.
+ */
+function resolveApiIdForEndpoint(endpointId: string, apis: readonly APIItem[]): string | null {
+  for (const api of apis) {
+    if (api.id === endpointId) return api.id;
+    const ep = (api.endpoints ?? []).find((e: { id?: unknown }) => e.id === endpointId);
+    if (ep) return api.id;
+  }
+  return null;
 }
 
 // ─── Export / Import helpers ─────────────────────────────────────────────────
@@ -105,6 +122,7 @@ function CollectionRow({
   } = useCollections();
 
   const [expanded, setExpanded] = useState(false);
+  const { apis: resolvedApis } = useApisByIds(expanded ? endpointIds : []);
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(name);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -340,7 +358,10 @@ function CollectionRow({
               No endpoints saved yet.
             </li>
           ) : (
-            endpointIds.map((epId) => (
+            endpointIds.map((epId) => {
+              const label = resolveEndpointLabel(epId, resolvedApis);
+              const apiId = resolveApiIdForEndpoint(epId, resolvedApis);
+              return (
               <li
                 key={epId}
                 style={{
@@ -355,18 +376,38 @@ function CollectionRow({
                   borderBottom: "1px solid rgba(255,255,255,0.04)",
                 }}
               >
-                <span
-                  style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {resolveEndpointLabel(epId)}
-                </span>
+                {apiId ? (
+                  <a
+                    href={`/details/${apiId}`}
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: "var(--accent)",
+                      textDecoration: "none",
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      history.pushState({}, "", `/details/${apiId}`);
+                      window.dispatchEvent(new PopStateEvent("popstate"));
+                    }}
+                  >
+                    {label}
+                  </a>
+                ) : (
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {label}
+                  </span>
+                )}
                 <button
                   onClick={() => removeEndpointFromCollection(id, epId)}
-                  aria-label={`Remove ${resolveEndpointLabel(epId)} from ${name}`}
+                  aria-label={`Remove ${label} from ${name}`}
                   title="Remove from collection"
                   style={{
                     background: "none",
@@ -382,7 +423,8 @@ function CollectionRow({
                   ✕
                 </button>
               </li>
-            ))
+              );
+            })
           )}
         </ul>
       )}

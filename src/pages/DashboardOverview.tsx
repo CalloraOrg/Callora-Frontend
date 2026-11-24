@@ -13,33 +13,51 @@
  * 5. Quick action controls (Deposit, Top-up, Marketplace, Usage analytics)
  */
 
-import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LowBalanceBanner from '../components/LowBalanceBanner';
 import UsageGauge from '../components/UsageGauge';
 import Skeleton from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import PreviewCard, { type PreviewCardData } from '../components/PreviewCard';
+import BalanceReadout from '../components/BalanceReadout';
 import { formatUsdc, formatPrice, formatTimeString } from '../utils/format';
 import { usePinnedApis, pinnedApisStore } from '../state/pinnedApis';
 import { useAccountId } from '../hooks/useAccount';
 import { useRecentActivity } from '../hooks/useRecentActivity';
-import MOCK_APIS from '../data/mockApis';
+import { useApisByIds } from '../hooks/useApisByIds';
 import '../components/Dashboard.css';
+import type { BalanceReadStatus } from '../hooks/useVaultBalances';
+import { getWalletNetworkLabel } from '../state/walletStore';
+
+export interface DashboardBalancesView {
+  vaultText: string | null;
+  walletText: string | null;
+  status: BalanceReadStatus;
+  error: string | null;
+  configured: boolean;
+  walletConnected: boolean;
+  pending: boolean;
+  onRetry: () => void;
+}
 
 export interface DashboardOverviewProps {
-  /** Current Vault balance in USDC */
+  /** Current Vault balance in USDC (fallback for legacy callers) */
   vaultBalance?: number;
-  /** Available Wallet balance in USDC */
+  /** Available Wallet balance in USDC (fallback for legacy callers) */
   walletBalance?: number;
   /** Average cost per call in USDC */
   costPerCall?: number;
   /** Average daily API calls */
   callsPerDay?: number;
+  /** Connected Freighter address and network details */
+  walletAddress?: string | null;
+  walletNetworkPassphrase?: string | null;
   /** Callback fired when user triggers deposit flow */
   openDeposit?: (presetAmount?: number) => void;
   /** Optional custom class name */
   className?: string;
+  /** Chain-sourced balance read state from useVaultBalances. When present, the balance cards render from it (exact text, loading/error/retry). */
+  balances?: DashboardBalancesView;
 }
 
 /** Re-exported for backwards compat; canonical definition lives in useRecentActivity. */
@@ -50,8 +68,11 @@ export function DashboardOverview({
   walletBalance = 450.0,
   costPerCall = 0.005,
   callsPerDay = 120,
+  walletAddress = null,
+  walletNetworkPassphrase = null,
   openDeposit = () => {},
   className = '',
+  balances,
 }: DashboardOverviewProps) {
   const navigate = useNavigate();
   const accountId = useAccountId();
@@ -65,10 +86,16 @@ export function DashboardOverview({
   );
 
   const pinnedApiIds = usePinnedApis();
-  const pinnedApis = useMemo(
-    () => MOCK_APIS.filter((api) => pinnedApiIds.has(api.id)),
-    [pinnedApiIds],
-  );
+  const {
+    status: pinnedStatus,
+    apis: pinnedApis,
+    missing: missingPinnedIds,
+  } = useApisByIds(pinnedApiIds);
+
+  // Determine values for math (gauge, runway, banner) — prefer chain values when available
+  const vaultBalanceForMath = balances?.vaultText !== null && balances?.vaultText !== undefined
+    ? parseFloat(balances.vaultText.replace(/,/g, ''))
+    : vaultBalance;
 
   // Vault preview data
   const vaultPreviewData: PreviewCardData = {
@@ -77,10 +104,10 @@ export function DashboardOverview({
     subtitle: 'Callora Stellar Vault Settlement Account',
     description: 'Pre-funded reserve for automatic API micropayments across subscribed services.',
     metrics: [
-      { label: 'Available', value: `${formatUsdc(vaultBalance)} USDC` },
-      { label: 'Est. Runway', value: `${Math.round(vaultBalance / (costPerCall * callsPerDay))} days` },
+      { label: 'Available', value: balances ? (balances.vaultText ? `${balances.vaultText} USDC` : '—') : `${formatUsdc(vaultBalance)} USDC` },
+      { label: 'Est. Runway', value: vaultBalanceForMath > 0 && costPerCall * callsPerDay > 0 ? `${Math.round(vaultBalanceForMath / (costPerCall * callsPerDay))} days` : '—' },
     ],
-    status: vaultBalance < 20 ? 'warning' : 'operational',
+    status: vaultBalanceForMath < 20 ? 'warning' : 'operational',
     details: {
       'Auto-Refill': 'Disabled',
       'Settlement Layer': 'Stellar Soroban',
@@ -91,10 +118,12 @@ export function DashboardOverview({
   const walletPreviewData: PreviewCardData = {
     id: 'wallet-overview',
     title: 'Connected Wallet',
-    subtitle: 'Freighter Stellar Wallet (Public Net)',
+    subtitle: walletAddress
+      ? `Freighter Stellar Wallet (${getWalletNetworkLabel(walletNetworkPassphrase)}) · ${walletAddress.slice(0, 5)}…${walletAddress.slice(-4)}`
+      : 'Freighter Stellar Wallet (Not connected)',
     description: 'Instant deposit source for refilling Callora Vault reserve balances.',
     metrics: [
-      { label: 'Wallet Balance', value: `${formatUsdc(walletBalance)} USDC` },
+      { label: 'Wallet Balance', value: balances ? (balances.walletText ? `${balances.walletText} USDC` : (balances.walletConnected ? '—' : 'Connect wallet')) : `${formatUsdc(walletBalance)} USDC` },
       { label: 'Min Deposit', value: '10 USDC' },
     ],
     status: 'operational',
@@ -102,21 +131,51 @@ export function DashboardOverview({
 
   return (
     <div className={['dashboard-overview-container', className].filter(Boolean).join(' ')}>
-      <LowBalanceBanner balance={vaultBalance} openDeposit={openDeposit} />
+      {balances && balances.configured && balances.vaultText !== null ? (
+        <LowBalanceBanner balance={vaultBalanceForMath} openDeposit={openDeposit} />
+      ) : !balances ? (
+        <LowBalanceBanner balance={vaultBalance} openDeposit={openDeposit} />
+      ) : null}
 
       <section className="dashboard-grid surface">
         {/* Balance Overview Cards with PreviewCard Wrappers */}
         <PreviewCard data={vaultPreviewData} position="bottom">
           <div className="dashboard-card" data-testid="dashboard-card-vault">
             <h3 className="eyebrow">Vault balance</h3>
-            <strong className="tabular-nums numeric-tabular">{formatUsdc(vaultBalance)} USDC</strong>
+            {balances ? (
+              <BalanceReadout
+                label="Vault balance"
+                value={balances.vaultText}
+                status={balances.status}
+                configured={balances.configured}
+                error={balances.error}
+                onRetry={balances.onRetry}
+                pending={balances.pending}
+                className="tabular-nums numeric-tabular"
+              />
+            ) : (
+              <strong className="tabular-nums numeric-tabular">{formatUsdc(vaultBalance)} USDC</strong>
+            )}
           </div>
         </PreviewCard>
 
         <PreviewCard data={walletPreviewData} position="bottom">
           <div className="dashboard-card" data-testid="dashboard-card-wallet">
             <h3 className="eyebrow">Wallet available</h3>
-            <strong className="tabular-nums numeric-tabular">{formatUsdc(walletBalance)} USDC</strong>
+            {balances ? (
+              <BalanceReadout
+                label="Wallet available"
+                value={balances.walletText}
+                status={balances.walletConnected ? balances.status : 'ready'}
+                configured={balances.configured}
+                error={balances.walletConnected ? balances.error : null}
+                onRetry={balances.onRetry}
+                placeholder="Connect wallet"
+                className="tabular-nums numeric-tabular"
+              />
+            ) : (
+              <strong className="tabular-nums numeric-tabular">{formatUsdc(walletBalance)} USDC</strong>
+            )}
           </div>
         </PreviewCard>
 
@@ -124,7 +183,7 @@ export function DashboardOverview({
         <UsageGauge
           label="API usage this cycle"
           used={totalUsage}
-          limit={vaultBalance}
+          limit={vaultBalanceForMath}
           unit="USDC"
           costPerCall={costPerCall}
           callsPerDay={callsPerDay}
@@ -175,16 +234,26 @@ export function DashboardOverview({
         <div className="dashboard-card dashboard-card--pinned">
           <div className="dashboard-card__pinned-heading">
             <h3 className="eyebrow">Pinned APIs</h3>
-            {pinnedApis.length > 0 && (
+            {pinnedApiIds.size > 0 && (
               <span className="dashboard-card__pinned-count tabular-nums numeric-tabular">
-                {pinnedApis.length} pinned
+                {pinnedApiIds.size} pinned
               </span>
             )}
           </div>
 
-          {pinnedApis.length === 0 ? (
+          {pinnedApiIds.size === 0 ? (
             <p className="dashboard-card__pinned-empty">
               Pin APIs from the marketplace to keep them handy on your dashboard.
+            </p>
+          ) : pinnedStatus === 'loading' ? (
+            <div className="dashboard-pinned-list" role="status" aria-label="Loading pinned APIs">
+              {Array.from({ length: Math.min(pinnedApiIds.size, 3) }).map((_, i) => (
+                <Skeleton key={i} width="100%" height={44} className="mb-2" />
+              ))}
+            </div>
+          ) : pinnedStatus === 'error' ? (
+            <p className="dashboard-card__pinned-empty" role="alert">
+              Could not load pinned APIs right now.
             </p>
           ) : (
             <div className="dashboard-pinned-list">
@@ -195,7 +264,7 @@ export function DashboardOverview({
                   subtitle: api.provider?.name ?? 'Callora Verified',
                   category: api.category ?? 'Data API',
                   description: api.description,
-                  status: (api.status as any) ?? 'operational',
+                  status: api.status ?? 'operational',
                   price: `$${formatPrice(api.pricePerCall ?? api.pricePerRequest)}`,
                   tags: api.tags,
                   metrics: [
@@ -231,6 +300,28 @@ export function DashboardOverview({
                   </PreviewCard>
                 );
               })}
+              {missingPinnedIds.map((missingId) => (
+                <div
+                  key={missingId}
+                  className="dashboard-pinned-item dashboard-pinned-item--unavailable"
+                  data-testid={`pinned-api-unavailable-${missingId}`}
+                >
+                  <div className="dashboard-pinned-item__content">
+                    <strong>Unavailable API</strong>
+                    <span>This API ({missingId}) is no longer available.</span>
+                  </div>
+                  <div className="dashboard-pinned-item__meta">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => pinnedApisStore.unpin(missingId)}
+                      aria-label={`Dismiss unavailable API ${missingId}`}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

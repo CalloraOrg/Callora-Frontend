@@ -1,7 +1,8 @@
 # Configuration
 
-The Callora frontend reads all of its configuration from `VITE_*` environment
-variables. This document covers the variables, their defaults, the dev-server
+The Callora frontend reads deployment-level Stellar settings from `GET
+/api/config` at runtime, with `VITE_*` values as build-time defaults. This
+document covers both configuration sources, their precedence, the dev-server
 `/api` proxy, and how the pieces fit together at runtime and at build time.
 
 Every variable is listed in [`.env.example`](../.env.example); that file is the
@@ -30,6 +31,47 @@ cp .env.example .env.local
 `VITE_*` values are inlined into the JavaScript bundle by Vite at build time.
 They are **not** secrets. Anything that must stay private belongs in the
 backend, never here.
+
+## Runtime configuration (`GET /api/config`)
+
+Before rendering, the browser requests `/api/config` and applies a valid
+response over the build-time defaults. The request gets a 1.5 second rendering
+head start; if it is still pending, the app renders immediately with the
+build-time values and applies a later successful response live. The request
+itself times out after three seconds. A failed or invalid response keeps the
+build-time configuration and shows a warning; invalid responses are rejected
+as a whole.
+
+The endpoint returns a JSON object with any subset of these fields:
+
+```json
+{
+  "network": "testnet",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "vaultContractId": "CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ",
+  "usdcIssuer": "GDXDZNSTNORCX4373EGGYS4Q3U3XVZMBSIMMRHG5S5GCCF7JHC7QZWAZ",
+  "enableDemoOutcome": false
+}
+```
+
+- `network` must be `testnet`, `mainnet`, or `futurenet`.
+- `rpcUrl` must be an HTTPS URL.
+- `vaultContractId` must be a valid Stellar contract StrKey. Mainnet requires an
+  explicit vault ID; the testnet reference contract is never carried over.
+- `usdcIssuer`, when provided, must be a valid Stellar Ed25519 public key.
+- `enableDemoOutcome`, when provided, must be a JSON boolean.
+- Changing the configured network requires `rpcUrl` and `usdcIssuer` in the
+  same response, so a network switch cannot accidentally reuse another
+  network's endpoint or test asset.
+- Unknown fields are rejected. Do not return private keys, credentials, or
+  other secrets; the browser loader accepts only the listed public settings and
+  never logs response values.
+
+For each supplied setting, runtime values take precedence over the corresponding
+build-time value. Omitted fields keep their build-time defaults. Runtime config
+is deployment-specific and can therefore switch network, RPC, and vault
+without rebuilding the frontend. The endpoint must be served from the app's
+origin or be reachable through the configured API base and CORS policy.
 
 ## Variables
 
@@ -63,6 +105,41 @@ in development, because a silently wrong network is worse than a loud warning.
 Resolve it through `resolveStellarNetwork()` rather than reading the raw
 variable.
 
+### `VITE_STELLAR_RPC_URL`
+
+Soroban RPC endpoint used for wallet deposits, trustline checks, and vault
+reads. Default: the selected network's public RPC —
+`https://soroban-testnet.stellar.org` on `testnet` and
+`https://rpc-futurenet.stellar.org` on `futurenet`. **Mainnet has no public
+default**, so a mainnet deployment must set this explicitly.
+
+Surrounding whitespace and trailing slashes are stripped by
+`normalizeBaseUrl`, so `https://rpc.example.com/` and `https://rpc.example.com`
+are equivalent. The resolved value is exported as `STELLAR_RPC_URL`.
+
+When the value is empty, deposits and vault reads fail before any network call
+with `Stellar RPC is not configured for this network.` (`isVaultReadConfigured()`
+returns `false`), rather than silently talking to the wrong chain. Keep this
+pointed at the same network as `VITE_STELLAR_NETWORK` and the connected wallet.
+
+### `VITE_STELLAR_VAULT_CONTRACT_ID`
+
+The deployed Callora vault contract (a `C…` Soroban contract address) that
+receives USDC deposits. Default: the reference testnet vault
+`CBJZLUKQBWDMZPKNJAVONZ7GCCWADSETRXWOPN5Z3XWAUNI4F2R7XDYQ` when
+`VITE_STELLAR_NETWORK=testnet`. **Mainnet and futurenet have no default** and
+require an explicit contract ID.
+
+The value is trimmed and validated with `StrKey.isValidContract`. If it is
+missing on mainnet/futurenet, deposits are blocked with "The Callora vault
+contract is not configured for this network."; if it is present but not a valid
+contract address (an account address, for example), deposits are blocked with
+"The configured Callora vault contract ID is not a valid contract address."
+Both errors surface in the deposit modal before a signature is requested and
+before any vault read. The resolved contract ID is exported as
+`STELLAR_VAULT_CONTRACT_ID`; `STELLAR_VAULT_CONFIG` also carries the `source`
+(`"env"`, `"testnet-default"`, or `"missing"`) and any `error`.
+
 ### `VITE_STELLAR_USDC_ISSUER`
 
 Classic issuer public key for the `USDC` asset backing the configured vault's
@@ -80,7 +157,23 @@ request. Validation uses `StrKey.isValidEd25519PublicKey`.
 `STELLAR_HORIZON_URL` follows `STELLAR_NETWORK`: testnet uses
 `https://horizon-testnet.stellar.org`, mainnet uses `https://horizon.stellar.org`,
 and futurenet uses `https://horizon-futurenet.stellar.org`.
+`.env.example` intentionally leaves `VITE_STELLAR_USDC_ISSUER` commented out:
+uncommenting it with the testnet value changes nothing on testnet, and on other
+networks it is the place to put that network's issuer.
 See [Deposit flow](Deposit-Flow.md) for the trustline and funding steps.
+
+### `VITE_ENABLE_DEMO_OUTCOME`
+
+Shows the deposit demo-outcome toggle, which lets a developer force a simulated
+success or failure result while exercising the deposit flow. Default: `false`
+(toggle hidden).
+
+It is enabled only when both conditions hold: the value is exactly `true`
+(case-sensitive; `1` or `TRUE` do not enable it), and the app is running on the
+Vite dev server (`import.meta.env.DEV`). Production builds
+always resolve `ENABLE_DEMO_OUTCOME` to `false`, even if the variable is set at
+build time, so the toggle cannot appear on a deployed site. Anything other than
+`"true"` leaves it off; there is no invalid-value error.
 
 ### `VITE_DEV_API_PROXY_TARGET`
 
@@ -157,16 +250,17 @@ Key contract details and adapter behavior:
 | `resolveStellarNetwork(raw)` | validate with dev-only warning |
 | `STELLAR_NETWORK_PASSPHRASE` | passphrase for `STELLAR_NETWORK`, used to sign deposits |
 | `STELLAR_RPC_URL` | `VITE_STELLAR_RPC_URL`, else the network's public RPC (none for mainnet) |
-| `STELLAR_VAULT_CONTRACT_ID` | `VITE_STELLAR_VAULT_CONTRACT_ID`, empty by default |
+| `STELLAR_VAULT_CONTRACT_ID` | `VITE_STELLAR_VAULT_CONTRACT_ID`; defaults to the reference testnet vault on `testnet`, empty on other networks. An invalid value (for example an account address) blocks deposits before signing. |
 | `STELLAR_USDC_ASSET` | classic USDC code and validated configured issuer |
 | `STELLAR_USDC_CONFIGURATION_ERROR` | invalid/missing issuer configuration error, otherwise `null` |
 | `STELLAR_HORIZON_URL` | Horizon origin for `STELLAR_NETWORK` |
 | `ENABLE_DEMO_OUTCOME` | `VITE_ENABLE_DEMO_OUTCOME === "true"` on the dev server only |
 | `EXPLORER_BASE_URL` | stellar.expert transaction URL for `STELLAR_NETWORK` |
 
-`src/config/constants.ts` is the single place these variables are read. Read
-the exported constants instead of `import.meta.env` elsewhere so validation and
-defaults cannot drift between call sites.
+`src/config/constants.ts` supplies build-time defaults. The effective,
+validated settings are held by `src/config/runtimeConfig.ts`; wallet and vault
+operations read a snapshot from that store when they begin. A transaction
+already in progress continues using the config snapshot it started with.
 
 ```ts
 import { STELLAR_NETWORK, apiUrl } from "./config/constants";
@@ -188,3 +282,109 @@ fetch(apiUrl("/marketplace")); // "/marketplace" locally, absolute when configur
 
 - [`README.md`](../README.md) — setup and scripts
 - [`.env.example`](../.env.example) — copy-paste template
+
+## Session model (wallet sign-in)
+
+Callora uses wallet-based authentication via Freighter and the backend
+`POST /api/auth/wallet` endpoint. This section explains the token lifecycle,
+storage decisions, and the automatic refresh flow.
+
+### Sign-in sequence
+
+```
+Browser                    Freighter             Callora API
+   |                           |                     |
+   | requestAccess()           |                     |
+   |-------------------------->|                     |
+   |<----- address ------------|                     |
+   |                           |                     |
+   | signMessage(challenge)    |                     |
+   |   challenge includes:     |                     |
+   |   • app origin            |                     |
+   |   • wallet address        |                     |
+   |   • ISO timestamp         |                     |
+   |   • expiry (+5 min)       |                     |
+   |   • random nonce          |                     |
+   |-------------------------->|                     |
+   |<----- signedMessage ------|                     |
+   |                           |                     |
+   | POST /api/auth/wallet     |                     |
+   |   { walletAddress,        |                     |
+   |     signature,            |                     |
+   |     message }             |                     |
+   |---------------------------------------------->  |
+   |<-- { accessToken,         |                     |
+   |       refreshToken }------|---------------------|
+   |                           |                     |
+   | store tokens (see below)  |                     |
+```
+
+The signed challenge binds the signature to:
+- **App origin** — a signature captured on `attacker.com` cannot be replayed
+  on `callora.org`.
+- **Expiry** — the backend can reject challenges older than 5 minutes.
+- **Nonce** — two sign-ins at the same second produce different messages.
+
+### Token storage
+
+| Token | Storage | Rationale |
+|---|---|---|
+| Access token | Module-level variable (in memory only) | Never written to any browser storage. Survives page navigation within the SPA; cleared on page reload. |
+| Refresh token | `sessionStorage` | Survives navigation and back/forward cache; cleared when the tab is closed. Guarded with `try/catch` so blocked storage (private browsing, full quota) degrades gracefully. |
+
+**Why not `localStorage`?** Tokens in `localStorage` persist until explicitly
+deleted and are accessible to any script running on the same origin (e.g.
+through an XSS). `sessionStorage` is scoped to the tab and cleared when it
+closes, which is a meaningful reduction in exposure.
+
+**Why not `httpOnly` cookies?** An `httpOnly` cookie is the most secure option
+because it is inaccessible to JavaScript entirely. The backend does not yet set
+one (`authController.ts` TODO). Once the backend adds `Set-Cookie:
+callora-rt=...; HttpOnly; Secure; SameSite=Strict`, the frontend should:
+
+1. Remove the `sessionStorage` write in `authService.ts`.
+2. Remove the `refreshToken` field from the JSON body sent to `/api/auth/refresh`.
+3. Drop the `clearRefreshToken()` call in `signOut` (the cookie clears via `/api/auth/revoke`).
+
+### Refresh and retry sequence
+
+```
+authFetch("/api/usage", init)
+    │
+    ├── fetch(url, { Authorization: Bearer <token> })
+    │       │
+    │   [200] ──────────────────────────────────────> return response
+    │       │
+    │   [401] ──> ensureRefresh()   ← shared across concurrent calls
+    │               │
+    │           POST /api/auth/refresh
+    │               │
+    │           [200] new accessToken ─> retry fetch
+    │               │                       │
+    │           [401/5xx] ──> signOut()     │
+    │                       signalExpiry()   │
+    │                       reject           │
+    │                                       │
+    │                             [200] ──> return response
+    │                             [401] ──> signOut() + signalExpiry() + return 401
+```
+
+Key properties:
+- **Single-flight refresh.** Three concurrent 401s share one `POST /api/auth/refresh`.
+  The second and third calls await the promise started by the first.
+- **Abort propagation.** An `AbortSignal` passed to `authFetch` is forwarded to
+  both the initial request and the retry; it is checked before starting the
+  retry as well, so a cancelled caller never triggers an unnecessary network request.
+- **Session-expired event.** When the refresh itself fails, `signalExpiry()` is
+  called, which `useSessionExpiry` subscribes to. `AppSessionExpiryBanner` in
+  `App.tsx` renders `SessionExpiryBanner` when the session is expired.
+
+### Relevant source files
+
+| File | Purpose |
+|---|---|
+| `src/services/authService.ts` | `signIn`, `signOut`, `getAccessToken`, `refreshAccessToken` |
+| `src/services/authFetch.ts` | `authFetch` with single-flight refresh |
+| `src/services/sessionExpiry.ts` | Signal bus for session expiry events |
+| `src/hooks/useSessionExpiry.ts` | React hook wrapping the signal bus |
+| `src/components/SessionExpiryBanner.tsx` | UI banner shown on expiry |

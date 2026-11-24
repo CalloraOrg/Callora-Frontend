@@ -1,0 +1,63 @@
+/* BalanceReadout — one on-chain balance with loading / error / not-configured
+   states. Sizes mirror the `.vault-balance-card strong` / `.balance-tile
+   strong` typography (1.35rem) so the skeleton keeps the card height stable. */
+
+.balance-readout {
+  display: block;
+}
+
+.balance-readout--muted {
+  color: var(--muted);
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.balance-readout--loading {
+  display: flex;
+  align-items: center;
+  min-height: 1.6em;
+}
+
+.balance-readout--loading .skeleton {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.balance-readout--error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--danger, #ef4444);
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.balance-readout__error-text {
+  overflow-wrap: anywhere;
+}
+
+.balance-readout__retry {
+  color: var(--danger, #ef4444);
+  font-size: 0.85rem;
+  padding: 2px 8px;
+}
+
+.balance-readout__pending {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+[data-theme="light"] .balance-readout--error {
+  color: var(--danger, #b91c1c);
+}
