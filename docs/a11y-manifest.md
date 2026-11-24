@@ -93,3 +93,50 @@ A component with a known, tracked gap:
 ```json
 { "id": "Toast", "name": "Toast", "status": "needs-work" }
 ```
+
+## Automated route regression suite
+
+`src/a11y/routes.a11y.test.tsx` renders every route in
+[`ROUTE_CATALOGUE`](../src/config/routeCatalogue.ts) through the real `App` and
+runs axe-core against it. It is the automated counterpart to this manifest: the
+board records what has been audited, the suite catches regressions in what is
+rendered.
+
+### Running it
+
+```bash
+npx vitest run src/a11y            # the whole suite
+npx vitest run src/a11y -t Billing # a single route by label
+```
+
+It runs in the same jsdom environment as the rest of the tests. The
+`color-contrast` rule is disabled because jsdom has no layout or paint; contrast
+stays covered by the dedicated contrast tests. Network calls (`fetch`) and the
+Freighter wallet are stubbed, so a run never depends on a backend.
+
+### What fails a run
+
+- A `serious` or `critical` axe violation that is not listed in
+  `KNOWN_VIOLATIONS`.
+- An allowlisted violation that no longer occurs (delete the stale entry).
+- A catalogue path missing from `APP_ROUTES`, or a route that falls through to
+  the 404 page.
+- A component marked `audited` in the manifest that appears in
+  `KNOWN_VIOLATIONS`, or an audited component that has no entry in
+  `AUDITED_COMPONENT_ROUTES`.
+
+`moderate` and `minor` violations are printed as `[a11y]` console warnings and do
+not fail the run.
+
+### Adding a route or a component
+
+1. Add the route to `ROUTE_CATALOGUE` and `APP_ROUTES`; the suite picks it up
+   automatically.
+2. If the route needs fixture data or parameters, extend the fetch stub or mock
+   the API module in the suite so the render is deterministic.
+3. If a `serious`/`critical` violation cannot be fixed in the same pull request,
+   add a `KNOWN_VIOLATIONS` entry with the route, rule id, affected components
+   and a reason. Also re-classify the component in this manifest as
+   `needs-work` — an audited component must not be on the allowlist.
+4. When the fix lands, delete the allowlist entry and move the component back to
+   `audited`.
