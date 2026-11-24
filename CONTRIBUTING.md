@@ -43,7 +43,8 @@ Example: `git checkout -b feature/api-search-filters`
 Before opening a pull request, confirm:
 
 - [ ] `npm run build` passes with no TypeScript errors (`tsconfig.json` enforces `strict`, `noUnusedLocals`, `noUnusedParameters`, and `noUncheckedIndexedAccess`; avoid explicit `any`).
-- [ ] Tests pass (`npm test -- --run`).
+- [ ] Test files type-check cleanly (`npm run typecheck:test`).
+- [ ] Tests and coverage thresholds pass (`npm run test:coverage`).
 - [ ] Any new component added to `src/components/` has a matching entry in
       [`src/data/a11y-manifest.json`](src/data/a11y-manifest.json)
       (`{ "id", "name", "status" }`), and changed components have their `status`
@@ -81,8 +82,9 @@ npm run test:coverage                                   # single pass + coverage
 
 Before opening a pull request:
 
-1. Run `npm test -- --run` and make sure the suite is green.
-2. Run `npm run build` to confirm there are no TypeScript errors.
+1. Run `npm run typecheck:test` to confirm test files have no TypeScript errors.
+2. Run `npm run test:coverage` and make sure the suite is green and meets all coverage thresholds.
+3. Run `npm run build` to confirm there are no TypeScript errors.
 3. Add or update tests for the behaviour you changed. New components should
    ship with a `src/components/<Name>.test.tsx` file; bug fixes should add a
    regression test that fails against the old code.
