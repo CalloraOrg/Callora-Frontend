@@ -1,6 +1,6 @@
 # Deposit flow
 
-The `/billing` deposit modal signs transactions with Freighter and submits vault
+The `/billing` deposit modal signs transactions with the selected Stellar wallet and submits vault
 deposits through Stellar RPC. Shared configuration lives in
 `src/config/constants.ts`; wallet operations live in `src/services/walletService.ts`.
 On-chain balance reads use `src/services/vaultReads.ts` and the `useVaultBalances`
@@ -17,7 +17,7 @@ Invalid configuration blocks trustline and deposit actions before Horizon is cal
 The configured vault must accept this asset; a public key alone cannot prove that
 it matches the vault. See [Configuration](Configuration.md) and `.env.example`.
 
-Freighter must use `STELLAR_NETWORK_PASSPHRASE`. `STELLAR_HORIZON_URL` selects the
+The selected wallet must use `STELLAR_NETWORK_PASSPHRASE`. `STELLAR_HORIZON_URL` selects the
 same network for classic account lookups and trustline submission. Vault deposits
 require `VITE_STELLAR_VAULT_CONTRACT_ID` and the configured Soroban RPC endpoint.
 
@@ -290,3 +290,28 @@ Contract simulation errors are decoded by `decodeVaultError` with `action = "wit
 | `src/components/WithdrawModal.tsx` | New modal component |
 | `src/App.tsx` | Withdraw button on billing page, `WithdrawModal` mounted |
 | `src/components/WithdrawModal.test.tsx` | Validation and stage-transition tests |
+
+## Wallet adapters
+
+The wallet picker in `WalletStatus` selects Freighter or Albedo. The selected ID
+is stored in local storage and resets to Freighter on sign-out. Freighter's
+extension API is isolated in `src/services/wallets/FreighterAdapter.ts`; Albedo
+is loaded dynamically from its official `@albedo-link/intent` SDK, so the SDK is
+not part of the initial application bundle. Both adapters support transaction
+and sign-in message signing.
+
+Adapters implement `WalletAdapter` in
+`src/services/wallets/WalletAdapter.ts`: provide a stable `id` and display
+`name`, availability and connection methods, current address/network reads,
+transaction signing, and the optional message-signing capability. `watch` is
+optional; it reports account and network changes where the wallet exposes a
+change event. Keep SDK imports inside the adapter directory, normalize returned
+signatures to `WalletTransactionSignature`, and use `WalletAdapterError` to
+classify unavailable wallets, rejected requests, and network mismatches.
+
+To add a wallet, implement the interface in `src/services/wallets/`, add its
+adapter to `walletAdapters` in `src/services/wallets/index.ts`, and include an
+install/service URL. A wallet without `signMessage` remains usable for deposits
+but sign-in reports that message signing is unsupported. Web-intent wallets
+that cannot report their network until signing must validate the network in the
+returned signing response before allowing a transaction to be submitted.

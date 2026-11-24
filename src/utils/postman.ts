@@ -51,6 +51,111 @@ export function buildPostmanCollection(
   };
 }
 
+export interface PostmanApiEndpoint {
+  method: string;
+  path: string;
+  name?: string;
+  group?: string;
+}
+
+export interface PostmanApiCollectionInput {
+  name: string;
+  baseUrl: string;
+  endpoints: PostmanApiEndpoint[];
+}
+
+function buildPostmanRequestItem(
+  endpoint: PostmanApiEndpoint,
+  usedNames: Set<string>,
+) {
+  const method = (endpoint.method || "GET").trim().toUpperCase();
+  const rawPath = (endpoint.path || "").trim();
+  const normalizedPath = rawPath
+    ? rawPath.startsWith("/")
+      ? rawPath
+      : `/${rawPath}`
+    : "";
+  const baseName =
+    (endpoint.name ?? "").trim() ||
+    (normalizedPath ? `${method} ${normalizedPath}` : method);
+
+  let uniqueName = baseName;
+  let suffix = 2;
+  while (usedNames.has(uniqueName)) {
+    uniqueName = `${baseName} (${suffix})`;
+    suffix += 1;
+  }
+  usedNames.add(uniqueName);
+
+  return {
+    name: uniqueName,
+    request: {
+      method,
+      header: [],
+      url: {
+        raw: `{{baseUrl}}${normalizedPath}`,
+        host: ["{{baseUrl}}"],
+        path: normalizedPath.split("/").filter(Boolean),
+      },
+    },
+  };
+}
+
+/**
+ * Build a Postman Collection v2.1 JSON object for an entire API with
+ * collection-level `baseUrl` variable and optional folders per endpoint group.
+ */
+export function buildPostmanApiCollection({
+  name,
+  baseUrl,
+  endpoints,
+}: PostmanApiCollectionInput): {
+  info: { name: string; schema: string };
+  variable: Array<{ key: string; value: string }>;
+  item: Array<Record<string, unknown>>;
+} {
+  const collectionName = name.trim() || "API Collection";
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const hasGroups = endpoints.some((ep) => Boolean(ep.group?.trim()));
+
+  let item: Array<Record<string, unknown>>;
+  if (!hasGroups) {
+    const usedNames = new Set<string>();
+    item = endpoints.map((ep) => buildPostmanRequestItem(ep, usedNames));
+  } else {
+    const grouped = new Map<string, PostmanApiEndpoint[]>();
+    for (const ep of endpoints) {
+      const folderName = ep.group?.trim() || "General";
+      const list = grouped.get(folderName) ?? [];
+      list.push(ep);
+      grouped.set(folderName, list);
+    }
+
+    item = Array.from(grouped.entries()).map(([folderName, groupEndpoints]) => {
+      const usedNames = new Set<string>();
+      return {
+        name: folderName,
+        item: groupEndpoints.map((ep) => buildPostmanRequestItem(ep, usedNames)),
+      };
+    });
+  }
+
+  return {
+    info: {
+      name: collectionName,
+      schema:
+        "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    },
+    variable: [
+      {
+        key: "baseUrl",
+        value: normalizedBaseUrl,
+      },
+    ],
+    item,
+  };
+}
+
 /**
  * Generate a Postman import URL that can be pasted into a browser to
  * open the endpoint in the Postman desktop app.

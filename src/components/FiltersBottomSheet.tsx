@@ -48,6 +48,8 @@ interface FiltersBottomSheetProps {
   toggleFavoritesOnly: () => void;
   selectedStatuses?: Set<string>;
   toggleStatus?: (s: string) => void;
+  /** Per-category result counts, forwarded to the shared FiltersSidebar. */
+  categoryCounts?: Record<string, number>;
   /** Ref to the trigger button so focus is restored on close */
   triggerRef: React.RefObject<HTMLButtonElement>;
 }
@@ -69,6 +71,7 @@ export default function FiltersBottomSheet({
   toggleFavoritesOnly,
   selectedStatuses = new Set<string>(),
   toggleStatus = () => {},
+  categoryCounts,
   triggerRef,
 }: FiltersBottomSheetProps) {
   const [snap, setSnap] = useState<Snap>("half");
@@ -237,6 +240,7 @@ export default function FiltersBottomSheet({
             selectedStatuses={selectedStatuses}
             toggleStatus={toggleStatus}
             resultCount={resultCount}
+            categoryCounts={categoryCounts}
           />
         </div>
 

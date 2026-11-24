@@ -5780,6 +5780,20 @@ code,
   color: var(--text);
   cursor: pointer;
 }
+.filter-count {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.filter-option--empty {
+  opacity: 0.55;
+}
+.filter-option--empty .filter-label {
+  color: var(--text-muted, var(--muted));
+}
+.filter-option--empty:hover .filter-label {
+  color: var(--text-muted, var(--muted));
+}
 
 /* ─── Filter Group Collapsible Styles ─────────────────────────────────────────── */
 .filter-group__header {
