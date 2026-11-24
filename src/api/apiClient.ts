@@ -1,14 +1,13 @@
 /**
  * Shared typed HTTP client for Callora.
  *
- * Combines base URL resolution (`apiUrl` / `getApiBaseUrl`), authenticated
+ * Combines base URL resolution (`apiUrl`), authenticated
  * fetch (`authFetch` with single-flight 401 refresh), request timeouts
  * (`runWithTimeout`), `AbortSignal` passthrough, query-string encoding,
  * safe JSON/204 parsing, optional response validation (`parse`), and
  * classified `ApiError` instances built with `classifyHttpError`.
  */
 
-import { getApiBaseUrl } from "../config/api";
 import { apiUrl } from "../config/constants";
 import { authFetch } from "../services/authFetch";
 import {
@@ -112,10 +111,6 @@ function resolveTargetUrl(pathWithQuery: string, baseUrl?: string): string {
   if (baseUrl !== undefined) {
     const cleanBase = baseUrl.trim().replace(/\/+$/, "");
     return cleanBase ? `${cleanBase}${pathWithQuery}` : pathWithQuery;
-  }
-  const configuredBase = getApiBaseUrl().trim().replace(/\/+$/, "");
-  if (configuredBase) {
-    return `${configuredBase}${pathWithQuery}`;
   }
   return apiUrl(pathWithQuery);
 }

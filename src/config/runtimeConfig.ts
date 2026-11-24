@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { isValidContractId, isValidEd25519PublicKey } from "../utils/stellarAddress";
-import { getApiBaseUrl } from "./api";
 import {
+  API_BASE,
   DEFAULT_STELLAR_NETWORK,
   STELLAR_NETWORK,
   STELLAR_RPC_URL,
@@ -217,7 +217,7 @@ export async function loadRuntimeConfig(signal?: AbortSignal): Promise<RuntimeCo
   else signal?.addEventListener("abort", abort, { once: true });
 
   try {
-    const base = getApiBaseUrl().trim().replace(/\/+$/, "");
+    const base = API_BASE;
     const response = await fetch(`${base}/api/config`, {
       method: "GET",
       headers: { Accept: "application/json" },

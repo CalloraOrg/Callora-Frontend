@@ -139,6 +139,12 @@ export const API_BASE = normalizeBaseUrl(
   runtimeEnv.VITE_API_BASE_URL as string | undefined,
 );
 
+/**
+ * Whether the application is configured to call a remote backend directly.
+ * Evaluates to `true` when `VITE_API_BASE_URL` (normalised into `API_BASE`) is non-empty.
+ */
+export const IS_BACKEND_MODE = API_BASE !== "";
+
 /** Human-readable labels for each supported Stellar network. */
 export const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
   mainnet: "Mainnet",
