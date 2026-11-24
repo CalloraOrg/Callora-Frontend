@@ -103,7 +103,7 @@ export default function TestInBrowser({
 
     try {
       let url = endpointUrl;
-      let fetchInit: RequestInit = { method, signal: controller.signal };
+      const fetchInit: RequestInit = { method, signal: controller.signal };
 
       if (method.toUpperCase() === "GET" || method.toUpperCase() === "DELETE") {
         const qs = new URLSearchParams(

@@ -63,9 +63,11 @@ export const pinnedApisStore = {
   },
 
   toggle(apiId: string): void {
-    state.has(apiId)
-      ? pinnedApisStore.unpin(apiId)
-      : pinnedApisStore.pin(apiId);
+    if (state.has(apiId)) {
+      pinnedApisStore.unpin(apiId);
+    } else {
+      pinnedApisStore.pin(apiId);
+    }
   },
 
   isPinned(apiId: string): boolean {

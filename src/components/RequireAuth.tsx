@@ -27,6 +27,7 @@ export function sanitizeReturnTo(raw: string | null | undefined): string {
   if (trimmed.startsWith("//") || trimmed.startsWith("/\\")) {
     return APP_ROUTES.dashboard;
   }
+  // eslint-disable-next-line no-control-regex -- intentionally rejects ASCII control characters in returnTo paths
   if (/[\u0000-\u001f\u007f]/.test(trimmed)) {
     return APP_ROUTES.dashboard;
   }

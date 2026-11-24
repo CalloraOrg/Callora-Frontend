@@ -85,7 +85,7 @@ const SENSITIVE_PATTERNS = [
   // surrounding JSON stays valid after redaction. Runs before the generic
   // patterns below so quoted secret values are claimed first.
   {
-    pattern: /(\"(?:password|passwd|pwd|secret|token|api_?key|access_?token|refresh_?token|client_?secret|authorization|private_?key)\"\s*:\s*)\"[^\"]*\"/gi,
+    pattern: /("(?:password|passwd|pwd|secret|token|api_?key|access_?token|refresh_?token|client_?secret|authorization|private_?key)"\s*:\s*)"[^"]*"/gi,
     replacement: '$1"[REDACTED]"',
   },
   // API keys
@@ -102,7 +102,7 @@ const SENSITIVE_PATTERNS = [
     replacement: '[REDACTED_TOKEN]',
   },
   // Email addresses
-  { pattern: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: '[REDACTED_EMAIL]' },
+  { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, replacement: '[REDACTED_EMAIL]' },
   // URLs with credentials
   { pattern: /https?:\/\/[^:]+:[^@]+@[^\s]/gi, replacement: 'https://[REDACTED_CREDENTIALS]' },
   // Passwords
@@ -112,9 +112,9 @@ const SENSITIVE_PATTERNS = [
   // API keys in URLs
   { pattern: /[?&](?:api_?key|key|token)=[^\s&]*/gi, replacement: '[REDACTED_PARAM]' },
   // Credit card-like patterns
-  { pattern: /\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b/g, replacement: '[REDACTED_CARD]' },
+  { pattern: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g, replacement: '[REDACTED_CARD]' },
   // Phone numbers
-  { pattern: /\b\d{3}[\s\-]?\d{3}[\s\-]?\d{4}\b/g, replacement: '[REDACTED_PHONE]' },
+  { pattern: /\b\d{3}[\s-]?\d{3}[\s-]?\d{4}\b/g, replacement: '[REDACTED_PHONE]' },
 ];
 
 /**

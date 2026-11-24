@@ -176,7 +176,7 @@ export default function ApiUsage() {
       await navigator.clipboard.writeText(apiKey);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch {
       console.error('Failed to copy API key');
     }
   };
@@ -290,7 +290,7 @@ export default function ApiUsage() {
       await navigator.clipboard.writeText(code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch {
       console.error('Failed to copy code');
     }
   };

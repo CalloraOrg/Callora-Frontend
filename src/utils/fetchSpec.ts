@@ -137,7 +137,6 @@ export async function fetchSpecFromUrl(
   // ── 2. Build a composite AbortSignal (caller + timeout) ─────────────────
 
   const timeoutController = new AbortController();
-  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
   // Compose the caller's signal with our timeout signal.
   const signals: AbortSignal[] = [timeoutController.signal];
@@ -154,7 +153,7 @@ export async function fetchSpecFromUrl(
     }
   });
 
-  timeoutHandle = setTimeout(() => {
+  const timeoutHandle: ReturnType<typeof setTimeout> = setTimeout(() => {
     timeoutController.abort('timeout');
     abortComposed();
   }, timeoutMs);

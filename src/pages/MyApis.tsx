@@ -347,8 +347,6 @@ export default function MyApis() {
   useEffect(() => {
     load();
     return () => abortRef.current?.abort();
-    // retryKey intentionally causes a re-run on explicit retry
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, retryKey]);
 
   const handleRetry = useCallback(() => {

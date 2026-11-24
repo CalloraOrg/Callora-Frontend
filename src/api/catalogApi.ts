@@ -21,7 +21,7 @@
  * {@link isCatalogAbortError}) is the idiomatic way to say that.
  */
 
-import { API_BASE, API_BASE_URL, apiUrl } from "../config/constants";
+import { API_BASE, apiUrl } from "../config/constants";
 import MOCK_APIS, { type APIItem, type ApiEndpointItem } from "../data/mockApis";
 import { onAccountCacheInvalidated } from "../utils/offlineApiCache";
 import type { HealthStatus } from "../components/HealthTimeline";

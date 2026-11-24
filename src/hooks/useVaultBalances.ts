@@ -181,9 +181,9 @@ export function useVaultBalances(
       queuedRef.current = false;
       if (runQueued) {
         await loadRef.current();
-        return;
+      } else {
+        flushRefreshResolvers();
       }
-      flushRefreshResolvers();
     }
   }, [config, flushRefreshResolvers]);
 

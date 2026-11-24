@@ -53,7 +53,7 @@ export function readAllPrefs(): UserPrefs {
       if (typeof parsed !== 'object' || parsed === null) {
         parsed = {};
       }
-    } catch (e) {
+    } catch {
       // Parse failure
       parsed = {};
     }

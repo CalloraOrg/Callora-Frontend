@@ -42,6 +42,7 @@ Example: `git checkout -b feature/api-search-filters`
 
 Before opening a pull request, confirm:
 
+- [ ] `npm run lint` passes with zero errors (`npm run lint:fix` auto-fixes simple issues).
 - [ ] `npm run build` passes with no TypeScript errors (`tsconfig.json` enforces `strict`, `noUnusedLocals`, `noUnusedParameters`, and `noUncheckedIndexedAccess`; avoid explicit `any`).
 - [ ] Tests pass (`npm test -- --run`).
 - [ ] Any new component added to `src/components/` has a matching entry in
@@ -104,6 +105,18 @@ Conventions:
   instead of real waits, to keep tests fast and deterministic. Restore them
   with `vi.useRealTimers()` afterwards; note that Testing Library's `waitFor`
   can hang under fake timers.
+
+## Linting
+
+The project uses ESLint's flat config (`eslint.config.js`) with `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, and `eslint-plugin-jsx-a11y`.
+
+```bash
+npm run lint       # check all files
+npm run lint:fix   # auto-fix safe issues
+```
+
+- Fix violations directly rather than disabling rules. If an `eslint-disable-next-line` comment is genuinely required, include a brief justification on the same line (e.g. `// eslint-disable-next-line react-hooks/exhaustive-deps -- ...`).
+- Accessibility (`jsx-a11y`) rules that already pass are enforced as errors; remaining legacy violations are tracked as warnings and should not be increased.
 
 ## Manual verification
 

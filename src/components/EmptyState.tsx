@@ -657,6 +657,7 @@ export default function EmptyState({
   const resolvedMessage = message ?? description;
   const resolvedAction = action;
   const { handleCopy, copied } = useCopy();
+  const [isRetrying, setIsRetrying] = React.useState(false);
 
   if (loading) {
     return (
@@ -733,7 +734,6 @@ export default function EmptyState({
 
   const finalTitle = title ?? defaults[variant].title;
   const finalMessage = resolvedMessage ?? defaults[variant].message;
-  const [isRetrying, setIsRetrying] = React.useState(false);
 
   const handleRetry = async () => {
     if (!onRetry || isRetrying) return;
