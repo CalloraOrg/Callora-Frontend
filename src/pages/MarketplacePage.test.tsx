@@ -1,12 +1,16 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import MarketplacePage from "./MarketplacePage";
 import { ToastProvider } from "../components/Toast";
 import { CollectionsProvider } from "../state/collectionsStore";
+import { compareStore } from "../state/compareStore";
 import * as catalogApiModule from "../api/catalogApi";
 import * as constants from "../config/constants";
+import { setCache } from "../utils/offlineApiCache";
 import type { APIItem } from "../data/mockApis";
 
 vi.mock("../hooks/useDocumentTitle", () => ({
@@ -35,9 +39,9 @@ const TEST_BACKEND_APIS: APIItem[] = [
   },
 ];
 
-function renderMarketplace() {
+function renderMarketplace(initialEntries: string[] = ["/"]) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <ToastProvider>
         <CollectionsProvider>
           <MarketplacePage />
@@ -209,6 +213,185 @@ describe("MarketplacePage backend catalogue integration (Issue #1327 & #1328)", 
           {},
         );
       });
+    });
+  });
+
+  describe("ActiveFilterChips integration (Issue #1400)", () => {
+    it("renders active chips when category is filtered and removing chip updates results and live region", async () => {
+      vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
+      vi.spyOn(catalogApiModule, "fetchCatalog").mockResolvedValue(TEST_BACKEND_APIS);
+
+      renderMarketplace(["/?categories=Security"]);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Remove filter: Category Security" })).toBeInTheDocument();
+      });
+
+      const grid = document.querySelector(".marketplace-grid")!;
+      expect(grid).toBeInTheDocument();
+      expect(within(grid).getByText("Enterprise KYC Verifier")).toBeInTheDocument();
+      expect(within(grid).queryByText("Live Blockchain Indexer")).not.toBeInTheDocument();
+
+      // Remove the chip
+      const removeBtn = screen.getByRole("button", {
+        name: "Remove filter: Category Security",
+      });
+      await userEvent.click(removeBtn);
+
+      // Now both APIs are visible in the grid and chip is gone
+      await waitFor(() => {
+        expect(screen.queryByRole("button", { name: "Remove filter: Category Security" })).not.toBeInTheDocument();
+        expect(within(grid).getByText("Live Blockchain Indexer")).toBeInTheDocument();
+      });
+
+      // Announcement in live region
+      await waitFor(() => {
+        expect(screen.getByText(/Removed filter Category Security/i)).toBeInTheDocument();
+      });
+    });
+
+    it("renders chips for status, tag, and price and clicking Clear all resets them", async () => {
+      vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
+      vi.spyOn(catalogApiModule, "fetchCatalog").mockResolvedValue(TEST_BACKEND_APIS);
+
+      renderMarketplace(["/?statuses=operational&tag=events&minPrice=1"]);
+
+      await waitFor(() => {
+        expect(screen.getByText("Status: Operational")).toBeInTheDocument();
+        expect(screen.getByText("Tag: events")).toBeInTheDocument();
+        expect(screen.getByText("Min price: $1")).toBeInTheDocument();
+      });
+
+      const clearAllBtn = screen.getByRole("button", { name: "Clear all" });
+      await userEvent.click(clearAllBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByRole("button", { name: "Clear all" })).not.toBeInTheDocument();
+      });
+    });
+
+    it("renders inverted price range as inactive chips without filtering results", async () => {
+      vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
+      vi.spyOn(catalogApiModule, "fetchCatalog").mockResolvedValue(TEST_BACKEND_APIS);
+
+      renderMarketplace(["/?minPrice=50&maxPrice=10"]);
+
+      await waitFor(() => {
+        const minChip = screen.getByTestId("filter-chip-minPrice");
+        const maxChip = screen.getByTestId("filter-chip-maxPrice");
+        expect(minChip).toHaveClass("filter-chip--inactive");
+        expect(maxChip).toHaveClass("filter-chip--inactive");
+        expect(minChip).toHaveAttribute("title", "Min price exceeds max price; price filter is inactive");
+      });
+
+      // Inverted price skips price filtering, so both APIs are still displayed in grid
+      const grid = document.querySelector(".marketplace-grid")!;
+      expect(within(grid).getByText("Live Blockchain Indexer")).toBeInTheDocument();
+      expect(within(grid).getByText("Enterprise KYC Verifier")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("Offline reconnect (Issue #1403)", () => {
+  const originalOnLine = navigator.onLine;
+
+  function setOnline(value: boolean) {
+    Object.defineProperty(navigator, "onLine", {
+      configurable: true,
+      value,
+    });
+  }
+
+  afterEach(() => {
+    setOnline(originalOnLine);
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it("refetches a stale catalogue once connectivity returns", async () => {
+    vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
+    setCache("marketplace", catalogApiModule.buildCacheKey({}), TEST_BACKEND_APIS);
+    setOnline(false);
+
+    const fetchCatalogSpy = vi
+      .spyOn(catalogApiModule, "fetchCatalog")
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValue(TEST_BACKEND_APIS);
+
+    renderMarketplace();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Showing saved results/i)).toBeInTheDocument();
+    });
+    expect(fetchCatalogSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      setOnline(true);
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await waitFor(() => {
+      expect(fetchCatalogSpy).toHaveBeenCalledTimes(2);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/Showing saved results/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not refetch when the catalogue was never stale", async () => {
+    vi.spyOn(constants, "API_BASE", "get").mockReturnValue("https://api.callora.com");
+    setOnline(false);
+
+    const fetchCatalogSpy = vi
+      .spyOn(catalogApiModule, "fetchCatalog")
+      .mockResolvedValue(TEST_BACKEND_APIS);
+
+    renderMarketplace();
+    await waitFor(() => expect(fetchCatalogSpy).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      setOnline(true);
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Live Blockchain Indexer").length).toBeGreaterThan(0);
+    });
+    expect(fetchCatalogSpy).toHaveBeenCalledTimes(1);
+  });
+
+  describe("Roving tabindex grid navigation", () => {
+    beforeEach(() => {
+      compareStore.clear();
+    });
+
+    it("exposes a single tabIndex=0 card in the grid, moves focus with arrow keys, and preserves the 'c' compare shortcut", async () => {
+
+      renderMarketplace();
+
+        expect(screen.getAllByText("Live Blockchain Indexer").length).toBeGreaterThan(0);
+      });
+
+      const grid = screen.getByRole("group", { name: "Marketplace APIs" });
+      const cards = Array.from(grid.querySelectorAll<HTMLElement>(".api-marketplace-card"));
+      expect(cards.length).toBe(2);
+
+      // Only the first card is a tab stop
+      const tabbableCards = cards.filter((card) => card.getAttribute("tabindex") === "0");
+      expect(tabbableCards).toHaveLength(1);
+      expect(cards[0].getAttribute("tabindex")).toBe("0");
+      expect(cards[1].getAttribute("tabindex")).toBe("-1");
+
+      // ArrowRight moves focus and roving tabIndex to the second card
+      cards[0].focus();
+      fireEvent.keyDown(cards[0], { key: "ArrowRight" });
+      expect(document.activeElement).toBe(cards[1]);
+      expect(cards[0].getAttribute("tabindex")).toBe("-1");
+      expect(cards[1].getAttribute("tabindex")).toBe("0");
+
+      // 'c' shortcut on the focused card still toggles compare
+      fireEvent.keyDown(cards[1], { key: "c" });
+      expect(compareStore.getApis().some((a) => a.id === "backend-102")).toBe(true);
     });
   });
 });
