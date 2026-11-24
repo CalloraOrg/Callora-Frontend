@@ -26,6 +26,8 @@ import { useSessionExpiry } from "./hooks/useSessionExpiry";
 import { useNotifications, NotificationsContext } from "./hooks/useNotifications";
 import { isSignedIn } from "./services/authService";
 import SessionExpiryBanner from "./components/SessionExpiryBanner";
+import OfflineBanner from "./components/OfflineBanner";
+import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import WalletStatus from "./components/WalletStatus";
 import { useWalletStore } from "./state/walletStore";
 import { useToast } from "./components/Toast";
@@ -102,6 +104,16 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const wallet = useWalletStore();
+  const { isOnline, lastReconnectedAt } = useOnlineStatus();
+  const [connectivityAnnouncement, setConnectivityAnnouncement] = useState("");
+
+  useEffect(() => {
+    if (lastReconnectedAt === null) return;
+    setConnectivityAnnouncement("You are back online. Refreshing data.");
+    const timer = setTimeout(() => setConnectivityAnnouncement(""), 3000);
+    return () => clearTimeout(timer);
+  }, [lastReconnectedAt]);
+
   const runtimeConfig = useRuntimeConfig();
   const vaultConfig = resolveVaultConfig({
     network: runtimeConfig.network,
@@ -884,7 +896,9 @@ function App() {
 
         <main id="main-content" role="main" className="page">
           <AppSessionExpiryBanner />
+          <OfflineBanner isOnline={isOnline} />
           <LiveRegion message={balanceAnnouncement} />
+          <LiveRegion message={connectivityAnnouncement} regionId="connectivity" />
           <LiveRegion message={notificationAnnouncement} regionId="notifications-unread" />
           <RouteErrorBoundary
             resetKey={location.pathname}

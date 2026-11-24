@@ -1,6 +1,20 @@
 import "@testing-library/jest-dom";
+import { expect, vi } from "vitest";
 import { vi, beforeAll, afterEach, afterAll } from "vitest";
 import type { Mock } from "vitest";
+import { toHaveNoViolations } from "vitest-axe/dist/matchers";
+
+declare module "vitest" {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  interface Assertion<T = any> {
+    toHaveNoViolations(): void;
+  }
+  interface AsymmetricMatchersContaining {
+    toHaveNoViolations(): void;
+  }
+}
+
+expect.extend({ toHaveNoViolations });
 import { server } from "./mocks/server";
 import { resetQuotaStore, mockConfig } from "./mocks/handlers";
 
