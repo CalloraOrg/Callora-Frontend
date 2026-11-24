@@ -5,7 +5,7 @@ import Skeleton from "../components/Skeleton";
 import { StatusBadge, apiStatusToVariant } from "../components/StatusBadge";
 import useDocumentTitle from "../hooks/useDocumentTitle";
 import { formatPrice } from "../utils/format";
-import { fetchCatalog } from "../api/catalogApi";
+import { apiUrl } from "../config/constants";
 import type { APIItem } from "../data/mockApis";
 import { isSignedIn, getAccessToken } from "../services/authService";
 import KeyRotationModal from "./KeyRotationModal";
@@ -52,25 +52,22 @@ function reducer(_state: FetchState, action: Action): FetchState {
 // once the backend endpoint is available.
 // ---------------------------------------------------------------------------
 
-const PROVIDER_ID = "acme-labs"; // placeholder — swap for authed user id
-
-/** Returns the subset of catalogue APIs belonging to the current provider. */
+/** Returns the published APIs belonging to the current provider from GET /api/provider/apis. */
 async function fetchProviderApis(
   signal: AbortSignal,
 ): Promise<PublishedApiItem[]> {
-  const catalog = await fetchCatalog(signal);
-  return catalog
-    .filter(
-      (api) =>
-        api.provider.name.toLowerCase().replace(/\s+/g, "-") === PROVIDER_ID,
-    )
-    .map((api, i) => ({
-      ...api,
-      // Spread representative publish statuses across the rows.
-      publishStatus: (["live", "pending", "rejected"] as PublishStatus[])[
-        i % 3
-      ],
-    }));
+  const url = apiUrl("/api/provider/apis");
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load your APIs: ${response.status}`);
+  }
+
+  return (await response.json()) as PublishedApiItem[];
 }
 
 // ---------------------------------------------------------------------------
