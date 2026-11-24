@@ -16,6 +16,24 @@ npm run build   # tsc type-check + vite build -> dist/
 - Framework `vite`, output `dist`.
 - A single rewrite sends every path except `/api/*` and `/assets/*` to `index.html`, so client-side routes survive a refresh. `/api/*` is deliberately excluded so a missing backend returns a real 404 (the app then switches to mock data) rather than HTML.
 - Hashed files under `/assets/` get immutable caching.
+- `/sw.js` is served with `Cache-Control: no-cache` and `Service-Worker-Allowed: /` so browsers always revalidate the service worker script on navigation.
+
+## Service Worker & Caching
+
+Production builds register `public/sw.js` (via `src/utils/registerServiceWorker.ts` in `src/main.tsx` when `import.meta.env.PROD` is true, after `window` `load`). It is never registered in development (`npm run dev`) or Vitest.
+
+### Strategy
+
+- **App shell & static assets (`callora-shell-v1`)**: `/` and `/index.html` are precached on install. Same-origin `/assets/*` and navigation requests use **stale-while-revalidate** (SWR) with offline fallback to cached `/index.html`.
+- **Catalogue API (`callora-catalog-v1`)**: Same-origin `GET /api/apis` and `GET /api/apis/*` requests without an `Authorization` header use **stale-while-revalidate** so the last catalogue response loads offline while refreshing in the background.
+- **Network-only**: All other `/api/*` endpoints, all non-`GET` requests, cross-origin requests, and any request carrying an `Authorization` header bypass the service worker cache completely so authenticated or account-scoped data is never cached across accounts.
+- **Account switching / removal**: `invalidateAccountCache` in `src/utils/offlineApiCache.ts` posts `{ type: "CLEAR_API_CACHE" }` to the active service worker, dropping `callora-catalog-v1` alongside `localStorage`.
+
+### Versioning & Busting Caches
+
+- Cache names are versioned at the top of `public/sw.js` (`SHELL_CACHE = "callora-shell-v1"`, `CATALOG_CACHE = "callora-catalog-v1"`).
+- To force a full cache bust on deploy, bump the version suffix (e.g. `v1` -> `v2`). On `activate`, the service worker automatically deletes any caches whose names are not in `CURRENT_CACHES` and claims active clients.
+- Because `/sw.js` is served with `Cache-Control: no-cache`, browsers detect the updated script on the next navigation and install the new version automatically.
 
 Deploy with the CLI:
 
