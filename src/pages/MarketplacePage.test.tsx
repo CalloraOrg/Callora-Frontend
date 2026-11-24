@@ -1,11 +1,13 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import MarketplacePage from "./MarketplacePage";
 import { ToastProvider } from "../components/Toast";
 import { CollectionsProvider } from "../state/collectionsStore";
+import { compareStore } from "../state/compareStore";
 import * as catalogApiModule from "../api/catalogApi";
 import * as constants from "../config/constants";
 import { setCache } from "../utils/offlineApiCache";
@@ -356,5 +358,40 @@ describe("Offline reconnect (Issue #1403)", () => {
       expect(screen.getAllByText("Live Blockchain Indexer").length).toBeGreaterThan(0);
     });
     expect(fetchCatalogSpy).toHaveBeenCalledTimes(1);
+  });
+
+  describe("Roving tabindex grid navigation", () => {
+    beforeEach(() => {
+      compareStore.clear();
+    });
+
+    it("exposes a single tabIndex=0 card in the grid, moves focus with arrow keys, and preserves the 'c' compare shortcut", async () => {
+
+      renderMarketplace();
+
+        expect(screen.getAllByText("Live Blockchain Indexer").length).toBeGreaterThan(0);
+      });
+
+      const grid = screen.getByRole("group", { name: "Marketplace APIs" });
+      const cards = Array.from(grid.querySelectorAll<HTMLElement>(".api-marketplace-card"));
+      expect(cards.length).toBe(2);
+
+      // Only the first card is a tab stop
+      const tabbableCards = cards.filter((card) => card.getAttribute("tabindex") === "0");
+      expect(tabbableCards).toHaveLength(1);
+      expect(cards[0].getAttribute("tabindex")).toBe("0");
+      expect(cards[1].getAttribute("tabindex")).toBe("-1");
+
+      // ArrowRight moves focus and roving tabIndex to the second card
+      cards[0].focus();
+      fireEvent.keyDown(cards[0], { key: "ArrowRight" });
+      expect(document.activeElement).toBe(cards[1]);
+      expect(cards[0].getAttribute("tabindex")).toBe("-1");
+      expect(cards[1].getAttribute("tabindex")).toBe("0");
+
+      // 'c' shortcut on the focused card still toggles compare
+      fireEvent.keyDown(cards[1], { key: "c" });
+      expect(compareStore.getApis().some((a) => a.id === "backend-102")).toBe(true);
+    });
   });
 });

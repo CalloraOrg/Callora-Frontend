@@ -46,6 +46,7 @@ import RecentlyActiveRail from "../components/RecentlyActiveRail";
 import { useCompareStore } from "../state/compareStore";
 import MarketplacePageSkeleton from "./MarketplacePage.skeleton";
 import { useCursorPagination } from "../hooks/useCursorPagination";
+import { useRovingGrid } from "../hooks/useRovingGrid";
 
 export default function MarketplacePage(): JSX.Element {
   const { apis } = useCompareStore();
@@ -108,6 +109,7 @@ export default function MarketplacePage(): JSX.Element {
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
   const resultsHeadingRef = useRef<HTMLHeadingElement>(null);
   const pendingRemovedFilterRef = useRef<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
   // Monotonic sequence that guards the loading transition: only the latest
   // in-flight load may flip `isLoading` off, so a stale response from an
@@ -406,6 +408,30 @@ export default function MarketplacePage(): JSX.Element {
   ]);
 
   // ── Aria-live announcements (relies on filtered being defined above) ──
+  const {
+    activeIndex: activeCardIndex,
+    setActiveIndex: setActiveCardIndex,
+    onKeyDown: handleGridKeyDown,
+  } = useRovingGrid({
+    containerRef: gridRef,
+    itemSelector: ".api-marketplace-card",
+    itemCount: pageItems.length,
+    resetDeps: [
+      currentPageIndex,
+      pageSize,
+      density,
+      debouncedQuery,
+      categories.join(","),
+      statuses.join(","),
+      tag,
+      minPrice,
+      maxPrice,
+      popularity,
+      favoritesOnly,
+      sort,
+    ],
+  });
+
   const prevIsLoading = useRef(isLoading);
   const prevFetchError = useRef(fetchError);
   const prevPageIndex = useRef(currentPageIndex);
@@ -835,12 +861,26 @@ export default function MarketplacePage(): JSX.Element {
               }
             />
           ) : (
-            <div className="marketplace-grid">
-              {pageItems.map((a) => (
+            /*
+             * Uses role="group" with roving tabindex rather than role="grid" because
+             * ApiCard renders <article role="button"> with interactive child buttons
+             * (favorite, bookmark, compare, tags); role="grid" would require row/gridcell
+             * wrappers and break existing button-role semantics and tests.
+             */
+            <div
+              ref={gridRef}
+              className="marketplace-grid"
+              role="group"
+              aria-label="Marketplace APIs"
+              onKeyDown={handleGridKeyDown}
+            >
+              {pageItems.map((a, index) => (
                 <ApiCard
                   key={a.id}
                   api={a}
                   density={density}
+                  tabIndex={index === activeCardIndex ? 0 : -1}
+                  onFocus={() => setActiveCardIndex(index)}
                   onViewDetails={handleViewDetails}
                   onTagClick={handleTagClick}
                   activeTag={tag}
