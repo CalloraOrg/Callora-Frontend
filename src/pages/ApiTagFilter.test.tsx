@@ -477,3 +477,79 @@ describe("getAllUniqueTags", () => {
     expect(a).not.toBe(b);
   });
 });
+// ── Facet counts ───────────────────────────────────────────────────────────
+
+describe("ApiTagFilter counts", () => {
+  it("renders the provided counts instead of deriving them from apis", () => {
+    render(
+      <ApiTagFilter
+        tags={["weather", "geo"]}
+        selectedTag={null}
+        onTagChange={() => {}}
+        apis={[{ id: "a", tags: ["weather", "weather", "weather"] } as never]}
+        counts={{ weather: 4, geo: 0 }}
+      />,
+    );
+
+    const weather = screen.getByRole("button", { name: /weather/i });
+    const geo = screen.getByRole("button", { name: /geo/i });
+
+    expect(weather.querySelector(".api-tag-filter__count")?.textContent).toBe("4");
+    expect(weather.getAttribute("aria-label")).toContain("(4 APIs)");
+    expect(geo.querySelector(".api-tag-filter__count")?.textContent).toBe("0");
+  });
+
+  it("falls back to counting the apis catalogue when counts is omitted", () => {
+    render(
+      <ApiTagFilter
+        tags={["weather", "geo"]}
+        selectedTag={null}
+        onTagChange={() => {}}
+        apis={[
+          { id: "a", tags: ["Weather", "geo"] },
+          { id: "b", tags: ["weather"] },
+        ] as never}
+      />,
+    );
+
+    expect(
+      screen
+        .getByRole("button", { name: /weather/i })
+        .querySelector(".api-tag-filter__count")?.textContent,
+    ).toBe("2");
+    expect(
+      screen
+        .getByRole("button", { name: /geo/i })
+        .querySelector(".api-tag-filter__count")?.textContent,
+    ).toBe("1");
+  });
+
+  it("counts each tag once per API", () => {
+    render(
+      <ApiTagFilter
+        tags={["weather"]}
+        selectedTag={null}
+        onTagChange={() => {}}
+        apis={[{ id: "a", tags: ["weather", "WEATHER"] }] as never}
+      />,
+    );
+
+    expect(
+      screen
+        .getByRole("button", { name: /weather/i })
+        .querySelector(".api-tag-filter__count")?.textContent,
+    ).toBe("1");
+  });
+
+  it("renders no count when neither counts nor apis are provided", () => {
+    render(
+      <ApiTagFilter tags={["weather"]} selectedTag={null} onTagChange={() => {}} />,
+    );
+
+    expect(
+      screen
+        .getByRole("button", { name: /weather/i })
+        .querySelector(".api-tag-filter__count"),
+    ).toBeNull();
+  });
+});

@@ -16,6 +16,24 @@ npm run build   # tsc type-check + vite build -> dist/
 - Framework `vite`, output `dist`.
 - A single rewrite sends every path except `/api/*` and `/assets/*` to `index.html`, so client-side routes survive a refresh. `/api/*` is deliberately excluded so a missing backend returns a real 404 (the app then switches to mock data) rather than HTML.
 - Hashed files under `/assets/` get immutable caching.
+- `/sw.js` is served with `Cache-Control: no-cache` and `Service-Worker-Allowed: /` so browsers always revalidate the service worker script on navigation.
+
+## Service Worker & Caching
+
+Production builds register `public/sw.js` (via `src/utils/registerServiceWorker.ts` in `src/main.tsx` when `import.meta.env.PROD` is true, after `window` `load`). It is never registered in development (`npm run dev`) or Vitest.
+
+### Strategy
+
+- **App shell & static assets (`callora-shell-v1`)**: `/` and `/index.html` are precached on install. Same-origin `/assets/*` and navigation requests use **stale-while-revalidate** (SWR) with offline fallback to cached `/index.html`.
+- **Catalogue API (`callora-catalog-v1`)**: Same-origin `GET /api/apis` and `GET /api/apis/*` requests without an `Authorization` header use **stale-while-revalidate** so the last catalogue response loads offline while refreshing in the background.
+- **Network-only**: All other `/api/*` endpoints, all non-`GET` requests, cross-origin requests, and any request carrying an `Authorization` header bypass the service worker cache completely so authenticated or account-scoped data is never cached across accounts.
+- **Account switching / removal**: `invalidateAccountCache` in `src/utils/offlineApiCache.ts` posts `{ type: "CLEAR_API_CACHE" }` to the active service worker, dropping `callora-catalog-v1` alongside `localStorage`.
+
+### Versioning & Busting Caches
+
+- Cache names are versioned at the top of `public/sw.js` (`SHELL_CACHE = "callora-shell-v1"`, `CATALOG_CACHE = "callora-catalog-v1"`).
+- To force a full cache bust on deploy, bump the version suffix (e.g. `v1` -> `v2`). On `activate`, the service worker automatically deletes any caches whose names are not in `CURRENT_CACHES` and claims active clients.
+- Because `/sw.js` is served with `Cache-Control: no-cache`, browsers detect the updated script on the next navigation and install the new version automatically.
 - Frame headers: `/embed/(.*)` sends `Content-Security-Policy: frame-ancestors *` (with `X-Frame-Options` omitted) so the embeddable API widget can be framed from any origin; all other routes send `Content-Security-Policy: frame-ancestors 'self'`.
 
 Deploy with the CLI:
@@ -27,34 +45,111 @@ vercel --prod --yes          # add --archive=tgz if you hit the upload rate limi
 
 Set `VITE_*` variables (see `.env.example`) with `vercel env add`. They are inlined at build time and are public: never put secrets in them.
 
+## Security headers
+
+`vercel.json` defines a global `"source": "/(.*)"` headers rule that Vercel merges with the `/assets/(.*)` immutable cache rule. Every response includes:
+
+| Header | Value | Purpose |
+| --- | --- | --- |
+| `Content-Security-Policy` | See directive table below | Restricts script, style, image, frame, and network origins. |
+| `X-Content-Type-Options` | `nosniff` | Prevents MIME-type sniffing. |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Sends only the origin on cross-origin navigations and requests. |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=()` | Disables unused browser sensor and payment APIs. |
+
+### Content-Security-Policy directives
+
+| Directive | Value | Notes |
+| --- | --- | --- |
+| `default-src` | `'self'` | Fallback for any resource type without a more specific directive. |
+| `script-src` | `'self'` | Only same-origin scripts may execute. Pre-paint theme resolution is served from `public/theme-init.js` rather than an inline `<script>` so no `'unsafe-inline'` or hash is needed. |
+| `style-src` | `'self' 'unsafe-inline'` | `'unsafe-inline'` is required because several components (such as `FormField.tsx` and `SessionExpiryBanner.tsx`) inject `<style>` tags at runtime and some elements use inline `style` attributes. |
+| `img-src` | `'self' data:` | Allows same-origin images plus `data:` SVG backgrounds used in `src/styles/patterns.css` and `src/index.css`. |
+| `connect-src` | `'self'` + Callora API + Stellar Horizon, Soroban RPC, and Friendbot origins | Allows browser `fetch`/XHR calls to `https://api.callora.com`, Stellar Horizon (`horizon-testnet.stellar.org`, `horizon.stellar.org`, `horizon-futurenet.stellar.org`), Soroban RPC (`soroban-testnet.stellar.org`, `rpc-futurenet.stellar.org`), and `https://friendbot.stellar.org`. |
+| `frame-ancestors` | `'none'` | Blocks the app from being embedded in `<iframe>`, `<frame>`, or `<object>` elements (clickjacking protection). |
+| `base-uri` | `'self'` | Prevents `<base>` tag injection from redirecting relative URLs. |
+| `object-src` | `'none'` | Disables legacy plugin content (`<object>`, `<embed>`, `<applet>`). |
+
+### Extending `connect-src` for custom origins
+
+Because `Content-Security-Policy` is evaluated by the browser at runtime, any new origin the frontend calls must be added to the `connect-src` directive in `vercel.json`:
+
+- **Custom or staging Callora API (`VITE_API_BASE_URL`):** If you deploy against a non-default backend (for example `https://staging-api.callora.com`), append that origin to `connect-src` in `vercel.json`.
+- **Mainnet Soroban RPC (`VITE_STELLAR_RPC_URL`):** Stellar mainnet has no default public Soroban RPC endpoint in `src/config/constants.ts`. When building for mainnet with a custom `VITE_STELLAR_RPC_URL` host, add that RPC origin to `connect-src` in `vercel.json` so wallet balance reads and deposit submissions are not blocked.
+
+## Crawlers and indexing
+
+`public/robots.txt` is copied verbatim to `dist/robots.txt` (served before the Vercel SPA rewrite) and disallows wallet-gated and error routes (`/billing`, `/apis/my-apis`, `/webhooks`, `/500`). Note that `robots.txt` rules are advisory—they are not an access-control boundary—and `useDocumentTitle` also injects `<meta name="robots" content="noindex, nofollow">` on those routes to cover crawlers that ignore `robots.txt`.
+
 ## Demo mode
 
-When `VITE_API_BASE_URL` is empty the app runs in static demo mode: the
-marketplace catalogue is served from [`src/data/mockApis.ts`](../src/data/mockApis.ts)
-and labelled **Sample data**, and the billing invoice card shows the labelled
-`DEMO_INVOICE` fixture. Pages backed by authenticated endpoints (My APIs, API
-usage, dashboard activity, invoices) do not all fall back the same way — see the
-matrix below. Set `VITE_API_BASE_URL` to a real Callora API to use live data.
+Demo mode provides a complete, standalone preview of the Callora marketplace, detail pages, provider APIs, usage analytics, billing invoices, and webhook deliveries without needing a live backend service or Stellar wallet.
 
-## Fixture and fallback behaviour
+Instead of ad-hoc per-page fallbacks, demo mode is powered by a unified [Mock Service Worker (MSW)](https://mswjs.io/) handler set located in `src/mocks/handlers.ts`. In the browser, MSW registers a service worker (`public/mockServiceWorker.js`) that intercepts outgoing `/api/*` network requests and responds with realistic fixtures. In Vitest, the exact same handlers run under Node via `src/mocks/server.ts`.
 
-What each page reads from when a backend is configured, when
-`VITE_API_BASE_URL` is empty (demo), and when the configured backend cannot be
-reached. "Cached" means the account-scoped `sessionStorage` copy written by
-[`src/utils/offlineApiCache.ts`](../src/utils/offlineApiCache.ts) or
-[`src/hooks/useApiCache.ts`](../src/hooks/useApiCache.ts).
+### Enabling demo mode
 
-| Page | Source file(s) | Backend reachable | Backend unreachable | User-visible indicator |
-| --- | --- | --- | --- | --- |
-| Marketplace | [`src/pages/MarketplacePage.tsx`](../src/pages/MarketplacePage.tsx), [`src/api/catalogApi.ts`](../src/api/catalogApi.ts), [`src/data/mockApis.ts`](../src/data/mockApis.ts) | **Configured:** `GET /api/apis` through `fetchCatalog`, with server-side search/category and `If-None-Match` revalidation.<br>**Demo (empty `VITE_API_BASE_URL`):** no request is made; `fetchCatalog` returns `MOCK_APIS`. | Uses the cached catalogue and flags it as stale; with no usable cache it clears the list and shows the error empty state with retry. | **Sample data** badge beside the title in demo mode; "Showing saved results" stale notice on a cache fallback; error empty state with retry otherwise. |
-| My APIs | [`src/pages/MyApis.tsx`](../src/pages/MyApis.tsx), [`src/api/catalogApi.ts`](../src/api/catalogApi.ts), [`src/data/mockApis.ts`](../src/data/mockApis.ts) | **Configured:** calls `fetchCatalog` (the same `/api/apis` request as the marketplace), then filters the result to the provider slug `acme-labs` and assigns representative `publishStatus` values by row index. There is no `/api/provider/apis` request yet.<br>**Demo:** same `fetchCatalog` path, so the rows are built from `MOCK_APIS`. | Rejects into the "Failed to load your APIs" error state with retry. No fixture fallback and no cached copy. | Error empty state only. In demo mode there is **no** sample-data badge (see PR notes). |
-| API usage | [`src/pages/ApiUsage.tsx`](../src/pages/ApiUsage.tsx), [`src/services/testCall.ts`](../src/services/testCall.ts), [`src/services/authFetch.ts`](../src/services/authFetch.ts) | **Configured:** `authFetch('/api/usage?groupBy=day&limit=100')`; test calls hit the selected endpoint path for real. Only signed-in accounts issue the request.<br>**Demo:** no fixture — the relative request fails against the static host and the stats stay zeroed with the error alert below. | Keeps the last cached usage response visible and shows an error alert; a test call returns the safe network-error payload. No fixture fallback. | Error `<p role="alert">` only; cached rows are not labelled as stale. Signed-out / no-account state shows zeroed stats and an empty history without an error. |
-| Dashboard activity | [`src/hooks/useRecentActivity.ts`](../src/hooks/useRecentActivity.ts), [`src/pages/DashboardOverview.tsx`](../src/pages/DashboardOverview.tsx), [`src/hooks/useApisByIds.ts`](../src/hooks/useApisByIds.ts) | **Configured:** `GET /api/activity?accountId=…&limit=10` for the feed; pinned API previews resolve through `resolveApisByIds` (`/api/apis/:id`).<br>**Demo:** the activity feed has no fixture, so it settles into the error state; pinned APIs resolve from `MOCK_APIS`. | Feed shows the error alert with a Retry action and no items. No fixture fallback or cached copy. Pinned previews show their own error/partial state. | Error alert with retry. Pinned demo data has no sample-data label. The legacy unrouted [`src/components/Dashboard.tsx`](../src/components/Dashboard.tsx) still shows hard-coded activity after `LOADING_DELAY_MS`. |
-| Billing invoices | [`src/api/invoicesApi.ts`](../src/api/invoicesApi.ts), [`src/pages/InvoiceCard.tsx`](../src/pages/InvoiceCard.tsx), [`src/data/billingFixtures.ts`](../src/data/billingFixtures.ts) | **Configured:** `GET /api/invoices?limit=20` with the active account's bearer token; the newest `pending` invoice is rendered.<br>**Demo:** no request; `DEMO_INVOICE` is rendered instead. | Error state with retry; a 401 shows the sign-in prompt instead. No fixture fallback. | Error state / sign-in prompt with retry. In demo mode the invoice card shows its **Demo** badge. `billingFixtures.ts` is test-only and is not imported by the production page. |
+Set `VITE_DEMO_MODE=true` in `.env.local` or inline when running the dev server or build:
+| Latency chart | [`src/pages/LatencyChart.tsx`](../src/pages/LatencyChart.tsx), [`src/api/latencyApi.ts`](../src/api/latencyApi.ts) | **Configured:** `authFetch('/api/apis/:apiId/latency?range=24h')` for the `?api=<id>` query param; shows an empty state when no API is selected.<br>**Demo:** no request; `getDemoLatencyData()` is rendered instead. | Error empty state with retry. No fixture fallback. | **Sample data** badge beside the title in demo mode; stale opacity + live-region notice while refetching; error empty state with retry on failure. |
 
-The legacy [`src/ApiUsage.tsx`](../src/ApiUsage.tsx) is not routed (the router
-loads `src/pages/ApiUsage.tsx`); it keeps its own `MOCK_ENDPOINTS` and
-`MOCK_CALL_HISTORY`, so editing it has no effect on the live page.
+```bash
+# Start dev server with MSW demo mode
+VITE_DEMO_MODE=true npm run dev
+
+# Build a standalone demo preview
+VITE_DEMO_MODE=true npm run build
+```
+
+When `VITE_DEMO_MODE` is not `"true"` (default), MSW is not initialized and requests proceed over the network. MSW is imported dynamically in `src/main.tsx`, ensuring that standard production builds do not include any MSW code in the primary bundle chunk.
+
+### Mock service worker setup
+
+The browser worker script is initialized with:
+
+```bash
+npx msw init public/ --save
+```
+
+This places `public/mockServiceWorker.js` in the public directory and registers `msw.workerDirectory` in `package.json`.
+
+### How to add an endpoint handler
+
+1. **Add or reuse fixtures**: Place sample payloads in `src/mocks/fixtures/` (e.g. `catalog.ts`, `billing.ts`, `usage.ts`, `webhooks.ts`, `quota.ts`), reusing existing data sources like `MOCK_APIS` and `billingFixtures.ts` rather than duplicating data.
+2. **Define the handler**: Add an `http.<method>()` entry to `src/mocks/handlers.ts`:
+   ```ts
+   import { http, HttpResponse } from "msw";
+
+   export const handlers = [
+     // ...
+     http.get("*/api/example", ({ request }) => {
+       const url = new URL(request.url);
+       return HttpResponse.json({ ok: true, query: url.searchParams.get("q") });
+     }),
+   ];
+   ```
+3. **Share across browser and tests**: Both `src/mocks/browser.ts` and `src/mocks/server.ts` export instances wired to `handlers`. Any handler added here is immediately available in both demo mode in the browser and in Vitest.
+4. **Override in tests**: In specific Vitest test suites, override or simulate edge cases (e.g., 500 error, custom delay) using `server.use(...)`:
+   ```ts
+   import { server } from "../mocks/server";
+   import { http, HttpResponse } from "msw";
+
+   server.use(
+     http.get("*/api/example", () => {
+       return new HttpResponse(null, { status: 500 });
+     }),
+   );
+   ```
+
+## Endpoint behaviours
+
+When `VITE_DEMO_MODE=true`, MSW intercepts requests across the app and serves consistent fixtures:
+- **Marketplace (`GET /api/apis`)**: Returns catalogue items supporting search, category, and `304 Not Modified` conditional ETag revalidation.
+- **API Details (`GET /api/apis/:id`)**: Returns API details or 404 for unknown IDs.
+- **Provider APIs (`GET /api/provider/apis`)**: Returns publisher APIs for `acme-labs` with cyclical publish statuses.
+- **API Usage (`GET /api/usage`)**: Returns aggregated daily usage and history matching `UsageApiResponse`.
+- **Billing Invoices (`GET /api/invoices`)**: Returns invoice listings with status, amounts, and dates.
+- **Activity Feed (`GET /api/activity`)**: Returns recent account activity events.
+- **Quota (`GET /api/quota`, `PUT /api/quota`)**: In-memory stateful store supporting updates and version conflict detection.
+- **Auth (`/api/auth/*`)**: Simulated wallet authentication, session refresh, and revocation.
 
 ## CI
 

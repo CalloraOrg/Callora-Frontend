@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { StrKey } from "@stellar/stellar-sdk";
+import { isValidContractId, isValidEd25519PublicKey } from "../utils/stellarAddress";
 import { getApiBaseUrl } from "./api";
 import {
   DEFAULT_STELLAR_NETWORK,
@@ -101,7 +101,7 @@ export function usdcConfigurationError(config: RuntimeConfig = getConfig()): str
   ) {
     return STELLAR_USDC_CONFIGURATION_ERROR;
   }
-  if (!config.usdcIssuer || !StrKey.isValidEd25519PublicKey(config.usdcIssuer)) {
+  if (!config.usdcIssuer || !isValidEd25519PublicKey(config.usdcIssuer)) {
     return "Configure a valid Stellar Ed25519 public key for the USDC issuer on this network.";
   }
   return null;
@@ -163,7 +163,7 @@ export function validateRuntimeConfig(
   if (hasOwn(payload, "vaultContractId")) {
     if (
       typeof payload.vaultContractId !== "string" ||
-      !StrKey.isValidContract(payload.vaultContractId)
+      !isValidContractId(payload.vaultContractId)
     ) {
       throw new Error("Runtime config vault contract ID is invalid.");
     }
@@ -173,7 +173,7 @@ export function validateRuntimeConfig(
   if (hasOwn(payload, "usdcIssuer")) {
     if (
       typeof payload.usdcIssuer !== "string" ||
-      !StrKey.isValidEd25519PublicKey(payload.usdcIssuer)
+      !isValidEd25519PublicKey(payload.usdcIssuer)
     ) {
       throw new Error("Runtime config USDC issuer is invalid.");
     }

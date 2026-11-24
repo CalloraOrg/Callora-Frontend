@@ -24,7 +24,7 @@ export default function ServerError({
   requestId,
   title,
   description,
-  onGoHome: _onGoHome,
+  onGoHome,
   resetAt,
   remaining,
   limit,
@@ -59,6 +59,10 @@ export default function ServerError({
     setIsRetrying(true);
     try {
       await onRetry();
+    } catch (err) {
+      // A failed retry keeps the user on the page; the button re-enables so
+      // they can try again.
+      console.error("Retry failed:", err);
     } finally {
       setIsRetrying(false);
     }
@@ -266,6 +270,23 @@ export default function ServerError({
         >
           {isRetrying ? "Retrying…" : "Try again"}
         </button>
+      )}
+
+      {/* Go home */}
+      {onGoHome && (
+        <div style={{ marginTop: "16px" }}>
+          <button
+            className="ghost-button"
+            onClick={onGoHome}
+            type="button"
+            style={{
+              minWidth: "140px",
+              minHeight: "48px",
+            }}
+          >
+            Go home
+          </button>
+        </div>
       )}
 
       {/* Request ID */}
