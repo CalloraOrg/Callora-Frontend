@@ -11,6 +11,7 @@ import {
   parseColor,
   type ContrastCheckResult,
 } from "../utils/contrast";
+import "./ThemePlayground.css";
 
 /**
  * Preview panels are painted with the edited surface colour, so they take the

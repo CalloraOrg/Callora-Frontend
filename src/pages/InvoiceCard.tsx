@@ -15,6 +15,7 @@ import {
   selectNewestPendingInvoice,
   type InvoiceItem,
 } from '../api/invoicesApi';
+import "./InvoiceCard.css";
 
 /**
  * Props for the InvoiceCard component.

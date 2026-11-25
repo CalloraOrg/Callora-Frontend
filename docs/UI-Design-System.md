@@ -1410,6 +1410,21 @@ Callora supports Windows High Contrast via `@media (forced-colors: active)` rule
 
 ---
 
+## Stylesheet Architecture
+
+CSS is organized into three layers so global design tokens, cross-cutting overrides, and feature-specific rules stay decoupled and easy to maintain:
+
+1. **Global base & tokens (`src/index.css`, `src/styles/tokens.css`)**:
+   - `src/index.css` holds global resets, theme tokens (`:root`, `[data-theme="dark"]`, `[data-theme="light"]`), `@layer focus`, shared shell/navigation/button/badge/toast/skeleton utilities, and `@media print` rules.
+   - `src/styles/tokens.css` defines additional marketplace, API, and status tokens.
+2. **Cross-cutting global stylesheets (`src/styles/*.css`)**:
+   - Imported in `src/main.tsx` after `src/index.css` (`typography.css`, `patterns.css`, `focus.css`, `contrast.css`, `code.css`, `print.css`) so focus rings, high-contrast overrides, color-blind patterns, and print rules win consistently in the cascade.
+3. **Co-located per-feature & per-component stylesheets**:
+   - Feature pages and components import their own co-located `.css` files (e.g., `src/pages/MarketplacePage.css`, `src/components/ApiCard.css`, `src/components/FiltersSidebar.css`, `src/components/CategoryPills.css`, `src/pages/SortMenu.css`, `src/pages/ApiTagFilter.css`, `src/components/DepositPreview.css`, `src/pages/BillingHistory.css`, `src/pages/InvoiceCard.css`, `src/app/landing.css`, `src/pages/ApiDetailPage.css`, `src/pages/ApiUsage.css`, `src/pages/WebhookDeliveries.css`, `src/pages/LatencyChart.css`, `src/pages/ThemePlayground.css`, and subcomponent stylesheets).
+   - When adding new component styles, place them in a co-located `<Component>.css` file imported by the owning component rather than appending to `src/index.css`. Avoid unlayered `outline: none` rules that would defeat `@layer focus`.
+
+---
+
 ## Best Practices
 
 ### When Adding New UI

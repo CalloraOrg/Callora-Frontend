@@ -27,6 +27,7 @@ import { CheckCircle, XCircle } from "lucide-react";
 import { formatPrice } from "../utils/format";
 import { diffJson, hasDifferences } from "../utils/diff";
 import type { DiffLine } from "../utils/diff";
+import "./CallHistoryRow.css";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

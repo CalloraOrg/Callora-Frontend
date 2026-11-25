@@ -39,6 +39,7 @@ import RateLimitAlert from "../components/RateLimitAlert";
 import { formatCountdown } from "../utils/format";
 import { DateRangePicker } from "../components/DateRangePicker";
 import type { DateRange as DateRangePickerRange } from "../components/DateRangePicker";
+import "./ApiUsage.css";
 
 type ApiEndpoint = {
   id: string;

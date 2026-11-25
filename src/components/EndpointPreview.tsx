@@ -25,6 +25,7 @@
  */
 
 import { useId, useRef, useState } from "react";
+import "./EndpointPreview.css";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

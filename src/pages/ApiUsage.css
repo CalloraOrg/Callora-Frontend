@@ -1,0 +1,674 @@
+/* API Usage Page Styles */
+.api-usage-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--api-space-3xl);
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.api-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--api-space-3xl);
+  padding: var(--api-space-3xl);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+}
+
+.api-header-info {
+  display: flex;
+  gap: var(--api-space-xl);
+  align-items: center;
+}
+
+.api-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.api-header h1 {
+  margin: 0 0 var(--api-space-sm) 0;
+  font-size: var(--api-font-size-xl);
+  font-weight: 600;
+}
+
+.api-description {
+  margin: 0;
+  color: var(--muted);
+}
+
+.api-header-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--api-space-lg);
+  align-items: flex-end;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.status-indicator.active {
+  background: rgba(115, 242, 187, 0.16);
+  color: var(--success);
+  border: 1px solid rgba(115, 242, 187, 0.32);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.api-key-section h2 {
+  margin: 0 0 var(--api-space-xl) 0;
+}
+
+.api-key-card {
+  padding: var(--api-space-2xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.api-key-display {
+  display: flex;
+  flex-direction: column;
+  gap: var(--api-space-xl);
+}
+
+.key-input-group {
+  display: flex;
+  gap: var(--api-space-md);
+}
+
+.api-key-input {
+  flex: 1;
+  padding: 12px;
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: "Courier New", monospace;
+  font-size: 0.875rem;
+}
+
+.key-actions {
+  display: flex;
+  gap: var(--api-space-md);
+}
+
+.usage-instruction {
+  margin: var(--api-space-lg) 0 0 0;
+  color: var(--muted);
+  font-size: var(--api-font-size-md);
+}
+
+.test-call-section h2 {
+  margin: 0 0 var(--api-space-xl) 0;
+}
+
+.test-call-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--api-space-xl);
+  margin-bottom: var(--api-space-3xl);
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--api-space-md);
+}
+
+.form-row label {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.endpoint-select,
+.params-textarea {
+  padding: 12px;
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.params-textarea {
+  font-family: "Courier New", monospace;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.response-display {
+  padding: 20px;
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.response-display h3 {
+  margin: 0 0 var(--api-space-lg) 0;
+}
+
+.loading-placeholder {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.response-meta {
+  display: flex;
+  gap: var(--api-space-xl);
+  margin-bottom: var(--api-space-lg);
+  font-size: var(--api-font-size-md);
+}
+
+.response-time,
+.response-cost {
+  color: var(--muted);
+}
+
+.response-json {
+  background: var(--surface);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.usage-stats-section h2 {
+  margin: 0 0 var(--api-space-xl) 0;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--api-space-xl);
+  margin-bottom: var(--api-space-3xl);
+}
+
+.stat-card {
+  padding: var(--api-space-2xl);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--api-space-md);
+}
+
+.stat-label {
+  font-size: var(--api-font-size-md);
+  color: var(--muted);
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mini-chart {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.mini-chart h4 {
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+}
+
+.chart-placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 80px;
+}
+
+.chart-bar {
+  flex: 1;
+  background: linear-gradient(to top, var(--accent), var(--accent-strong));
+  border-radius: 4px 4px 0 0;
+  min-height: 8px;
+}
+
+.chart-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.call-history-section h2 {
+  margin: 0 0 var(--api-space-xl) 0;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--api-space-xl);
+}
+
+.history-actions {
+  display: flex;
+  gap: var(--api-space-md);
+}
+
+.filter-select {
+  padding: 8px 12px;
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.call-history-table {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  /* Internal scroll container: bounds the table height so the virtualized
+     window stays small and stable no matter how many calls exist. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  max-height: min(60vh, 640px);
+}
+
+.table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr;
+  gap: 16px;
+  padding: 16px;
+  background: var(--surface);
+  backdrop-filter: blur(22px);
+  font-weight: 500;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr;
+  gap: 16px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+}
+
+.call-history-table__viewport {
+  position: relative;
+}
+
+/* Windowed rows are absolutely positioned at their measured offsets; the
+   viewport's explicit height acts as the full-list spacer. */
+.call-history-table__item {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+/* The pinned row stays mounted (and focusable) when the keyboard-focused
+   row is scrolled outside the window. */
+.call-history-table__item--pinned {
+  z-index: 0;
+}
+
+/* Virtualized rows: drop the divider on the final rendered row. */
+.call-history-table__item:last-child .table-row {
+  border-bottom: none;
+}
+
+/* Loading skeletons are still direct children of the table shell. */
+.call-history-table > .table-row:last-child {
+  border-bottom: none;
+}
+
+.endpoint-cell {
+  font-family: "Courier New", monospace;
+  font-size: 0.875rem;
+}
+
+.status-cell.success {
+  color: var(--success);
+  /* Success: solid baseline — no supplemental pattern needed. */
+}
+
+.status-cell.error {
+  color: var(--danger);
+  /* Error: diagonal stripes so status is distinguishable without color alone (WCAG 1.4.1). */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cline x1='0' y1='0' x2='6' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='3' y1='0' x2='6' y2='3' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3Cline x1='0' y1='3' x2='3' y2='6' stroke='currentColor' stroke-width='1' stroke-opacity='0.25'/%3E%3C/svg%3E");
+  background-size: 6px 6px;
+  background-repeat: repeat;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.expanded-details {
+  grid-column: 1 / -1;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: 8px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detail-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.875rem;
+}
+
+.detail-section pre {
+  margin: 0;
+  padding: 12px;
+  background: var(--page-bg);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  overflow-x: auto;
+}
+
+.integration-guide-section h2 {
+  margin: 0 0 16px 0;
+}
+
+.language-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab-button {
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-button.active {
+  background: var(--accent);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.code-example {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.code-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.code-block {
+  padding: 20px;
+  background: var(--page-bg);
+  margin: 0;
+  overflow-x: auto;
+  font-family: "Courier New", monospace;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.documentation-link {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.documentation-link a {
+  text-decoration: none;
+  display: inline-block;
+}
+
+/* ── ApiUsage responsive breakpoint audit (v7) ──────────────────────────
+   Three granular tiers ensure the page looks polished on every viewport:
+
+   - 768px (tablet portrait):   compact spacing, full-width forms, 2-col stats
+   - 640px (large phone):       tighter margins, wrapped action rows
+   - 480px (small phone):       minimal padding, single-column everything
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* 768px – tablet portrait */
+@media (max-width: 768px) {
+  .api-usage-page .test-call-form .form-row select {
+    width: 100%;
+  }
+
+  .api-usage-page .response-meta {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .api-usage-page .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .api-usage-page .history-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .api-usage-page .key-input-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .api-usage-page .key-input-group input {
+    width: 100%;
+  }
+}
+
+/* 640px – large phone */
+@media (max-width: 640px) {
+  .api-usage-page .api-header {
+    padding: 16px;
+  }
+
+  .api-usage-page .api-header-actions {
+    width: 100%;
+  }
+
+  .api-usage-page .api-header-actions button {
+    width: 100%;
+  }
+
+  .api-usage-page .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .api-usage-page .test-call-form .form-row {
+    gap: 6px;
+  }
+
+  .api-usage-page .response-display {
+    padding: 16px;
+  }
+
+  .api-usage-page .response-json {
+    padding: 12px;
+    font-size: 0.8125rem;
+    overflow-x: auto;
+  }
+
+  .api-usage-page .mini-chart {
+    padding: 16px;
+  }
+
+  .api-usage-page .chart-labels span {
+    font-size: 0.75rem;
+  }
+
+  .api-usage-page .code-block {
+    padding: 14px;
+    font-size: 0.8125rem;
+    overflow-x: auto;
+  }
+}
+
+/* 480px – small phone */
+@media (max-width: 480px) {
+  .api-usage-page .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .api-usage-page .api-logo {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .api-usage-page .api-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .api-usage-page .api-description {
+    font-size: 0.8125rem;
+  }
+
+  .api-usage-page .surface {
+    border-radius: 18px;
+  }
+
+  .api-usage-page .key-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .api-usage-page .key-actions button {
+    width: 100%;
+  }
+
+  .api-usage-page .language-tabs {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .api-usage-page .tab-button {
+    flex: 1;
+    min-width: 80px;
+  }
+
+  .api-usage-page .documentation-link a {
+    width: 100%;
+  }
+
+  .api-usage-page .kbd-hint {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* ── ApiUsage — prefers-reduced-motion fallback (Issue #721) ───────────
+   When users prefer reduced motion, disable pulsing status dots, skeleton
+   shimmer animations, button spinner, and chart-bar transitions in the ApiUsage section
+   so the UI stays completely static. */
+@media (prefers-reduced-motion: reduce) {
+  .api-usage-page .status-dot {
+    animation: none;
+    opacity: 1;
+  }
+
+  .api-usage-page .skeleton {
+    animation: none;
+    background: var(--surface-soft);
+  }
+
+  .api-usage-page .button-spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .api-usage-page .chart-bar {
+    transition: none;
+  }
+
+  .api-usage-page .tab-button {
+    transition: none;
+  }
+
+  .api-usage-page .danger-button {
+    transition: none;
+  }
+
+  .api-usage-page .primary-button {
+    transition: none;
+  }
+
+  .api-usage-page .secondary-button {
+    transition: none;
+  }
+
+  .api-usage-page .ghost-button {
+    transition: none;
+  }
+}

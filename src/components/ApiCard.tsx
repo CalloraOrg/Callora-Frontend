@@ -26,6 +26,7 @@ import WhyApi from "./WhyApi";
 import { colorFromId } from "../utils/colorFromId";
 import { ClockIcon, BoltIcon } from "./icons";
 import { useToast } from "./Toast";
+import "./ApiCard.css";
 
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────

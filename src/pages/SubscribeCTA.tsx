@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import SubscribeButton from "../components/SubscribeButton";
 import Tooltip from "../components/Tooltip";
 import { formatPrice } from "../utils/format";
+import "./SubscribeCTA.css";
 
 /**
  * SubscribeCTA — a sticky bottom bar that appears when the hero CTA scrolls

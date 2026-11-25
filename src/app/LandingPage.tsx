@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import ExternalLink from "../components/ExternalLink";
 import { EXTERNAL_LINKS } from "../config/constants";
 import { APP_ROUTES } from "./routes";
+import "./landing.css";
 
 export type Feature = {
   icon: string;

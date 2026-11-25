@@ -6,6 +6,7 @@ import { usePersistedState } from "../hooks/usePersistedState";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 
 import LiveRegion from "./LiveRegion";
+import "./FiltersSidebar.css";
 
 const POPULARITY_OPTIONS = [
   { value: "any", label: "Any" },

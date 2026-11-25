@@ -5,6 +5,7 @@ import { downsampleLatencyData, type LatencyPoint } from "../utils/downsample";
 import { useFetchTracker } from "../hooks/useFetchTracker";
 import { LOADING_DELAY_MS } from "../config/constants";
 import EmptyState from "../components/EmptyState";
+import "./LatencyChart.css";
 
 const MOCK_DATA: LatencyPoint[] = [
   { label: "00:00", value: 120, timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000) },

@@ -1,3 +1,4 @@
+import "./SortMenu.css";
 
 /**
  * SortMenu page used for printing tests.

@@ -4,6 +4,7 @@ import Skeleton from './components/Skeleton';
 import RateLimitAlert from './components/RateLimitAlert';
 import { formatPrice } from './utils/format';
 import { useRateLimit } from './hooks/useRateLimit';
+import "./pages/ApiUsage.css";
 
 type ApiEndpoint = {
   id: string;

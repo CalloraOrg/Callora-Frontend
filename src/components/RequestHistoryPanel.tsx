@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Icons } from "../utils/icons";
 import EmptyState from "./EmptyState";
 import type { HistoryEntry } from "../state/testCallHistory";
+import "./RequestHistoryPanel.css";
 
 type Props = {
   entries: HistoryEntry[];

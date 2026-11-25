@@ -1,0 +1,345 @@
+/* ApiCard component styles (extracted from src/index.css) */
+
+.api-card {
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.api-card:hover,
+.api-card:focus-visible {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .api-card {
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .api-card:hover,
+  .api-card:focus-visible {
+    transform: none;
+    background-color: var(--surface-soft);
+  }
+}
+
+.api-card-header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.api-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.api-card-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.api-status {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.api-status.active {
+  color: var(--success);
+}
+
+.api-status.inactive {
+  color: var(--muted);
+}
+
+.api-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.api-card-content p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.api-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.api-marketplace-card {
+  min-width: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    box-shadow 160ms ease,
+    transform 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+  border: 1px solid var(--mkt-card-border);
+}
+
+.api-card--compact {
+  padding: var(--mkt-card-compact-padding);
+  gap: var(--mkt-card-compact-gap);
+  min-height: var(--mkt-card-compact-min-height);
+}
+
+.api-card--compact .api-marketplace-card-description {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-height 180ms ease,
+    opacity 180ms ease,
+    margin-top 180ms ease;
+}
+
+.api-card--compact .api-marketplace-card-title-row {
+  gap: var(--mkt-space-xs) var(--mkt-space-md);
+}
+
+.api-card--compact .api-marketplace-card-tags {
+  gap: var(--mkt-card-compact-gap);
+}
+
+.api-card--compact .api-marketplace-card-footer {
+  gap: var(--mkt-space-md);
+}
+
+.api-card--compact .api-card__stats {
+  gap: var(--mkt-space-md);
+  padding-top: var(--mkt-space-md);
+}
+
+.api-marketplace-card:hover {
+  box-shadow: var(--mkt-card-hover-shadow);
+  transform: translateY(-4px);
+  border-color: var(--mkt-card-hover-border);
+}
+
+.api-marketplace-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: var(--mkt-card-hover-shadow);
+  transform: translateY(-4px);
+  border-color: var(--mkt-card-hover-border);
+  border-radius: var(--radius-lg);
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .api-marketplace-card,
+  .api-card--compact .api-marketplace-card-description {
+    transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+  }
+
+  .api-marketplace-card:hover,
+  .api-marketplace-card:focus-visible {
+    transform: none;
+    box-shadow: none;
+    background-color: var(--surface-soft);
+  }
+}
+
+.api-marketplace-card-header,
+.api-marketplace-card-body,
+.api-marketplace-card-title-row,
+.api-marketplace-card-footer,
+.api-card__stat {
+  min-width: 0;
+}
+
+.api-marketplace-card-title-row strong,
+.api-marketplace-card-title-row div {
+  overflow-wrap: anywhere;
+}
+
+.api-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--mkt-space-lg);
+  padding: var(--mkt-space-lg) 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.api-card__stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mkt-space-sm);
+}
+
+.api-card__stat-label {
+  color: var(--muted);
+  font-size: var(--mkt-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.api-card__stat-value {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.api-card__stat-value--empty {
+  color: var(--muted);
+}
+
+/* ─── ApiCard responsive breakpoints ────────────────────────────────────── */
+/* Narrow viewports (≤768px): reduce spacing and adjust stat grid. */
+@media (max-width: 768px) {
+  .api-marketplace-card {
+    padding: var(--mkt-card-compact-padding);
+    gap: var(--mkt-card-compact-gap);
+    min-height: auto;
+  }
+
+  .api-marketplace-card-header {
+    gap: var(--mkt-space-md);
+  }
+
+  .api-marketplace-card-icon {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    font-size: 16px;
+    border-radius: var(--mkt-radius-sm);
+  }
+
+  .api-marketplace-card-price {
+    padding-right: var(--mkt-space-xl);
+  }
+
+  .api-card__stats {
+    gap: var(--mkt-space-md);
+    padding: var(--mkt-space-sm) 0 0;
+  }
+
+  .api-card__stat-label {
+    font-size: var(--mkt-font-size-xs);
+  }
+
+  .api-card__stat-value {
+    font-size: var(--mkt-font-size-tag);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .api-marketplace-card-footer-row {
+    gap: var(--mkt-space-md);
+  }
+}
+
+/* Extra-narrow viewports (≤480px): stack content, collapse stats. */
+@media (max-width: 480px) {
+  .api-marketplace-card {
+    padding: var(--mkt-card-compact-padding);
+    gap: var(--mkt-card-compact-gap);
+  }
+
+  .api-marketplace-card-header {
+    gap: var(--mkt-card-margin-top-sm);
+  }
+
+  .api-marketplace-card-title-row {
+    flex-direction: column;
+    gap: var(--mkt-space-xs);
+  }
+
+  .api-marketplace-card-description {
+    font-size: var(--mkt-font-size-sm);
+  }
+
+  .api-card__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mkt-card-compact-gap);
+    padding: var(--mkt-space-sm) 0 0;
+  }
+
+  .api-card__stat-value {
+    font-size: var(--mkt-font-size-sm);
+  }
+
+  .api-card__compare-btn {
+    padding: var(--mkt-space-xs) var(--mkt-space-sm);
+    font-size: var(--mkt-font-size-micro);
+    left: var(--mkt-space-md);
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+.api-marketplace-card:hover .api-card__compare-btn,
+.api-marketplace-card:focus-within .api-card__compare-btn {
+  opacity: 1 !important;
+}
+
+/* ── Skeleton layout-stability on narrow screens (#1010) ───────────────
+   Mirror the real .api-marketplace-card responsive rules so that the
+   skeleton's height, grid columns, header layout, and visible sections
+   match the loaded card at every breakpoint.  This eliminates CLS when
+   the skeleton swaps to real content. */
+@media (max-width: 768px) {
+  .api-card-skeleton {
+    min-height: 0 !important;
+  }
+
+  /* Skeleton header matches real card grid: icon 48px + fluid body */
+  .api-card-skeleton .api-marketplace-card-header {
+    display: grid !important;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: flex-start !important;
+  }
+
+  /* Skeleton icon shrinks to match real 48×48 icon */
+  .api-card-skeleton .api-marketplace-card-header > .skeleton:first-child {
+    width: 48px !important;
+    height: 48px !important;
+    flex: 0 0 48px;
+  }
+
+  /* Hide skeleton price section (matches real card display:none) */
+  .api-card-skeleton .api-marketplace-card-price {
+    display: none !important;
+  }
+
+  /* Stats row adapts to full width */
+  .api-card-skeleton .api-card__stats {
+    gap: var(--mkt-space-xl);
+  }
+}
+
+/* Phones: the favourite/compare/bookmark/pin controls are absolutely positioned
+   in the card's top band, so keep the header clear of them. */
+@media (max-width: 480px) {
+  .api-marketplace-card { padding-top: 52px !important; }
+  .api-marketplace-card .api-marketplace-card-header { padding-right: 36px; }
+  .api-marketplace-card .api-card__compare-btn { left: 48px !important; min-height: 32px; }
+}

@@ -1,0 +1,28 @@
+/* ── SortMenu component styles ───────────────────────────────────────────── */
+.sort-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sort-menu__sort-row {
+  display: flex;
+  align-items: center;
+}
+
+.sort-menu__current-state {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.sort-menu__label {
+  font-weight: 500;
+}
+
+.sort-menu__value {
+  font-weight: 600;
+  color: var(--text);
+}

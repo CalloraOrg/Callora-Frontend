@@ -1,3 +1,4 @@
+import "./CategoryPills.css";
 
 interface CategoryPillsProps {
   categories: readonly string[];

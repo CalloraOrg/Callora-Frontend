@@ -39,6 +39,7 @@ import RecentlyActiveRail from "../components/RecentlyActiveRail";
 import { useCompareStore } from "../state/compareStore";
 import MarketplacePageSkeleton from "./MarketplacePage.skeleton";
 import { useCursorPagination } from "../hooks/useCursorPagination";
+import "./MarketplacePage.css";
 
 export default function MarketplacePage(): JSX.Element {
   const { apis } = useCompareStore();

@@ -5,6 +5,7 @@ import { TagIcon } from "../components/icons";
 import Tooltip from "../components/Tooltip";
 import KbdHint from "../components/KbdHint";
 import type { Shortcut } from "../hooks/useGlobalShortcuts";
+import "./ApiTagFilter.css";
 
 /**
  * Extracts all unique tags from a catalogue, sorted alphabetically.

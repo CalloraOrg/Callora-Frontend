@@ -1,4 +1,5 @@
 import Skeleton from "../components/Skeleton";
+import "./ApiDetailPage.css";
 
 function SidebarCardSkeleton() {
   return (

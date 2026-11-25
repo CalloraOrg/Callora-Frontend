@@ -88,3 +88,45 @@
     transition: none;
   }
 }
+
+/* QuotaBanner layout and styles */
+.quota-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 16px);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  transition: border-color var(--transition-speed, 240ms) ease;
+}
+
+.quota-banner h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.quota-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.quota-banner__primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.quota-banner__status-message {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--success);
+}

@@ -1,0 +1,296 @@
+/* API Catalog Page Styles */
+.apis-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.apis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.apis-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+/* Marketplace responsive layout */
+.marketplace-page {
+  width: 100%;
+  padding: var(--mkt-page-padding);
+}
+
+.marketplace-header {
+  display: flex;
+  gap: var(--mkt-space-lg);
+  align-items: center;
+  margin-bottom: var(--mkt-space-3xl);
+  min-width: 0;
+}
+
+.marketplace-header h1 {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: var(--mkt-font-size-page-title);
+  line-height: var(--mkt-line-height-tight);
+}
+
+.marketplace-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mkt-space-lg);
+  flex: 1;
+  min-width: 0;
+}
+
+.marketplace-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.marketplace-density-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mkt-space-sm);
+  padding: var(--mkt-space-sm);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  min-height: 44px;
+}
+
+.density-toggle-button {
+  min-height: 36px;
+  padding: 0 var(--mkt-space-xl);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.density-toggle-button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(78, 133, 255, 0.22);
+}
+
+.marketplace-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: var(--mkt-space-3xl);
+  align-items: start;
+}
+
+.marketplace-sidebar {
+  padding-left: var(--mkt-sidebar-padding-start);
+  min-width: 0;
+}
+
+.marketplace-actions select {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Mobile filter toggle — hidden by default (desktop). */
+.mobile-filters-toggle {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .marketplace-sidebar {
+    display: none;
+  }
+
+  .marketplace-filter-button {
+    display: inline-flex;
+  }
+
+  .filters-sidebar .mobile-filters-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mkt-space-sm);
+    padding: var(--mkt-space-md) var(--mkt-space-xl);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--mkt-font-size-sm);
+    cursor: pointer;
+  }
+
+  .filters-sidebar .mobile-filters-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* ── MarketplacePage skeleton ───────────────────────────────────
+   Route-level loading shell that mirrors the full marketplace
+   layout. Uses design tokens for spacing, typography, and colour
+   so it stays consistent across light/dark modes and responsive
+   breakpoints. */
+.marketplace-skeleton {
+  padding: var(--mkt-page-padding);
+}
+
+.marketplace-skeleton .marketplace-header {
+  gap: var(--mkt-space-lg);
+  margin-bottom: var(--mkt-space-3xl);
+}
+
+.marketplace-skeleton .marketplace-layout {
+  gap: var(--mkt-space-3xl);
+}
+
+.marketplace-skeleton .marketplace-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mkt-space-md);
+  padding-left: var(--mkt-sidebar-padding-start);
+}
+
+.marketplace-skeleton .marketplace-toolbar {
+  gap: var(--mkt-space-lg);
+  margin-bottom: var(--mkt-space-lg);
+}
+
+.marketplace-skeleton .marketplace-grid {
+  gap: var(--mkt-space-lg);
+}
+
+.marketplace-skeleton .marketplace-count,
+.marketplace-skeleton .marketplace-actions {
+  display: flex;
+  align-items: center;
+}
+
+/* Responsive: stack sidebar below main on narrow viewports */
+@media (max-width: 1024px) {
+  .marketplace-skeleton .marketplace-layout {
+    grid-template-columns: 1fr;
+    gap: var(--mkt-space-xl);
+  }
+
+  .marketplace-skeleton .marketplace-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--mkt-space-sm);
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .marketplace-skeleton .marketplace-page,
+  .marketplace-skeleton .api-detail-page {
+    padding: var(--mkt-page-padding-sm);
+  }
+}
+
+.marketplace-results {
+  min-width: 0;
+}
+
+.marketplace-results--tray-open {
+  padding-bottom: var(--mkt-drawer-offset);
+}
+
+.marketplace-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--mkt-space-lg);
+  margin-bottom: var(--mkt-space-lg);
+}
+
+.marketplace-count {
+  color: var(--muted);
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mkt-space-sm) var(--mkt-space-lg);
+}
+
+.marketplace-active-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--mkt-space-sm) var(--mkt-space-md);
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: var(--mkt-font-size-sm);
+  font-weight: 600;
+}
+
+/* Shown when the catalogue request failed but a cached copy is being rendered.
+   The warning wording carries the meaning; the colour is subordinate to it
+   (WCAG 1.4.1). */
+.marketplace-stale-notice {
+  margin: 0 0 var(--mkt-space-lg);
+  padding: var(--mkt-space-sm) var(--mkt-space-md);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--text);
+  font-size: var(--mkt-font-size-sm);
+}
+
+.marketplace-actions {
+  display: flex;
+  gap: var(--mkt-space-md);
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.marketplace-filter-button {
+  display: none;
+}
+
+.marketplace-grid {
+  display: grid;
+  gap: var(--mkt-space-lg);
+  grid-template-columns: repeat(auto-fill, minmax(var(--mkt-grid-min), 1fr));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .density-toggle-button {
+    transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+  }
+}
+
+.marketplace-filter-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+  padding: 16px;
+}
+
+.marketplace-filter-panel {
+  width: min(100%, 480px);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: var(--surface-strong);
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.marketplace-filter-panel h3 {
+  margin-top: 0;
+}
+
+.marketplace-filter-footer {
+  text-align: right;
+  margin-top: 8px;
+}

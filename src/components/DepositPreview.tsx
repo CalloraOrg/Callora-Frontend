@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { HORIZON_FEE_STATS_URL, NETWORK_FEE_CACHE_TTL_MS } from '../config/constants';
 import { formatUsdc, formatUsdcStroops } from '../utils/format';
 import type { InvokeTransactionSummary } from '../services/txSummary';
+import "./DepositPreview.css";
 
 type FeeStats = {
   fee_charged?: { mode?: string | number };

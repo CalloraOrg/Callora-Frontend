@@ -9,6 +9,7 @@ import { useToast } from '../components/Toast';
 import { Pagination } from '../components/Pagination';
 import { JsonViewer } from '../components/JsonViewer';
 import { redactSensitiveData } from '../services/SecureErrorHandler';
+import "./WebhookDeliveries.css";
 
 const MOBILE_MEDIA_QUERY = '(max-width: 639px)';
 const MAX_VISIBLE_PATH_LENGTH = 28;

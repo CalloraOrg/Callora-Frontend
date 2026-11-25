@@ -47,6 +47,7 @@ import WalletSignInButton from "./app/WalletSignInButton";
 import RequireAuth from "./components/RequireAuth";
 import AccountSwitcher from "./app/AccountSwitcher";
 import WithdrawModal from "./components/WithdrawModal";
+import "./components/DepositPreview.css";
 
 // Re-export public API
 export { prefetchRoute } from "./app/routes";

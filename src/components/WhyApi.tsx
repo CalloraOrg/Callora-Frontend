@@ -27,6 +27,7 @@
 
 import { useId, useState } from "react";
 import type { APIItem } from "../data/mockApis";
+import "./WhyApi.css";
 
 // ─── Reason builder ──────────────────────────────────────────────────────────
 

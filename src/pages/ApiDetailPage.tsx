@@ -34,6 +34,7 @@ import LiveRegion from "../components/LiveRegion";
 import { toCurl, type CurlRequest } from "../utils/toCurl";
 import { fetchApiDetail, fetchCatalog, isCatalogAbortError } from "../api/catalogApi";
 import ReviewsTab from "./ReviewsTab";
+import "./ApiDetailPage.css";
 
 /**
  * ApiDetailPage
