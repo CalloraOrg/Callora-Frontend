@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   isConnected: vi.fn(),
   requestAccess: vi.fn(),
   getNetwork: vi.fn(),
+  getNetworkDetails: vi.fn(),
   signTransaction: vi.fn(),
   fetch: vi.fn(),
   configurationError: null as string | null,
@@ -26,6 +27,7 @@ vi.mock("@stellar/freighter-api", () => ({
   isConnected: mocks.isConnected,
   requestAccess: mocks.requestAccess,
   getNetwork: mocks.getNetwork,
+  getNetworkDetails: mocks.getNetworkDetails,
   signTransaction: mocks.signTransaction,
 }));
 
@@ -97,7 +99,7 @@ describe("walletService", () => {
     });
     mocks.isConnected.mockResolvedValue({ isConnected: true });
     mocks.requestAccess.mockResolvedValue({ address: walletAddress });
-    mocks.getNetwork.mockResolvedValue({
+    mocks.getNetworkDetails.mockResolvedValue({
       networkPassphrase: "Test SDF Network ; September 2015",
     });
     mocks.signTransaction.mockImplementation(async (xdr: string) => ({ signedTxXdr: xdr, signerAddress: walletAddress }));
@@ -213,7 +215,7 @@ describe("walletService", () => {
   });
 
   it("rejects a wallet connected to a different Stellar network", async () => {
-    mocks.getNetwork.mockResolvedValue({
+    mocks.getNetworkDetails.mockResolvedValue({
       networkPassphrase: "Public Global Stellar Network ; September 2015",
     });
 
@@ -381,7 +383,7 @@ describe("walletService", () => {
   it("handles missing addresses, network errors, and a missing extension", async () => {
     mocks.requestAccess.mockResolvedValueOnce({ address: "" });
     await expect(getWalletAddress()).rejects.toMatchObject({ code: "WALLET_UNAVAILABLE" });
-    mocks.getNetwork.mockResolvedValueOnce({ error: { message: "wallet error" } });
+    mocks.getNetworkDetails.mockResolvedValueOnce({ error: { message: "wallet error" } });
     await expect(getWalletAddress()).rejects.toMatchObject({ code: "WALLET_ERROR" });
     mocks.isConnected.mockRejectedValueOnce(new Error("not installed"));
     await expect(getWalletAddress()).rejects.toMatchObject({ code: "WALLET_UNAVAILABLE" });

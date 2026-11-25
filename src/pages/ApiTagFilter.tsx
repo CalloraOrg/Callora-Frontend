@@ -40,6 +40,11 @@ export interface ApiTagFilterProps {
    * beside each pill match the listings actually on screen.
    */
   apis?: readonly APIItem[];
+  /**
+   * Result count per tag (lower-cased keys), computed from the catalogue
+   * filtered by the other facets. When omitted, counts are derived from `apis`.
+   */
+  counts?: Record<string, number>;
   /** Optional hover delay in ms for tooltips on tag icon buttons. Defaults to 0. */
   hoverDelayMs?: number;
   /** Optional touch long-press duration in ms for tooltips. Defaults to 500. */
@@ -110,22 +115,22 @@ export default function ApiTagFilter({
   selectedTag,
   onTagChange,
   apis = [],
+  counts,
   hoverDelayMs = 0,
   longPressMs = 500,
   isLoading = false,
 }: ApiTagFilterProps) {
   const isAllSelected = selectedTag === null;
 
-  const tagCounts = useMemo(() => {
-    const counts = new Map<string, number>();
+  const derivedCounts = useMemo(() => {
+    const result: Record<string, number> = {};
     for (const api of apis) {
       if (!api.tags) continue;
-      for (const t of api.tags) {
-        const key = t.toLowerCase();
-        counts.set(key, (counts.get(key) ?? 0) + 1);
+      for (const t of new Set(api.tags.map((tag) => tag.toLowerCase()))) {
+        result[t] = (result[t] ?? 0) + 1;
       }
     }
-    return counts;
+    return result;
   }, [apis]);
 
   if (isLoading) {
@@ -146,7 +151,9 @@ export default function ApiTagFilter({
 
       {tags.map((tag) => {
         const isActive = selectedTag?.toLowerCase() === tag.toLowerCase();
-        const count = tagCounts.get(tag.toLowerCase());
+        const count = counts
+          ? (counts[tag.toLowerCase()] ?? 0)
+          : derivedCounts[tag.toLowerCase()];
         const tooltipLabel = `Filter by tag ${tag}${count != null ? ` (${count} APIs)` : ""}`;
 
         return (

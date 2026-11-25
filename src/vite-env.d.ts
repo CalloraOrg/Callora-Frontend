@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
+  readonly VITE_DEMO_MODE?: string;
   readonly VITE_STELLAR_NETWORK?: string;
   readonly VITE_STELLAR_RPC_URL?: string;
   readonly VITE_STELLAR_VAULT_CONTRACT_ID?: string;
