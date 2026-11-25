@@ -21,7 +21,8 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Node.js 18+ (CI uses 20). No `.env` is required: if the backend is unreachable the app falls back to bundled mock data, so every page renders.
+Node.js 18+ (CI uses 20). No `.env` is required. To run standalone with full mock data served via Mock Service Worker (MSW), start with `VITE_DEMO_MODE=true npm run dev` (see [Demo mode](#demo-mode)).
+Node.js 20 (see `.nvmrc`; `nvm use` picks it up). No `.env` is required: if the backend is unreachable the app falls back to bundled mock data, so every page renders.
 
 ## Environment variables
 
@@ -31,6 +32,7 @@ Copy `.env.example` to `.env.local`. All variables are optional.
 | --- | --- |
 | `VITE_API_BASE_URL` | Absolute API origin. Empty (default) uses relative `/api` calls, proxied in dev |
 | `VITE_DEV_API_PROXY_TARGET` | Dev-server proxy target for `/api` (default `http://localhost:3000`) |
+| `VITE_DEMO_MODE` | Set to `"true"` to enable Mock Service Worker (MSW) for offline/standalone demo builds |
 | `VITE_STELLAR_NETWORK` | `testnet` (default), `mainnet` or `futurenet` |
 | `VITE_STELLAR_RPC_URL` | Soroban RPC endpoint override |
 | `VITE_STELLAR_VAULT_CONTRACT_ID` | Vault contract that receives USDC deposits (needed for real deposits) |
@@ -47,16 +49,38 @@ Details in [docs/Configuration.md](docs/Configuration.md).
 | `npm run preview` | Serve the production build locally |
 | `npm run typecheck` | `tsc --noEmit` on the app sources |
 | `npm test` | Vitest in watch mode (`npx vitest run` for one pass) |
+| `npm run e2e` | Run the Playwright browser smoke suite against a production build |
 | `npm run test:coverage` | Single pass with coverage |
 
 ## Architecture
 
 - **Stack:** React 18, TypeScript, Vite, React Router 6, Stellar SDK + Freighter for wallet deposits.
 - **Routing:** `src/main.tsx` calls `renderRoute` (`src/renderRoute.tsx`), which renders heavy pages (`/marketplace`, `/publish`, `/details/:id`) inside a shared `StandaloneShell` and everything else inside `App.tsx` (React Router). See [Routes](#routes).
-- **Data:** `src/api/*` talks to the backend. When a request fails the app degrades to `src/data/mockApis.ts` (marketplace, details) or in-component sample data (usage, my APIs, billing history), so there are no dead screens on static hosting.
+- **Data:** `src/api/*` talks to the backend. In demo mode (`VITE_DEMO_MODE=true`), network requests to `/api/*` are intercepted by [Mock Service Worker (MSW)](https://mswjs.io/) using handlers in `src/mocks/handlers.ts` and fixtures in `src/mocks/fixtures/`. The same MSW handlers power node tests in Vitest via `src/mocks/server.ts`.
 - **State:** small stores in `src/state/` plus React context (theme, account, collections, toasts).
 - **Styling:** plain CSS: tokens in `src/styles/tokens.css`, global styles in `src/index.css`. Light/dark/system themes and high-contrast support. See [docs/UI-Design-System.md](docs/UI-Design-System.md).
-- **More:** [docs/README.md](docs/README.md) indexes every design note; [docs/Deployment.md](docs/Deployment.md) covers Vercel.
+- **More:** [docs/README.md](docs/README.md) indexes every design note; [docs/Deployment.md](docs/Deployment.md) covers Vercel and demo mode.
+
+## Demo mode
+
+Demo mode allows Callora to run completely standalone with realistic mock data for marketplace browsing, API details, billing, provider APIs, webhooks, and analytics, without requiring a live backend or wallet.
+
+Demo mode is implemented with **Mock Service Worker (MSW)**:
+- **Browser:** `src/mocks/browser.ts` registers a client-side Service Worker (`public/mockServiceWorker.js`) that intercepts `/api/*` requests. MSW is loaded dynamically in `src/main.tsx` only when `VITE_DEMO_MODE === "true"`, so standard production builds do not include MSW code in the main chunk.
+- **Node / Vitest:** `src/mocks/server.ts` starts an MSW server in `src/setupTests.ts` (`onUnhandledRequest: "warn"`), ensuring unit tests run against identical API fixtures with support for per-test overrides via `server.use()`.
+- **Fixtures & Handlers:** Endpoints are defined in `src/mocks/handlers.ts` and fixtures are centralized under `src/mocks/fixtures/`.
+
+To run or build in demo mode:
+
+```bash
+# Run dev server with MSW demo mode
+VITE_DEMO_MODE=true npm run dev
+
+# Build a standalone demo preview
+VITE_DEMO_MODE=true npm run build
+```
+
+See [docs/Deployment.md](docs/Deployment.md#demo-mode) for details on adding new endpoint handlers.
 
 ## Deployment
 
@@ -65,6 +89,20 @@ The app is a static Vite SPA deployed on Vercel. `vercel.json` rewrites all non-
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Before opening a PR run `npm run typecheck && npm run build && npx vitest run`.
+
+## Running browser smoke tests
+
+Install the Chromium browser once, then run the Playwright suite:
+
+```bash
+npx playwright install chromium
+npm run e2e
+```
+
+The suite builds and serves the production app on `http://localhost:4173`. Its
+Freighter provider, Callora API routes, and Stellar Horizon/Soroban RPC
+responses are stubbed, so it does not require wallet extensions, credentials,
+or access to external services.
 
 ---
 
@@ -188,7 +226,7 @@ Key principles:
 
 ## Local setup
 
-1. **Prerequisites:** Node.js 18+
+1. **Prerequisites:** Node.js 20 (see `.nvmrc`; `nvm use` picks it up)
 
 2. **Install and run:**
 

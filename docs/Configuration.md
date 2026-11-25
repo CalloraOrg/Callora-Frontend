@@ -91,7 +91,16 @@ Trailing slashes and surrounding whitespace are stripped automatically by
 `normalizeBaseUrl`, so `https://api.callora.com/` and
 `https://api.callora.com` are equivalent. Use `apiUrl()` from
 `src/config/constants.ts` to build request paths so this normalisation is
-applied consistently.
+applied consistently. `src/config/constants.ts` is the single source of truth
+and the only place in the codebase that reads `VITE_API_BASE_URL`.
+
+### `VITE_DEMO_MODE`
+
+Enables Mock Service Worker (MSW) in the browser for demo builds and standalone evaluation without a backend. Default: **false**.
+
+- When set to `"true"`, MSW starts in the browser (`src/mocks/browser.ts`) and intercepts `/api/*` endpoints with realistic fixtures.
+- When `false` (default), MSW is not initialized and requests proceed normally over the network.
+- MSW is loaded via dynamic import so production builds without demo mode do not include MSW code in the primary bundle chunk.
 
 ### `VITE_STELLAR_NETWORK`
 
@@ -242,6 +251,7 @@ Key contract details and adapter behavior:
 | Export | Purpose |
 | --- | --- |
 | `API_BASE` | normalised `VITE_API_BASE_URL`, empty by default |
+| `IS_BACKEND_MODE` | boolean flag indicating whether `API_BASE` is configured |
 | `STELLAR_NETWORK` | validated `VITE_STELLAR_NETWORK` |
 | `DEFAULT_STELLAR_NETWORK` | `"testnet"` |
 | `StellarNetwork` | union type of valid networks |

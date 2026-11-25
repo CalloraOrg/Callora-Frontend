@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { apiClient, ApiError, isApiAbortError, isApiError } from "./apiClient";
 import * as authFetchModule from "../services/authFetch";
-import * as apiConfig from "../config/api";
+import * as constantsConfig from "../config/constants";
 import { isTimeoutError } from "../services/idempotency";
 
 describe("apiClient", () => {
@@ -9,7 +9,7 @@ describe("apiClient", () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.spyOn(apiConfig, "getApiBaseUrl").mockReturnValue("");
+    vi.spyOn(constantsConfig, "apiUrl").mockImplementation((p: string) => p.startsWith("/") ? p : `/${p}`);
   });
 
   afterEach(() => {
@@ -53,8 +53,8 @@ describe("apiClient", () => {
     );
   });
 
-  it("uses getApiBaseUrl when configured and auth is false", async () => {
-    vi.spyOn(apiConfig, "getApiBaseUrl").mockReturnValue("https://backend.callora.dev/");
+  it("uses apiUrl when configured and auth is false", async () => {
+    vi.spyOn(constantsConfig, "apiUrl").mockImplementation((p: string) => `https://backend.callora.dev${p.startsWith("/") ? p : `/${p}`}`);
     const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );

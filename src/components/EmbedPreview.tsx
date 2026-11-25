@@ -341,6 +341,19 @@ export default function EmbedPreview({
               resize: 'vertical',
             }}
           />
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12,
+              color: 'var(--muted)',
+              lineHeight: 1.5,
+            }}
+          >
+            Auto-resize: the embed page posts{' '}
+            <code>{`{ type: "callora-embed-height", height }`}</code> to{' '}
+            <code>window.parent</code> via <code>postMessage</code> whenever its
+            content height changes. Supports <code>?theme=light|dark|system</code>.
+          </p>
           <button
             onClick={handleCopy}
             aria-label="Copy embed snippet"
