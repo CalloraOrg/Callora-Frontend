@@ -16,6 +16,7 @@ vi.mock("@stellar/freighter-api", () => ({
   isAllowed: vi.fn().mockResolvedValue({ isAllowed: false }),
   getAddress: vi.fn().mockResolvedValue({ address: "" }),
   getNetwork: vi.fn().mockResolvedValue({ network: "TESTNET", networkPassphrase: "" }),
+  getNetworkDetails: vi.fn().mockResolvedValue({ network: "TESTNET", networkPassphrase: "" }),
   requestAccess: vi.fn().mockResolvedValue({ address: "" }),
   signTransaction: vi.fn().mockResolvedValue({ signedTxXdr: "" }),
   WatchWalletChanges: class {

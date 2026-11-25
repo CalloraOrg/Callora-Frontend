@@ -12,4 +12,6 @@ coverage
 # Test output
 test-output*.txt
 coverage/
+playwright-report/
+test-results/
 .vercel

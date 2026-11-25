@@ -20,7 +20,7 @@ type EndpointEntry = ParsedEndpoint & {
   id: string;
 };
 
-type PublishFormState = {
+export type PublishFormState = {
   apiName: string;
   baseUrl: string;
   category: string;
@@ -108,7 +108,7 @@ function methodBadgeClass(method: string): string {
  * `/users` and `/users/:id` are different endpoints, and rewriting paths here
  * could merge definitions the provider meant to keep apart.
  */
-function endpointKey(ep: Pick<EndpointEntry, 'method' | 'path'>): string {
+export function endpointKey(ep: Pick<EndpointEntry, 'method' | 'path'>): string {
   return `${ep.method.toUpperCase()} ${ep.path}`;
 }
 
@@ -134,7 +134,7 @@ function findDuplicateEndpointIds(endpoints: EndpointEntry[]): Set<string> {
   return duplicates;
 }
 
-function validateEndpoints(endpoints: EndpointEntry[]): string | undefined {
+export function validateEndpoints(endpoints: EndpointEntry[]): string | undefined {
   if (endpoints.length === 0) {
     return 'Add at least one endpoint before publishing. Use "Import spec" above to add them.';
   }
@@ -151,7 +151,7 @@ function validateEndpoints(endpoints: EndpointEntry[]): string | undefined {
   return `Each endpoint must have a unique method and path. Remove the duplicates: ${list}.`;
 }
 
-function validateForm(form: PublishFormState): ValidationErrors {
+export function validateForm(form: PublishFormState): ValidationErrors {
   const errors: ValidationErrors = {};
 
   if (!form.apiName.trim()) {
@@ -218,7 +218,7 @@ function fieldStatus(
  * `endpoints` no longer an array). Reject anything that does not look like a
  * `PublishFormState` and start blank instead.
  */
-function isPublishFormDraft(candidate: unknown): candidate is PublishFormState {
+export function isPublishFormDraft(candidate: unknown): candidate is PublishFormState {
   if (typeof candidate !== 'object' || candidate === null) return false;
   const draft = candidate as Record<string, unknown>;
 
@@ -246,7 +246,7 @@ function isPublishFormDraft(candidate: unknown): candidate is PublishFormState {
 // ---------------------------------------------------------------------------
 
 /** Lowercase and strip separators so `base_url` matches `baseUrl`. */
-function normalizeFieldKey(key: string): string {
+export function normalizeFieldKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
@@ -279,7 +279,7 @@ const FIELD_ALIASES: Record<string, ValidatedFields> = {
  * corresponding input, so the caller can surface them as a form-level error
  * instead of losing them.
  */
-function toValidationErrors(fields: PublishApiFieldErrors): {
+export function toValidationErrors(fields: PublishApiFieldErrors): {
   mapped: ValidationErrors;
   unmapped: string[];
 } {
@@ -310,7 +310,7 @@ function toValidationErrors(fields: PublishApiFieldErrors): {
  * price becomes `null` rather than `0` so "set later" is distinguishable from
  * "free".
  */
-function toPublishPayload(form: PublishFormState): PublishApiInput {
+export function toPublishPayload(form: PublishFormState): PublishApiInput {
   const rawPrice = form.pricePerCall.trim();
   const parsedPrice = rawPrice === '' ? Number.NaN : Number(rawPrice);
 
@@ -350,6 +350,7 @@ export default function PublishApi() {
   const [touched, setTouched] = useState<TouchedState>(INITIAL_TOUCHED);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [importFeedback, setImportFeedback] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   /** Per-field messages returned by the server on the last attempt. */
@@ -474,19 +475,32 @@ export default function PublishApi() {
 
   const handleImport = useCallback(
     (endpoints: ParsedEndpoint[]) => {
+      let importedCount = 0;
+      let skippedCount = 0;
       setForm((prev) => {
-        // Ids must stay unique: a restored draft can already hold ids that the
-        // module-level counter has not reached yet, and duplicate React keys
-        // would drop list entries.
-        const taken = new Set(prev.endpoints.map((ep) => ep.id));
-        const entries: EndpointEntry[] = endpoints.map((ep) => {
+        const takenIds = new Set(prev.endpoints.map((ep) => ep.id));
+        const keys = new Set(prev.endpoints.map((ep) => endpointKey(ep)));
+        const entries: EndpointEntry[] = [];
+        for (const ep of endpoints) {
+          const key = endpointKey(ep);
+          if (keys.has(key)) {
+            skippedCount += 1;
+            continue;
+          }
+          keys.add(key);
           let id = nextId();
-          while (taken.has(id)) id = nextId();
-          taken.add(id);
-          return { ...ep, id };
-        });
+          while (takenIds.has(id)) id = nextId();
+          takenIds.add(id);
+          entries.push({ ...ep, id });
+        }
+        importedCount = entries.length;
         return { ...prev, endpoints: [...prev.endpoints, ...entries] };
       });
+      setImportFeedback(
+        importedCount === 0
+          ? (endpoints.length === 0 ? 'No endpoints found in the specification.' : 'No new endpoints imported; duplicates were skipped.')
+          : `${importedCount} endpoint${importedCount === 1 ? '' : 's'} imported${skippedCount > 0 ? `; ${skippedCount} duplicate${skippedCount === 1 ? '' : 's'} skipped` : ''}.`,
+      );
       setImportOpen(false);
     },
     [setForm],
@@ -686,6 +700,11 @@ export default function PublishApi() {
                 onCancel={() => setImportOpen(false)}
               />
             </div>
+          )}
+          {importFeedback && (
+            <p className="pa-import-feedback" role="status" aria-live="polite">
+              {importFeedback}
+            </p>
           )}
         </section>
 
