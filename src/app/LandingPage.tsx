@@ -175,15 +175,12 @@ export function LandingPage({ onStartUsingApis, onPublishApi, onTakeTour }: Land
           </article>
 
           <article className="lp-card">
-            <h3>Testimonials</h3>
-            <p>
-              “Callora helped us launch usage-based API monetization in days, not months.”
-              <span> — Case study placeholder</span>
-            </p>
-            <p>
-              “Our teams can scale integration costs exactly with demand, no wasted subscription spend.”
-              <span> — Customer quote placeholder</span>
-            </p>
+            <h3>Why teams choose Callora</h3>
+            <ul>
+              <li>Pay-per-call billing with transparent micro-payments in USDC.</li>
+              <li>USDC settlement on Stellar with verifiable on-chain records.</li>
+              <li>No subscriptions or recurring plans—pay only for actual usage.</li>
+            </ul>
           </article>
         </div>
       </section>
