@@ -6,6 +6,7 @@ export interface UserPrefs {
   density: DensityPreference;
   pageSize: number;
   analyticsConsent: boolean;
+  analyticsConsentDecided: boolean;
 }
 
 export const DEFAULT_PREFS: UserPrefs = {
@@ -13,9 +14,11 @@ export const DEFAULT_PREFS: UserPrefs = {
   density: 'comfortable',
   pageSize: 12,
   analyticsConsent: false,
+  analyticsConsentDecided: false,
 };
 
 export const PREFS_STORAGE_KEY = 'callora.prefs';
+export const PREFS_CHANGED_EVENT = 'callora:prefs-changed';
 
 function migrateLegacyKeys(prefs: Partial<UserPrefs>): Partial<UserPrefs> {
   const updatedPrefs = { ...prefs };
@@ -64,6 +67,14 @@ export function readAllPrefs(): UserPrefs {
   const finalPrefs: UserPrefs = {
     ...DEFAULT_PREFS,
     ...migrated,
+    analyticsConsent:
+      typeof migrated.analyticsConsent === 'boolean'
+        ? migrated.analyticsConsent
+        : DEFAULT_PREFS.analyticsConsent,
+    analyticsConsentDecided:
+      typeof migrated.analyticsConsentDecided === 'boolean'
+        ? migrated.analyticsConsentDecided
+        : DEFAULT_PREFS.analyticsConsentDecided,
   };
 
   // Ensure any migrations or fixes are persisted immediately
@@ -84,5 +95,8 @@ export function setPref<K extends keyof UserPrefs>(key: K, value: UserPrefs[K]):
   prefs[key] = value;
   if (typeof window !== 'undefined') {
     window.localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+    window.dispatchEvent(
+      new CustomEvent(PREFS_CHANGED_EVENT, { detail: { key, value } }),
+    );
   }
 }
