@@ -83,8 +83,9 @@ npm run test:coverage                                   # single pass + coverage
 
 Before opening a pull request:
 
-1. Run `npm test -- --run` and make sure the suite is green.
-2. Run `npm run build` to confirm there are no TypeScript errors.
+1. Run `npm run typecheck:test` to confirm test files have no TypeScript errors.
+2. Run `npm run test:coverage` and make sure the suite is green and meets all coverage thresholds.
+3. Run `npm run build` to confirm there are no TypeScript errors.
 3. Add or update tests for the behaviour you changed. New components should
    ship with a `src/components/<Name>.test.tsx` file; bug fixes should add a
    regression test that fails against the old code.
