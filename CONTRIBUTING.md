@@ -158,3 +158,22 @@ Rules of thumb:
 For changes that automated tests cannot cover — layout, animation, theming,
 or the dev-server proxy — manually verify the affected routes load and behave
 correctly after your changes, in both light and dark mode.
+
+## Dependency updates
+
+Automated dependency updates for `npm` packages and GitHub Actions are managed
+by Dependabot (`.github/dependabot.yml`) on a **weekly** cadence (up to 5 open
+`npm` pull requests at a time):
+
+- **Grouped updates:** minor and patch updates are batched into two `npm`
+  groups — `dev-tooling` (`vitest`, `@vitest/*`, `@testing-library/*`, `jsdom`,
+  `typescript`, `@types/*`) and `production-dependencies` — with
+  `chore(deps)` commit prefixes.
+- **Ignored major bumps:** major version updates for the React family
+  (`react`, `react-dom`, `@types/react`, `@types/react-dom`) and the Vite
+  family (`vite`, `@vitejs/plugin-react`) are intentionally ignored so
+  breaking framework and bundler upgrades are planned and verified manually in
+  dedicated PRs.
+- **Review requirement:** changes to `package.json` and `package-lock.json`
+  are soft-flagged by `pr-malware-guard` and require maintainer review per
+  `.github/CODEOWNERS` before merge.
