@@ -645,6 +645,30 @@ export default function ApiCard({
     );
   }
 
+  return (
+    <ApiCardContent
+      api={api}
+      density={density}
+      onViewDetails={onViewDetails}
+      onTagClick={onTagClick}
+      activeTag={activeTag}
+    />
+  );
+}
+
+function ApiCardContent({
+  api,
+  density,
+  onViewDetails,
+  onTagClick,
+  activeTag,
+}: {
+  api: APIItem;
+  density: "comfortable" | "compact";
+  onViewDetails?: (api: APIItem) => void;
+  onTagClick?: (tag: string) => void;
+  activeTag?: string | null;
+}) {
   const isMobile = useMediaQuery("(max-width: 768px)");
 
   const pricePerCall = api.pricePerCall ?? api.pricePerRequest;

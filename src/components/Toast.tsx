@@ -116,7 +116,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       };
 
       setToasts((prev) => {
-        let next = [...prev, toast];
+        const next = [...prev, toast];
         if (next.length > MAX_TOASTS) {
           const removable = next.findIndex((t) => !t.persistent);
           if (removable !== -1) {

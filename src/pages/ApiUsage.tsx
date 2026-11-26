@@ -462,14 +462,6 @@ export default function ApiUsage() {
       : callHistory.filter((call) => call.status === statusFilter),
   );
 
-  // Export uses the range-filtered history so the downloaded file matches what
-  // is shown in the table. The filename includes the preset for traceability.
-  const exportRangeLabel = selectedRange.preset === "custom"
-    ? (selectedRange.from && selectedRange.to
-        ? `${selectedRange.from.toISOString().slice(0, 10)}_to_${selectedRange.to.toISOString().slice(0, 10)}`
-        : "custom")
-    : selectedRange.preset;
-
   const {
     status: exportStatus,
     format: exportFormat,
@@ -481,9 +473,6 @@ export default function ApiUsage() {
     fileName: exportFileName,
     lastFailedFormat: exportLastFailedFormat,
     isExporting,
-    isFailed: isExportFailed,
-    isCompleted: isExportCompleted,
-    isCancelled: isExportCancelled,
     startExport: startExportBase,
     cancelExport,
     retryLastFailedExport,
@@ -597,7 +586,7 @@ export default function ApiUsage() {
       setCopied(true);
       announceStatus("API key copied to clipboard.");
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch {
       console.error("Failed to copy API key");
     }
   };
@@ -722,7 +711,7 @@ export default function ApiUsage() {
         `${selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)} code example copied to clipboard.`,
       );
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch {
       console.error("Failed to copy code");
     }
   };

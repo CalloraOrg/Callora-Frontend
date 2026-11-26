@@ -363,7 +363,7 @@ async function waitForConfirmation(
     let transaction;
     try {
       transaction = await server.getTransaction(hash);
-    } catch (error) {
+    } catch {
       throw new WalletServiceError(
         "NETWORK_TIMEOUT",
         "Could not confirm the submitted transaction. It may still be processing; check Stellar Explorer before retrying.",

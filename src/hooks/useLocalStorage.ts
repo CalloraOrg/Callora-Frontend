@@ -52,7 +52,7 @@ export function useLocalStorage<T>(
 
   useEffect(() => {
     setStoredValue(readValue());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate once on mount; readValue closes over initialValue
   }, []);
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export function useLocalStorage<T>(
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener(LOCAL_STORAGE_SYNC_EVENT, handleSync);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resubscribe only when key changes; initialValue may be an inline literal
   }, [key]);
 
   return [storedValue, setValue];

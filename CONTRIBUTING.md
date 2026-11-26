@@ -41,6 +41,7 @@ Example: `git checkout -b feature/api-search-filters`
 
 Before opening a pull request, confirm:
 
+- [ ] `npm run lint` passes with zero errors (`npm run lint:fix` auto-fixes simple issues).
 - [ ] `npm run build` passes with no TypeScript errors (`tsconfig.json` enforces `strict`, `noUnusedLocals`, `noUnusedParameters`, and `noUncheckedIndexedAccess`; avoid explicit `any`).
 - [ ] Tests pass (`npm test -- --run`).
 - [ ] `npm run format:changed` passes for the files you touched (see [Formatting](#formatting)).

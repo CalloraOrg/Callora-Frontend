@@ -625,7 +625,7 @@ function getByJsonPointer(root: Record<string, unknown>, pointer: string): unkno
   let current: unknown = root;
 
   for (const raw of parts) {
-    const key = raw.replace(/\~1/g, '/').replace(/\~0/g, '\~');
+    const key = raw.replace(/~1/g, '/').replace(/~0/g, '~');
     if (typeof current !== 'object' || current === null) return undefined;
     if (Array.isArray(current)) {
       const idx = Number(key);

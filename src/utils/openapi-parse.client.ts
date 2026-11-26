@@ -155,7 +155,7 @@ export function parseOpenApiInWorker(
       }
     };
 
-    const onError = (event: ErrorEvent) => {
+    const onError = (_event: ErrorEvent) => {
       cleanup();
       // Translate worker onerror into a ParseError result — never expose the raw event.
       resolve({

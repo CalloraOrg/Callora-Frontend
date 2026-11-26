@@ -14,7 +14,6 @@ import { Icons } from "../utils/icons";
 import { API_BASE_URL } from "../config/constants";
 import EndpointGroupHover, { type EndpointGroupPreview } from "../components/EndpointGroupHover";
 import EndpointPreview from "../components/EndpointPreview";
-import RatingHistogram from "../components/RatingHistogram";
 import { ApiDetailStickyTOC, type TocSection } from "../components/ApiDetailStickyTOC";
 import { StickyTocErrorBoundary } from "../components/StickyTocErrorBoundary";
 import PricingTierTable, { type PricingTier } from "../components/PricingTierTable";
@@ -483,7 +482,7 @@ function EndpointSaveButton({
                     type="checkbox"
                     checked={savedIn.has(collection.id)}
                     onChange={() => handleToggleCollection(collection.id)}
-                    aria-label={`${savedIn.has(collection.id) ? "Remove from" : "Add to"} collection \"${collection.name}\"`}
+                    aria-label={`${savedIn.has(collection.id) ? "Remove from" : "Add to"} collection "${collection.name}"`}
                     style={{ accentColor: "var(--accent)", width: 16, height: 16 }}
                   />
                   <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -690,17 +689,6 @@ export default function ApiDetailPage({ onBack }: Props) {
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [documentationEndpoints]);
-
-  // Derive distribution map from raw reviews for the histogram
-  const ratingDistribution = useMemo(() => {
-    if (rawReviews.length === 0) return undefined;
-    const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    rawReviews.forEach((r) => {
-      const star = Math.min(5, Math.max(1, Math.round(r.rating)));
-      dist[star] = (dist[star] ?? 0) + 1;
-    });
-    return dist;
-  }, [rawReviews]);
 
   // ── Pricing recommendation (issue #1091) ───────────────────────────────────
   //

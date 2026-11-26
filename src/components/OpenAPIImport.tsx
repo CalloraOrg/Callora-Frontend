@@ -229,9 +229,8 @@ export default function OpenAPIImport({ onImport, onCancel }: OpenAPIImportProps
       return;
     }
 
-    let result;
     try {
-      result = await parseOpenApiInWorker(text, file.name, {
+      await parseOpenApiInWorker(text, file.name, {
         signal: controller.signal,
         onProgress: (phase) => {
           // Only update state for the active generation.
