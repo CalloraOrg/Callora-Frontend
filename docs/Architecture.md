@@ -25,6 +25,20 @@ The application shell in `src/App.tsx` delegates route definitions, marketing se
 | `src/app/WalletSignInButton.tsx` | Topbar Freighter wallet sign-in / sign-out button managing self-contained auth states |
 | `src/app/AccountSwitcher.tsx` | Multi-account selector dropdown with rename, add, and remove capabilities |
 
+## Publish API modules (`src/pages/publish/`)
+
+`src/pages/PublishApi.tsx` is the lazy-loaded composition root for `/publish` and delegates model logic, form state, and section UI to focused modules under `src/pages/publish/`:
+
+| Module | Responsibility |
+| --- | --- |
+| `src/pages/publish/model.ts` | Pure types, constants (`INITIAL_FORM`, `CATEGORIES`, `DRAFT_STORAGE_KEY`), validation helpers (`validateForm`, `validateEndpoints`, `findDuplicateEndpointIds`), draft guard (`isPublishFormDraft`), server error mapping (`toValidationErrors`), and payload shaping (`toPublishPayload`) |
+| `src/pages/publish/usePublishForm.ts` | Form state, touched tracking, localStorage draft persistence (`useFormPersistence`), unsaved-changes guard (`useBeforeUnload`), throttled description counter announcements, and idempotent submission via `submitPublishApi` |
+| `src/pages/publish/BasicsStep.tsx` | API details fieldset (name, base URL, category, description, and live character-count region) with a slot for pricing |
+| `src/pages/publish/PricingStep.tsx` | Per-call USDC pricing input field |
+| `src/pages/publish/EndpointEditor.tsx` | OpenAPI spec importer toggle (`OpenApiImportSection`) and endpoint list (`EndpointEditor`) with duplicate flagging, removal, and `pa-endpoints-error` accessibility wiring |
+| `src/pages/publish/ReviewSummary.tsx` | Form footer submit controls and form-level error alert (`ReviewSummary`), plus the post-submission confirmation view (`PublishSuccessView`) |
+| `src/pages/publish/publish.css` | Stylesheet for the publish flow |
+
 ## Protected routes & authentication guard
 
 Routes that require an authenticated Freighter session are wrapped in `RequireAuth` (`src/components/RequireAuth.tsx`), which subscribes to `useIsSignedIn()` (`src/services/authService.ts`) and `useSessionExpiry()` (`src/hooks/useSessionExpiry.ts`):
