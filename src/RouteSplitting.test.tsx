@@ -62,6 +62,9 @@ describe('Route Splitting and Responsiveness Suite (Quality-2)', () => {
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' });
     expect(within(primaryNav).getByRole('link', { name: 'Dashboard' })).toBeTruthy();
     expect(within(primaryNav).getByRole('link', { name: 'Marketplace' })).toBeTruthy();
+    expect(screen.queryByText(/Case study/i)).toBeNull();
+    expect(screen.queryByText(/Customer quote/i)).toBeNull();
+    expect(screen.queryByText(/Testimonials/i)).toBeNull();
   });
 
   it('dynamically loads Plan Badge route inside Suspense boundary', async () => {
