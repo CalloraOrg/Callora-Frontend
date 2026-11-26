@@ -16,6 +16,8 @@ describe('useDocumentTitle', () => {
       const meta = document.querySelector('meta[name="description"]');
       if (meta) meta.remove();
     }
+    const robots = document.querySelector('meta[name="robots"]');
+    if (robots) robots.remove();
   });
 
   test('sets provided title and description', () => {
@@ -39,5 +41,41 @@ describe('useDocumentTitle', () => {
     expect(document.title).toBe('Callora');
     unmount();
     expect(document.title).toBe(originalTitle);
+  });
+
+  test('adds robots meta when noindex is true and removes it on unmount', () => {
+    expect(document.querySelector('meta[name="robots"]')).toBeNull();
+    const { unmount } = renderHook(() =>
+      useDocumentTitle('Billing – Callora', undefined, { noindex: true }),
+    );
+    const robots = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
+    expect(robots).toBeTruthy();
+    expect(robots?.getAttribute('content')).toBe('noindex, nofollow');
+
+    unmount();
+    expect(document.querySelector('meta[name="robots"]')).toBeNull();
+  });
+
+  test('restores an existing robots meta tag on unmount', () => {
+    const existing = document.createElement('meta');
+    existing.name = 'robots';
+    existing.content = 'index, follow';
+    document.head.appendChild(existing);
+
+    const { unmount } = renderHook(() =>
+      useDocumentTitle('Billing – Callora', undefined, { noindex: true }),
+    );
+    expect(existing.getAttribute('content')).toBe('noindex, nofollow');
+
+    unmount();
+    expect(document.querySelector('meta[name="robots"]')).toBe(existing);
+    expect(existing.getAttribute('content')).toBe('index, follow');
+  });
+
+  test('leaves head untouched when noindex option is absent', () => {
+    const { unmount } = renderHook(() => useDocumentTitle('Marketplace – Callora'));
+    expect(document.querySelector('meta[name="robots"]')).toBeNull();
+    unmount();
+    expect(document.querySelector('meta[name="robots"]')).toBeNull();
   });
 });

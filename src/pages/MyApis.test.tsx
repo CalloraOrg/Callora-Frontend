@@ -1,35 +1,36 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { http, HttpResponse } from "msw";
+import { server } from "../mocks/server";
+import { ToastProvider } from "../components/Toast";
 import MyApis from "./MyApis";
 
 // ---------------------------------------------------------------------------
-// Hoisted fixtures (must be defined before any vi.mock factory that uses them)
+// Hoisted fixtures
 // ---------------------------------------------------------------------------
 
-const { MOCK_API_1, MOCK_API_2 } = vi.hoisted(() => {
-  const MOCK_API_1 = {
-    id: "weather-001",
-    name: "WeatherSim API",
-    provider: { name: "Acme Labs" },
-    status: "operational" as const,
-    description: "Weather forecast API",
-    pricePerRequest: 0.01,
-    pricePerCall: 0.01,
-  };
+const MOCK_API_1 = {
+  id: "weather-001",
+  name: "WeatherSim API",
+  provider: { name: "Acme Labs" },
+  status: "operational" as const,
+  description: "Weather forecast API",
+  pricePerRequest: 0.01,
+  pricePerCall: 0.01,
+  publishStatus: "live" as const,
+};
 
-  const MOCK_API_2 = {
-    id: "geo-002",
-    name: "GeoLocate API",
-    provider: { name: "Acme Labs" },
-    status: "degraded" as const,
-    description: "Geocoding API",
-    pricePerRequest: 0.005,
-    pricePerCall: 0.005,
-  };
-
-  return { MOCK_API_1, MOCK_API_2 };
-});
+const MOCK_API_2 = {
+  id: "geo-002",
+  name: "GeoLocate API",
+  provider: { name: "Acme Labs" },
+  status: "degraded" as const,
+  description: "Geocoding API",
+  pricePerRequest: 0.005,
+  pricePerCall: 0.005,
+  publishStatus: "pending" as const,
+};
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -49,31 +50,21 @@ vi.mock("../hooks/useDocumentTitle", () => ({
   default: vi.fn(),
 }));
 
-// Replace MOCK_APIS with the two controlled fixtures so fetch results are
-// deterministic.  Individual tests further override via vi.spyOn when needed.
-vi.mock("../data/mockApis", async () => {
-  const actual = await vi.importActual<typeof import("../data/mockApis")>(
-    "../data/mockApis"
-  );
-  return {
-    ...actual,
-    MOCK_APIS: [MOCK_API_1, MOCK_API_2],
-  };
-});
-
 // ---------------------------------------------------------------------------
 // Helper
 // ---------------------------------------------------------------------------
 
 function renderMyApis() {
   return render(
-    <MemoryRouter>
-      <MyApis />
-    </MemoryRouter>
+    <ToastProvider>
+      <MemoryRouter>
+        <MyApis />
+      </MemoryRouter>
+    </ToastProvider>
   );
 }
 
-// Generous timeout to cover the 300 ms stub delay + React scheduling.
+// Generous timeout to cover network round-trip + React scheduling.
 const WAIT_OPTS = { timeout: 2000 };
 
 // ---------------------------------------------------------------------------
@@ -83,6 +74,11 @@ const WAIT_OPTS = { timeout: 2000 };
 describe("MyApis page", () => {
   beforeEach(() => {
     mockNavigate.mockClear();
+    server.use(
+      http.get("*/api/provider/apis", () => {
+        return HttpResponse.json([MOCK_API_1, MOCK_API_2]);
+      })
+    );
   });
 
   afterEach(() => {
@@ -94,7 +90,7 @@ describe("MyApis page", () => {
   it("renders skeleton rows while the request is in flight", () => {
     renderMyApis();
 
-    // Before the 300 ms stub resolves the skeleton must be present.
+    // Before the request resolves the skeleton must be present.
     expect(screen.getByTestId("my-apis-skeleton")).toBeTruthy();
     expect(screen.queryByTestId("my-apis-list")).toBeNull();
     expect(screen.queryByText("No APIs published yet")).toBeNull();
@@ -143,11 +139,11 @@ describe("MyApis page", () => {
   // ── 4. Empty state (zero results) ─────────────────────────────────────────
 
   it("renders the empty state when the provider has no published APIs", async () => {
-    const mockApis = await import("../data/mockApis");
-    // Provider name doesn't match PROVIDER_ID → filter returns [].
-    vi.spyOn(mockApis, "MOCK_APIS", "get").mockReturnValue([
-      { ...MOCK_API_1, provider: { name: "Someone Else" } },
-    ] as typeof mockApis.MOCK_APIS);
+    server.use(
+      http.get("*/api/provider/apis", () => {
+        return HttpResponse.json([]);
+      })
+    );
 
     renderMyApis();
 
@@ -166,9 +162,10 @@ describe("MyApis page", () => {
   // ── 5. Empty state CTA ────────────────────────────────────────────────────
 
   it("navigates to /publish when 'Publish your first API' is clicked", async () => {
-    const mockApis = await import("../data/mockApis");
-    vi.spyOn(mockApis, "MOCK_APIS", "get").mockReturnValue(
-      [] as unknown as typeof mockApis.MOCK_APIS
+    server.use(
+      http.get("*/api/provider/apis", () => {
+        return HttpResponse.json([]);
+      })
     );
 
     renderMyApis();
@@ -185,11 +182,11 @@ describe("MyApis page", () => {
   // ── 6. Error state ────────────────────────────────────────────────────────
 
   it("renders an error empty-state when the fetch rejects", async () => {
-    const mockApis = await import("../data/mockApis");
-    // Throwing inside the getter causes the timer callback to reject.
-    vi.spyOn(mockApis, "MOCK_APIS", "get").mockImplementation(() => {
-      throw new Error("Network failure");
-    });
+    server.use(
+      http.get("*/api/provider/apis", () => {
+        return new HttpResponse(null, { status: 500 });
+      })
+    );
 
     renderMyApis();
 
@@ -208,14 +205,14 @@ describe("MyApis page", () => {
   // ── 7. Error → retry → success ────────────────────────────────────────────
 
   it("shows the list after clicking Retry following an error", async () => {
-    const mockApis = await import("../data/mockApis");
     let callCount = 0;
-
-    vi.spyOn(mockApis, "MOCK_APIS", "get").mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) throw new Error("Network failure");
-      return [MOCK_API_1] as unknown as typeof mockApis.MOCK_APIS;
-    });
+    server.use(
+      http.get("*/api/provider/apis", () => {
+        callCount++;
+        if (callCount === 1) return new HttpResponse(null, { status: 500 });
+        return HttpResponse.json([MOCK_API_1]);
+      })
+    );
 
     renderMyApis();
 
@@ -240,12 +237,15 @@ describe("MyApis page", () => {
   // ── 8. Publish-status pills ───────────────────────────────────────────────
 
   it("renders Live / Pending / Rejected pills across three rows", async () => {
-    const mockApis = await import("../data/mockApis");
-    vi.spyOn(mockApis, "MOCK_APIS", "get").mockReturnValue([
-      MOCK_API_1,
-      MOCK_API_2,
-      { ...MOCK_API_1, id: "extra-003", name: "Extra API" },
-    ] as unknown as typeof mockApis.MOCK_APIS);
+    server.use(
+      http.get("*/api/provider/apis", () => {
+        return HttpResponse.json([
+          { ...MOCK_API_1, publishStatus: "live" },
+          { ...MOCK_API_2, publishStatus: "pending" },
+          { ...MOCK_API_1, id: "extra-003", name: "Extra API", publishStatus: "rejected" },
+        ]);
+      })
+    );
 
     renderMyApis();
 

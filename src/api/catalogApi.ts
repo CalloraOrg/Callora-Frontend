@@ -21,8 +21,8 @@
  * {@link isCatalogAbortError}) is the idiomatic way to say that.
  */
 
-import { API_BASE, apiUrl } from "../config/constants";
-import MOCK_APIS, { type APIItem, type ApiEndpointItem } from "../data/mockApis";
+import { API_BASE, API_BASE_URL, apiUrl } from "../config/constants";
+import type { APIItem, ApiEndpointItem } from "../data/mockApis";
 import { onAccountCacheInvalidated } from "../utils/offlineApiCache";
 import type { HealthStatus } from "../components/HealthTimeline";
 import { apiClient, isApiAbortError, isApiError } from "./apiClient";
@@ -472,10 +472,18 @@ export function createCatalogApi(
     inFlightById.clear();
   });
 
-  const resolveBase = (): string =>
-    options.baseUrl !== undefined
-      ? options.baseUrl.replace(/\/+$/, "")
-      : "";
+  const resolveBase = (): string => {
+    if (options.baseUrl !== undefined) {
+      return options.baseUrl.replace(/\/+$/, "");
+    }
+    if (API_BASE) {
+      return API_BASE;
+    }
+    if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
+      return window.location.origin.replace(/\/+$/, "");
+    }
+    return "";
+  };
 
   const api: CatalogApi = {
     async fetchCatalog(signal, params = {}) {
@@ -735,12 +743,6 @@ export async function fetchCatalog(
   signal?: AbortSignal,
   params?: CatalogParams,
 ): Promise<APIItem[]> {
-  // No backend configured (static demo deployment): use the bundled sample
-  // catalogue instead of firing a request that can only fail.
-  if (!API_BASE) return MOCK_APIS;
-
-  // When API_BASE is configured, errors must reject so the UI surfaces its
-  // error or stale-data states rather than hiding failures behind mock data.
   return await catalogApi.fetchCatalog(signal, params);
 }
 
@@ -753,13 +755,6 @@ export async function fetchApiDetail(
 ): Promise<ApiDetailResult> {
   if (signal?.aborted) {
     throw abortError();
-  }
-
-  if (!API_BASE) {
-    const found = MOCK_APIS.find((api) => api.id === id);
-    return found
-      ? { status: "ready", kind: "ready", api: found }
-      : { status: "not-found", kind: "not-found" };
   }
 
   return await catalogApi.fetchApiDetail(id, signal);
@@ -780,10 +775,6 @@ export async function fetchApiHealth(
     throw abortError();
   }
 
-  if (!API_BASE) {
-    return [];
-  }
-
   return await catalogApi.fetchApiHealth(id, signal);
 }
 
@@ -800,22 +791,6 @@ export async function resolveApisByIds(
 
   if (ids.length === 0) {
     return { apis: [], missing: [] };
-  }
-
-  if (!API_BASE) {
-    const uniqueIds = Array.from(new Set(ids));
-    const mockById = new Map(MOCK_APIS.map((item) => [item.id, item]));
-    const apis: APIItem[] = [];
-    const missing: string[] = [];
-    for (const id of uniqueIds) {
-      const found = mockById.get(id);
-      if (found) {
-        apis.push(found);
-      } else {
-        missing.push(id);
-      }
-    }
-    return { apis, missing };
   }
 
   return await catalogApi.resolveApisByIds(ids, signal);

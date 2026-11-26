@@ -60,7 +60,11 @@ export function parseRateLimitHeaders(
   if (reset) {
     // Try parsing as ISO 8601 first
     if (reset.includes("T") || reset.includes("-")) {
-      resetAt = new Date(reset).toISOString();
+      const date = new Date(reset);
+      if (isNaN(date.getTime())) {
+        return null;
+      }
+      resetAt = date.toISOString();
     } else {
       // Assume Unix timestamp in seconds; convert to milliseconds
       const timestamp = parseInt(reset, 10);

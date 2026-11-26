@@ -3,17 +3,24 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev": "vite",
     "test": "vitest",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "check:bundle": "node scripts/check-bundle-size.mjs",
+    "e2e": "playwright test",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "format:check": "node scripts/format-changed.mjs",
+    "format:changed": "node scripts/format-changed.mjs"
   },
   "dependencies": {
+    "@albedo-link/intent": "^0.13.0",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^17.2.0",
     "lucide-react": "^1.21.0",
@@ -22,7 +29,7 @@
     "react-router-dom": "^6.30.3"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
+    "@playwright/test": "1.56.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^14.1.0",
@@ -32,14 +39,19 @@
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",
     "@vitest/coverage-v8": "^1.6.1",
-    "eslint": "^9.39.5",
-    "eslint-plugin-jsx-a11y": "^6.10.2",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "globals": "^17.14.0",
+    "axe-core": "^4.14.1",
     "jsdom": "^24.0.0",
+    "msw": "^2.15.0",
+    "prettier": "^3.10.1",
     "typescript": "^5.3.0",
     "typescript-eslint": "^8.74.0",
     "vite": "^5.0.0",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "vitest-axe": "^0.1.0"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }

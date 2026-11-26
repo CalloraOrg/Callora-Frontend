@@ -139,6 +139,41 @@ export async function renderRoute(
     return;
   }
 
+  if (
+    pathname.startsWith("/embed/api/") ||
+    pathname === "/embed/api" ||
+    pathname.startsWith("/embed/api?")
+  ) {
+    const [rawPath = "", rawQuery = ""] = pathname.split("?");
+    const search = rawQuery
+      ? `?${rawQuery.split("#")[0]}`
+      : typeof window !== "undefined"
+        ? window.location.search
+        : "";
+    const rawId = rawPath.startsWith("/embed/api/")
+      ? rawPath.slice("/embed/api/".length).replace(/\/+$/, "")
+      : "";
+    let apiId = rawId;
+    try {
+      apiId = decodeURIComponent(rawId);
+    } catch {
+      apiId = rawId;
+    }
+
+    const mod = await import("./pages/EmbedApi");
+    const EmbedApi = mod.default;
+    const embedTheme = mod.parseEmbedTheme(search);
+
+    root.render(
+      <React.StrictMode>
+        <ThemeProvider initialTheme={embedTheme} persist={false}>
+          <EmbedApi apiId={apiId} />
+        </ThemeProvider>
+      </React.StrictMode>,
+    );
+    return;
+  }
+
   // Default: render the existing App
   root.render(
     <React.StrictMode>

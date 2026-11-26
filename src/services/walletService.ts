@@ -1,10 +1,4 @@
 import {
-  getNetwork,
-  isConnected,
-  requestAccess,
-  signTransaction,
-} from "@stellar/freighter-api";
-import {
   Address,
   Account,
   Asset,
@@ -37,6 +31,10 @@ import {
   type InvokeTransactionSummary,
 } from "./txSummary";
 import { resolveVaultConfig } from "./vaultConfig";
+import {
+  getSelectedWallet,
+} from "./wallets";
+import { WalletAdapterError } from "./wallets/WalletAdapter";
 
 const STELLAR_NETWORK_LABELS: Record<StellarNetwork, string> = {
   mainnet: "Mainnet",
@@ -122,6 +120,24 @@ function isUserRejection(error: unknown): boolean {
 }
 
 function throwWalletError(error: unknown): never {
+  if (error instanceof WalletAdapterError) {
+    if (error.code === "USER_REJECTED") {
+      throw new WalletServiceError(
+        "SIGNATURE_REJECTED",
+        "Signature rejected. No funds were added to the vault.",
+      );
+    }
+    if (error.code === "UNAVAILABLE") {
+      throw new WalletServiceError("WALLET_UNAVAILABLE", error.message);
+    }
+    if (error.code === "NETWORK_MISMATCH") {
+      throw new WalletServiceError(
+        "NETWORK_MISMATCH",
+        `Switch ${getSelectedWallet().name} to Stellar ${STELLAR_NETWORK_LABELS[getConfig().network]} and try again.`,
+      );
+    }
+    throw new WalletServiceError("WALLET_ERROR", error.message);
+  }
   if (isUserRejection(error)) {
     throw new WalletServiceError(
       "SIGNATURE_REJECTED",
@@ -164,8 +180,7 @@ function toUsdcStroops(amount: string | number): bigint {
 
 export async function isWalletAvailable(): Promise<boolean> {
   try {
-    const connection = await isConnected();
-    return connection.isConnected;
+    return await getSelectedWallet().isAvailable();
   } catch {
     return false;
   }
@@ -219,21 +234,23 @@ export async function hasUsdcTrustline(
   }
 }
 
-/** Connect Freighter and ensure every action targets the configured network. */
+/** Connect the selected wallet and ensure every action targets the configured network. */
 export async function getWalletAddress(config: RuntimeConfig = getConfig()): Promise<string> {
   if (!(await isWalletAvailable())) {
-    throw new WalletServiceError("WALLET_UNAVAILABLE", "Freighter is not installed or available in this browser.");
+    throw new WalletServiceError("WALLET_UNAVAILABLE", `${getSelectedWallet().name} is not installed or available in this browser.`);
   }
   try {
-    const access = await requestAccess();
-    if (access.error) throw access.error;
+    const adapter = getSelectedWallet();
+    const access = await adapter.connect();
     if (!access.address) {
-      throw new WalletServiceError("WALLET_UNAVAILABLE", "Freighter did not provide an account address. Connect an account and try again.");
+      throw new WalletServiceError("WALLET_UNAVAILABLE", `${adapter.name} did not provide an account address. Connect an account and try again.`);
     }
-    const network = await getNetwork();
-    if (network.error) throw network.error;
-    if (network.networkPassphrase !== networkPassphraseFor(config.network)) {
-      throw new WalletServiceError("NETWORK_MISMATCH", `Switch Freighter to Stellar ${STELLAR_NETWORK_LABELS[config.network]} and try again.`);
+    const network = await adapter.getNetwork();
+    if (
+      network.networkPassphrase &&
+      network.networkPassphrase !== networkPassphraseFor(config.network)
+    ) {
+      throw new WalletServiceError("NETWORK_MISMATCH", `Switch ${adapter.name} to Stellar ${STELLAR_NETWORK_LABELS[config.network]} and try again.`);
     }
     return access.address;
   } catch (error) {
@@ -263,13 +280,12 @@ export async function addUsdcTrustline(config: RuntimeConfig = getConfig()): Pro
       .setTimeout(TRANSACTION_TIMEOUT_SECONDS)
       .build();
 
-    const signature = await signTransaction(transaction.toXDR(), {
+    const signature = await getSelectedWallet().signTransaction(transaction.toXDR(), {
       networkPassphrase: networkPassphraseFor(config.network),
       address,
     });
-    if (signature.error) throw signature.error;
     if (!signature.signedTxXdr || signature.signerAddress !== address) {
-      throw new WalletServiceError("WALLET_ERROR", "Freighter did not sign the trustline with the connected account.");
+      throw new WalletServiceError("WALLET_ERROR", `${getSelectedWallet().name} did not sign the trustline with the connected account.`);
     }
     const submission = await horizonRequest("/transactions", config, {
       method: "POST",
@@ -286,6 +302,7 @@ export async function addUsdcTrustline(config: RuntimeConfig = getConfig()): Pro
     return "present";
   } catch (error) {
     if (isUserRejection(error) || (error instanceof WalletServiceError && error.code === "SIGNATURE_REJECTED")) return "cancelled";
+    if (error instanceof WalletAdapterError) throwWalletError(error);
     if (error instanceof WalletServiceError) throw error;
     throw new WalletServiceError("NETWORK_ERROR", "Could not confirm the USDC trustline. Check your connection and wallet activity, then check the trustline again.");
   }
@@ -540,18 +557,17 @@ export async function signAndSubmit(
 
   let signature;
   try {
-    signature = await signTransaction(prepared.xdr, {
+    signature = await getSelectedWallet().signTransaction(prepared.xdr, {
       networkPassphrase: passphrase,
       address: prepared.address,
     });
   } catch (error) {
     throwWalletError(error);
   }
-  if (signature.error) throwWalletError(signature.error);
   if (!signature.signedTxXdr || signature.signerAddress !== prepared.address) {
     throw new WalletServiceError(
       "WALLET_ERROR",
-      "Freighter did not sign the deposit with the connected account.",
+      `${getSelectedWallet().name} did not sign the deposit with the connected account.`,
     );
   }
 
@@ -725,18 +741,17 @@ export async function submitVaultWithdraw(
 
   let signature;
   try {
-    signature = await signTransaction(preparedTransaction.toXDR(), {
+    signature = await getSelectedWallet().signTransaction(preparedTransaction.toXDR(), {
       networkPassphrase: expectedPassphrase,
       address,
     });
   } catch (error) {
     throwWalletError(error);
   }
-  if (signature.error) throwWalletError(signature.error);
   if (!signature.signedTxXdr || signature.signerAddress !== address) {
     throw new WalletServiceError(
       "WALLET_ERROR",
-      "Freighter did not sign the withdrawal with the connected account.",
+      `${getSelectedWallet().name} did not sign the withdrawal with the connected account.`,
     );
   }
 

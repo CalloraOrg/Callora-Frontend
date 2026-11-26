@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
-import { StrKey } from "@stellar/stellar-sdk";
-import { getApiBaseUrl } from "./api";
+import { isValidContractId, isValidEd25519PublicKey } from "../utils/stellarAddress";
 import {
+  API_BASE,
   DEFAULT_STELLAR_NETWORK,
   STELLAR_NETWORK,
   STELLAR_RPC_URL,
@@ -101,7 +101,7 @@ export function usdcConfigurationError(config: RuntimeConfig = getConfig()): str
   ) {
     return STELLAR_USDC_CONFIGURATION_ERROR;
   }
-  if (!config.usdcIssuer || !StrKey.isValidEd25519PublicKey(config.usdcIssuer)) {
+  if (!config.usdcIssuer || !isValidEd25519PublicKey(config.usdcIssuer)) {
     return "Configure a valid Stellar Ed25519 public key for the USDC issuer on this network.";
   }
   return null;
@@ -163,7 +163,7 @@ export function validateRuntimeConfig(
   if (hasOwn(payload, "vaultContractId")) {
     if (
       typeof payload.vaultContractId !== "string" ||
-      !StrKey.isValidContract(payload.vaultContractId)
+      !isValidContractId(payload.vaultContractId)
     ) {
       throw new Error("Runtime config vault contract ID is invalid.");
     }
@@ -173,7 +173,7 @@ export function validateRuntimeConfig(
   if (hasOwn(payload, "usdcIssuer")) {
     if (
       typeof payload.usdcIssuer !== "string" ||
-      !StrKey.isValidEd25519PublicKey(payload.usdcIssuer)
+      !isValidEd25519PublicKey(payload.usdcIssuer)
     ) {
       throw new Error("Runtime config USDC issuer is invalid.");
     }
@@ -217,7 +217,7 @@ export async function loadRuntimeConfig(signal?: AbortSignal): Promise<RuntimeCo
   else signal?.addEventListener("abort", abort, { once: true });
 
   try {
-    const base = getApiBaseUrl().trim().replace(/\/+$/, "");
+    const base = API_BASE;
     const response = await fetch(`${base}/api/config`, {
       method: "GET",
       headers: { Accept: "application/json" },

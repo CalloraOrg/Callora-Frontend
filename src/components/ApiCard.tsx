@@ -601,6 +601,8 @@ export default function ApiCard({
   onTagClick,
   activeTag,
   onBrowse: _onBrowse,
+  tabIndex = 0,
+  onFocus,
 }: {
   api?: APIItem;
   loading?: boolean;
@@ -609,6 +611,8 @@ export default function ApiCard({
   onTagClick?: (tag: string) => void;
   activeTag?: string | null;
   onBrowse?: () => void;
+  tabIndex?: number;
+  onFocus?: React.FocusEventHandler<HTMLElement>;
 }) {
   if (loading) {
     return <ApiCardSkeleton />;
@@ -800,10 +804,11 @@ function ApiCardContent({
     <article
       className={`preview-card api-marketplace-card${isCompact ? " api-card--compact" : ""}`}
       role="button"
-      tabIndex={0}
+      tabIndex={tabIndex}
       aria-label={`View details for ${api.name}`}
       aria-keyshortcuts="c"
       onClick={() => onViewDetails?.(api)}
+      onFocus={onFocus}
       onKeyDown={handleKeyDown}
       onContextMenu={handleContextMenu}
       onTouchStart={handleTouchStart}

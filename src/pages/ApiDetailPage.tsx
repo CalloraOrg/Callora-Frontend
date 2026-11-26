@@ -18,7 +18,7 @@ import { ApiDetailStickyTOC, type TocSection } from "../components/ApiDetailStic
 import { StickyTocErrorBoundary } from "../components/StickyTocErrorBoundary";
 import PricingTierTable, { type PricingTier } from "../components/PricingTierTable";
 import { PRICING_PLANS, cheapestPlan, type PricingPlanId } from "../utils/pricingTiers";
-import { copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
+import { buildPostmanApiCollection, copyToClipboard, getInsomniaImportUrl, getPostmanImportUrl } from "../utils/postman";
 import SubscribeButton from "../components/SubscribeButton";
 import StatusBadge, { apiStatusToVariant } from "../components/StatusBadge";
 import HealthTimeline from "../components/HealthTimeline";
@@ -592,6 +592,47 @@ export default function ApiDetailPage({ onBack }: Props) {
 
   const documentationEndpoints = useMemo(() => (api?.endpoints || []) as ApiEndpoint[], [api]);
 
+  const handleExportAllEndpoints = useCallback(() => {
+    if (!api || documentationEndpoints.length === 0) return;
+
+    try {
+      const collection = buildPostmanApiCollection({
+        name: api.name,
+        baseUrl: API_BASE_URL,
+        endpoints: documentationEndpoints.map((ep) => ({
+          method: ep.method,
+          path: ep.url,
+          name: ep.title,
+          group: deriveEndpointGroupLabel(ep),
+        })),
+      });
+
+      const slug =
+        (api.id || api.name || "api")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "") || "api";
+      const filename = `${slug}.postman_collection.json`;
+      const blob = new Blob([JSON.stringify(collection, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast(`Exported ${documentationEndpoints.length} endpoints to ${filename}`, "success");
+      setAssertiveAnnouncement(`Exported all endpoints as ${filename}`);
+    } catch {
+      showToast("Failed to export Postman collection", "error");
+      setAssertiveAnnouncement("Failed to export Postman collection");
+    }
+  }, [api, documentationEndpoints, showToast]);
+
   const endpointGroups = useMemo<EndpointGroupPreview[]>(() => {
     const groups = new Map<
       string,
@@ -947,9 +988,26 @@ export default function ApiDetailPage({ onBack }: Props) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="endpoint-section-header">
                         <h3 id="toc-endpoints">Available Endpoints</h3>
-                        <span style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)" }}>
-                          Base URL: <code>{API_BASE_URL}</code>
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "var(--mkt-space-md)", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "var(--mkt-font-size-sm)", color: "var(--muted)" }}>
+                            Base URL: <code>{API_BASE_URL}</code>
+                          </span>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            onClick={handleExportAllEndpoints}
+                            disabled={documentationEndpoints.length === 0}
+                            aria-label="Export all endpoints as Postman collection"
+                            title={
+                              documentationEndpoints.length === 0
+                                ? "No endpoints available to export"
+                                : "Download Postman v2.1 collection for all endpoints"
+                            }
+                          >
+                            <Icons.ExternalLink size={14} />
+                            <span>Export all endpoints</span>
+                          </button>
+                        </div>
                       </div>
 
                       {endpointGroups.length > 0 && <EndpointGroupHover groups={endpointGroups} />}
